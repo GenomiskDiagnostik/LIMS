@@ -2,7 +2,7 @@
 <html lang="da">
 <head>
 <meta charset="UTF-8">
-<title>GLIMS - Genetics LIMS</title>
+<title>GLIMS - Genetisk LIMS</title>
 <style>
 :root {
   font-family: "Segoe UI", Arial, sans-serif;
@@ -173,12 +173,12 @@ pre {
 <body>
 <header>
   <div>
-    <h1>GLIMS – Genetics Laboratory Information Management</h1>
+    <h1>GLIMS – Genetisk laboratorieinformationssystem</h1>
     <div id="statusBar">Initialiserer...</div>
   </div>
   <div>
     <button class="primary" id="demoDataBtn">Indlæs demo-data</button>
-    <button class="secondary" id="runTestsBtn">Kør tests</button>
+    <button class="secondary" id="runTestsBtn">Kør selvtest</button>
   </div>
 </header>
 <nav id="tabNav"></nav>
@@ -200,28 +200,28 @@ const state = {
   lastStatus: ''
 };
 const classificationMap = {
-  '1': {code:'LA6576-8', display:'Benign'},
-  '2': {code:'LA6577-6', display:'Likely benign'},
-  '3': {code:'LA4489-6', display:'VUS'},
-  '4': {code:'LA6668-3', display:'Likely pathogenic'},
-  '5': {code:'LA6708-8', display:'Pathogenic'}
+  '1': {code:'LA6576-8', display:'Godartet'},
+  '2': {code:'LA6577-6', display:'Sandsynligvis godartet'},
+  '3': {code:'LA4489-6', display:'Variant af ukendt betydning (VUS)'},
+  '4': {code:'LA6668-3', display:'Sandsynligvis patogen'},
+  '5': {code:'LA6708-8', display:'Patogen'}
 };
 const tabs = [
-  {id:'dashboard', label:'Dashboard'},
-  {id:'patients', label:'Patients'},
-  {id:'samples', label:'Samples'},
-  {id:'orders', label:'Orders'},
-  {id:'panels', label:'Assays/Panels'},
-  {id:'variants', label:'Variants'},
+  {id:'dashboard', label:'Overblik'},
+  {id:'patients', label:'Patienter'},
+  {id:'samples', label:'Prøver'},
+  {id:'orders', label:'Ordinationer'},
+  {id:'panels', label:'Analyser/Panels'},
+  {id:'variants', label:'Varianter'},
   {id:'variant_library', label:'Variantbibliotek'},
-  {id:'reports', label:'Reports'},
-  {id:'qc', label:'QC'},
+  {id:'reports', label:'Rapporter'},
+  {id:'qc', label:'Kvalitetskontrol'},
   {id:'responses', label:'Svar (MedCom)'},
-  {id:'users', label:'Users'},
-  {id:'audit', label:'Audit'},
-  {id:'db', label:'DB & Backup'},
-  {id:'admin', label:'Admin'},
-  {id:'tests', label:'Tests'}
+  {id:'users', label:'Brugere'},
+  {id:'audit', label:'Revision'},
+  {id:'db', label:'Database & Backup'},
+  {id:'admin', label:'Administration'},
+  {id:'tests', label:'Selvtest'}
 ];
 const schemaFields = {
   patients: ['id','mrn','name','gender','birth_date','notes','created_at','updated_at'],
@@ -407,7 +407,7 @@ async function saveBoundFile() {
   const data = await exportData();
   await writable.write(JSON.stringify(data, null, 2));
   await writable.close();
-  setStatus('Autosave gemt ' + new Date().toLocaleTimeString());
+  setStatus('Autogemt kl. ' + new Date().toLocaleTimeString());
 }
 async function manualSave() {
   try {
@@ -419,7 +419,7 @@ async function manualSave() {
 }
 async function bindDbFile() {
   try {
-    const [handle] = await window.showOpenFilePicker({multiple:false, types:[{description:'GLIMS data', accept:{'application/json':['.json']}}]});
+    const [handle] = await window.showOpenFilePicker({multiple:false, types:[{description:'GLIMS-data', accept:{'application/json':['.json']}}]});
     state.boundHandle = handle;
     setStatus('Fil tilknyttet: ' + handle.name);
     const file = await handle.getFile();
@@ -523,26 +523,26 @@ function renderDashboard(section) {
   <div class="panel">
     <h2>KPI'er</h2>
     <div class="flex">
-      <div><div class="badge">Patients</div><h3>${patients}</h3></div>
-      <div><div class="badge">Samples</div><h3>${samples}</h3></div>
-      <div><div class="badge">Orders</div><h3>${orders.length}</h3></div>
-      <div><div class="badge">Sequencing</div><h3>${seq}</h3></div>
-      <div><div class="badge">Analysis</div><h3>${analysis}</h3></div>
-      <div><div class="badge">Reported</div><h3>${reported}</h3></div>
-      <div><div class="badge">Variants</div><h3>${variants.length}</h3></div>
+      <div><div class="badge">Patienter</div><h3>${patients}</h3></div>
+      <div><div class="badge">Prøver</div><h3>${samples}</h3></div>
+      <div><div class="badge">Ordinationer</div><h3>${orders.length}</h3></div>
+      <div><div class="badge">Sekventering</div><h3>${seq}</h3></div>
+      <div><div class="badge">Analyse</div><h3>${analysis}</h3></div>
+      <div><div class="badge">Rapporteret</div><h3>${reported}</h3></div>
+      <div><div class="badge">Varianter</div><h3>${variants.length}</h3></div>
     </div>
   </div>
   <div class="panel">
     <h2>Seneste ordrer</h2>
     <table>
-      <thead><tr><th>ID</th><th>Patient</th><th>Sample</th><th>Panel</th><th>Status</th><th>Updated</th></tr></thead>
+      <thead><tr><th>ID</th><th>Patient</th><th>Prøve</th><th>Panel</th><th>Status</th><th>Opdateret</th></tr></thead>
       <tbody>
         ${recentOrders.map(o => `<tr><td>${o.id}</td><td>${esc(getName('patients', o.patient_id))}</td><td>${o.sample_id || ''}</td><td>${getName('panels', o.panel_id)}</td><td>${esc(o.status || '')}</td><td>${esc(o.updated_at||'')}</td></tr>`).join('') || '<tr><td colspan="6">Ingen</td></tr>'}
       </tbody>
     </table>
   </div>
   <div class="panel">
-    <h2>Audit</h2>
+    <h2>Revision</h2>
     <table>
       <thead><tr><th>Tid</th><th>Bruger</th><th>Handling</th><th>Entitet</th><th>ID</th></tr></thead>
       <tbody>
@@ -605,12 +605,17 @@ function renderPatients(section) {
   const searchInput = section.querySelector('#patientSearch');
   const deleteBtn = section.querySelector('#patientDelete');
   const clearBtn = section.querySelector('#patientClear');
+  const genderMap = {male:'Mand', female:'Kvinde', other:'Andet'};
   const renderRows = () => {
     const term = searchInput.value.trim().toLowerCase();
     tbody.innerHTML = list.filter(p => {
       if (!term) return true;
-      return [p.name, p.mrn, p.gender].some(v => (v||'').toLowerCase().includes(term));
-    }).map(p => `<tr data-id="${p.id}"><td>${p.id}</td><td>${esc(p.mrn)}</td><td>${esc(p.name)}</td><td>${esc(p.gender||'')}</td><td>${esc(p.birth_date||'')}</td></tr>`).join('');
+      const displayGender = genderMap[p.gender];
+      return [p.name, p.mrn, p.gender, displayGender].some(v => (v||'').toLowerCase().includes(term));
+    }).map(p => {
+      const gender = genderMap[p.gender] || p.gender || '';
+      return `<tr data-id="${p.id}"><td>${p.id}</td><td>${esc(p.mrn)}</td><td>${esc(p.name)}</td><td>${esc(gender)}</td><td>${esc(p.birth_date||'')}</td></tr>`;
+    }).join('');
   };
   renderRows();
   searchInput.addEventListener('input', renderRows);
@@ -659,14 +664,14 @@ function renderSamples(section) {
       <div>
         <label for="sampleSearch">Søg</label>
         <input id="sampleSearch" type="search" placeholder="ID/status...">
-        <table><thead><tr><th>ID</th><th>Patient</th><th>Type</th><th>Status</th><th>Collected</th></tr></thead><tbody></tbody></table>
+        <table><thead><tr><th>ID</th><th>Patient</th><th>Prøvetype</th><th>Status</th><th>Opsamlet</th></tr></thead><tbody></tbody></table>
       </div>
       <div>
-        <h2>Sample</h2>
+        <h2>Prøve</h2>
         <form id="sampleForm">
           <input type="hidden" name="id">
           <label>Patient<select name="patient_id" required>${patients.map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.mrn)})</option>`).join('')}</select></label>
-          <label>Type<input name="sample_type" required></label>
+          <label>Prøvetype<input name="sample_type" required></label>
           <label>Status<input name="status"></label>
           <label>Opsamlet<input type="datetime-local" name="collected_at"></label>
           <label>Noter<textarea name="notes"></textarea></label>
@@ -801,18 +806,18 @@ function renderOrders(section) {
       <div>
         <label for="orderSearch">Søg</label>
         <input id="orderSearch" type="search" placeholder="Status/ID...">
-        <table><thead><tr><th>ID</th><th>Patient</th><th>Sample</th><th>Panel</th><th>Status</th><th>Bestilt</th></tr></thead><tbody></tbody></table>
+        <table><thead><tr><th>ID</th><th>Patient</th><th>Prøve</th><th>Panel</th><th>Status</th><th>Bestilt</th></tr></thead><tbody></tbody></table>
       </div>
       <div>
-        <h2>Order</h2>
+        <h2>Ordination</h2>
         <form id="orderForm">
           <input type="hidden" name="id">
           <label>Patient<select name="patient_id" required>${patients.map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.mrn)})</option>`).join('')}</select></label>
-          <label>Sample<select name="sample_id" required>${samples.map(s => `<option value="${s.id}">${s.id} – ${esc(getName('patients', s.patient_id))}</option>`).join('')}</select></label>
+          <label>Prøve<select name="sample_id" required>${samples.map(s => `<option value="${s.id}">${s.id} – ${esc(getName('patients', s.patient_id))}</option>`).join('')}</select></label>
           <label>Panel<select name="panel_id"><option value="">-</option>${panels.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label>
-          <label>Kliniker<input name="clinician"></label>
+          <label>Rekvirent<input name="clinician"></label>
           <label>Status<input name="status"></label>
-          <label>Bestilt<input type="datetime-local" name="ordered_at"></label>
+          <label>Bestillingstidspunkt<input type="datetime-local" name="ordered_at"></label>
           <div class="btn-row">
             <button class="primary" type="submit">Gem</button>
             <button class="secondary" type="button" id="orderClear">Ny</button>
@@ -877,18 +882,18 @@ function renderVariants(section) {
       <div>
         <label for="variantSearch">Søg</label>
         <input id="variantSearch" type="search" placeholder="Gen/HGVS...">
-        <table><thead><tr><th>ID</th><th>Order</th><th>Gen</th><th>HGVS c.</th><th>Klasse</th><th>Kriterier</th></tr></thead><tbody></tbody></table>
+        <table><thead><tr><th>ID</th><th>Ordination</th><th>Gen</th><th>HGVS c.</th><th>Klasse</th><th>Kriterier</th></tr></thead><tbody></tbody></table>
       </div>
       <div>
         <h2>Variant</h2>
         <form id="variantForm">
           <input type="hidden" name="id">
-          <label>Order<select name="order_id" required>${orders.map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}</select></label>
+          <label>Ordination<select name="order_id" required>${orders.map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}</select></label>
           <label>Gen<input name="gene" required></label>
-          <label>Transcript<input name="transcript"></label>
+          <label>Transkript<input name="transcript"></label>
           <label>HGVS c.<input name="hgvs_c"></label>
           <label>HGVS p.<input name="hgvs_p"></label>
-          <label>Zygosity<input name="zygosity"></label>
+          <label>Zygositet<input name="zygosity"></label>
           <label>ACMG-klasse<select name="classification" required><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></label>
           <label>Kriterier<input name="criteria" placeholder="PM1,PP3..."></label>
           <label>Allelfrekvens<input name="af" type="number" step="0.0001"></label>
@@ -965,7 +970,7 @@ function renderVariants(section) {
     await addRecord('variant_library', libraryEntry);
     await loadStore('variant_library');
     renderTab('variant_library');
-    alert('Tilføjet til bibliotek');
+    alert('Variant tilføjet til biblioteket');
   });
 }
 function renderVariantLibrary(section) {
@@ -973,8 +978,8 @@ function renderVariantLibrary(section) {
   section.innerHTML = `
   <div class="panel">
     <label for="libSearch">Søg</label>
-    <input id="libSearch" type="search" placeholder="Gene/HGVS...">
-    <table><thead><tr><th>ID</th><th>Gen</th><th>HGVS</th><th>Klasse</th><th>Kriterier</th><th>Evidence</th><th>Curated by</th></tr></thead><tbody></tbody></table>
+    <input id="libSearch" type="search" placeholder="Gen/HGVS...">
+    <table><thead><tr><th>ID</th><th>Gen</th><th>HGVS</th><th>Klasse</th><th>Kriterier</th><th>Evidens</th><th>Kurateret af</th></tr></thead><tbody></tbody></table>
   </div>`;
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#libSearch');
@@ -1002,14 +1007,14 @@ function renderReports(section) {
       <div>
         <label for="reportSearch">Søg</label>
         <input id="reportSearch" type="search" placeholder="Status...">
-        <table><thead><tr><th>ID</th><th>Order</th><th>Status</th><th>Issued</th></tr></thead><tbody></tbody></table>
+        <table><thead><tr><th>ID</th><th>Ordination</th><th>Status</th><th>Udstedt</th></tr></thead><tbody></tbody></table>
       </div>
       <div>
         <h2>Rapport</h2>
         <form id="reportForm">
           <input type="hidden" name="id">
-          <label>Order<select name="order_id" required>${orders.map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}</select></label>
-          <label>Status<select name="status"><option value="draft">Draft</option><option value="final">Final</option><option value="amended">Amended</option></select></label>
+          <label>Ordination<select name="order_id" required>${orders.map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}</select></label>
+          <label>Status<select name="status"><option value="draft">Udkast</option><option value="final">Endelig</option><option value="amended">Ændret</option></select></label>
           <label>Udstedt<input type="datetime-local" name="issued_at"></label>
           <label>Fund<textarea name="findings"></textarea></label>
           <label>Resumé<textarea name="summary"></textarea></label>
@@ -1017,7 +1022,7 @@ function renderReports(section) {
             <button class="primary" type="submit">Gem</button>
             <button class="secondary" type="button" id="reportClear">Ny</button>
             <button class="danger" type="button" id="reportDelete">Slet</button>
-            <button class="secondary" type="button" id="reportPreview">Print/preview</button>
+            <button class="secondary" type="button" id="reportPreview">Udskriv/forhåndsvis</button>
           </div>
         </form>
       </div>
@@ -1026,9 +1031,18 @@ function renderReports(section) {
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#reportSearch');
   const form = section.querySelector('#reportForm');
+  const statusMap = {draft:'Udkast', final:'Endelig', amended:'Ændret'};
   const renderRows = () => {
     const term = search.value.toLowerCase();
-    tbody.innerHTML = list.filter(r => !term || (r.status||'').toLowerCase().includes(term)).map(r => `<tr data-id="${r.id}"><td>${r.id}</td><td>${r.order_id}</td><td>${esc(r.status||'')}</td><td>${esc(r.issued_at||'')}</td></tr>`).join('');
+    tbody.innerHTML = list.filter(r => {
+      if (!term) return true;
+      const raw = (r.status||'').toLowerCase();
+      const display = (statusMap[r.status] || r.status || '').toLowerCase();
+      return raw.includes(term) || display.includes(term);
+    }).map(r => {
+      const displayStatus = statusMap[r.status] || r.status || '';
+      return `<tr data-id="${r.id}"><td>${r.id}</td><td>${r.order_id}</td><td>${esc(displayStatus)}</td><td>${esc(r.issued_at||'')}</td></tr>`;
+    }).join('');
   };
   renderRows();
   search.addEventListener('input', renderRows);
@@ -1083,9 +1097,9 @@ function buildReportHtml(orderId, reportData) {
   const rows = variants.map(v => `<tr><td>${esc(v.gene)}</td><td>${esc(v.hgvs_c||'')}</td><td>${esc(v.hgvs_p||'')}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(v.af??'')}</td><td>${esc(v.interpretation||'')}</td></tr>`).join('') || '<tr><td colspan="7">Ingen fund</td></tr>';
   return `
   <h1>Diagnostisk rapport</h1>
-  <p><strong>Order:</strong> ${orderId}</p>
+  <p><strong>Ordination:</strong> ${orderId}</p>
   <p><strong>Patient:</strong> ${esc(patient?.name||'')} (${esc(patient?.mrn||'')})</p>
-  <p><strong>Sample:</strong> ${esc(sample?.sample_type||'')} (${sample?.id||''})</p>
+  <p><strong>Prøve:</strong> ${esc(sample?.sample_type||'')} (${sample?.id||''})</p>
   <p><strong>Status:</strong> ${esc(reportData.status||'')}</p>
   <p><strong>Udstedt:</strong> ${esc(reportData.issued_at||'')}</p>
   <h2>Resumé</h2>
@@ -1103,17 +1117,17 @@ function renderQC(section) {
     <div class="flex">
       <div>
         <label for="qcSearch">Søg</label>
-        <input id="qcSearch" type="search" placeholder="Metric...">
-        <table><thead><tr><th>ID</th><th>Sample</th><th>Metric</th><th>Value</th><th>Unit</th></tr></thead><tbody></tbody></table>
+        <input id="qcSearch" type="search" placeholder="Måling...">
+        <table><thead><tr><th>ID</th><th>Prøve</th><th>Måling</th><th>Værdi</th><th>Enhed</th></tr></thead><tbody></tbody></table>
       </div>
       <div>
-        <h2>QC Metric</h2>
+        <h2>Kvalitetsmåling</h2>
         <form id="qcForm">
           <input type="hidden" name="id">
-          <label>Sample<select name="sample_id" required>${samples.map(s => `<option value="${s.id}">${s.id} – ${esc(getName('patients', s.patient_id))}</option>`).join('')}</select></label>
-          <label>Metric<input name="metric" required></label>
-          <label>Value<input name="value" type="number" step="0.0001" required></label>
-          <label>Unit<input name="unit"></label>
+          <label>Prøve<select name="sample_id" required>${samples.map(s => `<option value="${s.id}">${s.id} – ${esc(getName('patients', s.patient_id))}</option>`).join('')}</select></label>
+          <label>Måling<input name="metric" required></label>
+          <label>Værdi<input name="value" type="number" step="0.0001" required></label>
+          <label>Enhed<input name="unit"></label>
           <label>Noter<textarea name="notes"></textarea></label>
           <div class="btn-row">
             <button class="primary" type="submit">Gem</button>
@@ -1175,16 +1189,16 @@ function renderResponses(section) {
         <input type="file" id="fhirImport" accept="application/json" style="display:none;">
       </label>
     </div>
-    <table><thead><tr><th>Tid</th><th>Sender</th><th>Patient</th><th>Report</th><th>Varianter</th></tr></thead><tbody>
+    <table><thead><tr><th>Tid</th><th>Sender</th><th>Patient</th><th>Rapport</th><th>Varianter</th></tr></thead><tbody>
       ${list.map(r => `<tr><td>${esc(r.ts)}</td><td>${esc(r.sender||'')}</td><td>${esc(r.patient||'')}</td><td>${esc(r.diagnostic_report_id||'')}</td><td>${esc(r.variant_count||0)}</td></tr>`).join('') || '<tr><td colspan="5">Ingen svar</td></tr>'}
     </tbody></table>
   </div>
   <div class="panel">
-    <h2>Outbound svar</h2>
+    <h2>Udgående MedCom-svar</h2>
     <label>Vælg ordre<select id="fhirOrderSelect"><option value="">Vælg...</option>${getCached('orders').map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}</select></label>
     <div class="btn-row">
-      <button class="primary" id="generateFhir">Generér FHIR Bundle</button>
-      <button class="secondary" id="previewFhir">Preview</button>
+      <button class="primary" id="generateFhir">Generér FHIR-bundle</button>
+      <button class="secondary" id="previewFhir">Forhåndsvis</button>
     </div>
     <pre id="fhirPreview" style="display:none"></pre>
   </div>`;
@@ -1226,7 +1240,7 @@ async function exportFhir(section, download) {
 }
 function buildFhirBundle(orderId) {
   const order = findById('orders', orderId);
-  if (!order) throw new Error('Order ikke fundet');
+  if (!order) throw new Error('Ordination ikke fundet');
   const patient = findById('patients', Number(order.patient_id));
   const sample = findById('samples', Number(order.sample_id));
   const panel = order.panel_id ? findById('panels', Number(order.panel_id)) : null;
@@ -1363,14 +1377,14 @@ function renderUsers(section) {
       <div>
         <label for="userSearch">Søg</label>
         <input id="userSearch" type="search" placeholder="Navn/mail...">
-        <table><thead><tr><th>ID</th><th>Navn</th><th>Email</th><th>Rolle</th></tr></thead><tbody></tbody></table>
+        <table><thead><tr><th>ID</th><th>Navn</th><th>E-mail</th><th>Rolle</th></tr></thead><tbody></tbody></table>
       </div>
       <div>
         <h2>Bruger</h2>
         <form id="userForm">
           <input type="hidden" name="id">
           <label>Navn<input name="name" required></label>
-          <label>Email<input type="email" name="email" required></label>
+          <label>E-mail<input type="email" name="email" required></label>
           <label>Rolle<input name="role"></label>
           <div class="btn-row">
             <button class="primary" type="submit">Gem</button>
@@ -1427,7 +1441,7 @@ function renderAudit(section) {
   section.innerHTML = `
   <div class="panel">
     <table><thead><tr><th>Tid</th><th>Bruger</th><th>Handling</th><th>Entitet</th><th>ID</th><th>Før</th><th>Efter</th></tr></thead><tbody>
-      ${list.map(a => `<tr><td>${esc(a.ts)}</td><td>${esc(a.user)}</td><td>${esc(a.action)}</td><td>${esc(a.entity)}</td><td>${esc(a.entity_id??'')}</td><td>${esc(a.before||'')}</td><td>${esc(a.after||'')}</td></tr>`).join('') || '<tr><td colspan="7">Ingen audit</td></tr>'}
+      ${list.map(a => `<tr><td>${esc(a.ts)}</td><td>${esc(a.user)}</td><td>${esc(a.action)}</td><td>${esc(a.entity)}</td><td>${esc(a.entity_id??'')}</td><td>${esc(a.before||'')}</td><td>${esc(a.after||'')}</td></tr>`).join('') || '<tr><td colspan="7">Ingen revisionsposter</td></tr>'}
     </tbody></table>
   </div>`;
 }
@@ -1443,14 +1457,14 @@ function renderDbTab(section) {
       <button class="secondary" id="bindFile">Knyt/åbn DB-fil...</button>
       <button class="secondary" id="saveNow">Gem nu</button>
       <label style="display:flex;align-items:center;gap:0.5rem;">
-        <input type="checkbox" id="autosaveToggle" ${state.autosave?'checked':''}> Autosave
+        <input type="checkbox" id="autosaveToggle" ${state.autosave?'checked':''}> Autogem
       </label>
     </div>
   </div>
   <div class="panel">
     <h2>Backup</h2>
     <div class="btn-row">
-      <button class="secondary" id="downloadBackup">Download backup (JSON)</button>
+      <button class="secondary" id="downloadBackup">Hent backup (JSON)</button>
       <label class="secondary" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.4rem 0.8rem;border-radius:0.5rem;cursor:pointer;">Gendan fra backup<input type="file" id="restoreFile" accept="application/json" style="display:none;"></label>
     </div>
   </div>`;
@@ -1458,7 +1472,7 @@ function renderDbTab(section) {
   section.querySelector('#saveNow').addEventListener('click', manualSave);
   section.querySelector('#autosaveToggle').addEventListener('change', e => {
     state.autosave = e.target.checked;
-    setStatus('Autosave ' + (state.autosave ? 'aktiveret' : 'deaktiveret'));
+    setStatus('Autogemning ' + (state.autosave ? 'aktiveret' : 'deaktiveret'));
   });
   section.querySelector('#downloadBackup').addEventListener('click', downloadBackup);
   section.querySelector('#restoreFile').addEventListener('change', async e => {
@@ -1478,9 +1492,9 @@ function renderAdmin(section) {
   section.innerHTML = `
   <div class="panel">
     <div class="btn-row">
-      <button class="primary" id="downloadSql">Download glims.sql</button>
+      <button class="primary" id="downloadSql">Hent glims.sql</button>
       <button class="secondary" id="showSchema">Vis skema</button>
-      <button class="secondary" id="downloadZip">Download ZIP</button>
+      <button class="secondary" id="downloadZip">Hent ZIP</button>
     </div>
     <textarea id="schemaText" style="width:100%;min-height:200px;margin-top:1rem;display:none;"></textarea>
   </div>`;
@@ -1509,7 +1523,7 @@ function renderAdmin(section) {
 function renderTestsTab(section) {
   section.innerHTML = `
   <div class="panel">
-    <h2>Sanity tests</h2>
+    <h2>Selvtest</h2>
     <table><thead><tr><th>Test</th><th>Status</th><th>Detaljer</th></tr></thead><tbody id="testsBody"></tbody></table>
   </div>`;
 }
@@ -1521,37 +1535,37 @@ async function runTests() {
   }
   const results = [];
   try {
-    const patientId = await addRecord('patients', {mrn:'TEST1', name:'Test Patient', gender:'other', birth_date:'1980-01-01', notes:''});
+    const patientId = await addRecord('patients', {mrn:'TEST1', name:'Testpatient', gender:'other', birth_date:'1980-01-01', notes:''});
     const patient = findById('patients', patientId);
-    results.push(['Oprettelse/udlæsning patient', patient?.name === 'Test Patient', `Navn: ${patient?.name}`]);
-    const sampleId = await addRecord('samples', {patient_id:patientId, sample_type:'Blood', status:'received', collected_at:new Date().toISOString(), notes:''});
-    const orderId = await addRecord('orders', {patient_id:patientId, sample_id:sampleId, panel_id:null, clinician:'Tester', status:'analysis', ordered_at:new Date().toISOString()});
-    results.push(['Oprettelse ordre med FK', !!findById('orders', orderId), `Order ${orderId}`]);
-    const reportHtml = buildReportHtml(orderId, {status:'draft', issued_at:new Date().toISOString(), summary:'Test', findings:'None'});
+    results.push(['Oprettelse/udlæsning patient', patient?.name === 'Testpatient', `Navn: ${patient?.name}`]);
+    const sampleId = await addRecord('samples', {patient_id:patientId, sample_type:'Blod', status:'received', collected_at:new Date().toISOString(), notes:''});
+    const orderId = await addRecord('orders', {patient_id:patientId, sample_id:sampleId, panel_id:null, clinician:'Testperson', status:'analysis', ordered_at:new Date().toISOString()});
+    results.push(['Oprettelse ordination med FK', !!findById('orders', orderId), `Ordination ${orderId}`]);
+    const reportHtml = buildReportHtml(orderId, {status:'draft', issued_at:new Date().toISOString(), summary:'Test', findings:'Ingen'});
     results.push(['Generering af rapport HTML', reportHtml.includes('Diagnostisk rapport'), 'HTML længde ' + reportHtml.length]);
     const bundle = buildFhirBundle(orderId);
     const hasResources = ['MessageHeader','Patient','DiagnosticReport','Observation'].every(type => (bundle.entry||[]).some(e => e.resource.resourceType === type));
-    results.push(['Outbound FHIR bundle indhold', hasResources, `Entries: ${(bundle.entry||[]).length}`]);
+    results.push(['Udgående FHIR-bundle indhold', hasResources, `Ressourcer: ${(bundle.entry||[]).length}`]);
     const files = await buildZipFiles();
     const zip = createZip(files);
     const view = new DataView(zip.buffer);
     const centralDirOffset = view.getUint32(zip.length - 6, true);
-    results.push(['ZIP bytes genereret', centralDirOffset > 0, `Central dir offset: ${centralDirOffset}`]);
+    results.push(['ZIP-bytes genereret', centralDirOffset > 0, `Centraldir-offset: ${centralDirOffset}`]);
     const sql = await generateSqlDump();
-    results.push(['SQL dump indeholder variants criteria', sql.includes('`criteria`'), 'Length ' + sql.length]);
-    results.push(['Filbinding API', 'showOpenFilePicker' in window || 'showSaveFilePicker' in window, 'File access ' + (('showOpenFilePicker' in window) ? 'tilgængelig' : 'ukendt')]);
+    results.push(['SQL-dump indeholder variants.criteria', sql.includes('`criteria`'), 'Længde ' + sql.length]);
+    results.push(['Filbinding API', 'showOpenFilePicker' in window || 'showSaveFilePicker' in window, 'Filadgang ' + (('showOpenFilePicker' in window) ? 'tilgængelig' : 'ukendt')]);
   } catch (err) {
     console.error(err);
     results.push(['Testfejl', false, err.message]);
   }
-  tbody.innerHTML = results.map(([name, pass, detail]) => `<tr><td>${esc(name)}</td><td>${pass ? 'PASS' : 'FAIL'}</td><td>${esc(detail||'')}</td></tr>`).join('');
+  tbody.innerHTML = results.map(([name, pass, detail]) => `<tr><td>${esc(name)}</td><td>${pass ? 'OK' : 'FEJL'}</td><td>${esc(detail||'')}</td></tr>`).join('');
   await loadAllStores();
   renderAll();
 }
 async function buildZipFiles() {
   const backup = JSON.stringify(await exportData(), null, 2);
   const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
-  const readme = 'GLIMS - lokal single-file LIMS\n\nÅbn glims.html i en moderne browser.\n';
+  const readme = 'GLIMS - lokalt enkeltfil-LIMS\n\nÅbn glims.html i en moderne browser.\n';
   return [
     {name:'glims.html', data:utf8Encode(html)},
     {name:'glims-backup.json', data:utf8Encode(backup)},
@@ -1676,13 +1690,13 @@ async function loadDemoData() {
   if (!getCached('patients').length) {
     const p1 = await addRecord('patients', {mrn:'MRN001', name:'Anna Jensen', gender:'female', birth_date:'1985-03-12', notes:'Familiehistorik positiv'});
     const p2 = await addRecord('patients', {mrn:'MRN002', name:'Lars Petersen', gender:'male', birth_date:'1978-11-03', notes:''});
-    const s1 = await addRecord('samples', {patient_id:p1, sample_type:'Blood', status:'sequencing', collected_at:new Date().toISOString(), notes:''});
-    const s2 = await addRecord('samples', {patient_id:p2, sample_type:'Saliva', status:'analysis', collected_at:new Date().toISOString(), notes:''});
+    const s1 = await addRecord('samples', {patient_id:p1, sample_type:'Blod', status:'sequencing', collected_at:new Date().toISOString(), notes:''});
+    const s2 = await addRecord('samples', {patient_id:p2, sample_type:'Spyt', status:'analysis', collected_at:new Date().toISOString(), notes:''});
     const panel = await addRecord('panels', {name:'Onko-panel', description:'50 gener'});
     const o1 = await addRecord('orders', {patient_id:p1, sample_id:s1, panel_id:panel, clinician:'Dr. Holm', status:'analysis', ordered_at:new Date().toISOString()});
     const o2 = await addRecord('orders', {patient_id:p2, sample_id:s2, panel_id:panel, clinician:'Dr. Holm', status:'reported', ordered_at:new Date().toISOString()});
-    await addRecord('variants', {order_id:o1, gene:'BRCA1', transcript:'NM_007294.3', hgvs_c:'c.5266dupC', hgvs_p:'p.Gln1756Profs', zygosity:'heterozygous', classification:'5', criteria:'PVS1,PS3,PM2,PP3', af:0.0001, interpretation:'Patogen variant med høj risiko'});
-    await addRecord('qc', {sample_id:s1, metric:'Coverage', value:98.5, unit:'%', notes:''});
+    await addRecord('variants', {order_id:o1, gene:'BRCA1', transcript:'NM_007294.3', hgvs_c:'c.5266dupC', hgvs_p:'p.Gln1756Profs', zygosity:'heterozygot', classification:'5', criteria:'PVS1,PS3,PM2,PP3', af:0.0001, interpretation:'Patogen variant med høj risiko'});
+    await addRecord('qc', {sample_id:s1, metric:'Dækning', value:98.5, unit:'%', notes:''});
     await addRecord('reports', {order_id:o2, findings:'Ingen klinisk signifikante varianter', summary:'Negativ rapport', status:'final', issued_at:new Date().toISOString()});
     await addRecord('users', {name:'Admin', email:'admin@example.com', role:'Administrator'});
   } else {
