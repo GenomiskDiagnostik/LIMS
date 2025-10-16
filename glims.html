@@ -236,12 +236,270 @@ const schemaFields = {
   variant_library: ['id','gene','transcript','hgvs_c','hgvs_p','classification','criteria','evidence','condition','inheritance','curated_by','last_review','created_at','updated_at'],
   responses: ['id','ts','sender','patient','diagnostic_report_id','variant_count','variants','raw','created_at','updated_at']
 };
+const tooltipCatalog = {
+  tabs: {
+    dashboard: 'Viser nøgletal, seneste ordinationer og seneste revisionshændelser.',
+    patients: 'Administrer patientoplysninger og søg i patientlisten.',
+    samples: 'Registrer og vedligehold prøver knyttet til patienter.',
+    orders: 'Administrer analyseordinationer og deres status.',
+    panels: 'Vedligehold assays og analysepaneler.',
+    variants: 'Registrer genetiske varianter for ordinationer.',
+    variant_library: 'Se og vedligehold det kuraterede variantbibliotek.',
+    reports: 'Opret og redigér laboratoriesvar og rapporter.',
+    qc: 'Registrer kvalitetskontrolmålinger for prøver.',
+    responses: 'Importer og gennemse MedCom/FHIR-svar.',
+    users: 'Administrer GLIMS-brugere og roller.',
+    audit: 'Gennemgå revisionsloggen for alle ændringer.',
+    db: 'Håndter lokal databasefil, backup og autogem.',
+    admin: 'Tilgå administrative værktøjer, SQL og ZIP-eksport.',
+    tests: 'Kør indbyggede selvtests og se resultater.'
+  },
+  metrics: {
+    'Patienter': 'Antal registrerede patienter i databasen.',
+    'Prøver': 'Antal registrerede laboratorieprøver.',
+    'Ordinationer': 'Samlet antal aktive og historiske ordinationer.',
+    'Sekventering': 'Ordinationer der er markeret i sekventeringsfasen.',
+    'Analyse': 'Ordinationer under bioinformatisk analyse.',
+    'Rapporteret': 'Ordinationer med endelig rapport.',
+    'Varianter': 'Antal registrerede genetiske varianter.'
+  },
+  headers: {
+    'ID': 'Intern databaseidentifikator for posten.',
+    'MRN': 'Medicinsk journalnummer eller CPR-reference.',
+    'Navn': 'Navnet på patient, panel eller bruger.',
+    'Køn': 'Patientens registrerede køn.',
+    'Født': 'Patientens fødselsdato.',
+    'Patient': 'Tilknyttet patient til posten.',
+    'Prøve': 'Prøve-ID eller beskrivelse.',
+    'Prøvetype': 'Type af biologisk materiale.',
+    'Panel': 'Navn på det analyserede panel.',
+    'Status': 'Aktuel status for posten.',
+    'Opdateret': 'Seneste ændringstidspunkt.',
+    'Bestilt': 'Tidspunkt for oprettelse af ordinationen.',
+    'Opsamlet': 'Dato og tidspunkt for prøveindsamling.',
+    'Ordination': 'Reference til ordinationen.',
+    'Gen': 'Genet hvor varianten er fundet.',
+    'HGVS c.': 'HGVS-beskrivelse på cDNA-niveau.',
+    'HGVS p.': 'HGVS-beskrivelse på protein-niveau.',
+    'Klasse': 'ACMG-klassifikation 1–5.',
+    'Kriterier': 'Anvendte ACMG-kriterier.',
+    'HGVS': 'HGVS-beskrivelse for varianten.',
+    'Evidens': 'Kurateret evidens for varianten.',
+    'Kurateret af': 'Navn på ansvarlig kurator.',
+    'Beskrivelse': 'Uddybende beskrivelse.',
+    'Måling': 'Navn på kvalitetskontrolmålingen.',
+    'Værdi': 'Målt værdi.',
+    'Enhed': 'Måleenhed for værdien.',
+    'Tid': 'Tidsstempel for hændelsen.',
+    'Handling': 'Registreret handlingstype.',
+    'Entitet': 'Tabellen som blev ændret.',
+    'Før': 'Data før ændringen.',
+    'Efter': 'Data efter ændringen.',
+    'Sender': 'Afsendende organisation eller system.',
+    'Rapport': 'DiagnosticReport-identifikator.',
+    'Varianter': 'Antal varianter i posten.',
+    'Udstedt': 'Tidspunkt hvor rapporten blev udsendt.',
+    'Test': 'Navn på selvtesten.',
+    'Detaljer': 'Supplerende oplysninger til testen.'
+  },
+  search: {
+    patientSearch: 'Filtrer patientlisten efter navn, MRN eller køn.',
+    sampleSearch: 'Filtrer prøver efter ID, status eller type.',
+    panelSearch: 'Find paneler efter navn.',
+    orderSearch: 'Søg efter ordination ud fra status eller ID.',
+    variantSearch: 'Søg efter varianter baseret på gen eller HGVS.',
+    libSearch: 'Filtrer variantbiblioteket efter gen eller HGVS.',
+    reportSearch: 'Find rapporter ved at søge på status.',
+    qcSearch: 'Søg efter kvalitetsmålinger.',
+    userSearch: 'Søg brugere på navn, e-mail eller rolle.'
+  },
+  forms: {
+    patientForm: {
+      mrn: 'Patientens MRN/CPR til entydig identifikation.',
+      name: 'Patientens fulde navn som angivet i journalen.',
+      gender: 'Registreret køn for patienten.',
+      birth_date: 'Patientens fødselsdato (ÅÅÅÅ-MM-DD).',
+      notes: 'Evt. kliniske noter om patienten.'
+    },
+    sampleForm: {
+      patient_id: 'Vælg hvilken patient prøven tilhører.',
+      sample_type: 'Angiv hvilken type materiale der er indsamlet.',
+      status: 'Prøvens aktuelle laboratoriestatus.',
+      collected_at: 'Dato og tidspunkt for prøveindsamling.',
+      notes: 'Evt. bemærkninger til prøven.'
+    },
+    panelForm: {
+      name: 'Navn på analysepanelet eller assay.',
+      description: 'Beskriv kort panelets indhold og formål.'
+    },
+    orderForm: {
+      patient_id: 'Vælg patienten ordinationen vedrører.',
+      sample_id: 'Vælg den prøve der analyseres.',
+      panel_id: 'Vælg panel for analysen (valgfrit).',
+      clinician: 'Navn på rekvirerende kliniker eller afdeling.',
+      status: 'Ordinationens arbejdsgangstatus.',
+      ordered_at: 'Tidspunkt for oprettelse af ordinationen.'
+    },
+    variantForm: {
+      order_id: 'Ordination som varianten er registreret på.',
+      gene: 'Gen-symbol for den påviste variant.',
+      transcript: 'Reference-transkript (fx NM_).',
+      hgvs_c: 'HGVS-beskrivelse på cDNA-niveau.',
+      hgvs_p: 'HGVS-beskrivelse på protein-niveau.',
+      zygosity: 'Zygositetsstatus (fx heterozygot).',
+      classification: 'ACMG-klassifikation 1 (godartet) – 5 (patogen).',
+      criteria: 'Anfør anvendte ACMG-kriterier, adskilt af komma.',
+      af: 'Allelfrekvens eller observationsfrekvens.',
+      interpretation: 'Klinisk tolkning og evidens for varianten.'
+    },
+    reportForm: {
+      order_id: 'Ordinationen som rapporten beskriver.',
+      status: 'Rapportstatus (udkast, endelig eller ændret).',
+      issued_at: 'Dato og tidspunkt for rapportens udsendelse.',
+      findings: 'Detaljerede fund til rapportens bilag.',
+      summary: 'Kort klinisk resumé til modtageren.'
+    },
+    qcForm: {
+      sample_id: 'Vælg den prøve QC-målingen relaterer til.',
+      metric: 'Navn på kvalitetskontrolparameteren.',
+      value: 'Målt værdi for QC-parameteren.',
+      unit: 'Måleenhed (fx %, ng/µl).',
+      notes: 'Supplerende noter om målingen.'
+    },
+    userForm: {
+      name: 'Brugerens fulde navn.',
+      email: 'Brugerens arbejds-e-mailadresse.',
+      role: 'Brugerens rolle eller funktion i laboratoriet.'
+    }
+  },
+  buttons: {
+    demoDataBtn: 'Indlæser et demodatasæt til hurtig afprøvning.',
+    runTestsBtn: 'Kører den indbyggede selvtest og viser resultater.',
+    patientClear: 'Ryd formularen for at registrere en ny patient.',
+    patientDelete: 'Slet den valgte patient permanent.',
+    sampleClear: 'Ryd formularen for at registrere en ny prøve.',
+    sampleDelete: 'Slet den valgte prøve.',
+    panelClear: 'Ryd formularen for at oprette et nyt panel.',
+    panelDelete: 'Slet det valgte panel.',
+    orderClear: 'Ryd formularen for at oprette en ny ordination.',
+    orderDelete: 'Slet den valgte ordination.',
+    variantClear: 'Ryd formularen for at registrere en ny variant.',
+    variantDelete: 'Slet den valgte variant.',
+    variantToLibrary: 'Tilføj varianten til det kuraterede bibliotek.',
+    reportClear: 'Ryd formularen for at skrive en ny rapport.',
+    reportDelete: 'Slet den valgte rapport.',
+    reportPreview: 'Åbn rapporten i en ny fane til forhåndsvisning.',
+    qcClear: 'Ryd formularen for at registrere en ny QC-måling.',
+    qcDelete: 'Slet den valgte QC-måling.',
+    userClear: 'Ryd formularen for at oprette en ny bruger.',
+    userDelete: 'Slet den valgte bruger.',
+    generateFhir: 'Generér og download et FHIR-svar for ordinationen.',
+    previewFhir: 'Vis FHIR-bundlen som JSON uden download.',
+    downloadSql: 'Download komplet MySQL-dump af GLIMS-data.',
+    showSchema: 'Vis MySQL-skemaet direkte på siden.',
+    downloadZip: 'Download ZIP med GLIMS og aktuelle data.',
+    bindFile: 'Vælg eller opret en lokal databasefil til autogem.',
+    saveNow: 'Gem straks til den tilknyttede databasefil.',
+    downloadBackup: 'Eksportér alle data som JSON-backup.',
+    submit: 'Gemmer formularens indhold i databasen.'
+  },
+  controls: {
+    autosaveToggle: 'Aktiver eller deaktiver automatisk gemning til fil.',
+    fhirOrderSelect: 'Vælg hvilken ordination der skal bruges til FHIR-svar.',
+    fhirImportLabel: 'Importer en modtaget FHIR JSON-fil.',
+    fhirPreview: 'JSON-visning af den genererede FHIR-bundle.',
+    restoreLabel: 'Gendan databasen fra en tidligere JSON-backup.',
+    schemaText: 'Viser MySQL-skema og INSERT-statements til reference.'
+  }
+};
+function setTooltip(el, text) {
+  if (!el || !text) return;
+  el.title = text;
+  el.dataset.tip = text;
+  el.setAttribute('aria-label', text);
+}
+function annotateHeaders(root) {
+  if (!root) return;
+  root.querySelectorAll('th').forEach(th => {
+    const key = th.textContent.trim();
+    const tip = tooltipCatalog.headers[key] || `Kolonne: ${key}`;
+    setTooltip(th, tip);
+  });
+}
+function annotateTableCells(root) {
+  if (!root) return;
+  root.querySelectorAll('tbody td').forEach(td => {
+    const text = td.textContent.trim();
+    if (text) setTooltip(td, text);
+  });
+}
+function annotateSearchInputs(root) {
+  if (!root) return;
+  root.querySelectorAll('input[type="search"]').forEach(input => {
+    const tip = tooltipCatalog.search[input.id] || 'Filtrer tabellen ved at indtaste søgetekst.';
+    setTooltip(input, tip);
+  });
+}
+function applyMetricTooltips(root) {
+  if (!root) return;
+  root.querySelectorAll('.badge').forEach(badge => {
+    const key = badge.textContent.trim();
+    const tip = tooltipCatalog.metrics[key];
+    if (tip) {
+      setTooltip(badge, tip);
+      const container = badge.parentElement;
+      if (container) {
+        setTooltip(container, tip);
+        const value = container.querySelector('h3');
+        if (value) setTooltip(value, tip);
+      }
+    }
+  });
+}
+function applyFormTooltips(form) {
+  if (!form) return;
+  const map = tooltipCatalog.forms[form.id];
+  if (map) {
+    Object.entries(map).forEach(([name, tip]) => {
+      const field = form.elements[name];
+      if (!field) return;
+      const isRadioList = typeof RadioNodeList !== 'undefined' && field instanceof RadioNodeList;
+      const el = isRadioList ? field[0] : field;
+      if (!el) return;
+      setTooltip(el, tip);
+      const label = el.closest('label');
+      if (label) setTooltip(label, tip);
+    });
+  }
+  const submit = form.querySelector('button[type="submit"]');
+  if (submit) setTooltip(submit, tooltipCatalog.buttons.submit);
+}
+function applyButtonTooltips(root) {
+  if (!root) return;
+  root.querySelectorAll('button').forEach(btn => {
+    const tip = tooltipCatalog.buttons[btn.id] || tooltipCatalog.buttons[btn.textContent.trim()];
+    if (tip) setTooltip(btn, tip);
+  });
+}
+function applyControlTooltips(root) {
+  if (!root) return;
+  Object.entries(tooltipCatalog.controls).forEach(([id, tip]) => {
+    const el = root.querySelector(`#${id}`);
+    if (el) {
+      setTooltip(el, tip);
+      if (el.tagName === 'INPUT' && el.type === 'checkbox' && el.parentElement) {
+        setTooltip(el.parentElement, tip);
+      }
+    }
+  });
+}
 function esc(str) {
   return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
 }
 function setStatus(msg) {
   state.lastStatus = msg;
   document.getElementById('statusBar').textContent = msg;
+  setTooltip(document.getElementById('statusBar'), msg);
 }
 function initTabs() {
   const nav = document.getElementById('tabNav');
@@ -252,6 +510,7 @@ function initTabs() {
     const btn = document.createElement('button');
     btn.textContent = tab.label;
     btn.dataset.tab = tab.id;
+    setTooltip(btn, tooltipCatalog.tabs[tab.id]);
     btn.addEventListener('click', () => activateTab(tab.id));
     nav.appendChild(btn);
     const section = document.createElement('section');
@@ -550,6 +809,11 @@ function renderDashboard(section) {
       </tbody>
     </table>
   </div>`;
+  applyMetricTooltips(section);
+  annotateHeaders(section);
+  annotateTableCells(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
 }
 function getName(store, id) {
   if (!id) return '';
@@ -605,6 +869,11 @@ function renderPatients(section) {
   const searchInput = section.querySelector('#patientSearch');
   const deleteBtn = section.querySelector('#patientDelete');
   const clearBtn = section.querySelector('#patientClear');
+  annotateHeaders(section);
+  annotateSearchInputs(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+  applyFormTooltips(form);
   const genderMap = {male:'Mand', female:'Kvinde', other:'Andet'};
   const renderRows = () => {
     const term = searchInput.value.trim().toLowerCase();
@@ -616,6 +885,7 @@ function renderPatients(section) {
       const gender = genderMap[p.gender] || p.gender || '';
       return `<tr data-id="${p.id}"><td>${p.id}</td><td>${esc(p.mrn)}</td><td>${esc(p.name)}</td><td>${esc(gender)}</td><td>${esc(p.birth_date||'')}</td></tr>`;
     }).join('');
+    annotateTableCells(section);
   };
   renderRows();
   searchInput.addEventListener('input', renderRows);
@@ -687,12 +957,18 @@ function renderSamples(section) {
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#sampleSearch');
   const form = section.querySelector('#sampleForm');
+  annotateHeaders(section);
+  annotateSearchInputs(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+  applyFormTooltips(form);
   const renderRows = () => {
     const term = search.value.toLowerCase();
     tbody.innerHTML = list.filter(s => {
       if (!term) return true;
       return [s.id, s.status, s.sample_type].some(v => (v??'').toString().toLowerCase().includes(term));
     }).map(s => `<tr data-id="${s.id}"><td>${s.id}</td><td>${esc(getName('patients', Number(s.patient_id)))}</td><td>${esc(s.sample_type)}</td><td>${esc(s.status||'')}</td><td>${esc(s.collected_at||'')}</td></tr>`).join('');
+    annotateTableCells(section);
   };
   renderRows();
   search.addEventListener('input', renderRows);
@@ -757,9 +1033,15 @@ function renderPanels(section) {
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#panelSearch');
   const form = section.querySelector('#panelForm');
+  annotateHeaders(section);
+  annotateSearchInputs(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+  applyFormTooltips(form);
   const renderRows = () => {
     const term = search.value.toLowerCase();
     tbody.innerHTML = list.filter(p => !term || (p.name||'').toLowerCase().includes(term)).map(p => `<tr data-id="${p.id}"><td>${p.id}</td><td>${esc(p.name)}</td><td>${esc(p.description||'')}</td></tr>`).join('');
+    annotateTableCells(section);
   };
   renderRows();
   search.addEventListener('input', renderRows);
@@ -830,9 +1112,15 @@ function renderOrders(section) {
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#orderSearch');
   const form = section.querySelector('#orderForm');
+  annotateHeaders(section);
+  annotateSearchInputs(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+  applyFormTooltips(form);
   const renderRows = () => {
     const term = search.value.toLowerCase();
     tbody.innerHTML = list.filter(o => !term || [o.status,o.id].some(v => (v??'').toString().toLowerCase().includes(term))).map(o => `<tr data-id="${o.id}"><td>${o.id}</td><td>${esc(getName('patients', o.patient_id))}</td><td>${esc(o.sample_id||'')}</td><td>${esc(getName('panels', o.panel_id))}</td><td>${esc(o.status||'')}</td><td>${esc(o.ordered_at||'')}</td></tr>`).join('');
+    annotateTableCells(section);
   };
   renderRows();
   search.addEventListener('input', renderRows);
@@ -911,9 +1199,15 @@ function renderVariants(section) {
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#variantSearch');
   const form = section.querySelector('#variantForm');
+  annotateHeaders(section);
+  annotateSearchInputs(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+  applyFormTooltips(form);
   const renderRows = () => {
     const term = search.value.toLowerCase();
     tbody.innerHTML = list.filter(v => !term || [v.gene,v.hgvs_c,v.hgvs_p].some(val => (val||'').toLowerCase().includes(term))).map(v => `<tr data-id="${v.id}"><td>${v.id}</td><td>${v.order_id}</td><td>${esc(v.gene)}</td><td>${esc(v.hgvs_c||'')}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td></tr>`).join('');
+    annotateTableCells(section);
   };
   renderRows();
   search.addEventListener('input', renderRows);
@@ -983,9 +1277,14 @@ function renderVariantLibrary(section) {
   </div>`;
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#libSearch');
+  annotateHeaders(section);
+  annotateSearchInputs(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
   const renderRows = () => {
     const term = search.value.toLowerCase();
     tbody.innerHTML = list.filter(v => !term || [v.gene,v.hgvs_c,v.hgvs_p].some(val => (val||'').toLowerCase().includes(term))).map(v => `<tr data-id="${v.id}"><td>${v.id}</td><td>${esc(v.gene)}</td><td>${esc(v.hgvs_c||v.hgvs_p||'')}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(v.evidence||'')}</td><td>${esc(v.curated_by||'')}</td></tr>`).join('');
+    annotateTableCells(section);
   };
   renderRows();
   search.addEventListener('input', renderRows);
@@ -1031,6 +1330,11 @@ function renderReports(section) {
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#reportSearch');
   const form = section.querySelector('#reportForm');
+  annotateHeaders(section);
+  annotateSearchInputs(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+  applyFormTooltips(form);
   const statusMap = {draft:'Udkast', final:'Endelig', amended:'Ændret'};
   const renderRows = () => {
     const term = search.value.toLowerCase();
@@ -1043,6 +1347,7 @@ function renderReports(section) {
       const displayStatus = statusMap[r.status] || r.status || '';
       return `<tr data-id="${r.id}"><td>${r.id}</td><td>${r.order_id}</td><td>${esc(displayStatus)}</td><td>${esc(r.issued_at||'')}</td></tr>`;
     }).join('');
+    annotateTableCells(section);
   };
   renderRows();
   search.addEventListener('input', renderRows);
@@ -1141,9 +1446,15 @@ function renderQC(section) {
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#qcSearch');
   const form = section.querySelector('#qcForm');
+  annotateHeaders(section);
+  annotateSearchInputs(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+  applyFormTooltips(form);
   const renderRows = () => {
     const term = search.value.toLowerCase();
     tbody.innerHTML = list.filter(q => !term || [q.metric,q.unit].some(v => (v||'').toLowerCase().includes(term))).map(q => `<tr data-id="${q.id}"><td>${q.id}</td><td>${esc(q.sample_id)}</td><td>${esc(q.metric)}</td><td>${esc(q.value)}</td><td>${esc(q.unit||'')}</td></tr>`).join('');
+    annotateTableCells(section);
   };
   renderRows();
   search.addEventListener('input', renderRows);
@@ -1185,7 +1496,7 @@ function renderResponses(section) {
   section.innerHTML = `
   <div class="panel">
     <div class="btn-row">
-      <label class="secondary" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.4rem 0.8rem;border-radius:0.5rem;cursor:pointer;">Importér FHIR...
+      <label class="secondary" id="fhirImportLabel" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.4rem 0.8rem;border-radius:0.5rem;cursor:pointer;">Importér FHIR...
         <input type="file" id="fhirImport" accept="application/json" style="display:none;">
       </label>
     </div>
@@ -1202,6 +1513,12 @@ function renderResponses(section) {
     </div>
     <pre id="fhirPreview" style="display:none"></pre>
   </div>`;
+  annotateHeaders(section);
+  annotateTableCells(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+  const orderLabel = section.querySelector('#fhirOrderSelect')?.closest('label');
+  if (orderLabel) setTooltip(orderLabel, tooltipCatalog.controls.fhirOrderSelect);
   section.querySelector('#fhirOrderSelect').addEventListener('change', () => section.querySelector('#fhirPreview').style.display='none');
   section.querySelector('#generateFhir').addEventListener('click', () => exportFhir(section, true));
   section.querySelector('#previewFhir').addEventListener('click', () => exportFhir(section, false));
@@ -1398,9 +1715,15 @@ function renderUsers(section) {
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#userSearch');
   const form = section.querySelector('#userForm');
+  annotateHeaders(section);
+  annotateSearchInputs(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+  applyFormTooltips(form);
   const renderRows = () => {
     const term = search.value.toLowerCase();
     tbody.innerHTML = list.filter(u => !term || [u.name,u.email,u.role].some(v => (v||'').toLowerCase().includes(term))).map(u => `<tr data-id="${u.id}"><td>${u.id}</td><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${esc(u.role||'')}</td></tr>`).join('');
+    annotateTableCells(section);
   };
   renderRows();
   search.addEventListener('input', renderRows);
@@ -1444,6 +1767,10 @@ function renderAudit(section) {
       ${list.map(a => `<tr><td>${esc(a.ts)}</td><td>${esc(a.user)}</td><td>${esc(a.action)}</td><td>${esc(a.entity)}</td><td>${esc(a.entity_id??'')}</td><td>${esc(a.before||'')}</td><td>${esc(a.after||'')}</td></tr>`).join('') || '<tr><td colspan="7">Ingen revisionsposter</td></tr>'}
     </tbody></table>
   </div>`;
+  annotateHeaders(section);
+  annotateTableCells(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
 }
 function renderDbTab(section) {
   section = section || document.querySelector('section[data-tab="db"]');
@@ -1465,9 +1792,11 @@ function renderDbTab(section) {
     <h2>Backup</h2>
     <div class="btn-row">
       <button class="secondary" id="downloadBackup">Hent backup (JSON)</button>
-      <label class="secondary" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.4rem 0.8rem;border-radius:0.5rem;cursor:pointer;">Gendan fra backup<input type="file" id="restoreFile" accept="application/json" style="display:none;"></label>
+      <label class="secondary" id="restoreLabel" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.4rem 0.8rem;border-radius:0.5rem;cursor:pointer;">Gendan fra backup<input type="file" id="restoreFile" accept="application/json" style="display:none;"></label>
     </div>
   </div>`;
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
   section.querySelector('#bindFile').addEventListener('click', bindDbFile);
   section.querySelector('#saveNow').addEventListener('click', manualSave);
   section.querySelector('#autosaveToggle').addEventListener('change', e => {
@@ -1498,6 +1827,8 @@ function renderAdmin(section) {
     </div>
     <textarea id="schemaText" style="width:100%;min-height:200px;margin-top:1rem;display:none;"></textarea>
   </div>`;
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
   section.querySelector('#downloadSql').addEventListener('click', async () => {
     const sql = await generateSqlDump();
     const blob = new Blob([sql], {type:'text/sql'});
@@ -1526,6 +1857,10 @@ function renderTestsTab(section) {
     <h2>Selvtest</h2>
     <table><thead><tr><th>Test</th><th>Status</th><th>Detaljer</th></tr></thead><tbody id="testsBody"></tbody></table>
   </div>`;
+  annotateHeaders(section);
+  annotateTableCells(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
 }
 async function runTests() {
   const tbody = document.querySelector('#testsBody');
@@ -1559,6 +1894,7 @@ async function runTests() {
     results.push(['Testfejl', false, err.message]);
   }
   tbody.innerHTML = results.map(([name, pass, detail]) => `<tr><td>${esc(name)}</td><td>${pass ? 'OK' : 'FEJL'}</td><td>${esc(detail||'')}</td></tr>`).join('');
+  annotateTableCells(document.querySelector('section[data-tab="tests"]'));
   await loadAllStores();
   renderAll();
 }
@@ -1711,6 +2047,8 @@ function hookUi() {
     activateTab('tests');
     setTimeout(runTests, 200);
   });
+  setTooltip(document.getElementById('demoDataBtn'), tooltipCatalog.buttons.demoDataBtn);
+  setTooltip(document.getElementById('runTestsBtn'), tooltipCatalog.buttons.runTestsBtn);
 }
 async function init() {
   initTabs();
