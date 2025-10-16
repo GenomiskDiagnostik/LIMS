@@ -2,183 +2,408 @@
 <html lang="da">
 <head>
 <meta charset="UTF-8">
-<title>GLIMS - Genetisk LIMS</title>
+<title>GlimR – Genetic LIMS Reporter</title>
 <style>
 :root {
   font-family: "Segoe UI", Arial, sans-serif;
+  color-scheme: light dark;
+  --bg: #f5f7fb;
+  --text: #162941;
+  --muted-text: #41516b;
+  --panel-bg: #ffffff;
+  --panel-border: #c7d2e3;
+  --shadow: 0 4px 14px rgba(18, 76, 135, 0.08);
+  --accent: #186faf;
+  --accent-strong: #124c87;
+  --danger: #c0392b;
+  --nav-bg: #ffffff;
+  --nav-border: #c7d2e3;
+  --nav-button-bg: #e3ecf8;
+  --nav-button-color: #124c87;
+  --nav-button-active-bg: #124c87;
+  --nav-button-active-color: #ffffff;
+  --table-header-bg: #f0f4fb;
+  --table-row-border: #dde4f1;
+  --badge-bg: #dce6f7;
+  --badge-color: #0f4173;
+  --input-bg: #ffffff;
+  --input-border: #c3cde0;
+  --input-placeholder: #6b7d97;
+  --input-focus: rgba(24, 111, 175, 0.35);
+  --header-bg: linear-gradient(135deg, #124c87, #186faf);
+  --header-text: #ffffff;
+  --code-bg: #101927;
+  --code-text: #e8f1ff;
+}
+[data-theme="dark"] {
+  --bg: #0f172a;
+  --text: #e2e8f0;
+  --muted-text: #94a3b8;
+  --panel-bg: #1e293b;
+  --panel-border: #334155;
+  --shadow: 0 6px 18px rgba(8, 47, 73, 0.55);
+  --accent: #38bdf8;
+  --accent-strong: #0ea5e9;
+  --danger: #ef4444;
+  --nav-bg: #111c30;
+  --nav-border: #1f2a3c;
+  --nav-button-bg: #1f2a3c;
+  --nav-button-color: #cbd5f5;
+  --nav-button-active-bg: #0ea5e9;
+  --nav-button-active-color: #0b1120;
+  --table-header-bg: #233049;
+  --table-row-border: #2f3e58;
+  --badge-bg: #1d4ed8;
+  --badge-color: #bfdbfe;
+  --input-bg: #0f172a;
+  --input-border: #334155;
+  --input-placeholder: #64748b;
+  --input-focus: rgba(56, 189, 248, 0.45);
+  --header-bg: linear-gradient(135deg, #0b2a4a, #14395d);
+  --header-text: #e2e8f0;
+  --code-bg: #0b1120;
+  --code-text: #e2e8f0;
 }
 body {
   margin: 0;
-  background: #f5f7fb;
-  color: #222;
+  background: var(--bg);
+  color: var(--text);
+  transition: background 0.2s ease, color 0.2s ease;
 }
 header {
-  background: linear-gradient(135deg,#124c87,#186faf);
-  color: #fff;
+  background: var(--header-bg);
+  color: var(--header-text);
   padding: 1rem 2rem;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  flex-wrap:wrap;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1 1 260px;
+  min-width: 200px;
+}
+.brand img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
 }
 header h1 {
-  margin:0;
-  font-size:1.8rem;
+  margin: 0;
+  font-size: 1.8rem;
 }
 #statusBar {
-  font-size:0.9rem;
-  margin-top:0.3rem;
+  font-size: 0.9rem;
+  margin-top: 0.3rem;
+  color: var(--header-text);
+}
+.header-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: stretch;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.auth-block {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+[data-theme="dark"] .auth-block {
+  background: rgba(15, 23, 42, 0.45);
+}
+.auth-block form {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.auth-block select,
+.auth-block input {
+  min-width: 160px;
+}
+.auth-block .user-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.auth-block .user-info span {
+  font-weight: 600;
+}
+.quick-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 nav {
-  background:#fff;
-  border-bottom:1px solid #c7d2e3;
-  display:flex;
-  flex-wrap:wrap;
-  padding:0.5rem 1rem;
-  gap:0.5rem;
+  background: var(--nav-bg);
+  border-bottom: 1px solid var(--nav-border);
+  display: flex;
+  flex-wrap: wrap;
+  padding: 0.5rem 1rem;
+  gap: 0.5rem;
 }
 nav button {
-  border:none;
-  background:#e3ecf8;
-  color:#124c87;
-  padding:0.5rem 1rem;
-  border-radius:0.5rem;
-  font-size:0.95rem;
-  cursor:pointer;
-  transition:background 0.2s;
+  border: none;
+  background: var(--nav-button-bg);
+  color: var(--nav-button-color);
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 nav button.active {
-  background:#124c87;
-  color:#fff;
+  background: var(--nav-button-active-bg);
+  color: var(--nav-button-active-color);
 }
 main {
-  padding:1.5rem;
+  padding: 1.5rem;
 }
 section[data-tab] {
-  display:none;
+  display: none;
 }
 section[data-tab].active {
-  display:block;
+  display: block;
 }
 .panel {
-  background:#fff;
-  border-radius:0.75rem;
-  box-shadow:0 4px 14px rgba(18,76,135,0.08);
-  padding:1rem 1.2rem;
-  margin-bottom:1.2rem;
+  background: var(--panel-bg);
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow);
+  padding: 1rem 1.2rem;
+  margin-bottom: 1.2rem;
+  border: 1px solid var(--panel-border);
 }
 .panel h2 {
-  margin-top:0;
+  margin-top: 0;
 }
 .flex {
-  display:flex;
-  gap:1rem;
-  flex-wrap:wrap;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 .flex > * {
-  flex:1 1 280px;
+  flex: 1 1 280px;
 }
 table {
-  width:100%;
-  border-collapse:collapse;
-  background:#fff;
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel-bg);
+  color: inherit;
 }
 th, td {
-  padding:0.45rem 0.6rem;
-  border-bottom:1px solid #dde4f1;
-  text-align:left;
-  font-size:0.9rem;
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--table-row-border);
+  text-align: left;
+  font-size: 0.9rem;
 }
 th {
-  background:#f0f4fb;
+  background: var(--table-header-bg);
 }
 form label {
-  display:block;
-  font-size:0.8rem;
-  font-weight:600;
-  margin-top:0.4rem;
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-top: 0.4rem;
+  color: var(--muted-text);
 }
-form input, form select, form textarea {
-  width:100%;
-  padding:0.4rem;
-  border-radius:0.4rem;
-  border:1px solid #c3cde0;
-  font-size:0.95rem;
-  background:#fff;
-  color:#162941;
+form input,
+form select,
+form textarea {
+  width: 100%;
+  padding: 0.4rem;
+  border-radius: 0.4rem;
+  border: 1px solid var(--input-border);
+  font-size: 0.95rem;
+  background: var(--input-bg);
+  color: var(--text);
+  transition: border 0.2s ease, box-shadow 0.2s ease;
 }
 form input::placeholder,
 form textarea::placeholder {
-  color:#6b7d97;
+  color: var(--input-placeholder);
 }
 form input:focus,
 form select:focus,
 form textarea:focus {
-  outline:2px solid rgba(24,111,175,0.35);
-  border-color:#186faf;
+  outline: 2px solid var(--input-focus);
+  border-color: var(--accent);
 }
 form textarea {
-  min-height:80px;
-  resize:vertical;
+  min-height: 80px;
+  resize: vertical;
 }
 .btn-row {
-  margin-top:0.8rem;
-  display:flex;
-  gap:0.6rem;
-  flex-wrap:wrap;
+  margin-top: 0.8rem;
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
 }
 button.primary {
-  background:#186faf;
-  color:#fff;
-  border:none;
-  border-radius:0.5rem;
-  padding:0.5rem 0.9rem;
-  cursor:pointer;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
 }
 button.danger {
-  background:#c0392b;
-  color:#fff;
+  background: var(--danger);
+  color: #fff;
 }
 button.secondary {
-  background:#d9e4f6;
-  color:#124c87;
+  background: var(--nav-button-bg);
+  color: var(--nav-button-color);
+  border: 1px solid transparent;
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 .badge {
-  display:inline-block;
-  padding:0.2rem 0.5rem;
-  border-radius:0.4rem;
-  background:#dce6f7;
-  color:#0f4173;
-  font-size:0.75rem;
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.4rem;
+  background: var(--badge-bg);
+  color: var(--badge-color);
+  font-size: 0.75rem;
 }
 input[type="search"] {
-  border-radius:1rem;
+  border-radius: 1rem;
+}
+.filterable-select {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.3rem;
+}
+.filterable-select input[type="search"] {
+  padding: 0.35rem 0.5rem;
+}
+.filterable-select select {
+  max-height: 220px;
+}
+.advanced-filter {
+  margin-top: 0.6rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 0.75rem;
+  padding: 0.35rem 0.75rem;
+  background: var(--panel-bg);
+  box-shadow: inset 0 1px 2px rgba(15, 27, 45, 0.08);
+}
+.advanced-filter summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent-strong);
+  outline: none;
+}
+.advanced-filter summary::-webkit-details-marker {
+  display: none;
+}
+.advanced-filter summary::after {
+  content: '▾';
+  float: right;
+  transform: rotate(0deg);
+  transition: transform 0.2s ease;
+}
+.advanced-filter[open] summary::after {
+  transform: rotate(-180deg);
+}
+.advanced-filter .filter-grid {
+  margin-top: 0.6rem;
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+.advanced-filter label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--muted-text);
+}
+.advanced-filter input,
+.advanced-filter select {
+  font-size: 0.9rem;
+}
+.read-only-banner {
+  background: rgba(192, 57, 43, 0.1);
+  color: var(--danger);
+  border: 1px dashed var(--danger);
+  border-radius: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
 }
 pre {
-  background:#101927;
-  color:#e8f1ff;
-  padding:0.8rem;
-  border-radius:0.6rem;
-  overflow:auto;
+  background: var(--code-bg);
+  color: var(--code-text);
+  padding: 0.8rem;
+  border-radius: 0.6rem;
+  overflow: auto;
 }
-@media (max-width:780px) {
+@media (max-width: 900px) {
   header {
-    flex-direction:column;
-    align-items:flex-start;
-    gap:0.4rem;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .auth-block,
+  .quick-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+@media (max-width: 600px) {
+  .auth-block form,
+  .quick-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .auth-block form > * {
+    width: 100%;
   }
 }
 </style>
 </head>
 <body>
 <header>
-  <div>
-    <h1>GLIMS – Genetisk laboratorieinformationssystem</h1>
-    <div id="statusBar">Initialiserer...</div>
+  <div class="brand">
+    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23124c87'/%3E%3Cstop offset='1' stop-color='%2338bdf8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='120' height='120' rx='24' fill='url(%23g)'/%3E%3Cpath d='M28 86c12 10 28 16 44 12 14-3 24-15 24-32 0-21-14-34-34-34h-6l-6 12h12c12 0 20 6 20 18 0 14-10 22-26 22-10 0-18-4-24-10z' fill='%23e0f2ff'/%3E%3Ctext x='36' y='72' font-size='42' font-family='Segoe UI, Arial, sans-serif' font-weight='700' fill='%23ffffff'%3ER%3C/text%3E%3C/svg%3E" alt="GlimR logo">
+    <div>
+      <h1>GlimR – Genetic LIMS Reporter</h1>
+      <div id="statusBar">Initialiserer...</div>
+    </div>
   </div>
-  <div>
-    <button class="primary" id="demoDataBtn">Indlæs demo-data</button>
-    <button class="secondary" id="runTestsBtn">Kør selvtest</button>
+  <div class="header-actions">
+    <div class="auth-block" id="authBlock">
+      <form id="loginForm">
+        <select id="loginUser" required></select>
+        <input id="loginPass" type="password" placeholder="Adgangskode (valgfri)">
+        <button type="submit" class="primary">Log ind</button>
+      </form>
+      <div class="user-info" id="userInfo" hidden>
+        <span id="currentUserLabel"></span>
+        <button type="button" class="secondary" id="logoutBtn">Log ud</button>
+      </div>
+    </div>
+    <div class="quick-actions">
+      <button class="secondary" id="themeToggle">Skift til mørkt tema</button>
+      <button class="primary" id="demoDataBtn">Indlæs demo-data</button>
+      <button class="secondary" id="runTestsBtn">Kør selvtest</button>
+    </div>
   </div>
 </header>
 <nav id="tabNav"></nav>
@@ -196,7 +421,9 @@ const state = {
   autosave: false,
   autosaveTimer: null,
   currentTab: 'dashboard',
-  currentUser: {name: 'system', id: 0},
+  currentUser: null,
+  theme: localStorage.getItem('glimr-theme') || 'light',
+  testResults: [],
   lastStatus: ''
 };
 const classificationMap = {
@@ -231,7 +458,7 @@ const schemaFields = {
   variants: ['id','order_id','gene','transcript','hgvs_c','hgvs_p','zygosity','classification','criteria','af','interpretation','created_at','updated_at'],
   qc: ['id','sample_id','metric','value','unit','notes','created_at','updated_at'],
   reports: ['id','order_id','findings','summary','status','issued_at','created_at','updated_at'],
-  users: ['id','name','email','role','created_at','updated_at'],
+  users: ['id','name','email','role','pin','created_at','updated_at'],
   audit: ['id','ts','user','action','entity','entity_id','before','after','created_at','updated_at'],
   variant_library: ['id','gene','transcript','hgvs_c','hgvs_p','classification','criteria','evidence','condition','inheritance','curated_by','last_review','created_at','updated_at'],
   responses: ['id','ts','sender','patient','diagnostic_report_id','variant_count','variants','raw','created_at','updated_at']
@@ -248,7 +475,7 @@ const tooltipCatalog = {
     reports: 'Opret og redigér laboratoriesvar og rapporter.',
     qc: 'Registrer kvalitetskontrolmålinger for prøver.',
     responses: 'Importer og gennemse MedCom/FHIR-svar.',
-    users: 'Administrer GLIMS-brugere og roller.',
+    users: 'Administrer GlimR-brugere og roller.',
     audit: 'Gennemgå revisionsloggen for alle ændringer.',
     db: 'Håndter lokal databasefil, backup og autogem.',
     admin: 'Tilgå administrative værktøjer, SQL og ZIP-eksport.',
@@ -369,11 +596,12 @@ const tooltipCatalog = {
     userForm: {
       name: 'Brugerens fulde navn.',
       email: 'Brugerens arbejds-e-mailadresse.',
-      role: 'Brugerens rolle eller funktion i laboratoriet.'
+      role: 'Brugerens rolle eller funktion i laboratoriet.',
+      pin: 'Valgfri adgangskode, der kræves ved login for brugeren.'
     }
   },
   buttons: {
-    demoDataBtn: 'Indlæser et demodatasæt til hurtig afprøvning.',
+    demoDataBtn: 'Indlæser et demodatasæt til hurtig afprøvning (kræver skriveadgang).',
     runTestsBtn: 'Kører den indbyggede selvtest og viser resultater.',
     patientClear: 'Ryd formularen for at registrere en ny patient.',
     patientDelete: 'Slet den valgte patient permanent.',
@@ -393,11 +621,13 @@ const tooltipCatalog = {
     qcDelete: 'Slet den valgte QC-måling.',
     userClear: 'Ryd formularen for at oprette en ny bruger.',
     userDelete: 'Slet den valgte bruger.',
+    themeToggle: 'Skifter mellem lyst og mørkt layout for GlimR.',
+    logoutBtn: 'Log brugeren ud og lås GlimR for redigering.',
     generateFhir: 'Generér og download et FHIR-svar for ordinationen.',
     previewFhir: 'Vis FHIR-bundlen som JSON uden download.',
-    downloadSql: 'Download komplet MySQL-dump af GLIMS-data.',
+    downloadSql: 'Download komplet MySQL-dump af GlimR-data.',
     showSchema: 'Vis MySQL-skemaet direkte på siden.',
-    downloadZip: 'Download ZIP med GLIMS og aktuelle data.',
+    downloadZip: 'Download ZIP med GlimR og aktuelle data.',
     bindFile: 'Vælg eller opret en lokal databasefil til autogem.',
     saveNow: 'Gem straks til den tilknyttede databasefil.',
     downloadBackup: 'Eksportér alle data som JSON-backup.',
@@ -409,7 +639,14 @@ const tooltipCatalog = {
     fhirImportLabel: 'Importer en modtaget FHIR JSON-fil.',
     fhirPreview: 'JSON-visning af den genererede FHIR-bundle.',
     restoreLabel: 'Gendan databasen fra en tidligere JSON-backup.',
-    schemaText: 'Viser MySQL-skema og INSERT-statements til reference.'
+    schemaText: 'Viser MySQL-skema og INSERT-statements til reference.',
+    patientsFilterPanel: 'Åbn avancerede filtre for at søge præcist i patientlisten.',
+    samplesFilterPanel: 'Finfiltrér prøver efter patient, status og indsamlingstid.',
+    ordersFilterPanel: 'Filtrer ordinationer på patient, panel, status og dato.',
+    variantsFilterPanel: 'Indsnævr variantoversigten efter gen, ordination og ACMG-klasse.',
+    reportsFilterPanel: 'Begræns rapportlisten efter status, ordination og udstedelsesdato.',
+    loginUser: 'Vælg hvilken GlimR-bruger der skal logges ind.',
+    loginPass: 'Indtast brugerens adgangskode hvis der er opsat en PIN.'
   }
 };
 function setTooltip(el, text) {
@@ -493,6 +730,186 @@ function applyControlTooltips(root) {
     }
   });
 }
+function applySelectFilters(root) {
+  if (!root) return;
+  root.querySelectorAll('.filterable-select').forEach(wrapper => {
+    const input = wrapper.querySelector('input[data-select-filter]');
+    const select = wrapper.querySelector('select');
+    if (!input || !select || wrapper.dataset.filterInit) return;
+    const options = Array.from(select.options).map(option => ({
+      option,
+      text: option.textContent.toLowerCase()
+    }));
+    input.addEventListener('input', () => {
+      const term = input.value.trim().toLowerCase();
+      options.forEach(({option, text}) => {
+        const matches = !term || text.includes(term) || option.selected;
+        option.hidden = !matches;
+      });
+      if (term) {
+        const firstMatch = options.find(({option}) => !option.hidden);
+        if (firstMatch && !firstMatch.option.selected) {
+          select.value = firstMatch.option.value;
+        }
+      }
+    });
+    input.addEventListener('keydown', evt => {
+      if (evt.key === 'Escape') {
+        input.value = '';
+        input.dispatchEvent(new Event('input'));
+      }
+    });
+    wrapper.dataset.filterInit = 'true';
+  });
+}
+function hasWriteRole(user) {
+  if (!user) return false;
+  const role = (user.role || '').toLowerCase();
+  return ['admin', 'administrator', 'skriv', 'skriver', 'redakt', 'editor', 'super'].some(key => role.includes(key));
+}
+function currentCanWrite() {
+  if (state.currentUser?.internal) return true;
+  return hasWriteRole(state.currentUser);
+}
+function ensureWrite(storeName) {
+  if (state.currentUser?.internal) return true;
+  if (storeName === 'users') {
+    const existing = state.cache.get('users');
+    if (!existing || existing.length === 0) {
+      return true;
+    }
+  }
+  if (currentCanWrite()) return true;
+  alert('Handling kræver skriveadgang. Log ind med en bruger der har rollen "Administrator" eller "Skriver".');
+  return false;
+}
+function updateWriteBanner() {
+  const hasWrite = currentCanWrite();
+  let banner = document.getElementById('writeLockBanner');
+  if (!hasWrite) {
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'writeLockBanner';
+      banner.className = 'read-only-banner';
+      banner.textContent = 'Skriveadgang er låst. Log ind med skrivetilladelse for at redigere eller oprette data.';
+      const main = document.getElementById('tabContent');
+      if (main) {
+        main.prepend(banner);
+      }
+    }
+  } else if (banner) {
+    banner.remove();
+  }
+}
+function refreshLoginOptions() {
+  const select = document.getElementById('loginUser');
+  if (!select) return;
+  const users = getCached('users').slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const currentId = state.currentUser?.id ? String(state.currentUser.id) : '';
+  select.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = users.length ? 'Vælg bruger' : 'Opret en bruger for at logge ind';
+  placeholder.disabled = true;
+  select.appendChild(placeholder);
+  users.forEach(user => {
+    const opt = document.createElement('option');
+    opt.value = String(user.id);
+    opt.textContent = `${user.name} (${user.role || 'rolle ukendt'})`;
+    select.appendChild(opt);
+  });
+  if (currentId) {
+    select.value = currentId;
+    placeholder.selected = false;
+  } else {
+    placeholder.selected = true;
+  }
+}
+function updateAuthUi() {
+  const form = document.getElementById('loginForm');
+  const info = document.getElementById('userInfo');
+  const label = document.getElementById('currentUserLabel');
+  const select = document.getElementById('loginUser');
+  if (!form || !info || !label || !select) return;
+  const user = state.currentUser;
+  if (user) {
+    form.style.display = 'none';
+    info.hidden = false;
+    label.textContent = `${user.name} – ${user.role || 'rolle ukendt'}`;
+  } else {
+    info.hidden = true;
+    form.style.display = '';
+    form.reset();
+    refreshLoginOptions();
+  }
+  updateWriteBanner();
+}
+function applyTheme() {
+  if (!['light', 'dark'].includes(state.theme)) {
+    state.theme = 'light';
+  }
+  document.documentElement.dataset.theme = state.theme;
+  localStorage.setItem('glimr-theme', state.theme);
+  const btn = document.getElementById('themeToggle');
+  if (btn) {
+    const toDark = state.theme !== 'dark';
+    btn.textContent = toDark ? 'Skift til mørkt tema' : 'Skift til lyst tema';
+    setTooltip(btn, tooltipCatalog.buttons.themeToggle);
+  }
+}
+function toggleTheme() {
+  state.theme = state.theme === 'dark' ? 'light' : 'dark';
+  applyTheme();
+}
+function restoreUserSession() {
+  const storedId = localStorage.getItem('glimr-user-id');
+  if (storedId) {
+    const user = findById('users', Number(storedId));
+    if (user) {
+      state.currentUser = {...user};
+    } else {
+      state.currentUser = null;
+      localStorage.removeItem('glimr-user-id');
+    }
+  } else if (!state.currentUser || !state.currentUser.internal) {
+    state.currentUser = null;
+  }
+  refreshLoginOptions();
+  updateAuthUi();
+}
+function logoutUser() {
+  state.currentUser = null;
+  localStorage.removeItem('glimr-user-id');
+  updateAuthUi();
+  setStatus('Logget ud. Systemet er skrivebeskyttet.');
+}
+function handleLogin(event) {
+  event.preventDefault();
+  const select = document.getElementById('loginUser');
+  const pass = document.getElementById('loginPass');
+  if (!select || !pass) return;
+  const id = Number(select.value);
+  if (!id) {
+    alert('Vælg en bruger for at logge ind.');
+    return;
+  }
+  const user = findById('users', id);
+  if (!user) {
+    alert('Brugeren findes ikke længere.');
+    refreshLoginOptions();
+    return;
+  }
+  const pin = pass.value.trim();
+  if (user.pin && user.pin !== pin) {
+    alert('Forkert adgangskode.');
+    return;
+  }
+  state.currentUser = {...user};
+  localStorage.setItem('glimr-user-id', String(user.id));
+  pass.value = '';
+  updateAuthUi();
+  setStatus(`Logget ind som ${user.name}.`);
+}
 function esc(str) {
   return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
 }
@@ -500,6 +917,9 @@ function setStatus(msg) {
   state.lastStatus = msg;
   document.getElementById('statusBar').textContent = msg;
   setTooltip(document.getElementById('statusBar'), msg);
+}
+function currentUserName() {
+  return state.currentUser?.name || 'System';
 }
 function initTabs() {
   const nav = document.getElementById('tabNav');
@@ -631,7 +1051,7 @@ async function deleteRecord(store, id) {
 async function logAudit(action, entity, entityId, before, after) {
   const entry = {
     ts: new Date().toISOString(),
-    user: state.currentUser.name,
+    user: currentUserName(),
     action,
     entity,
     entity_id: entityId ?? null,
@@ -678,7 +1098,7 @@ async function manualSave() {
 }
 async function bindDbFile() {
   try {
-    const [handle] = await window.showOpenFilePicker({multiple:false, types:[{description:'GLIMS-data', accept:{'application/json':['.json']}}]});
+    const [handle] = await window.showOpenFilePicker({multiple:false, types:[{description:'GlimR-data', accept:{'application/json':['.json']}}]});
     state.boundHandle = handle;
     setStatus('Fil tilknyttet: ' + handle.name);
     const file = await handle.getFile();
@@ -701,6 +1121,10 @@ async function bindDbFile() {
   renderDbTab();
 }
 async function importData(data, skipConfirm=false) {
+  if (!currentCanWrite()) {
+    alert('Import kræver login med skrivetilladelse.');
+    return;
+  }
   const proceed = skipConfirm || confirm('Dette vil overskrive eksisterende data. Fortsæt?');
   if (!proceed) return;
   const timestamp = new Date().toISOString();
@@ -725,7 +1149,7 @@ async function downloadBackup() {
   const data = await exportData();
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
-  triggerDownload(url, 'glims-backup.json');
+  triggerDownload(url, 'glimr-backup.json');
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function triggerDownload(url, filename) {
@@ -833,6 +1257,10 @@ function fillForm(form, record) {
       el.checked = Boolean(value);
       return;
     }
+    if (el.type === 'password') {
+      el.value = '';
+      return;
+    }
     el.value = value ?? '';
   });
 }
@@ -844,6 +1272,16 @@ function renderPatients(section) {
       <div>
         <label for="patientSearch">Søg</label>
         <input id="patientSearch" type="search" placeholder="Navn/MRN...">
+        <details class="advanced-filter" id="patientsFilterPanel">
+          <summary>Avanceret filter</summary>
+          <div class="filter-grid">
+            <label>ID<input type="search" data-filter-patients="id" placeholder="Fx 152"></label>
+            <label>MRN<input type="search" data-filter-patients="mrn" placeholder="MRN eller CPR"></label>
+            <label>Navn<input type="search" data-filter-patients="name" placeholder="Patientnavn"></label>
+            <label>Køn<select data-filter-patients="gender"><option value="">Alle</option><option value="male">Mand</option><option value="female">Kvinde</option><option value="other">Andet</option></select></label>
+            <label>Fødselsår<input type="search" data-filter-patients="birth" placeholder="ÅÅÅÅ"></label>
+          </div>
+        </details>
         <table id="patientsTable"><thead><tr><th>ID</th><th>MRN</th><th>Navn</th><th>Køn</th><th>Født</th></tr></thead><tbody></tbody></table>
       </div>
       <div>
@@ -869,6 +1307,13 @@ function renderPatients(section) {
   const searchInput = section.querySelector('#patientSearch');
   const deleteBtn = section.querySelector('#patientDelete');
   const clearBtn = section.querySelector('#patientClear');
+  const filterInputs = {
+    id: section.querySelector('[data-filter-patients="id"]'),
+    mrn: section.querySelector('[data-filter-patients="mrn"]'),
+    name: section.querySelector('[data-filter-patients="name"]'),
+    gender: section.querySelector('[data-filter-patients="gender"]'),
+    birth: section.querySelector('[data-filter-patients="birth"]')
+  };
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
@@ -877,10 +1322,24 @@ function renderPatients(section) {
   const genderMap = {male:'Mand', female:'Kvinde', other:'Andet'};
   const renderRows = () => {
     const term = searchInput.value.trim().toLowerCase();
+    const filters = {
+      id: filterInputs.id?.value.trim() || '',
+      mrn: filterInputs.mrn?.value.trim().toLowerCase() || '',
+      name: filterInputs.name?.value.trim().toLowerCase() || '',
+      gender: filterInputs.gender?.value || '',
+      birth: filterInputs.birth?.value.trim().toLowerCase() || ''
+    };
     tbody.innerHTML = list.filter(p => {
       if (!term) return true;
       const displayGender = genderMap[p.gender];
       return [p.name, p.mrn, p.gender, displayGender].some(v => (v||'').toLowerCase().includes(term));
+    }).filter(p => {
+      if (filters.id && !String(p.id).includes(filters.id)) return false;
+      if (filters.mrn && !(p.mrn||'').toLowerCase().includes(filters.mrn)) return false;
+      if (filters.name && !(p.name||'').toLowerCase().includes(filters.name)) return false;
+      if (filters.gender && (p.gender||'') !== filters.gender) return false;
+      if (filters.birth && !(p.birth_date||'').toLowerCase().startsWith(filters.birth)) return false;
+      return true;
     }).map(p => {
       const gender = genderMap[p.gender] || p.gender || '';
       return `<tr data-id="${p.id}"><td>${p.id}</td><td>${esc(p.mrn)}</td><td>${esc(p.name)}</td><td>${esc(gender)}</td><td>${esc(p.birth_date||'')}</td></tr>`;
@@ -889,6 +1348,7 @@ function renderPatients(section) {
   };
   renderRows();
   searchInput.addEventListener('input', renderRows);
+  Object.values(filterInputs).forEach(input => input?.addEventListener('input', renderRows));
   tbody.addEventListener('click', e => {
     const tr = e.target.closest('tr');
     if (!tr) return;
@@ -899,6 +1359,7 @@ function renderPatients(section) {
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
+    if (!ensureWrite('patients')) return;
     const data = Object.fromEntries(new FormData(form).entries());
     if (data.id) {
       const id = Number(data.id);
@@ -916,6 +1377,7 @@ function renderPatients(section) {
   deleteBtn.addEventListener('click', async () => {
     const id = Number(form.elements.id.value);
     if (!id) return alert('Vælg en patient');
+    if (!ensureWrite('patients')) return;
     if (confirm('Slet patient?')) {
       await deleteRecord('patients', id);
       form.reset();
@@ -928,19 +1390,36 @@ function renderPatients(section) {
 function renderSamples(section) {
   const list = getCached('samples');
   const patients = getCached('patients');
+  const patientMap = new Map(patients.map(p => [p.id, p]));
   section.innerHTML = `
   <div class="panel">
     <div class="flex">
       <div>
         <label for="sampleSearch">Søg</label>
         <input id="sampleSearch" type="search" placeholder="ID/status...">
+        <details class="advanced-filter" id="samplesFilterPanel">
+          <summary>Avanceret filter</summary>
+          <div class="filter-grid">
+            <label>ID<input type="search" data-filter-samples="id" placeholder="Sample-ID"></label>
+            <label>Patient<input type="search" data-filter-samples="patient" placeholder="Patientnavn eller MRN"></label>
+            <label>Prøvetype<input type="search" data-filter-samples="type" placeholder="Type"></label>
+            <label>Status<input type="search" data-filter-samples="status" placeholder="Status"></label>
+            <label>Opsamlet fra<input type="date" data-filter-samples="collected_from"></label>
+            <label>Opsamlet til<input type="date" data-filter-samples="collected_to"></label>
+          </div>
+        </details>
         <table><thead><tr><th>ID</th><th>Patient</th><th>Prøvetype</th><th>Status</th><th>Opsamlet</th></tr></thead><tbody></tbody></table>
       </div>
       <div>
         <h2>Prøve</h2>
         <form id="sampleForm">
           <input type="hidden" name="id">
-          <label>Patient<select name="patient_id" required>${patients.map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.mrn)})</option>`).join('')}</select></label>
+          <label>Patient
+            <div class="filterable-select">
+              <input type="search" data-select-filter placeholder="Filtrer patienter">
+              <select name="patient_id" required>${patients.map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.mrn)})</option>`).join('')}</select>
+            </div>
+          </label>
           <label>Prøvetype<input name="sample_type" required></label>
           <label>Status<input name="status"></label>
           <label>Opsamlet<input type="datetime-local" name="collected_at"></label>
@@ -957,21 +1436,59 @@ function renderSamples(section) {
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#sampleSearch');
   const form = section.querySelector('#sampleForm');
+  const filterInputs = {
+    id: section.querySelector('[data-filter-samples="id"]'),
+    patient: section.querySelector('[data-filter-samples="patient"]'),
+    type: section.querySelector('[data-filter-samples="type"]'),
+    status: section.querySelector('[data-filter-samples="status"]'),
+    collected_from: section.querySelector('[data-filter-samples="collected_from"]'),
+    collected_to: section.querySelector('[data-filter-samples="collected_to"]')
+  };
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
   applyControlTooltips(section);
   applyFormTooltips(form);
+  applySelectFilters(section);
   const renderRows = () => {
     const term = search.value.toLowerCase();
+    const filters = {
+      id: filterInputs.id?.value.trim() || '',
+      patient: filterInputs.patient?.value.trim().toLowerCase() || '',
+      type: filterInputs.type?.value.trim().toLowerCase() || '',
+      status: filterInputs.status?.value.trim().toLowerCase() || '',
+      collected_from: filterInputs.collected_from?.value || '',
+      collected_to: filterInputs.collected_to?.value || ''
+    };
+    const fromDate = filters.collected_from ? new Date(filters.collected_from) : null;
+    const toDate = filters.collected_to ? new Date(filters.collected_to) : null;
+    if (toDate) {
+      toDate.setHours(23, 59, 59, 999);
+    }
     tbody.innerHTML = list.filter(s => {
       if (!term) return true;
       return [s.id, s.status, s.sample_type].some(v => (v??'').toString().toLowerCase().includes(term));
+    }).filter(s => {
+      const patient = patientMap.get(Number(s.patient_id));
+      const patientString = [patient?.name, patient?.mrn].filter(Boolean).join(' ').toLowerCase();
+      if (filters.id && !String(s.id).includes(filters.id)) return false;
+      if (filters.patient && !patientString.includes(filters.patient)) return false;
+      if (filters.type && !(s.sample_type||'').toLowerCase().includes(filters.type)) return false;
+      if (filters.status && !(s.status||'').toLowerCase().includes(filters.status)) return false;
+      if (fromDate || toDate) {
+        if (!s.collected_at) return false;
+        const collectedAt = new Date(s.collected_at);
+        if (Number.isNaN(collectedAt.getTime())) return false;
+        if (fromDate && collectedAt < fromDate) return false;
+        if (toDate && collectedAt > toDate) return false;
+      }
+      return true;
     }).map(s => `<tr data-id="${s.id}"><td>${s.id}</td><td>${esc(getName('patients', Number(s.patient_id)))}</td><td>${esc(s.sample_type)}</td><td>${esc(s.status||'')}</td><td>${esc(s.collected_at||'')}</td></tr>`).join('');
     annotateTableCells(section);
   };
   renderRows();
   search.addEventListener('input', renderRows);
+  Object.values(filterInputs).forEach(input => input?.addEventListener('input', renderRows));
   tbody.addEventListener('click', e => {
     const tr = e.target.closest('tr');
     if (!tr) return;
@@ -981,6 +1498,7 @@ function renderSamples(section) {
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
+    if (!ensureWrite('samples')) return;
     const data = Object.fromEntries(new FormData(form).entries());
     data.patient_id = Number(data.patient_id);
     if (data.id) {
@@ -998,6 +1516,7 @@ function renderSamples(section) {
   section.querySelector('#sampleDelete').addEventListener('click', async () => {
     const id = Number(form.elements.id.value);
     if (!id) return alert('Vælg sample');
+    if (!ensureWrite('samples')) return;
     if (confirm('Slet sample?')) {
       await deleteRecord('samples', id);
       renderTab('samples');
@@ -1038,6 +1557,7 @@ function renderPanels(section) {
   applyButtonTooltips(section);
   applyControlTooltips(section);
   applyFormTooltips(form);
+  applySelectFilters(section);
   const renderRows = () => {
     const term = search.value.toLowerCase();
     tbody.innerHTML = list.filter(p => !term || (p.name||'').toLowerCase().includes(term)).map(p => `<tr data-id="${p.id}"><td>${p.id}</td><td>${esc(p.name)}</td><td>${esc(p.description||'')}</td></tr>`).join('');
@@ -1054,6 +1574,7 @@ function renderPanels(section) {
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
+    if (!ensureWrite('panels')) return;
     const data = Object.fromEntries(new FormData(form).entries());
     if (data.id) {
       const id = Number(data.id);
@@ -1070,6 +1591,7 @@ function renderPanels(section) {
   section.querySelector('#panelDelete').addEventListener('click', async () => {
     const id = Number(form.elements.id.value);
     if (!id) return alert('Vælg panel');
+    if (!ensureWrite('panels')) return;
     if (confirm('Slet panel?')) {
       await deleteRecord('panels', id);
       renderTab('panels');
@@ -1082,21 +1604,51 @@ function renderOrders(section) {
   const patients = getCached('patients');
   const samples = getCached('samples');
   const panels = getCached('panels');
+  const patientMap = new Map(patients.map(p => [p.id, p]));
+  const sampleMap = new Map(samples.map(s => [s.id, s]));
+  const panelMap = new Map(panels.map(p => [p.id, p]));
   section.innerHTML = `
   <div class="panel">
     <div class="flex">
       <div>
         <label for="orderSearch">Søg</label>
         <input id="orderSearch" type="search" placeholder="Status/ID...">
+        <details class="advanced-filter" id="ordersFilterPanel">
+          <summary>Avanceret filter</summary>
+          <div class="filter-grid">
+            <label>ID<input type="search" data-filter-orders="id" placeholder="Ordination-ID"></label>
+            <label>Patient<input type="search" data-filter-orders="patient" placeholder="Patientnavn eller MRN"></label>
+            <label>Prøve<input type="search" data-filter-orders="sample" placeholder="Prøve-ID"></label>
+            <label>Panel<input type="search" data-filter-orders="panel" placeholder="Panelnavn"></label>
+            <label>Status<input type="search" data-filter-orders="status" placeholder="Status"></label>
+            <label>Bestilt fra<input type="date" data-filter-orders="ordered_from"></label>
+            <label>Bestilt til<input type="date" data-filter-orders="ordered_to"></label>
+          </div>
+        </details>
         <table><thead><tr><th>ID</th><th>Patient</th><th>Prøve</th><th>Panel</th><th>Status</th><th>Bestilt</th></tr></thead><tbody></tbody></table>
       </div>
       <div>
         <h2>Ordination</h2>
         <form id="orderForm">
           <input type="hidden" name="id">
-          <label>Patient<select name="patient_id" required>${patients.map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.mrn)})</option>`).join('')}</select></label>
-          <label>Prøve<select name="sample_id" required>${samples.map(s => `<option value="${s.id}">${s.id} – ${esc(getName('patients', s.patient_id))}</option>`).join('')}</select></label>
-          <label>Panel<select name="panel_id"><option value="">-</option>${panels.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label>
+          <label>Patient
+            <div class="filterable-select">
+              <input type="search" data-select-filter placeholder="Filtrer patienter">
+              <select name="patient_id" required>${patients.map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.mrn)})</option>`).join('')}</select>
+            </div>
+          </label>
+          <label>Prøve
+            <div class="filterable-select">
+              <input type="search" data-select-filter placeholder="Filtrer prøver">
+              <select name="sample_id" required>${samples.map(s => `<option value="${s.id}">${s.id} – ${esc(getName('patients', s.patient_id))}</option>`).join('')}</select>
+            </div>
+          </label>
+          <label>Panel
+            <div class="filterable-select">
+              <input type="search" data-select-filter placeholder="Filtrer paneler">
+              <select name="panel_id"><option value="">-</option>${panels.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>
+            </div>
+          </label>
           <label>Rekvirent<input name="clinician"></label>
           <label>Status<input name="status"></label>
           <label>Bestillingstidspunkt<input type="datetime-local" name="ordered_at"></label>
@@ -1112,18 +1664,66 @@ function renderOrders(section) {
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#orderSearch');
   const form = section.querySelector('#orderForm');
+  const filterInputs = {
+    id: section.querySelector('[data-filter-orders="id"]'),
+    patient: section.querySelector('[data-filter-orders="patient"]'),
+    sample: section.querySelector('[data-filter-orders="sample"]'),
+    panel: section.querySelector('[data-filter-orders="panel"]'),
+    status: section.querySelector('[data-filter-orders="status"]'),
+    ordered_from: section.querySelector('[data-filter-orders="ordered_from"]'),
+    ordered_to: section.querySelector('[data-filter-orders="ordered_to"]')
+  };
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
   applyControlTooltips(section);
   applyFormTooltips(form);
+  applySelectFilters(section);
   const renderRows = () => {
     const term = search.value.toLowerCase();
-    tbody.innerHTML = list.filter(o => !term || [o.status,o.id].some(v => (v??'').toString().toLowerCase().includes(term))).map(o => `<tr data-id="${o.id}"><td>${o.id}</td><td>${esc(getName('patients', o.patient_id))}</td><td>${esc(o.sample_id||'')}</td><td>${esc(getName('panels', o.panel_id))}</td><td>${esc(o.status||'')}</td><td>${esc(o.ordered_at||'')}</td></tr>`).join('');
+    const filters = {
+      id: filterInputs.id?.value.trim() || '',
+      patient: filterInputs.patient?.value.trim().toLowerCase() || '',
+      sample: filterInputs.sample?.value.trim().toLowerCase() || '',
+      panel: filterInputs.panel?.value.trim().toLowerCase() || '',
+      status: filterInputs.status?.value.trim().toLowerCase() || '',
+      ordered_from: filterInputs.ordered_from?.value || '',
+      ordered_to: filterInputs.ordered_to?.value || ''
+    };
+    const fromDate = filters.ordered_from ? new Date(filters.ordered_from) : null;
+    const toDate = filters.ordered_to ? new Date(filters.ordered_to) : null;
+    if (toDate) toDate.setHours(23, 59, 59, 999);
+    tbody.innerHTML = list.filter(o => {
+      if (!term) return true;
+      return [o.status, o.id, o.patient_id, o.sample_id, o.panel_id].some(v => (v??'').toString().toLowerCase().includes(term));
+    }).filter(o => {
+      const patient = patientMap.get(Number(o.patient_id));
+      const sample = sampleMap.get(Number(o.sample_id));
+      const panel = panelMap.get(Number(o.panel_id));
+      const patientString = [patient?.name, patient?.mrn].filter(Boolean).join(' ').toLowerCase();
+      const sampleString = [o.sample_id, sample?.sample_type, getName('patients', sample?.patient_id)].filter(Boolean).join(' ').toLowerCase();
+      if (filters.id && !String(o.id).includes(filters.id)) return false;
+      if (filters.patient && !patientString.includes(filters.patient)) return false;
+      if (filters.sample && !sampleString.includes(filters.sample)) return false;
+      if (filters.panel) {
+        const panelString = (panel?.name || String(o.panel_id || '')).toLowerCase();
+        if (!panelString.includes(filters.panel)) return false;
+      }
+      if (filters.status && !(o.status||'').toLowerCase().includes(filters.status)) return false;
+      if (fromDate || toDate) {
+        if (!o.ordered_at) return false;
+        const ordered = new Date(o.ordered_at);
+        if (Number.isNaN(ordered.getTime())) return false;
+        if (fromDate && ordered < fromDate) return false;
+        if (toDate && ordered > toDate) return false;
+      }
+      return true;
+    }).map(o => `<tr data-id="${o.id}"><td>${o.id}</td><td>${esc(getName('patients', Number(o.patient_id)))}</td><td>${esc(getName('samples', Number(o.sample_id)))}</td><td>${esc(getName('panels', Number(o.panel_id)))}</td><td>${esc(o.status||'')}</td><td>${esc(o.ordered_at||'')}</td></tr>`).join('');
     annotateTableCells(section);
   };
   renderRows();
   search.addEventListener('input', renderRows);
+  Object.values(filterInputs).forEach(input => input?.addEventListener('input', renderRows));
   tbody.addEventListener('click', e => {
     const tr = e.target.closest('tr');
     if (!tr) return;
@@ -1133,6 +1733,7 @@ function renderOrders(section) {
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
+    if (!ensureWrite('orders')) return;
     const data = Object.fromEntries(new FormData(form).entries());
     data.patient_id = Number(data.patient_id);
     data.sample_id = Number(data.sample_id);
@@ -1153,6 +1754,7 @@ function renderOrders(section) {
   section.querySelector('#orderDelete').addEventListener('click', async () => {
     const id = Number(form.elements.id.value);
     if (!id) return alert('Vælg ordre');
+    if (!ensureWrite('orders')) return;
     if (confirm('Slet ordre?')) {
       await deleteRecord('orders', id);
       renderTab('orders');
@@ -1170,13 +1772,29 @@ function renderVariants(section) {
       <div>
         <label for="variantSearch">Søg</label>
         <input id="variantSearch" type="search" placeholder="Gen/HGVS...">
+        <details class="advanced-filter" id="variantsFilterPanel">
+          <summary>Avanceret filter</summary>
+          <div class="filter-grid">
+            <label>ID<input type="search" data-filter-variants="id" placeholder="Variant-ID"></label>
+            <label>Ordination<input type="search" data-filter-variants="order" placeholder="Ordinations-ID"></label>
+            <label>Gen<input type="search" data-filter-variants="gene" placeholder="Gen"></label>
+            <label>Transkript<input type="search" data-filter-variants="transcript" placeholder="RefSeq/ENST"></label>
+            <label>ACMG<input type="search" data-filter-variants="classification" placeholder="1-5"></label>
+            <label>Kriterier<input type="search" data-filter-variants="criteria" placeholder="PM1,PP3..."></label>
+          </div>
+        </details>
         <table><thead><tr><th>ID</th><th>Ordination</th><th>Gen</th><th>HGVS c.</th><th>Klasse</th><th>Kriterier</th></tr></thead><tbody></tbody></table>
       </div>
       <div>
         <h2>Variant</h2>
         <form id="variantForm">
           <input type="hidden" name="id">
-          <label>Ordination<select name="order_id" required>${orders.map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}</select></label>
+          <label>Ordination
+            <div class="filterable-select">
+              <input type="search" data-select-filter placeholder="Filtrer ordinationer">
+              <select name="order_id" required>${orders.map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}</select>
+            </div>
+          </label>
           <label>Gen<input name="gene" required></label>
           <label>Transkript<input name="transcript"></label>
           <label>HGVS c.<input name="hgvs_c"></label>
@@ -1199,18 +1817,44 @@ function renderVariants(section) {
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#variantSearch');
   const form = section.querySelector('#variantForm');
+  const filterInputs = {
+    id: section.querySelector('[data-filter-variants="id"]'),
+    order: section.querySelector('[data-filter-variants="order"]'),
+    gene: section.querySelector('[data-filter-variants="gene"]'),
+    transcript: section.querySelector('[data-filter-variants="transcript"]'),
+    classification: section.querySelector('[data-filter-variants="classification"]'),
+    criteria: section.querySelector('[data-filter-variants="criteria"]')
+  };
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
   applyControlTooltips(section);
   applyFormTooltips(form);
+  applySelectFilters(section);
   const renderRows = () => {
     const term = search.value.toLowerCase();
-    tbody.innerHTML = list.filter(v => !term || [v.gene,v.hgvs_c,v.hgvs_p].some(val => (val||'').toLowerCase().includes(term))).map(v => `<tr data-id="${v.id}"><td>${v.id}</td><td>${v.order_id}</td><td>${esc(v.gene)}</td><td>${esc(v.hgvs_c||'')}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td></tr>`).join('');
+    const filters = {
+      id: filterInputs.id?.value.trim() || '',
+      order: filterInputs.order?.value.trim().toLowerCase() || '',
+      gene: filterInputs.gene?.value.trim().toLowerCase() || '',
+      transcript: filterInputs.transcript?.value.trim().toLowerCase() || '',
+      classification: filterInputs.classification?.value.trim().toLowerCase() || '',
+      criteria: filterInputs.criteria?.value.trim().toLowerCase() || ''
+    };
+    tbody.innerHTML = list.filter(v => !term || [v.gene,v.hgvs_c,v.hgvs_p].some(val => (val||'').toLowerCase().includes(term))).filter(v => {
+      if (filters.id && !String(v.id).includes(filters.id)) return false;
+      if (filters.order && !(String(v.order_id||'')).toLowerCase().includes(filters.order)) return false;
+      if (filters.gene && !(v.gene||'').toLowerCase().includes(filters.gene)) return false;
+      if (filters.transcript && !(v.transcript||'').toLowerCase().includes(filters.transcript)) return false;
+      if (filters.classification && !(String(v.classification||'')).toLowerCase().includes(filters.classification)) return false;
+      if (filters.criteria && !(v.criteria||'').toLowerCase().includes(filters.criteria)) return false;
+      return true;
+    }).map(v => `<tr data-id="${v.id}"><td>${v.id}</td><td>${v.order_id}</td><td>${esc(v.gene)}</td><td>${esc(v.hgvs_c||'')}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td></tr>`).join('');
     annotateTableCells(section);
   };
   renderRows();
   search.addEventListener('input', renderRows);
+  Object.values(filterInputs).forEach(input => input?.addEventListener('input', renderRows));
   tbody.addEventListener('click', e => {
     const tr = e.target.closest('tr');
     if (!tr) return;
@@ -1220,6 +1864,7 @@ function renderVariants(section) {
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
+    if (!ensureWrite('variants')) return;
     const data = Object.fromEntries(new FormData(form).entries());
     data.order_id = Number(data.order_id);
     data.classification = String(data.classification);
@@ -1239,6 +1884,7 @@ function renderVariants(section) {
   section.querySelector('#variantDelete').addEventListener('click', async () => {
     const id = Number(form.elements.id.value);
     if (!id) return alert('Vælg variant');
+    if (!ensureWrite('variants')) return;
     if (confirm('Slet variant?')) {
       await deleteRecord('variants', id);
       renderTab('variants');
@@ -1246,6 +1892,7 @@ function renderVariants(section) {
   });
   section.querySelector('#variantClear').addEventListener('click', () => form.reset());
   section.querySelector('#variantToLibrary').addEventListener('click', async () => {
+    if (!ensureWrite('variant_library')) return;
     const data = Object.fromEntries(new FormData(form).entries());
     if (!data.gene) return alert('Vælg variant først');
     const libraryEntry = {
@@ -1258,7 +1905,7 @@ function renderVariants(section) {
       evidence: data.interpretation,
       condition: '',
       inheritance: '',
-      curated_by: state.currentUser.name,
+      curated_by: currentUserName(),
       last_review: new Date().toISOString().split('T')[0]
     };
     await addRecord('variant_library', libraryEntry);
@@ -1306,13 +1953,28 @@ function renderReports(section) {
       <div>
         <label for="reportSearch">Søg</label>
         <input id="reportSearch" type="search" placeholder="Status...">
+        <details class="advanced-filter" id="reportsFilterPanel">
+          <summary>Avanceret filter</summary>
+          <div class="filter-grid">
+            <label>ID<input type="search" data-filter-reports="id" placeholder="Rapport-ID"></label>
+            <label>Ordination<input type="search" data-filter-reports="order" placeholder="Ordinations-ID"></label>
+            <label>Status<input type="search" data-filter-reports="status" placeholder="Status"></label>
+            <label>Udstedt fra<input type="date" data-filter-reports="issued_from"></label>
+            <label>Udstedt til<input type="date" data-filter-reports="issued_to"></label>
+          </div>
+        </details>
         <table><thead><tr><th>ID</th><th>Ordination</th><th>Status</th><th>Udstedt</th></tr></thead><tbody></tbody></table>
       </div>
       <div>
         <h2>Rapport</h2>
         <form id="reportForm">
           <input type="hidden" name="id">
-          <label>Ordination<select name="order_id" required>${orders.map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}</select></label>
+          <label>Ordination
+            <div class="filterable-select">
+              <input type="search" data-select-filter placeholder="Filtrer ordinationer">
+              <select name="order_id" required>${orders.map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}</select>
+            </div>
+          </label>
           <label>Status<select name="status"><option value="draft">Udkast</option><option value="final">Endelig</option><option value="amended">Ændret</option></select></label>
           <label>Udstedt<input type="datetime-local" name="issued_at"></label>
           <label>Fund<textarea name="findings"></textarea></label>
@@ -1330,19 +1992,50 @@ function renderReports(section) {
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#reportSearch');
   const form = section.querySelector('#reportForm');
+  const filterInputs = {
+    id: section.querySelector('[data-filter-reports="id"]'),
+    order: section.querySelector('[data-filter-reports="order"]'),
+    status: section.querySelector('[data-filter-reports="status"]'),
+    issued_from: section.querySelector('[data-filter-reports="issued_from"]'),
+    issued_to: section.querySelector('[data-filter-reports="issued_to"]')
+  };
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
   applyControlTooltips(section);
   applyFormTooltips(form);
+  applySelectFilters(section);
   const statusMap = {draft:'Udkast', final:'Endelig', amended:'Ændret'};
   const renderRows = () => {
     const term = search.value.toLowerCase();
+    const filters = {
+      id: filterInputs.id?.value.trim() || '',
+      order: filterInputs.order?.value.trim().toLowerCase() || '',
+      status: filterInputs.status?.value.trim().toLowerCase() || '',
+      issued_from: filterInputs.issued_from?.value || '',
+      issued_to: filterInputs.issued_to?.value || ''
+    };
+    const fromDate = filters.issued_from ? new Date(filters.issued_from) : null;
+    const toDate = filters.issued_to ? new Date(filters.issued_to) : null;
+    if (toDate) toDate.setHours(23, 59, 59, 999);
     tbody.innerHTML = list.filter(r => {
       if (!term) return true;
       const raw = (r.status||'').toLowerCase();
       const display = (statusMap[r.status] || r.status || '').toLowerCase();
       return raw.includes(term) || display.includes(term);
+    }).filter(r => {
+      if (filters.id && !String(r.id).includes(filters.id)) return false;
+      if (filters.order && !(String(r.order_id||'')).toLowerCase().includes(filters.order)) return false;
+      const statusStrings = [(r.status||'').toLowerCase(), (statusMap[r.status] || '').toLowerCase()];
+      if (filters.status && !statusStrings.some(v => v.includes(filters.status))) return false;
+      if (fromDate || toDate) {
+        if (!r.issued_at) return false;
+        const issued = new Date(r.issued_at);
+        if (Number.isNaN(issued.getTime())) return false;
+        if (fromDate && issued < fromDate) return false;
+        if (toDate && issued > toDate) return false;
+      }
+      return true;
     }).map(r => {
       const displayStatus = statusMap[r.status] || r.status || '';
       return `<tr data-id="${r.id}"><td>${r.id}</td><td>${r.order_id}</td><td>${esc(displayStatus)}</td><td>${esc(r.issued_at||'')}</td></tr>`;
@@ -1351,6 +2044,7 @@ function renderReports(section) {
   };
   renderRows();
   search.addEventListener('input', renderRows);
+  Object.values(filterInputs).forEach(input => input?.addEventListener('input', renderRows));
   tbody.addEventListener('click', e => {
     const tr = e.target.closest('tr');
     if (!tr) return;
@@ -1360,6 +2054,7 @@ function renderReports(section) {
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
+    if (!ensureWrite('reports')) return;
     const data = Object.fromEntries(new FormData(form).entries());
     data.order_id = Number(data.order_id);
     if (data.id) {
@@ -1377,6 +2072,7 @@ function renderReports(section) {
   section.querySelector('#reportDelete').addEventListener('click', async () => {
     const id = Number(form.elements.id.value);
     if (!id) return alert('Vælg rapport');
+    if (!ensureWrite('reports')) return;
     if (confirm('Slet rapport?')) {
       await deleteRecord('reports', id);
       renderTab('reports');
@@ -1429,7 +2125,12 @@ function renderQC(section) {
         <h2>Kvalitetsmåling</h2>
         <form id="qcForm">
           <input type="hidden" name="id">
-          <label>Prøve<select name="sample_id" required>${samples.map(s => `<option value="${s.id}">${s.id} – ${esc(getName('patients', s.patient_id))}</option>`).join('')}</select></label>
+          <label>Prøve
+            <div class="filterable-select">
+              <input type="search" data-select-filter placeholder="Filtrer prøver">
+              <select name="sample_id" required>${samples.map(s => `<option value="${s.id}">${s.id} – ${esc(getName('patients', s.patient_id))}</option>`).join('')}</select>
+            </div>
+          </label>
           <label>Måling<input name="metric" required></label>
           <label>Værdi<input name="value" type="number" step="0.0001" required></label>
           <label>Enhed<input name="unit"></label>
@@ -1451,6 +2152,7 @@ function renderQC(section) {
   applyButtonTooltips(section);
   applyControlTooltips(section);
   applyFormTooltips(form);
+  applySelectFilters(section);
   const renderRows = () => {
     const term = search.value.toLowerCase();
     tbody.innerHTML = list.filter(q => !term || [q.metric,q.unit].some(v => (v||'').toLowerCase().includes(term))).map(q => `<tr data-id="${q.id}"><td>${q.id}</td><td>${esc(q.sample_id)}</td><td>${esc(q.metric)}</td><td>${esc(q.value)}</td><td>${esc(q.unit||'')}</td></tr>`).join('');
@@ -1467,6 +2169,7 @@ function renderQC(section) {
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
+    if (!ensureWrite('qc')) return;
     const data = Object.fromEntries(new FormData(form).entries());
     data.sample_id = Number(data.sample_id);
     if (data.id) {
@@ -1484,6 +2187,7 @@ function renderQC(section) {
   section.querySelector('#qcDelete').addEventListener('click', async () => {
     const id = Number(form.elements.id.value);
     if (!id) return alert('Vælg QC-post');
+    if (!ensureWrite('qc')) return;
     if (confirm('Slet QC-post?')) {
       await deleteRecord('qc', id);
       renderTab('qc');
@@ -1610,7 +2314,7 @@ function buildFhirBundle(orderId) {
     resourceType:'MessageHeader',
     id:`mh-${orderId}`,
     eventCoding:{system:'http://medcom.dk/fhir/medcom-messaging-communication-event', code:'medcom-lab-reporting', display:'MedCom Lab Report'},
-    source:{name:'GLIMS'},
+    source:{name:'GlimR'},
     destination:[{name:'Recipient'}],
     sender:{reference:'Organization/org-producer'},
     focus:[{reference:`DiagnosticReport/${diagnosticReport.id}`}] 
@@ -1648,6 +2352,7 @@ function buildFhirBundle(orderId) {
   return bundle;
 }
 async function handleInboundFhir(bundle, offerLibrary=false) {
+  if (!ensureWrite('responses')) return;
   if (!bundle || bundle.resourceType !== 'Bundle') throw new Error('Ikke en FHIR Bundle');
   const entries = bundle.entry || [];
   const findResource = type => entries.map(e => e.resource).find(r => r.resourceType === type);
@@ -1665,7 +2370,7 @@ async function handleInboundFhir(bundle, offerLibrary=false) {
   };
   await addRecord('responses', response);
   if (offerLibrary && observations.length) {
-    if (confirm('Tilføj varianter til bibliotek?')) {
+    if (ensureWrite('variant_library') && confirm('Tilføj varianter til bibliotek?')) {
       for (const obs of observations) {
         const note = obs.note?.[0]?.text || '';
         await addRecord('variant_library', {
@@ -1703,6 +2408,7 @@ function renderUsers(section) {
           <label>Navn<input name="name" required></label>
           <label>E-mail<input type="email" name="email" required></label>
           <label>Rolle<input name="role"></label>
+          <label>Adgangskode (PIN)<input type="password" name="pin" placeholder="Valgfri kode"></label>
           <div class="btn-row">
             <button class="primary" type="submit">Gem</button>
             <button class="secondary" type="button" id="userClear">Ny</button>
@@ -1736,24 +2442,35 @@ function renderUsers(section) {
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
+    if (!ensureWrite('users')) return;
     const data = Object.fromEntries(new FormData(form).entries());
     if (data.id) {
       const id = Number(data.id);
       const before = {...findById('users', id)};
+      if (!data.pin) data.pin = before?.pin || '';
       const updated = {...before, ...data, id};
       await updateRecord('users', updated, before);
     } else {
+      if (!data.pin) data.pin = '';
       delete data.id;
       await addRecord('users', data);
     }
     await loadStore('users');
+    refreshLoginOptions();
+    restoreUserSession();
     renderTab('users');
   });
   section.querySelector('#userDelete').addEventListener('click', async () => {
     const id = Number(form.elements.id.value);
     if (!id) return alert('Vælg bruger');
+    if (!ensureWrite('users')) return;
     if (confirm('Slet bruger?')) {
       await deleteRecord('users', id);
+      refreshLoginOptions();
+      const storedId = localStorage.getItem('glimr-user-id');
+      if (storedId && Number(storedId) === id) {
+        logoutUser();
+      }
       renderTab('users');
     }
   });
@@ -1821,7 +2538,7 @@ function renderAdmin(section) {
   section.innerHTML = `
   <div class="panel">
     <div class="btn-row">
-      <button class="primary" id="downloadSql">Hent glims.sql</button>
+      <button class="primary" id="downloadSql">Hent glimr.sql</button>
       <button class="secondary" id="showSchema">Vis skema</button>
       <button class="secondary" id="downloadZip">Hent ZIP</button>
     </div>
@@ -1833,7 +2550,7 @@ function renderAdmin(section) {
     const sql = await generateSqlDump();
     const blob = new Blob([sql], {type:'text/sql'});
     const url = URL.createObjectURL(blob);
-    triggerDownload(url, 'glims.sql');
+    triggerDownload(url, 'glimr.sql');
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
   section.querySelector('#showSchema').addEventListener('click', async () => {
@@ -1847,7 +2564,7 @@ function renderAdmin(section) {
     const zipBytes = createZip(files);
     const blob = new Blob([zipBytes], {type:'application/zip'});
     const url = URL.createObjectURL(blob);
-    triggerDownload(url, 'glims.zip');
+    triggerDownload(url, 'glimr.zip');
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
 }
@@ -1857,14 +2574,20 @@ function renderTestsTab(section) {
     <h2>Selvtest</h2>
     <table><thead><tr><th>Test</th><th>Status</th><th>Detaljer</th></tr></thead><tbody id="testsBody"></tbody></table>
   </div>`;
+  const tbody = section.querySelector('#testsBody');
+  if (tbody) {
+    tbody.innerHTML = state.testResults.length
+      ? state.testResults.map(([name, pass, detail]) => `<tr><td>${esc(name)}</td><td>${pass ? 'OK' : 'FEJL'}</td><td>${esc(detail||'')}</td></tr>`).join('')
+      : '<tr><td colspan="3">Ingen tests kørt endnu.</td></tr>';
+  }
   annotateHeaders(section);
   annotateTableCells(section);
   applyButtonTooltips(section);
   applyControlTooltips(section);
 }
 async function runTests() {
-  const tbody = document.querySelector('#testsBody');
-  if (!tbody) {
+  const section = document.querySelector('section[data-tab="tests"]');
+  if (!section) {
     activateTab('tests');
     return setTimeout(runTests, 200);
   }
@@ -1893,18 +2616,20 @@ async function runTests() {
     console.error(err);
     results.push(['Testfejl', false, err.message]);
   }
-  tbody.innerHTML = results.map(([name, pass, detail]) => `<tr><td>${esc(name)}</td><td>${pass ? 'OK' : 'FEJL'}</td><td>${esc(detail||'')}</td></tr>`).join('');
-  annotateTableCells(document.querySelector('section[data-tab="tests"]'));
+  state.testResults = results;
+  renderTestsTab(section);
   await loadAllStores();
   renderAll();
+  const refreshedSection = document.querySelector('section[data-tab="tests"]');
+  if (refreshedSection) renderTestsTab(refreshedSection);
 }
 async function buildZipFiles() {
   const backup = JSON.stringify(await exportData(), null, 2);
   const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
-  const readme = 'GLIMS - lokalt enkeltfil-LIMS\n\nÅbn glims.html i en moderne browser.\n';
+  const readme = 'GlimR - lokalt enkeltfil-LIMS\n\nÅbn glims.html i en moderne browser.\n';
   return [
     {name:'glims.html', data:utf8Encode(html)},
-    {name:'glims-backup.json', data:utf8Encode(backup)},
+    {name:'glimr-backup.json', data:utf8Encode(backup)},
     {name:'README.txt', data:utf8Encode(readme)}
   ];
 }
@@ -2000,7 +2725,7 @@ function createZip(files) {
   return buffer.slice(0, offset);
 }
 async function generateSqlDump() {
-  const createStatements = `SET NAMES utf8mb4;\nSET FOREIGN_KEY_CHECKS=0;\nCREATE TABLE IF NOT EXISTS \`patients\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`mrn\` VARCHAR(64),\n  \`name\` VARCHAR(255),\n  \`gender\` VARCHAR(32),\n  \`birth_date\` DATE,\n  \`notes\` TEXT,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`users\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`name\` VARCHAR(255),\n  \`email\` VARCHAR(255),\n  \`role\` VARCHAR(128),\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`panels\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`name\` VARCHAR(255),\n  \`description\` TEXT,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`samples\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`patient_id\` INT,\n  \`sample_type\` VARCHAR(128),\n  \`collected_at\` DATETIME,\n  \`status\` VARCHAR(64),\n  \`notes\` TEXT,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME,\n  CONSTRAINT fk_samples_patient FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`orders\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`patient_id\` INT,\n  \`sample_id\` INT,\n  \`panel_id\` INT NULL,\n  \`clinician\` VARCHAR(255),\n  \`status\` VARCHAR(64),\n  \`ordered_at\` DATETIME,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME,\n  CONSTRAINT fk_orders_patient FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,\n  CONSTRAINT fk_orders_sample FOREIGN KEY (sample_id) REFERENCES samples(id) ON DELETE CASCADE ON UPDATE CASCADE,\n  CONSTRAINT fk_orders_panel FOREIGN KEY (panel_id) REFERENCES panels(id) ON DELETE SET NULL ON UPDATE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`reports\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`order_id\` INT,\n  \`findings\` TEXT,\n  \`summary\` TEXT,\n  \`status\` VARCHAR(32),\n  \`issued_at\` DATETIME,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME,\n  CONSTRAINT fk_reports_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE ON UPDATE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`qc_metrics\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`sample_id\` INT,\n  \`metric\` VARCHAR(128),\n  \`value\` DECIMAL(18,6),\n  \`unit\` VARCHAR(64),\n  \`notes\` TEXT,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME,\n  CONSTRAINT fk_qc_sample FOREIGN KEY (sample_id) REFERENCES samples(id) ON DELETE CASCADE ON UPDATE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`variants\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`order_id\` INT,\n  \`gene\` VARCHAR(128),\n  \`transcript\` VARCHAR(128),\n  \`hgvs_c\` VARCHAR(255),\n  \`hgvs_p\` VARCHAR(255),\n  \`zygosity\` VARCHAR(64),\n  \`classification\` VARCHAR(8),\n  \`criteria\` VARCHAR(255),\n  \`af\` DECIMAL(18,6),\n  \`interpretation\` TEXT,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME,\n  CONSTRAINT fk_variants_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE ON UPDATE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`variant_library\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`gene\` VARCHAR(128),\n  \`transcript\` VARCHAR(128),\n  \`hgvs_c\` VARCHAR(255),\n  \`hgvs_p\` VARCHAR(255),\n  \`classification\` VARCHAR(8),\n  \`criteria\` VARCHAR(255),\n  \`evidence\` TEXT,\n  \`condition\` VARCHAR(255),\n  \`inheritance\` VARCHAR(128),\n  \`curated_by\` VARCHAR(255),\n  \`last_review\` DATE,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`responses\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`ts\` DATETIME,\n  \`sender\` VARCHAR(255),\n  \`patient\` VARCHAR(255),\n  \`diagnostic_report_id\` VARCHAR(255),\n  \`variant_count\` INT,\n  \`variants\` TEXT,\n  \`raw\` LONGTEXT,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`audit_log\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`ts\` DATETIME,\n  \`user\` VARCHAR(128),\n  \`action\` VARCHAR(64),\n  \`entity\` VARCHAR(64),\n  \`entity_id\` INT,\n  \`before\` LONGTEXT,\n  \`after\` LONGTEXT,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nSET FOREIGN_KEY_CHECKS=1;\n`;
+  const createStatements = `SET NAMES utf8mb4;\nSET FOREIGN_KEY_CHECKS=0;\nCREATE TABLE IF NOT EXISTS \`patients\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`mrn\` VARCHAR(64),\n  \`name\` VARCHAR(255),\n  \`gender\` VARCHAR(32),\n  \`birth_date\` DATE,\n  \`notes\` TEXT,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`users\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`name\` VARCHAR(255),\n  \`email\` VARCHAR(255),\n  \`role\` VARCHAR(128),\n  \`pin\` VARCHAR(128),\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`panels\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`name\` VARCHAR(255),\n  \`description\` TEXT,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`samples\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`patient_id\` INT,\n  \`sample_type\` VARCHAR(128),\n  \`collected_at\` DATETIME,\n  \`status\` VARCHAR(64),\n  \`notes\` TEXT,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME,\n  CONSTRAINT fk_samples_patient FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`orders\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`patient_id\` INT,\n  \`sample_id\` INT,\n  \`panel_id\` INT NULL,\n  \`clinician\` VARCHAR(255),\n  \`status\` VARCHAR(64),\n  \`ordered_at\` DATETIME,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME,\n  CONSTRAINT fk_orders_patient FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,\n  CONSTRAINT fk_orders_sample FOREIGN KEY (sample_id) REFERENCES samples(id) ON DELETE CASCADE ON UPDATE CASCADE,\n  CONSTRAINT fk_orders_panel FOREIGN KEY (panel_id) REFERENCES panels(id) ON DELETE SET NULL ON UPDATE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`reports\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`order_id\` INT,\n  \`findings\` TEXT,\n  \`summary\` TEXT,\n  \`status\` VARCHAR(32),\n  \`issued_at\` DATETIME,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME,\n  CONSTRAINT fk_reports_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE ON UPDATE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`qc_metrics\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`sample_id\` INT,\n  \`metric\` VARCHAR(128),\n  \`value\` DECIMAL(18,6),\n  \`unit\` VARCHAR(64),\n  \`notes\` TEXT,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME,\n  CONSTRAINT fk_qc_sample FOREIGN KEY (sample_id) REFERENCES samples(id) ON DELETE CASCADE ON UPDATE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`variants\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`order_id\` INT,\n  \`gene\` VARCHAR(128),\n  \`transcript\` VARCHAR(128),\n  \`hgvs_c\` VARCHAR(255),\n  \`hgvs_p\` VARCHAR(255),\n  \`zygosity\` VARCHAR(64),\n  \`classification\` VARCHAR(8),\n  \`criteria\` VARCHAR(255),\n  \`af\` DECIMAL(18,6),\n  \`interpretation\` TEXT,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME,\n  CONSTRAINT fk_variants_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE ON UPDATE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`variant_library\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`gene\` VARCHAR(128),\n  \`transcript\` VARCHAR(128),\n  \`hgvs_c\` VARCHAR(255),\n  \`hgvs_p\` VARCHAR(255),\n  \`classification\` VARCHAR(8),\n  \`criteria\` VARCHAR(255),\n  \`evidence\` TEXT,\n  \`condition\` VARCHAR(255),\n  \`inheritance\` VARCHAR(128),\n  \`curated_by\` VARCHAR(255),\n  \`last_review\` DATE,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`responses\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`ts\` DATETIME,\n  \`sender\` VARCHAR(255),\n  \`patient\` VARCHAR(255),\n  \`diagnostic_report_id\` VARCHAR(255),\n  \`variant_count\` INT,\n  \`variants\` TEXT,\n  \`raw\` LONGTEXT,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`audit_log\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`ts\` DATETIME,\n  \`user\` VARCHAR(128),\n  \`action\` VARCHAR(64),\n  \`entity\` VARCHAR(64),\n  \`entity_id\` INT,\n  \`before\` LONGTEXT,\n  \`after\` LONGTEXT,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nSET FOREIGN_KEY_CHECKS=1;\n`;
   const rows = await exportData();
   const inserts = [];
   const mapTable = {
@@ -2022,6 +2747,7 @@ function sqlValue(val) {
   return `'${str}'`;
 }
 async function loadDemoData() {
+  if (!ensureWrite('patients')) return;
   if (!confirm('Indlæse demo-data? Dette overskriver ikke eksisterende poster men tilføjer hvis tomt.')) return;
   if (!getCached('patients').length) {
     const p1 = await addRecord('patients', {mrn:'MRN001', name:'Anna Jensen', gender:'female', birth_date:'1985-03-12', notes:'Familiehistorik positiv'});
@@ -2034,21 +2760,48 @@ async function loadDemoData() {
     await addRecord('variants', {order_id:o1, gene:'BRCA1', transcript:'NM_007294.3', hgvs_c:'c.5266dupC', hgvs_p:'p.Gln1756Profs', zygosity:'heterozygot', classification:'5', criteria:'PVS1,PS3,PM2,PP3', af:0.0001, interpretation:'Patogen variant med høj risiko'});
     await addRecord('qc', {sample_id:s1, metric:'Dækning', value:98.5, unit:'%', notes:''});
     await addRecord('reports', {order_id:o2, findings:'Ingen klinisk signifikante varianter', summary:'Negativ rapport', status:'final', issued_at:new Date().toISOString()});
-    await addRecord('users', {name:'Admin', email:'admin@example.com', role:'Administrator'});
+    await addRecord('users', {name:'Admin', email:'admin@example.com', role:'Administrator', pin:'admin'});
   } else {
     alert('Demo-data allerede til stede.');
   }
   await loadAllStores();
   renderAll();
+  refreshLoginOptions();
+  updateAuthUi();
 }
 function hookUi() {
-  document.getElementById('demoDataBtn').addEventListener('click', loadDemoData);
-  document.getElementById('runTestsBtn').addEventListener('click', () => {
-    activateTab('tests');
-    setTimeout(runTests, 200);
-  });
-  setTooltip(document.getElementById('demoDataBtn'), tooltipCatalog.buttons.demoDataBtn);
-  setTooltip(document.getElementById('runTestsBtn'), tooltipCatalog.buttons.runTestsBtn);
+  const loginForm = document.getElementById('loginForm');
+  if (loginForm) loginForm.addEventListener('submit', handleLogin);
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', logoutUser);
+    setTooltip(logoutBtn, tooltipCatalog.buttons.logoutBtn);
+  }
+  const themeBtn = document.getElementById('themeToggle');
+  if (themeBtn) {
+    themeBtn.addEventListener('click', toggleTheme);
+    setTooltip(themeBtn, tooltipCatalog.buttons.themeToggle);
+  }
+  const demoBtn = document.getElementById('demoDataBtn');
+  if (demoBtn) {
+    demoBtn.addEventListener('click', () => {
+      if (!ensureWrite('patients')) return;
+      loadDemoData();
+    });
+    setTooltip(demoBtn, tooltipCatalog.buttons.demoDataBtn);
+  }
+  const testsBtn = document.getElementById('runTestsBtn');
+  if (testsBtn) {
+    testsBtn.addEventListener('click', () => {
+      activateTab('tests');
+      setTimeout(runTests, 200);
+    });
+    setTooltip(testsBtn, tooltipCatalog.buttons.runTestsBtn);
+  }
+  applyTheme();
+  refreshLoginOptions();
+  updateAuthUi();
+  applyControlTooltips(document.body);
 }
 async function init() {
   initTabs();
@@ -2057,6 +2810,7 @@ async function init() {
     setStatus('Database åben');
     await loadAllStores();
     hookUi();
+    restoreUserSession();
     renderAll();
     activateTab('dashboard');
   } catch (err) {
