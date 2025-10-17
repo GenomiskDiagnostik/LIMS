@@ -601,7 +601,7 @@ const tooltipCatalog = {
     }
   },
   buttons: {
-    demoDataBtn: 'Indlæser et demodatasæt til hurtig afprøvning (kræver skriveadgang).',
+    demoDataBtn: 'Indlæser et demodatasæt til hurtig afprøvning (kun i en tom database med skriveadgang).',
     runTestsBtn: 'Kører den indbyggede selvtest og viser resultater.',
     patientClear: 'Ryd formularen for at registrere en ny patient.',
     patientDelete: 'Slet den valgte patient permanent.',
@@ -1009,9 +1009,26 @@ async function loadAllStores() {
   for (const name of STORES) {
     await loadStore(name);
   }
+  updateDemoButtonState();
 }
 function getCached(name) {
   return state.cache.get(name) ?? [];
+}
+function isDatabaseEmpty() {
+  return STORES.every(store => {
+    const records = getCached(store);
+    return !records || records.length === 0;
+  });
+}
+function updateDemoButtonState() {
+  const demoBtn = document.getElementById('demoDataBtn');
+  if (!demoBtn) return;
+  const empty = isDatabaseEmpty();
+  demoBtn.disabled = !empty;
+  const tip = empty
+    ? tooltipCatalog.buttons.demoDataBtn
+    : 'Demo-data kan kun indlæses i en tom database.';
+  setTooltip(demoBtn, tip);
 }
 function findById(store, id) {
   return getCached(store).find(item => item.id === id);
@@ -1027,6 +1044,7 @@ async function addRecord(store, record) {
   await loadStore(store);
   await logAudit('CREATE', store, id, null, record);
   scheduleAutosave();
+  updateDemoButtonState();
   return id;
 }
 async function updateRecord(store, record, before) {
@@ -1047,6 +1065,7 @@ async function deleteRecord(store, id) {
   await loadStore(store);
   await logAudit('DELETE', store, id, existing, null);
   scheduleAutosave();
+  updateDemoButtonState();
 }
 async function logAudit(action, entity, entityId, before, after) {
   const entry = {
@@ -2748,26 +2767,28 @@ function sqlValue(val) {
 }
 async function loadDemoData() {
   if (!ensureWrite('patients')) return;
-  if (!confirm('Indlæse demo-data? Dette overskriver ikke eksisterende poster men tilføjer hvis tomt.')) return;
-  if (!getCached('patients').length) {
-    const p1 = await addRecord('patients', {mrn:'MRN001', name:'Anna Jensen', gender:'female', birth_date:'1985-03-12', notes:'Familiehistorik positiv'});
-    const p2 = await addRecord('patients', {mrn:'MRN002', name:'Lars Petersen', gender:'male', birth_date:'1978-11-03', notes:''});
-    const s1 = await addRecord('samples', {patient_id:p1, sample_type:'Blod', status:'sequencing', collected_at:new Date().toISOString(), notes:''});
-    const s2 = await addRecord('samples', {patient_id:p2, sample_type:'Spyt', status:'analysis', collected_at:new Date().toISOString(), notes:''});
-    const panel = await addRecord('panels', {name:'Onko-panel', description:'50 gener'});
-    const o1 = await addRecord('orders', {patient_id:p1, sample_id:s1, panel_id:panel, clinician:'Dr. Holm', status:'analysis', ordered_at:new Date().toISOString()});
-    const o2 = await addRecord('orders', {patient_id:p2, sample_id:s2, panel_id:panel, clinician:'Dr. Holm', status:'reported', ordered_at:new Date().toISOString()});
-    await addRecord('variants', {order_id:o1, gene:'BRCA1', transcript:'NM_007294.3', hgvs_c:'c.5266dupC', hgvs_p:'p.Gln1756Profs', zygosity:'heterozygot', classification:'5', criteria:'PVS1,PS3,PM2,PP3', af:0.0001, interpretation:'Patogen variant med høj risiko'});
-    await addRecord('qc', {sample_id:s1, metric:'Dækning', value:98.5, unit:'%', notes:''});
-    await addRecord('reports', {order_id:o2, findings:'Ingen klinisk signifikante varianter', summary:'Negativ rapport', status:'final', issued_at:new Date().toISOString()});
-    await addRecord('users', {name:'Admin', email:'admin@example.com', role:'Administrator', pin:'admin'});
-  } else {
-    alert('Demo-data allerede til stede.');
+  if (!isDatabaseEmpty()) {
+    alert('Demo-data kan kun indlæses i en tom database.');
+    updateDemoButtonState();
+    return;
   }
+  if (!confirm('Indlæse demo-data? Dette er kun muligt i en tom database.')) return;
+  const p1 = await addRecord('patients', {mrn:'MRN001', name:'Anna Jensen', gender:'female', birth_date:'1985-03-12', notes:'Familiehistorik positiv'});
+  const p2 = await addRecord('patients', {mrn:'MRN002', name:'Lars Petersen', gender:'male', birth_date:'1978-11-03', notes:''});
+  const s1 = await addRecord('samples', {patient_id:p1, sample_type:'Blod', status:'sequencing', collected_at:new Date().toISOString(), notes:''});
+  const s2 = await addRecord('samples', {patient_id:p2, sample_type:'Spyt', status:'analysis', collected_at:new Date().toISOString(), notes:''});
+  const panel = await addRecord('panels', {name:'Onko-panel', description:'50 gener'});
+  const o1 = await addRecord('orders', {patient_id:p1, sample_id:s1, panel_id:panel, clinician:'Dr. Holm', status:'analysis', ordered_at:new Date().toISOString()});
+  const o2 = await addRecord('orders', {patient_id:p2, sample_id:s2, panel_id:panel, clinician:'Dr. Holm', status:'reported', ordered_at:new Date().toISOString()});
+  await addRecord('variants', {order_id:o1, gene:'BRCA1', transcript:'NM_007294.3', hgvs_c:'c.5266dupC', hgvs_p:'p.Gln1756Profs', zygosity:'heterozygot', classification:'5', criteria:'PVS1,PS3,PM2,PP3', af:0.0001, interpretation:'Patogen variant med høj risiko'});
+  await addRecord('qc', {sample_id:s1, metric:'Dækning', value:98.5, unit:'%', notes:''});
+  await addRecord('reports', {order_id:o2, findings:'Ingen klinisk signifikante varianter', summary:'Negativ rapport', status:'final', issued_at:new Date().toISOString()});
+  await addRecord('users', {name:'Admin', email:'admin@example.com', role:'Administrator', pin:'admin'});
   await loadAllStores();
   renderAll();
   refreshLoginOptions();
   updateAuthUi();
+  updateDemoButtonState();
 }
 function hookUi() {
   const loginForm = document.getElementById('loginForm');
@@ -2784,11 +2805,8 @@ function hookUi() {
   }
   const demoBtn = document.getElementById('demoDataBtn');
   if (demoBtn) {
-    demoBtn.addEventListener('click', () => {
-      if (!ensureWrite('patients')) return;
-      loadDemoData();
-    });
-    setTooltip(demoBtn, tooltipCatalog.buttons.demoDataBtn);
+    demoBtn.addEventListener('click', loadDemoData);
+    updateDemoButtonState();
   }
   const testsBtn = document.getElementById('runTestsBtn');
   if (testsBtn) {
