@@ -93,7 +93,7 @@ header {
   object-fit: contain;
 }
 .brand.logo-missing::after {
-  content: 'Logo mangler – brug Administration → Hent logo-fil og placer glimr-logo.png ved siden af glims.html.';
+  content: 'Logo mangler – brug Administration → Hent logo-fil og placer glimr-logo.png ved siden af GlimR.html.';
   display: block;
   font-size: 0.75rem;
   color: var(--muted-text);
@@ -415,8 +415,6 @@ pre {
     </div>
     <div class="quick-actions">
       <button class="secondary" id="themeToggle">Skift til mørkt tema</button>
-      <button class="primary" id="demoDataBtn">Indlæs demo-data</button>
-      <button class="secondary" id="runTestsBtn">Kør selvtest</button>
     </div>
   </div>
 </header>
@@ -750,7 +748,7 @@ const tooltipCatalog = {
     downloadSql: 'Download komplet MySQL-dump af GlimR-data.',
     showSchema: 'Vis MySQL-skemaet direkte på siden.',
     downloadZip: 'Download ZIP med GlimR og aktuelle data.',
-    downloadLogo: 'Download den officielle GlimR-logo PNG til placering ved siden af glims.html.',
+    downloadLogo: 'Download den officielle GlimR-logo PNG til placering ved siden af GlimR.html.',
     bindFile: 'Vælg eller opret en lokal databasefil til autogem.',
     saveNow: 'Gem straks til den tilknyttede databasefil.',
     downloadBackup: 'Eksportér alle data som JSON-backup.',
@@ -1325,7 +1323,7 @@ function downloadLogoAsset() {
     const filename = withDateStamp('glimr-logo.png');
     triggerDownload(url, filename);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setStatus(`Logo downloadet som ${filename}. Placér filen ved siden af glims.html for at se det i headeren.`);
+    setStatus(`Logo downloadet som ${filename}. Placér filen ved siden af GlimR.html for at se det i headeren.`);
   } catch (err) {
     console.error(err);
     alert('Kunne ikke generere logo-filen. Prøv i stedet kommandolinje-eksemplet i README.');
@@ -2814,6 +2812,9 @@ function renderAdmin(section) {
   section.innerHTML = `
   <div class="panel">
     <div class="btn-row">
+      <button class="primary" id="demoDataBtn">Indlæs demo-data</button>
+    </div>
+    <div class="btn-row">
       <button class="primary" id="downloadSql">Hent glimr.sql</button>
       <button class="secondary" id="showSchema">Vis skema</button>
       <button class="secondary" id="downloadZip">Hent ZIP</button>
@@ -2823,6 +2824,13 @@ function renderAdmin(section) {
   </div>`;
   applyButtonTooltips(section);
   applyControlTooltips(section);
+  const demoBtn = section.querySelector('#demoDataBtn');
+  if (demoBtn) {
+    demoBtn.addEventListener('click', () => {
+      if (!ensureWrite('patients')) return;
+      loadDemoData();
+    });
+  }
   section.querySelector('#downloadSql').addEventListener('click', async () => {
     const sql = await generateSqlDump();
     const blob = new Blob([sql], {type:'text/sql'});
@@ -2854,6 +2862,9 @@ function renderTestsTab(section) {
   section.innerHTML = `
   <div class="panel">
     <h2>Selvtest</h2>
+    <div class="btn-row">
+      <button class="primary" id="runTestsBtn">Kør selvtest</button>
+    </div>
     <table><thead><tr><th>Test</th><th>Status</th><th>Detaljer</th></tr></thead><tbody id="testsBody"></tbody></table>
   </div>`;
   const tbody = section.querySelector('#testsBody');
@@ -2866,6 +2877,12 @@ function renderTestsTab(section) {
   annotateTableCells(section);
   applyButtonTooltips(section);
   applyControlTooltips(section);
+  const testsBtn = section.querySelector('#runTestsBtn');
+  if (testsBtn) {
+    testsBtn.addEventListener('click', () => {
+      runTests();
+    });
+  }
 }
 async function runTests() {
   const section = document.querySelector('section[data-tab="tests"]');
@@ -2908,9 +2925,9 @@ async function runTests() {
 async function buildZipFiles() {
   const backup = JSON.stringify(await exportData(), null, 2);
   const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
-  const readme = 'GlimR - lokalt enkeltfil-LIMS\n\nÅbn glims.html i en moderne browser.\n';
+  const readme = 'GlimR - lokalt enkeltfil-LIMS\n\nÅbn GlimR.html i en moderne browser.\n';
   return [
-    {name:'glims.html', data:utf8Encode(html)},
+    {name:'GlimR.html', data:utf8Encode(html)},
     {name:'glimr-backup.json', data:utf8Encode(backup)},
     {name:'README.txt', data:utf8Encode(readme)}
   ];
@@ -3063,22 +3080,6 @@ function hookUi() {
   if (themeBtn) {
     themeBtn.addEventListener('click', toggleTheme);
     setTooltip(themeBtn, tooltipCatalog.buttons.themeToggle);
-  }
-  const demoBtn = document.getElementById('demoDataBtn');
-  if (demoBtn) {
-    demoBtn.addEventListener('click', () => {
-      if (!ensureWrite('patients')) return;
-      loadDemoData();
-    });
-    setTooltip(demoBtn, tooltipCatalog.buttons.demoDataBtn);
-  }
-  const testsBtn = document.getElementById('runTestsBtn');
-  if (testsBtn) {
-    testsBtn.addEventListener('click', () => {
-      activateTab('tests');
-      setTimeout(runTests, 200);
-    });
-    setTooltip(testsBtn, tooltipCatalog.buttons.runTestsBtn);
   }
   const logoImg = document.getElementById('glimrLogo');
   if (logoImg) {
