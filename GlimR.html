@@ -93,7 +93,7 @@ header {
   object-fit: contain;
 }
 .brand.logo-missing::after {
-  content: 'Logo mangler – brug Administration → Hent logo-fil og placer glimr-logo.png ved siden af GlimR.html.';
+  content: 'Logo mangler – placer logo.png ved siden af GlimR.html.';
   display: block;
   font-size: 0.75rem;
   color: var(--muted-text);
@@ -400,7 +400,7 @@ pre {
 <body>
 <header>
   <div class="brand">
-    <img id="glimrLogo" src="glimr-logo.png" alt="GlimR logo" loading="lazy">
+    <img id="glimrLogo" src="logo.png" alt="G" loading="lazy">
     <div>
       <h1>GlimR – Genetic LIMS Reporter</h1>
       <div id="statusBar">Initialiserer...</div>
@@ -431,84 +431,6 @@ pre {
 const DB_NAME = 'glims';
 const DB_VER = 2;
 const STORES = ['patients','samples','orders','panels','variants','qc','reports','users','audit','variant_library','responses'];
-const GLIMR_LOGO_BASE64 = `
-iVBORw0KGgoAAAANSUhEUgAAAUAAAAFACAYAAADNkKWqAAAXMklEQVR4nO3dd3iV9d3H8c9JTk4m
-ISEBEkQIQwgCynai4tZarBW1DlQcLa2jbrFYtWrr5agDdx042lq19vGCB0e14sCByFKgQaAhYSQh
-ZJA9z3n+oPg4ss45v5PB9/26Lv/Q5Nz3HcA39/j9frcnddDhAQGAQVFdfQAA0FUIIACzCCAAswgg
-ALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAA
-swggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACz
-CCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMI
-IACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswgg
-ALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAA
-swggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACz
-CCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMI
-IACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswgg
-ALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALO8XX0Ae7PN
-r32m5MSmkD+/cWu8plwysccfA9BddZsApvZq0gHDqjRycI0GpDdoQHq9BqQ3qH+fBsX5/IqL9Sve
-51dcbLP8fo8aGqPU0ORRTV20yiq9Kq3wqrQiRlt3xGrLjljlF8Xp6/wE5RbEKRDo6p8OQHfUZQHM
-yqzTcZPLNHVcuQ4cXqV9+9V3+LNR0QF5o5uVICklqUkD0lv/bE1dtHLyErRyQ5KWrk3W0rXJ2rIj
-1sFPAKCn69QADh9Yq/NOKNJJB5dov31rO2WfCXHNmjCyUhNGVuriUwokSflFcXp3WareWZaqD1el
-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
-`.replace(/\s+/g, '');
 const state = {
   db: null,
   cache: new Map(),
@@ -754,7 +676,6 @@ const tooltipCatalog = {
     downloadSql: 'Download komplet MySQL-dump af GlimR-data.',
     showSchema: 'Vis MySQL-skemaet direkte på siden.',
     downloadZip: 'Download ZIP med GlimR og aktuelle data.',
-    downloadLogo: 'Download den officielle GlimR-logo PNG til placering ved siden af GlimR.html.',
     bindFile: 'Vælg eller opret en lokal databasefil til autogem.',
     saveNow: 'Gem straks til den tilknyttede databasefil.',
     downloadBackup: 'Eksportér alle data som JSON-backup.',
@@ -1340,28 +1261,6 @@ function downloadJsonFile(data, baseName) {
   triggerDownload(url, filename);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   return filename;
-}
-function downloadLogoAsset() {
-  if (!GLIMR_LOGO_BASE64) {
-    alert('Logo-data er ikke tilgængelig i denne GlimR-version.');
-    return;
-  }
-  try {
-    const binary = atob(GLIMR_LOGO_BASE64);
-    const buffer = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      buffer[i] = binary.charCodeAt(i);
-    }
-    const blob = new Blob([buffer], {type: 'image/png'});
-    const url = URL.createObjectURL(blob);
-    const filename = withDateStamp('glimr-logo.png');
-    triggerDownload(url, filename);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setStatus(`Logo downloadet som ${filename}. Placér filen ved siden af GlimR.html for at se det i headeren.`);
-  } catch (err) {
-    console.error(err);
-    alert('Kunne ikke generere logo-filen. Prøv i stedet kommandolinje-eksemplet i README.');
-  }
 }
 function withDateStamp(filename) {
   const stamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0].replace('T', '-');
@@ -2860,7 +2759,6 @@ function renderAdmin(section) {
       <button class="primary" id="downloadSql">Hent glimr.sql</button>
       <button class="secondary" id="showSchema">Vis skema</button>
       <button class="secondary" id="downloadZip">Hent ZIP</button>
-      <button class="secondary" id="downloadLogo">Hent logo-fil</button>
     </div>
     <textarea id="schemaText" style="width:100%;min-height:200px;margin-top:1rem;display:none;"></textarea>
   </div>`;
@@ -2898,7 +2796,6 @@ function renderAdmin(section) {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     setStatus(`ZIP-arkiv downloadet som ${filename}.`);
   });
-  section.querySelector('#downloadLogo').addEventListener('click', downloadLogoAsset);
 }
 function renderTestsTab(section) {
   section.innerHTML = `
@@ -3130,15 +3027,17 @@ function hookUi() {
   const logoImg = document.getElementById('glimrLogo');
   if (logoImg) {
     const brand = logoImg.closest('.brand');
-    logoImg.addEventListener('error', () => {
+    const markMissing = () => {
       if (brand) {
         brand.classList.add('logo-missing');
       }
-      logoImg.remove();
-    }, { once: true });
+      if (logoImg.parentElement) {
+        logoImg.remove();
+      }
+    };
+    logoImg.addEventListener('error', markMissing, { once: true });
     if (brand && logoImg.complete && logoImg.naturalWidth === 0) {
-      brand.classList.add('logo-missing');
-      logoImg.remove();
+      markMissing();
     }
   }
   applyTheme();
