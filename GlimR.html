@@ -530,11 +530,12 @@ const tooltipCatalog = {
     'Prøver': 'Antal registrerede laboratorieprøver.',
     'Ordinationer': 'Samlet antal aktive og historiske ordinationer.',
     'Modtaget': 'Prøver registreret som modtaget i laboratoriet.',
+    'Aktive': 'Prøver i aktiv behandling (QC, Analyse, Tolkning eller Rapport).',
     'Analyse': 'Prøver markeret som i analysefasen.',
     'Tolkning': 'Prøver under tolkning af resultater.',
     'Rapport': 'Prøver i rapporteringsfasen.',
-    'Aktive': 'Prøver i aktiv behandling (QC, Analyse, Tolkning eller Rapport).',
-    'Varianter': 'Antal registrerede genetiske varianter.'
+    'Varianter': 'Antal registrerede genetiske varianter.',
+    'Biobank': 'Prøver arkiveret i biobanken.'
   },
   headers: {
     'ID': 'Intern databaseidentifikator for posten.',
@@ -1356,8 +1357,9 @@ function renderDashboard(section) {
     else if (status === 'analyse') acc.analysis += 1;
     else if (status === 'tolkning') acc.interpretation += 1;
     else if (status === 'rapport') acc.report += 1;
+    else if (status === 'biobank') acc.biobank += 1;
     return acc;
-  }, {received: 0, qc: 0, analysis: 0, interpretation: 0, report: 0});
+  }, {received: 0, qc: 0, analysis: 0, interpretation: 0, report: 0, biobank: 0});
   const activeCount = statusCounts.qc + statusCounts.analysis + statusCounts.interpretation + statusCounts.report;
   const recentOrders = orders.slice().sort((a,b)=> (b.updated_at||'').localeCompare(a.updated_at||'' )).slice(0,5);
   const audit = getCached('audit').slice(-5).reverse();
@@ -1369,11 +1371,12 @@ function renderDashboard(section) {
       <div><div class="badge">Prøver</div><h3>${sampleCount}</h3></div>
       <div><div class="badge">Ordinationer</div><h3>${orders.length}</h3></div>
       <div><div class="badge">Modtaget</div><h3>${statusCounts.received}</h3></div>
+      <div><div class="badge">Aktive</div><h3>${activeCount}</h3></div>
       <div><div class="badge">Analyse</div><h3>${statusCounts.analysis}</h3></div>
       <div><div class="badge">Tolkning</div><h3>${statusCounts.interpretation}</h3></div>
       <div><div class="badge">Rapport</div><h3>${statusCounts.report}</h3></div>
-      <div><div class="badge">Aktive</div><h3>${activeCount}</h3></div>
       <div><div class="badge">Varianter</div><h3>${variants.length}</h3></div>
+      <div><div class="badge">Biobank</div><h3>${statusCounts.biobank}</h3></div>
     </div>
   </div>
   <div class="panel">
