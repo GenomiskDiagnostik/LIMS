@@ -533,6 +533,7 @@ const tooltipCatalog = {
     'Analyse': 'Prøver markeret som i analysefasen.',
     'Tolkning': 'Prøver under tolkning af resultater.',
     'Rapport': 'Prøver i rapporteringsfasen.',
+    'Aktive': 'Prøver i aktiv behandling (QC, Analyse, Tolkning eller Rapport).',
     'Varianter': 'Antal registrerede genetiske varianter.'
   },
   headers: {
@@ -1351,11 +1352,13 @@ function renderDashboard(section) {
   const statusCounts = samples.reduce((acc, sample) => {
     const status = (sample.status || '').toLowerCase();
     if (status === 'modtaget') acc.received += 1;
+    else if (status === 'qc') acc.qc += 1;
     else if (status === 'analyse') acc.analysis += 1;
     else if (status === 'tolkning') acc.interpretation += 1;
     else if (status === 'rapport') acc.report += 1;
     return acc;
-  }, {received: 0, analysis: 0, interpretation: 0, report: 0});
+  }, {received: 0, qc: 0, analysis: 0, interpretation: 0, report: 0});
+  const activeCount = statusCounts.qc + statusCounts.analysis + statusCounts.interpretation + statusCounts.report;
   const recentOrders = orders.slice().sort((a,b)=> (b.updated_at||'').localeCompare(a.updated_at||'' )).slice(0,5);
   const audit = getCached('audit').slice(-5).reverse();
   section.innerHTML = `
@@ -1369,6 +1372,7 @@ function renderDashboard(section) {
       <div><div class="badge">Analyse</div><h3>${statusCounts.analysis}</h3></div>
       <div><div class="badge">Tolkning</div><h3>${statusCounts.interpretation}</h3></div>
       <div><div class="badge">Rapport</div><h3>${statusCounts.report}</h3></div>
+      <div><div class="badge">Aktive</div><h3>${activeCount}</h3></div>
       <div><div class="badge">Varianter</div><h3>${variants.length}</h3></div>
     </div>
   </div>
