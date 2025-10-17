@@ -493,6 +493,7 @@ const tabs = [
   {id:'tests', label:'Selvtest'}
 ];
 const SAMPLE_TYPES = ['Blod','Kindskrab','Biopsi','Kontrol'];
+const SAMPLE_STATUSES = ['Modtaget','Afventer','QC','Analyse','Tolkning','Rapport','Svaret','Biobank','Annulleret'];
 const schemaFields = {
   patients: ['id','mrn','name','gender','birth_date','notes','created_at','updated_at'],
   samples: ['id','pmb_number','patient_id','sample_type','collected_at','status','notes','created_at','updated_at'],
@@ -1383,7 +1384,7 @@ function fillForm(form, record) {
         opt.dataset.legacy = 'true';
         el.appendChild(opt);
       }
-      if (el.name === 'sample_type' && asString && !Array.from(el.options).some(opt => opt.value === asString)) {
+      if (el.dataset.allowLegacyOption !== undefined && asString && !Array.from(el.options).some(opt => opt.value === asString)) {
         const opt = document.createElement('option');
         opt.value = asString;
         opt.textContent = asString;
@@ -1575,12 +1576,17 @@ function renderSamples(section) {
           </label>
           <label>PMB-nummer<input name="pmb_number" required></label>
           <label>Prøvetype
-            <select name="sample_type" required>
+            <select name="sample_type" required data-allow-legacy-option>
               <option value="">Vælg prøvetype</option>
               ${SAMPLE_TYPES.map(type => `<option value="${type}">${type}</option>`).join('')}
             </select>
           </label>
-          <label>Status<input name="status"></label>
+          <label>Status
+            <select name="status" data-allow-legacy-option>
+              <option value="">Vælg status</option>
+              ${SAMPLE_STATUSES.map(status => `<option value="${status}">${status}</option>`).join('')}
+            </select>
+          </label>
           <label>Opsamlet<input type="datetime-local" name="collected_at"></label>
           <label>Noter<textarea name="notes"></textarea></label>
           <div class="btn-row">
@@ -2880,7 +2886,7 @@ async function runTests() {
     const patientId = await addRecord('patients', {mrn:'TEST1', name:'Testpatient', gender:'other', birth_date:'1980-01-01', notes:''});
     const patient = findById('patients', patientId);
     results.push(['Oprettelse/udlæsning patient', patient?.name === 'Testpatient', `Navn: ${patient?.name}`]);
-    const sampleId = await addRecord('samples', {patient_id:patientId, pmb_number:`PMB-SELFTST-${Date.now()}`, sample_type:'Blod', status:'received', collected_at:new Date().toISOString(), notes:''});
+    const sampleId = await addRecord('samples', {patient_id:patientId, pmb_number:`PMB-SELFTST-${Date.now()}`, sample_type:'Blod', status:'Modtaget', collected_at:new Date().toISOString(), notes:''});
     const orderId = await addRecord('orders', {patient_id:patientId, sample_id:sampleId, panel_id:null, clinician:'Testperson', status:'analysis', ordered_at:new Date().toISOString()});
     results.push(['Oprettelse ordination med FK', !!findById('orders', orderId), `Ordination ${orderId}`]);
     const reportHtml = buildReportHtml(orderId, {status:'draft', issued_at:new Date().toISOString(), summary:'Test', findings:'Ingen'});
@@ -3037,8 +3043,8 @@ async function loadDemoData() {
   if (!getCached('patients').length) {
     const p1 = await addRecord('patients', {mrn:'MRN001', name:'Anna Jensen', gender:'female', birth_date:'1985-03-12', notes:'Familiehistorik positiv'});
     const p2 = await addRecord('patients', {mrn:'MRN002', name:'Lars Petersen', gender:'male', birth_date:'1978-11-03', notes:''});
-    const s1 = await addRecord('samples', {patient_id:p1, pmb_number:'PMB-0001', sample_type:'Blod', status:'sequencing', collected_at:new Date().toISOString(), notes:''});
-    const s2 = await addRecord('samples', {patient_id:p2, pmb_number:'PMB-0002', sample_type:'Kindskrab', status:'analysis', collected_at:new Date().toISOString(), notes:''});
+    const s1 = await addRecord('samples', {patient_id:p1, pmb_number:'PMB-0001', sample_type:'Blod', status:'QC', collected_at:new Date().toISOString(), notes:''});
+    const s2 = await addRecord('samples', {patient_id:p2, pmb_number:'PMB-0002', sample_type:'Kindskrab', status:'Analyse', collected_at:new Date().toISOString(), notes:''});
     const panel = await addRecord('panels', {name:'Onko-panel', description:'50 gener'});
     const o1 = await addRecord('orders', {patient_id:p1, sample_id:s1, panel_id:panel, clinician:'Dr. Holm', status:'analysis', ordered_at:new Date().toISOString()});
     const o2 = await addRecord('orders', {patient_id:p2, sample_id:s2, panel_id:panel, clinician:'Dr. Holm', status:'reported', ordered_at:new Date().toISOString()});
