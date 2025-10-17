@@ -1,0 +1,3121 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<title>GlimR – Genetic LIMS Reporter</title>
+<style>
+:root {
+  font-family: "Segoe UI", Arial, sans-serif;
+  color-scheme: light dark;
+  --bg: #f5f7fb;
+  --text: #162941;
+  --muted-text: #41516b;
+  --panel-bg: #ffffff;
+  --panel-border: #c7d2e3;
+  --shadow: 0 4px 14px rgba(18, 76, 135, 0.08);
+  --accent: #186faf;
+  --accent-strong: #124c87;
+  --danger: #c0392b;
+  --nav-bg: #ffffff;
+  --nav-border: #c7d2e3;
+  --nav-button-bg: #e3ecf8;
+  --nav-button-color: #124c87;
+  --nav-button-active-bg: #124c87;
+  --nav-button-active-color: #ffffff;
+  --table-header-bg: #f0f4fb;
+  --table-row-border: #dde4f1;
+  --badge-bg: #dce6f7;
+  --badge-color: #0f4173;
+  --input-bg: #ffffff;
+  --input-border: #c3cde0;
+  --input-placeholder: #6b7d97;
+  --input-focus: rgba(24, 111, 175, 0.35);
+  --header-bg: linear-gradient(135deg, #124c87, #186faf);
+  --header-text: #ffffff;
+  --code-bg: #101927;
+  --code-text: #e8f1ff;
+}
+[data-theme="dark"] {
+  --bg: #0f172a;
+  --text: #e2e8f0;
+  --muted-text: #94a3b8;
+  --panel-bg: #1e293b;
+  --panel-border: #334155;
+  --shadow: 0 6px 18px rgba(8, 47, 73, 0.55);
+  --accent: #38bdf8;
+  --accent-strong: #0ea5e9;
+  --danger: #ef4444;
+  --nav-bg: #111c30;
+  --nav-border: #1f2a3c;
+  --nav-button-bg: #1f2a3c;
+  --nav-button-color: #cbd5f5;
+  --nav-button-active-bg: #0ea5e9;
+  --nav-button-active-color: #0b1120;
+  --table-header-bg: #233049;
+  --table-row-border: #2f3e58;
+  --badge-bg: #1d4ed8;
+  --badge-color: #bfdbfe;
+  --input-bg: #0f172a;
+  --input-border: #334155;
+  --input-placeholder: #64748b;
+  --input-focus: rgba(56, 189, 248, 0.45);
+  --header-bg: linear-gradient(135deg, #0b2a4a, #14395d);
+  --header-text: #e2e8f0;
+  --code-bg: #0b1120;
+  --code-text: #e2e8f0;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+header {
+  background: var(--header-bg);
+  color: var(--header-text);
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1 1 260px;
+  min-width: 200px;
+}
+.brand img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+.brand.logo-missing::after {
+  content: 'Logo mangler – brug Administration → Hent logo-fil og placer glimr-logo.png ved siden af glims.html.';
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted-text);
+}
+header h1 {
+  margin: 0;
+  font-size: 1.8rem;
+}
+#statusBar {
+  font-size: 0.9rem;
+  margin-top: 0.3rem;
+  color: var(--header-text);
+}
+.header-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: stretch;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.auth-block {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+[data-theme="dark"] .auth-block {
+  background: rgba(15, 23, 42, 0.45);
+}
+.auth-block form {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.auth-block select,
+.auth-block input {
+  min-width: 160px;
+}
+.auth-block .user-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.auth-block .user-info span {
+  font-weight: 600;
+}
+.quick-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+nav {
+  background: var(--nav-bg);
+  border-bottom: 1px solid var(--nav-border);
+  display: flex;
+  flex-wrap: wrap;
+  padding: 0.5rem 1rem;
+  gap: 0.5rem;
+}
+nav button {
+  border: none;
+  background: var(--nav-button-bg);
+  color: var(--nav-button-color);
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+nav button.active {
+  background: var(--nav-button-active-bg);
+  color: var(--nav-button-active-color);
+}
+main {
+  padding: 1.5rem;
+}
+section[data-tab] {
+  display: none;
+}
+section[data-tab].active {
+  display: block;
+}
+.panel {
+  background: var(--panel-bg);
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow);
+  padding: 1rem 1.2rem;
+  margin-bottom: 1.2rem;
+  border: 1px solid var(--panel-border);
+}
+.panel h2 {
+  margin-top: 0;
+}
+.flex {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.flex > * {
+  flex: 1 1 280px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel-bg);
+  color: inherit;
+}
+th, td {
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--table-row-border);
+  text-align: left;
+  font-size: 0.9rem;
+}
+th {
+  background: var(--table-header-bg);
+}
+form label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-top: 0.4rem;
+  color: var(--muted-text);
+}
+form input,
+form select,
+form textarea {
+  width: 100%;
+  padding: 0.4rem;
+  border-radius: 0.4rem;
+  border: 1px solid var(--input-border);
+  font-size: 0.95rem;
+  background: var(--input-bg);
+  color: var(--text);
+  transition: border 0.2s ease, box-shadow 0.2s ease;
+}
+form input::placeholder,
+form textarea::placeholder {
+  color: var(--input-placeholder);
+}
+form input:focus,
+form select:focus,
+form textarea:focus {
+  outline: 2px solid var(--input-focus);
+  border-color: var(--accent);
+}
+form textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+.btn-row {
+  margin-top: 0.8rem;
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.table-actions {
+  margin-top: 0.8rem;
+  display: flex;
+  justify-content: flex-end;
+}
+.table-actions button {
+  min-width: 220px;
+}
+button.primary {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+}
+button.danger {
+  background: var(--danger);
+  color: #fff;
+}
+button.secondary {
+  background: var(--nav-button-bg);
+  color: var(--nav-button-color);
+  border: 1px solid transparent;
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.4rem;
+  background: var(--badge-bg);
+  color: var(--badge-color);
+  font-size: 0.75rem;
+}
+input[type="search"] {
+  border-radius: 1rem;
+}
+.filterable-select {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.3rem;
+}
+.filterable-select input[type="search"] {
+  padding: 0.35rem 0.5rem;
+}
+.filterable-select select {
+  max-height: 220px;
+}
+.advanced-filter {
+  margin-top: 0.6rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 0.75rem;
+  padding: 0.35rem 0.75rem;
+  background: var(--panel-bg);
+  box-shadow: inset 0 1px 2px rgba(15, 27, 45, 0.08);
+}
+.advanced-filter summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent-strong);
+  outline: none;
+}
+.advanced-filter summary::-webkit-details-marker {
+  display: none;
+}
+.advanced-filter summary::after {
+  content: '▾';
+  float: right;
+  transform: rotate(0deg);
+  transition: transform 0.2s ease;
+}
+.advanced-filter[open] summary::after {
+  transform: rotate(-180deg);
+}
+.advanced-filter .filter-grid {
+  margin-top: 0.6rem;
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+.advanced-filter label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--muted-text);
+}
+.advanced-filter input,
+.advanced-filter select {
+  font-size: 0.9rem;
+}
+.read-only-banner {
+  background: rgba(192, 57, 43, 0.1);
+  color: var(--danger);
+  border: 1px dashed var(--danger);
+  border-radius: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+pre {
+  background: var(--code-bg);
+  color: var(--code-text);
+  padding: 0.8rem;
+  border-radius: 0.6rem;
+  overflow: auto;
+}
+@media (max-width: 900px) {
+  header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .auth-block,
+  .quick-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+@media (max-width: 600px) {
+  .auth-block form,
+  .quick-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .auth-block form > * {
+    width: 100%;
+  }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <img id="glimrLogo" src="glimr-logo.png" alt="GlimR logo" loading="lazy">
+    <div>
+      <h1>GlimR – Genetic LIMS Reporter</h1>
+      <div id="statusBar">Initialiserer...</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <div class="auth-block" id="authBlock">
+      <form id="loginForm">
+        <select id="loginUser" required></select>
+        <input id="loginPass" type="password" placeholder="Adgangskode (valgfri)">
+        <button type="submit" class="primary">Log ind</button>
+      </form>
+      <div class="user-info" id="userInfo" hidden>
+        <span id="currentUserLabel"></span>
+        <button type="button" class="secondary" id="logoutBtn">Log ud</button>
+      </div>
+    </div>
+    <div class="quick-actions">
+      <button class="secondary" id="themeToggle">Skift til mørkt tema</button>
+      <button class="primary" id="demoDataBtn">Indlæs demo-data</button>
+      <button class="secondary" id="runTestsBtn">Kør selvtest</button>
+    </div>
+  </div>
+</header>
+<nav id="tabNav"></nav>
+<main id="tabContent"></main>
+<script>
+(() => {
+'use strict';
+const DB_NAME = 'glims';
+const DB_VER = 2;
+const STORES = ['patients','samples','orders','panels','variants','qc','reports','users','audit','variant_library','responses'];
+const GLIMR_LOGO_BASE64 = `
+iVBORw0KGgoAAAANSUhEUgAAAUAAAAFACAYAAADNkKWqAAAXMklEQVR4nO3dd3iV9d3H8c9JTk4m
+ISEBEkQIQwgCynai4tZarBW1DlQcLa2jbrFYtWrr5agDdx042lq19vGCB0e14sCByFKgQaAhYSQh
+ZJA9z3n+oPg4ss45v5PB9/26Lv/Q5Nz3HcA39/j9frcnddDhAQGAQVFdfQAA0FUIIACzCCAAswgg
+ALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAA
+swggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACz
+CCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMI
+IACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswgg
+ALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAA
+swggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACz
+CCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMI
+IACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswgg
+ALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALO8XX0Ae7PN
+r32m5MSmkD+/cWu8plwysccfA9BddZsApvZq0gHDqjRycI0GpDdoQHq9BqQ3qH+fBsX5/IqL9Sve
+51dcbLP8fo8aGqPU0ORRTV20yiq9Kq3wqrQiRlt3xGrLjljlF8Xp6/wE5RbEKRDo6p8OQHfUZQHM
+yqzTcZPLNHVcuQ4cXqV9+9V3+LNR0QF5o5uVICklqUkD0lv/bE1dtHLyErRyQ5KWrk3W0rXJ2rIj
+1sFPAKCn69QADh9Yq/NOKNJJB5dov31rO2WfCXHNmjCyUhNGVuriUwokSflFcXp3WareWZaqD1el
+qLaeW6GwY+ywan3w6MpO218gIDU2e9T436u2imqvyiq9Kq/0atvOWOUXximvMFbrNidqfX6CGps8
+nXZsEQ9gjDegU6fu1AUnF+qwsbsivbsOGdS/ThedUqCLTilQTV203vi0j/6+uK/eW56qpubO+8UH
+LPB4JJ83IJ+3WYnafbtrcEbL39vQ5NGaTUlavCJF7y1P1dK1yfJH8BZWxAIY5ZFOn1asm2bmKSuz
+LlK7CVtCXLNmTCvWjGnF2lHm0/Nv9tdzizJVUOLr6kMDzPF5A99csV179hYVlPj06nv99MzCzIjc
+uorItd8R48r10eMr9OQN67t1/L6vX2qDrj9ni1a/sEwDg7gnCSAyMtMadOUZW7V8/hd65NoNykxr
+cLp9pwFMjG/WvZdv0v/ctUajsmpcbrpTeaMD8nl5dAx0F97ogM45rkifPbVcF55c6Gy7zgI4YWSl
+ljy+UhefUiAPt9EARECvhGbdf+VGPXz1BsU4OElxEsDTjtypRfd+pcEZPedyF0DPde4JRXrqxvWK
+CvNkK+wAXn/OFj09J0exPn+4mwKADps+daduvzQ3rG2EFcC5F+TppvPzuOQF0CV+edo2HTm+POTP
+hxzAq87aqmvP3hLyjgEgXB6PdO9lmxQdFdr9wJACeO4JRbpl1uaQdggALg0fWKszji4O6bNBD4Qe
+M7Ra9122KaSdBSu/KE5f5PTSivVJyt0er63FsSos9amuPkq19VGK8kjxcc2K8/nVL7VR+/St1z7p
+9RqVVaOxw6q0f1aNEuObO+VYu6us0w/u6kMAIu7Ckwv1t3f7Bf25oALYK6FZz93874g+8MgvitOL
+b/XXok/SlJOX0O73N1R5tUtSUalPX21K/M7XoqMCGjeiSkeOK9dRE8p1yJiKkE+VAXRfU/av0OCM
+OuUVxgX1uaACeOfPczV0QGSGumzYEq87n8vSok/SnM39a/Z7tDynl5bn9NL9f9tXfVMbderhO3X6
+UcU6aHSFm50ARuUWxGnirEmtfj3Ks3tyRGJ8szLTGrR/VrUmZldq+uE71Sc59DUqW3PEuHK9+FYr
+k4xbO8aOfuP4EVU67wR3I7D3qG+M0s1/GqLDZk/Qwo/dxa8lxWUxenphpk669gAdPnu85i/KUHVt
+dOR2CBjmD0iVNdEqLPFp5ddJ+ss/++uaecM16pyDdPW84dpV5XYpgoNDOKnp0BFEeaT7Lt/ofLhL
+bkGcLrhjlNb8J7H9b3Zs3eZEXfvwcN35XJZmn7ZNvzi1IKyVk9H1PJ7dM5KOmVimscOqlT24Rim9
+mpSc0KTGpiiVV3lVXB6jNZsStWpDkt5Zlqr8ouAumTpiYnalph64S+OGVyl7cI1SezUqOalZHk9A
+tXXRKqnwKr8wTjn5CVq6NlkfrU5RaUW3WZs44hqbPHr+jQx9uDJFb92/Wn1TG51sN3tw8NNvO/Sr
+Pn3qTo0fURX0xtuy5j+JOn3uGBWXxTjdbrDKKr2664XBevS1fXTZ6dt0xYxtimNQd4+SnNikS6cX
+6MKTC7VP35YXsYjxNishrlkD0ut14PAqnXtCkQIBaem6ZD2zMFP/+KBvWCuHp/Zq0i9+sl1nHbOj
+zRlRvqQm9U5q0tABdTpqQrlm/2S7Gps8WrwiVU+8PkDvr0gJ/SB6mNyCOF18V7YW3POVk+2FMhOt
+QwG8YsbWoDfclk3b4nXqjWNVVtl9/tarqN4dwhfezNAtszZH9FK8M3X1O0FifX4VLPgk5M+3dQxR
+Hmn2adt043n56pUQ/NN+j2f3ZdPBoyt05RlbNffJoVryZe+gthHr8+uan23RL0/brqQQRxzEeAM6
+fkqpjp9SqqVrk3X1vOEdegC4N1jyZW99sCpFR44rD3tbfZKbFB0VULO/45eq7d4DPHTsLqdnf+VV
+Xp3129HdKn7ftq04Vr+4Z6Q2F7i/NII7gzPq9PYDq3Xnz3NDit/3jR1Wrdfv/kq/uSCvwyMFxo+o
+0gePrNL152wJOX7fd9DoCr3/6MpvVi+3YMFH6c62FR8b3NVbuwG8dLrb34g5jw3Vf7YTF4TuoNEV
+eueh1ZqYXel0u1Ee6bqzt+jFW/7d7nJo555QpLcfWK0Rg9wv++bzBnTv5Zv0u0s2O992d/TpmmRn
+24qNcRjA+Fi/jp9SGtYBfdu7y1L1ynvBD1YE9jhiXLlev2uN0nu7uXHekhMPLtWzc3PkjW45gjec
+m6+Hr97Q6tdduWLGVl1/zt4/3XRbsbuVnitrgruybDOAx08pDfqUsjWBgHT7/Cwn24JNE7Mr9Zdb
+IzsQf4+TDynR3AvyfvDfrzxjq+bMzI/4/veYMzNPR08s67T9dYXKmmgn7+Kpa9j90qVgtBnAU6fu
+DOuAvm3Rp2ldMtwFe4f+fRr011vXderUxivP2Pqdm/MzphXr1os2d9r+pd0Pah67boOT+5zdlccj
+J0PsykN4rtBmAA87wN1b3J5/I7gR2sAe0dEBPfubHGfjxTrK45Hu+e9KIyMG1Wje1Ru6ZOm3fqkN
+um4vvhROTmxyMkU1lCfnrQZwSGad+qa4+QNXWOLT4uWpTrYFe4Zk1umQMV0zdXG/fWs160eFenrO
+i4dH3rp9O0RmT7WHQzq7+YFZCu+7hX0Z1oN4KRR7p6wvftF6l4zrg723P2rTRoztLpLjyHO59cFJ
+7mfitodHDrGzZXmivVJQX+m1QCO289tAIGeqruseH7WMTu6+hAi4qdHhbaW37dVVHv1XghXma0G0
+OWqL8tzgj81BfBdIwbVhDTftTs7dnKZJju42nzt/XTVNQS/vnOrj00G9XcTwLJKr9NxPsAejU0e
+vbOsj17+V1+tz0/QtuJYeSRlpDVo2oRyXXRKgUZGYKDy99XURev1j9L1j/fTlbs9XttLfEqM82tw
+Rp1+dGiJLp2+3dlT3KPGl+810+T227dWT96wPuzt+APS/EWZIX221QDu6+jG5Nf5e8dvFrqXtbmJ
+uugP2dqwJf4HX9u4NV4bt8brhTf76/4rN+rs4yJ36bh4eYpm3ztSxeXfXdSjviFKpRVJWvl1kp57
+I0Ov3LHWydnbIWMq9MTrA8LeTleK8QY088RC3XbxZidTCF94MyPkIXYtBrBXQrOzuY0FJT4n2wH2
+WLw8Ref8bn/Vt3PJU98Ypase2k/Zg2ucr2YkSfMXZei6R4a3u4rM1h2x+tkt+2vJEyvD/v9q7DD3
+P0ekeDxSQtzulmSmNWj0kGpNyq7U9Kk7ldrLzRPt4vIY3f5sVsifbzGALgebFux0e/k760eF+uMV
+G51usy3vLU/VjLmjO21/aNumbfG66K7sduO3R2OTRw++MlDP35zj9Dg+Wt1bNz42rMNLaOUXxemZ
+hZn69Znhraw0KKNOsT5/h3/+SBqSWafSt5Z02f7rGqJ0/h2jVB7Gwqot/iomOJr+JkkVNay4DHeu
+uH+/oFcSfndZHydTrfZoaPLoV/eNCHqbf367f9j7jvJIWSGse7e3afZ7dMldI7V0bXgLKbQYwPhY
+d2eA9Y1d/zcV9g6Ll6fosxD+wNfWR2ndZnfTMJ9/IyOkB3ubtsUH/dKelvTr5Bkx3U1phVdn/na0
+3vg0LexttVgnX4y7Ucv1jd1kEBV6vHmvDgz5s1/n//BhSage+Xvox/HlpvBDnO5ohlZP9EVOLx11
+XgtXp7iZHstXks0BrmiQlvaW1cN6IjyKq8+/iq41Zq/besON/eiV29M0pYwtpXnYKHdhLi9d2GE
+1mzZEavfPzdYry7uF9arC76vxQDW1ru7bOX9GnDhn5+Hdx+vsNTNaIQ3P+0T1ucLSsIPcbCLfvZk
+K79O0otvZeild/pF5HZaiwGsqXP34MLVcBrY9vm68GYThbJUUkuWrgvvpnuNg5MLC1dVNXXRmvun
+IXrxzYyIriPQ4u+Gi9+kPTLSGpxtC3Zt2BLegPoqR+9/Xh/mwH4XJxfdZW5yJCXENeuBKzdq1fPL
+dPEpBRE7622xdLuqvM7OAjMJIBxYH+ZDjNqG8P8876ryqjDMgf1+O1evTgzsV697L9+k9x5epbHD
+3K/I0+qpXjg3er9tv4F71+RtdL5mv0c7ysILT6OD0QhbHcxpjzFw+RoJo7Jq9M8HV+vHh7tbpV5q
+I4D5RW4C2De1sdNX8sXepdrB5auL+0iVDgb1Jxp8gutKbIxf8+fmOF0WrNUA5m53N25qwgi3ry+E
+LTV14d+T9gfxsuzWVFSH/yDF5Rhbi6I80ryrNzh5kbrUxmowqzYEv7pqa6ZNKNfbS8MbPrDH/EUZ
+mr+oY+8XmXlioR66qvPmDSMyqh2OSgiHizNAhC/GG9D8m3N0+Ozx2h7mWgOtBnDZv90tYnrs5FLp
+8aHOtgdbXA58DQcPML4rtyBOE2dN+sF/j/X5lZzYrIF96zVmaJWOm1Km4yaXOX2Sm5LUpMev/1qn
+zRkb1u2NVq8tNm2LV5mjsVNDB9Q5WfUVQPdX3xCl4rKYbwYxn3/7KI09b7Kee8PtmL6pB+7SxT8u
+CGsbbd5cWbI6JayNf9vME/fOF7oAaN/OXTG6Zt5wzbpzVEhL17dm7gV5Yb29ss0jWbAk/NUW9jjz
+`.replace(/\s+/g, '');
+const state = {
+  db: null,
+  cache: new Map(),
+  boundHandle: null,
+  autosave: false,
+  autosaveTimer: null,
+  currentTab: 'dashboard',
+  currentUser: null,
+  theme: localStorage.getItem('glimr-theme') || 'light',
+  testResults: [],
+  lastStatus: ''
+};
+const ROLE_OPTIONS = [
+  {value: 'Observatør', description: 'Kun læseadgang til data', canWrite: false},
+  {value: 'Bioinformatiker', description: 'Kan registrere analyser og varianter', canWrite: true},
+  {value: 'Skriver', description: 'Kan oprette og redigere alle laboratoriedata', canWrite: true},
+  {value: 'Administrator', description: 'Fuld systemadgang inkl. brugeradministration', canWrite: true}
+];
+const WRITE_ROLE_KEYS = new Set(ROLE_OPTIONS.filter(opt => opt.canWrite).map(opt => opt.value.toLowerCase()));
+function normaliseRoleValue(role) {
+  return (role || '').toString().trim();
+}
+function findRoleOption(role) {
+  const normalised = normaliseRoleValue(role).toLowerCase();
+  return ROLE_OPTIONS.find(opt => opt.value.toLowerCase() === normalised) || null;
+}
+function roleLabel(role) {
+  if (!role) return '';
+  const match = findRoleOption(role);
+  return match ? match.value : normaliseRoleValue(role);
+}
+function roleWithDescription(role) {
+  if (!role) return '';
+  const match = findRoleOption(role);
+  if (!match) return normaliseRoleValue(role);
+  return `${match.value} – ${match.description}`;
+}
+const classificationMap = {
+  '1': {code:'LA6576-8', display:'Godartet'},
+  '2': {code:'LA6577-6', display:'Sandsynligvis godartet'},
+  '3': {code:'LA4489-6', display:'Variant af ukendt betydning (VUS)'},
+  '4': {code:'LA6668-3', display:'Sandsynligvis patogen'},
+  '5': {code:'LA6708-8', display:'Patogen'}
+};
+const tabs = [
+  {id:'dashboard', label:'Overblik'},
+  {id:'patients', label:'Patienter'},
+  {id:'samples', label:'Prøver'},
+  {id:'orders', label:'Ordinationer'},
+  {id:'panels', label:'Analyser/Panels'},
+  {id:'variants', label:'Varianter'},
+  {id:'variant_library', label:'Variantbibliotek'},
+  {id:'reports', label:'Rapporter'},
+  {id:'qc', label:'Kvalitetskontrol'},
+  {id:'responses', label:'Svar (MedCom)'},
+  {id:'users', label:'Brugere'},
+  {id:'audit', label:'Revision'},
+  {id:'db', label:'Database & Backup'},
+  {id:'admin', label:'Administration'},
+  {id:'tests', label:'Selvtest'}
+];
+const schemaFields = {
+  patients: ['id','mrn','name','gender','birth_date','notes','created_at','updated_at'],
+  samples: ['id','patient_id','sample_type','collected_at','status','notes','created_at','updated_at'],
+  panels: ['id','name','description','created_at','updated_at'],
+  orders: ['id','patient_id','sample_id','panel_id','clinician','status','ordered_at','created_at','updated_at'],
+  variants: ['id','order_id','gene','transcript','hgvs_c','hgvs_p','zygosity','classification','criteria','af','interpretation','created_at','updated_at'],
+  qc: ['id','sample_id','metric','value','unit','notes','created_at','updated_at'],
+  reports: ['id','order_id','findings','summary','status','issued_at','created_at','updated_at'],
+  users: ['id','name','email','role','pin','created_at','updated_at'],
+  audit: ['id','ts','user','action','entity','entity_id','before','after','created_at','updated_at'],
+  variant_library: ['id','gene','transcript','hgvs_c','hgvs_p','classification','criteria','evidence','condition','inheritance','curated_by','last_review','created_at','updated_at'],
+  responses: ['id','ts','sender','patient','diagnostic_report_id','variant_count','variants','raw','created_at','updated_at']
+};
+const tooltipCatalog = {
+  tabs: {
+    dashboard: 'Viser nøgletal, seneste ordinationer og seneste revisionshændelser.',
+    patients: 'Administrer patientoplysninger og søg i patientlisten.',
+    samples: 'Registrer og vedligehold prøver knyttet til patienter.',
+    orders: 'Administrer analyseordinationer og deres status.',
+    panels: 'Vedligehold assays og analysepaneler.',
+    variants: 'Registrer genetiske varianter for ordinationer.',
+    variant_library: 'Se og vedligehold det kuraterede variantbibliotek.',
+    reports: 'Opret og redigér laboratoriesvar og rapporter.',
+    qc: 'Registrer kvalitetskontrolmålinger for prøver.',
+    responses: 'Importer og gennemse MedCom/FHIR-svar.',
+    users: 'Administrer GlimR-brugere og roller.',
+    audit: 'Gennemgå revisionsloggen for alle ændringer.',
+    db: 'Håndter lokal databasefil, backup og autogem.',
+    admin: 'Tilgå administrative værktøjer, SQL og ZIP-eksport.',
+    tests: 'Kør indbyggede selvtests og se resultater.'
+  },
+  metrics: {
+    'Patienter': 'Antal registrerede patienter i databasen.',
+    'Prøver': 'Antal registrerede laboratorieprøver.',
+    'Ordinationer': 'Samlet antal aktive og historiske ordinationer.',
+    'Sekventering': 'Ordinationer der er markeret i sekventeringsfasen.',
+    'Analyse': 'Ordinationer under bioinformatisk analyse.',
+    'Rapporteret': 'Ordinationer med endelig rapport.',
+    'Varianter': 'Antal registrerede genetiske varianter.'
+  },
+  headers: {
+    'ID': 'Intern databaseidentifikator for posten.',
+    'MRN': 'Medicinsk journalnummer eller CPR-reference.',
+    'Navn': 'Navnet på patient, panel eller bruger.',
+    'Køn': 'Patientens registrerede køn.',
+    'Født': 'Patientens fødselsdato.',
+    'Patient': 'Tilknyttet patient til posten.',
+    'Prøve': 'Prøve-ID eller beskrivelse.',
+    'Prøvetype': 'Type af biologisk materiale.',
+    'Panel': 'Navn på det analyserede panel.',
+    'Status': 'Aktuel status for posten.',
+    'Opdateret': 'Seneste ændringstidspunkt.',
+    'Bestilt': 'Tidspunkt for oprettelse af ordinationen.',
+    'Opsamlet': 'Dato og tidspunkt for prøveindsamling.',
+    'Ordination': 'Reference til ordinationen.',
+    'Gen': 'Genet hvor varianten er fundet.',
+    'HGVS c.': 'HGVS-beskrivelse på cDNA-niveau.',
+    'HGVS p.': 'HGVS-beskrivelse på protein-niveau.',
+    'Klasse': 'ACMG-klassifikation 1–5.',
+    'Kriterier': 'Anvendte ACMG-kriterier.',
+    'HGVS': 'HGVS-beskrivelse for varianten.',
+    'Evidens': 'Kurateret evidens for varianten.',
+    'Kurateret af': 'Navn på ansvarlig kurator.',
+    'Beskrivelse': 'Uddybende beskrivelse.',
+    'Måling': 'Navn på kvalitetskontrolmålingen.',
+    'Værdi': 'Målt værdi.',
+    'Enhed': 'Måleenhed for værdien.',
+    'Tid': 'Tidsstempel for hændelsen.',
+    'Handling': 'Registreret handlingstype.',
+    'Entitet': 'Tabellen som blev ændret.',
+    'Før': 'Data før ændringen.',
+    'Efter': 'Data efter ændringen.',
+    'Sender': 'Afsendende organisation eller system.',
+    'Rapport': 'DiagnosticReport-identifikator.',
+    'Varianter': 'Antal varianter i posten.',
+    'Udstedt': 'Tidspunkt hvor rapporten blev udsendt.',
+    'Test': 'Navn på selvtesten.',
+    'Detaljer': 'Supplerende oplysninger til testen.'
+  },
+  search: {
+    patientSearch: 'Filtrer patientlisten efter navn, MRN eller køn.',
+    sampleSearch: 'Filtrer prøver efter ID, status eller type.',
+    panelSearch: 'Find paneler efter navn.',
+    orderSearch: 'Søg efter ordination ud fra status eller ID.',
+    variantSearch: 'Søg efter varianter baseret på gen eller HGVS.',
+    libSearch: 'Filtrer variantbiblioteket efter gen eller HGVS.',
+    reportSearch: 'Find rapporter ved at søge på status.',
+    qcSearch: 'Søg efter kvalitetsmålinger.',
+    userSearch: 'Søg brugere på navn, e-mail eller rolle.'
+  },
+  forms: {
+    patientForm: {
+      mrn: 'Patientens MRN/CPR til entydig identifikation.',
+      name: 'Patientens fulde navn som angivet i journalen.',
+      gender: 'Registreret køn for patienten.',
+      birth_date: 'Patientens fødselsdato (ÅÅÅÅ-MM-DD).',
+      notes: 'Evt. kliniske noter om patienten.'
+    },
+    sampleForm: {
+      patient_id: 'Vælg hvilken patient prøven tilhører.',
+      sample_type: 'Angiv hvilken type materiale der er indsamlet.',
+      status: 'Prøvens aktuelle laboratoriestatus.',
+      collected_at: 'Dato og tidspunkt for prøveindsamling.',
+      notes: 'Evt. bemærkninger til prøven.'
+    },
+    panelForm: {
+      name: 'Navn på analysepanelet eller assay.',
+      description: 'Beskriv kort panelets indhold og formål.'
+    },
+    orderForm: {
+      patient_id: 'Vælg patienten ordinationen vedrører.',
+      sample_id: 'Vælg den prøve der analyseres.',
+      panel_id: 'Vælg panel for analysen (valgfrit).',
+      clinician: 'Navn på rekvirerende kliniker eller afdeling.',
+      status: 'Ordinationens arbejdsgangstatus.',
+      ordered_at: 'Tidspunkt for oprettelse af ordinationen.'
+    },
+    variantForm: {
+      order_id: 'Ordination som varianten er registreret på.',
+      gene: 'Gen-symbol for den påviste variant.',
+      transcript: 'Reference-transkript (fx NM_).',
+      hgvs_c: 'HGVS-beskrivelse på cDNA-niveau.',
+      hgvs_p: 'HGVS-beskrivelse på protein-niveau.',
+      zygosity: 'Zygositetsstatus (fx heterozygot).',
+      classification: 'ACMG-klassifikation 1 (godartet) – 5 (patogen).',
+      criteria: 'Anfør anvendte ACMG-kriterier, adskilt af komma.',
+      af: 'Allelfrekvens eller observationsfrekvens.',
+      interpretation: 'Klinisk tolkning og evidens for varianten.'
+    },
+    reportForm: {
+      order_id: 'Ordinationen som rapporten beskriver.',
+      status: 'Rapportstatus (udkast, endelig eller ændret).',
+      issued_at: 'Dato og tidspunkt for rapportens udsendelse.',
+      findings: 'Detaljerede fund til rapportens bilag.',
+      summary: 'Kort klinisk resumé til modtageren.'
+    },
+    qcForm: {
+      sample_id: 'Vælg den prøve QC-målingen relaterer til.',
+      metric: 'Navn på kvalitetskontrolparameteren.',
+      value: 'Målt værdi for QC-parameteren.',
+      unit: 'Måleenhed (fx %, ng/µl).',
+      notes: 'Supplerende noter om målingen.'
+    },
+    userForm: {
+      name: 'Brugerens fulde navn.',
+      email: 'Brugerens arbejds-e-mailadresse.',
+      role: 'Vælg brugerrolle for at fastlægge læse- eller skriveadgang.',
+      pin: 'Valgfri adgangskode, der kræves ved login for brugeren.'
+    }
+  },
+  buttons: {
+    demoDataBtn: 'Indlæser et demodatasæt til hurtig afprøvning (kræver skriveadgang).',
+    runTestsBtn: 'Kører den indbyggede selvtest og viser resultater.',
+    patientClear: 'Ryd formularen for at registrere en ny patient.',
+    patientDelete: 'Slet den valgte patient permanent.',
+    sampleClear: 'Ryd formularen for at registrere en ny prøve.',
+    sampleDelete: 'Slet den valgte prøve.',
+    panelClear: 'Ryd formularen for at oprette et nyt panel.',
+    panelDelete: 'Slet det valgte panel.',
+    orderClear: 'Ryd formularen for at oprette en ny ordination.',
+    orderDelete: 'Slet den valgte ordination.',
+    variantClear: 'Ryd formularen for at registrere en ny variant.',
+    variantDelete: 'Slet den valgte variant.',
+    variantToLibrary: 'Tilføj varianten til det kuraterede bibliotek.',
+    reportClear: 'Ryd formularen for at skrive en ny rapport.',
+    reportDelete: 'Slet den valgte rapport.',
+    reportPreview: 'Åbn rapporten i en ny fane til forhåndsvisning.',
+    qcClear: 'Ryd formularen for at registrere en ny QC-måling.',
+    qcDelete: 'Slet den valgte QC-måling.',
+    userClear: 'Ryd formularen for at oprette en ny bruger.',
+    userDelete: 'Slet den valgte bruger.',
+    patientsExport: 'Eksportér den aktuelt filtrerede patientliste til en JSON-fil.',
+    samplesExport: 'Eksportér de filtrerede prøver til JSON til deling eller videre analyse.',
+    ordersExport: 'Eksportér ordinationerne der matcher filtrene.',
+    variantsExport: 'Eksportér filtrerede varianter inklusive ACMG-data.',
+    reportsExport: 'Eksportér rapportlisten med de valgte filtre.',
+    themeToggle: 'Skifter mellem lyst og mørkt layout for GlimR.',
+    logoutBtn: 'Log brugeren ud og lås GlimR for redigering.',
+    generateFhir: 'Generér og download et FHIR-svar for ordinationen.',
+    previewFhir: 'Vis FHIR-bundlen som JSON uden download.',
+    downloadSql: 'Download komplet MySQL-dump af GlimR-data.',
+    showSchema: 'Vis MySQL-skemaet direkte på siden.',
+    downloadZip: 'Download ZIP med GlimR og aktuelle data.',
+    downloadLogo: 'Download den officielle GlimR-logo PNG til placering ved siden af glims.html.',
+    bindFile: 'Vælg eller opret en lokal databasefil til autogem.',
+    saveNow: 'Gem straks til den tilknyttede databasefil.',
+    downloadBackup: 'Eksportér alle data som JSON-backup.',
+    submit: 'Gemmer formularens indhold i databasen.'
+  },
+  controls: {
+    autosaveToggle: 'Aktiver eller deaktiver automatisk gemning til fil.',
+    fhirOrderSelect: 'Vælg hvilken ordination der skal bruges til FHIR-svar.',
+    fhirImportLabel: 'Importer en modtaget FHIR JSON-fil.',
+    fhirPreview: 'JSON-visning af den genererede FHIR-bundle.',
+    restoreLabel: 'Gendan databasen fra en tidligere JSON-backup.',
+    schemaText: 'Viser MySQL-skema og INSERT-statements til reference.',
+    patientsFilterPanel: 'Åbn avancerede filtre for at søge præcist i patientlisten.',
+    samplesFilterPanel: 'Finfiltrér prøver efter patient, status og indsamlingstid.',
+    ordersFilterPanel: 'Filtrer ordinationer på patient, panel, status og dato.',
+    variantsFilterPanel: 'Indsnævr variantoversigten efter gen, ordination og ACMG-klasse.',
+    reportsFilterPanel: 'Begræns rapportlisten efter status, ordination og udstedelsesdato.',
+    loginUser: 'Vælg hvilken GlimR-bruger der skal logges ind.',
+    loginPass: 'Indtast brugerens adgangskode hvis der er opsat en PIN.'
+  }
+};
+function setTooltip(el, text) {
+  if (!el || !text) return;
+  el.title = text;
+  el.dataset.tip = text;
+  el.setAttribute('aria-label', text);
+}
+function annotateHeaders(root) {
+  if (!root) return;
+  root.querySelectorAll('th').forEach(th => {
+    const key = th.textContent.trim();
+    const tip = tooltipCatalog.headers[key] || `Kolonne: ${key}`;
+    setTooltip(th, tip);
+  });
+}
+function annotateTableCells(root) {
+  if (!root) return;
+  root.querySelectorAll('tbody td').forEach(td => {
+    const text = td.textContent.trim();
+    if (text) setTooltip(td, text);
+  });
+}
+function annotateSearchInputs(root) {
+  if (!root) return;
+  root.querySelectorAll('input[type="search"]').forEach(input => {
+    const tip = tooltipCatalog.search[input.id] || 'Filtrer tabellen ved at indtaste søgetekst.';
+    setTooltip(input, tip);
+  });
+}
+function applyMetricTooltips(root) {
+  if (!root) return;
+  root.querySelectorAll('.badge').forEach(badge => {
+    const key = badge.textContent.trim();
+    const tip = tooltipCatalog.metrics[key];
+    if (tip) {
+      setTooltip(badge, tip);
+      const container = badge.parentElement;
+      if (container) {
+        setTooltip(container, tip);
+        const value = container.querySelector('h3');
+        if (value) setTooltip(value, tip);
+      }
+    }
+  });
+}
+function applyFormTooltips(form) {
+  if (!form) return;
+  const map = tooltipCatalog.forms[form.id];
+  if (map) {
+    Object.entries(map).forEach(([name, tip]) => {
+      const field = form.elements[name];
+      if (!field) return;
+      const isRadioList = typeof RadioNodeList !== 'undefined' && field instanceof RadioNodeList;
+      const el = isRadioList ? field[0] : field;
+      if (!el) return;
+      setTooltip(el, tip);
+      const label = el.closest('label');
+      if (label) setTooltip(label, tip);
+    });
+  }
+  const submit = form.querySelector('button[type="submit"]');
+  if (submit) setTooltip(submit, tooltipCatalog.buttons.submit);
+}
+function applyButtonTooltips(root) {
+  if (!root) return;
+  root.querySelectorAll('button').forEach(btn => {
+    const tip = tooltipCatalog.buttons[btn.id] || tooltipCatalog.buttons[btn.textContent.trim()];
+    if (tip) setTooltip(btn, tip);
+  });
+}
+function applyControlTooltips(root) {
+  if (!root) return;
+  Object.entries(tooltipCatalog.controls).forEach(([id, tip]) => {
+    const el = root.querySelector(`#${id}`);
+    if (el) {
+      setTooltip(el, tip);
+      if (el.tagName === 'INPUT' && el.type === 'checkbox' && el.parentElement) {
+        setTooltip(el.parentElement, tip);
+      }
+    }
+  });
+}
+function applySelectFilters(root) {
+  if (!root) return;
+  root.querySelectorAll('.filterable-select').forEach(wrapper => {
+    const input = wrapper.querySelector('input[data-select-filter]');
+    const select = wrapper.querySelector('select');
+    if (!input || !select || wrapper.dataset.filterInit) return;
+    const options = Array.from(select.options).map(option => ({
+      option,
+      text: option.textContent.toLowerCase()
+    }));
+    input.addEventListener('input', () => {
+      const term = input.value.trim().toLowerCase();
+      options.forEach(({option, text}) => {
+        const matches = !term || text.includes(term) || option.selected;
+        option.hidden = !matches;
+      });
+      if (term) {
+        const firstMatch = options.find(({option}) => !option.hidden);
+        if (firstMatch && !firstMatch.option.selected) {
+          select.value = firstMatch.option.value;
+        }
+      }
+    });
+    input.addEventListener('keydown', evt => {
+      if (evt.key === 'Escape') {
+        input.value = '';
+        input.dispatchEvent(new Event('input'));
+      }
+    });
+    wrapper.dataset.filterInit = 'true';
+  });
+}
+function hasWriteRole(user) {
+  if (!user) return false;
+  const role = normaliseRoleValue(user.role).toLowerCase();
+  if (WRITE_ROLE_KEYS.has(role)) return true;
+  return ['admin', 'skriver', 'redakt', 'editor', 'bio', 'write', 'leder'].some(key => role.includes(key));
+}
+function currentCanWrite() {
+  if (state.currentUser?.internal) return true;
+  return hasWriteRole(state.currentUser);
+}
+function ensureWrite(storeName) {
+  if (state.currentUser?.internal) return true;
+  if (storeName === 'users') {
+    const existing = state.cache.get('users');
+    if (!existing || existing.length === 0) {
+      return true;
+    }
+  }
+  if (currentCanWrite()) return true;
+  alert('Handling kræver skriveadgang. Log ind med en bruger der har rollen "Administrator" eller "Skriver".');
+  return false;
+}
+function updateWriteBanner() {
+  const hasWrite = currentCanWrite();
+  let banner = document.getElementById('writeLockBanner');
+  if (!hasWrite) {
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'writeLockBanner';
+      banner.className = 'read-only-banner';
+      banner.textContent = 'Skriveadgang er låst. Log ind med skrivetilladelse for at redigere eller oprette data.';
+      const main = document.getElementById('tabContent');
+      if (main) {
+        main.prepend(banner);
+      }
+    }
+  } else if (banner) {
+    banner.remove();
+  }
+}
+function refreshLoginOptions() {
+  const select = document.getElementById('loginUser');
+  if (!select) return;
+  const users = getCached('users').slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const currentId = state.currentUser?.id ? String(state.currentUser.id) : '';
+  select.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = users.length ? 'Vælg bruger' : 'Opret en bruger for at logge ind';
+  placeholder.disabled = true;
+  select.appendChild(placeholder);
+  users.forEach(user => {
+    const opt = document.createElement('option');
+    opt.value = String(user.id);
+    opt.textContent = `${user.name} (${roleWithDescription(user.role) || 'rolle ukendt'})`;
+    select.appendChild(opt);
+  });
+  if (currentId) {
+    select.value = currentId;
+    placeholder.selected = false;
+  } else {
+    placeholder.selected = true;
+  }
+}
+function updateAuthUi() {
+  const form = document.getElementById('loginForm');
+  const info = document.getElementById('userInfo');
+  const label = document.getElementById('currentUserLabel');
+  const select = document.getElementById('loginUser');
+  if (!form || !info || !label || !select) return;
+  const user = state.currentUser;
+  if (user) {
+    form.style.display = 'none';
+    info.hidden = false;
+    label.textContent = `${user.name} – ${roleWithDescription(user.role) || 'rolle ukendt'}`;
+  } else {
+    info.hidden = true;
+    form.style.display = '';
+    form.reset();
+    refreshLoginOptions();
+  }
+  updateWriteBanner();
+}
+function applyTheme() {
+  if (!['light', 'dark'].includes(state.theme)) {
+    state.theme = 'light';
+  }
+  document.documentElement.dataset.theme = state.theme;
+  localStorage.setItem('glimr-theme', state.theme);
+  const btn = document.getElementById('themeToggle');
+  if (btn) {
+    const toDark = state.theme !== 'dark';
+    btn.textContent = toDark ? 'Skift til mørkt tema' : 'Skift til lyst tema';
+    setTooltip(btn, tooltipCatalog.buttons.themeToggle);
+  }
+}
+function toggleTheme() {
+  state.theme = state.theme === 'dark' ? 'light' : 'dark';
+  applyTheme();
+}
+function restoreUserSession() {
+  const storedId = localStorage.getItem('glimr-user-id');
+  if (storedId) {
+    const user = findById('users', Number(storedId));
+    if (user) {
+      state.currentUser = {...user};
+    } else {
+      state.currentUser = null;
+      localStorage.removeItem('glimr-user-id');
+    }
+  } else if (!state.currentUser || !state.currentUser.internal) {
+    state.currentUser = null;
+  }
+  refreshLoginOptions();
+  updateAuthUi();
+}
+function logoutUser() {
+  state.currentUser = null;
+  localStorage.removeItem('glimr-user-id');
+  updateAuthUi();
+  setStatus('Logget ud. Systemet er skrivebeskyttet.');
+}
+function handleLogin(event) {
+  event.preventDefault();
+  const select = document.getElementById('loginUser');
+  const pass = document.getElementById('loginPass');
+  if (!select || !pass) return;
+  const id = Number(select.value);
+  if (!id) {
+    alert('Vælg en bruger for at logge ind.');
+    return;
+  }
+  const user = findById('users', id);
+  if (!user) {
+    alert('Brugeren findes ikke længere.');
+    refreshLoginOptions();
+    return;
+  }
+  const pin = pass.value.trim();
+  if (user.pin && user.pin !== pin) {
+    alert('Forkert adgangskode.');
+    return;
+  }
+  state.currentUser = {...user};
+  localStorage.setItem('glimr-user-id', String(user.id));
+  pass.value = '';
+  updateAuthUi();
+  setStatus(`Logget ind som ${user.name}.`);
+}
+function esc(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
+}
+function setStatus(msg) {
+  state.lastStatus = msg;
+  document.getElementById('statusBar').textContent = msg;
+  setTooltip(document.getElementById('statusBar'), msg);
+}
+function currentUserName() {
+  return state.currentUser?.name || 'System';
+}
+function initTabs() {
+  const nav = document.getElementById('tabNav');
+  const main = document.getElementById('tabContent');
+  nav.innerHTML = '';
+  main.innerHTML = '';
+  tabs.forEach(tab => {
+    const btn = document.createElement('button');
+    btn.textContent = tab.label;
+    btn.dataset.tab = tab.id;
+    setTooltip(btn, tooltipCatalog.tabs[tab.id]);
+    btn.addEventListener('click', () => activateTab(tab.id));
+    nav.appendChild(btn);
+    const section = document.createElement('section');
+    section.dataset.tab = tab.id;
+    main.appendChild(section);
+  });
+}
+function activateTab(id) {
+  state.currentTab = id;
+  document.querySelectorAll('nav button').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === id);
+  });
+  document.querySelectorAll('section[data-tab]').forEach(sec => {
+    sec.classList.toggle('active', sec.dataset.tab === id);
+  });
+  renderTab(id);
+}
+function openDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = event => {
+      const db = event.target.result;
+      const ensureStore = (name, options) => {
+        if (!db.objectStoreNames.contains(name)) {
+          const store = db.createObjectStore(name, options);
+          return store;
+        }
+        return event.target.transaction.objectStore(name);
+      };
+      const withTimestamps = store => {
+        ['created_at','updated_at'].forEach(field => {
+          if (!store.indexNames.contains(field)) {
+            try { store.createIndex(field, field); } catch (e) {}
+          }
+        });
+        return store;
+      };
+      withTimestamps(ensureStore('patients', {keyPath:'id', autoIncrement:true}));
+      const samplesStore = withTimestamps(ensureStore('samples',{keyPath:'id',autoIncrement:true}));
+      if (!samplesStore.indexNames.contains('patient_id')) samplesStore.createIndex('patient_id','patient_id');
+      const ordersStore = withTimestamps(ensureStore('orders',{keyPath:'id',autoIncrement:true}));
+      ['patient_id','sample_id','panel_id'].forEach(idx => {
+        if (!ordersStore.indexNames.contains(idx)) ordersStore.createIndex(idx, idx);
+      });
+      withTimestamps(ensureStore('panels',{keyPath:'id',autoIncrement:true}));
+      const variantsStore = withTimestamps(ensureStore('variants',{keyPath:'id',autoIncrement:true}));
+      if (!variantsStore.indexNames.contains('order_id')) variantsStore.createIndex('order_id','order_id');
+      const qcStore = withTimestamps(ensureStore('qc',{keyPath:'id',autoIncrement:true}));
+      if (!qcStore.indexNames.contains('sample_id')) qcStore.createIndex('sample_id','sample_id');
+      const reportsStore = withTimestamps(ensureStore('reports',{keyPath:'id',autoIncrement:true}));
+      if (!reportsStore.indexNames.contains('order_id')) reportsStore.createIndex('order_id','order_id');
+      withTimestamps(ensureStore('users',{keyPath:'id',autoIncrement:true}));
+      withTimestamps(ensureStore('audit',{keyPath:'id',autoIncrement:true}));
+      withTimestamps(ensureStore('variant_library',{keyPath:'id',autoIncrement:true}));
+      withTimestamps(ensureStore('responses',{keyPath:'id',autoIncrement:true}));
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+function requestToPromise(req) {
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function loadStore(name) {
+  const tx = state.db.transaction(name, 'readonly');
+  const store = tx.objectStore(name);
+  const req = store.getAll();
+  const rows = await requestToPromise(req);
+  state.cache.set(name, rows);
+  return rows;
+}
+async function loadAllStores() {
+  for (const name of STORES) {
+    await loadStore(name);
+  }
+}
+function getCached(name) {
+  return state.cache.get(name) ?? [];
+}
+function findById(store, id) {
+  return getCached(store).find(item => item.id === id);
+}
+async function addRecord(store, record) {
+  const now = new Date().toISOString();
+  record.created_at = now;
+  record.updated_at = now;
+  const tx = state.db.transaction(store, 'readwrite');
+  const req = tx.objectStore(store).add(record);
+  const id = await requestToPromise(req);
+  await tx.done?.catch(() => {});
+  await loadStore(store);
+  await logAudit('CREATE', store, id, null, record);
+  scheduleAutosave();
+  return id;
+}
+async function updateRecord(store, record, before) {
+  record.updated_at = new Date().toISOString();
+  const tx = state.db.transaction(store, 'readwrite');
+  tx.objectStore(store).put(record);
+  await tx.done?.catch(() => {});
+  await loadStore(store);
+  await logAudit('UPDATE', store, record.id, before, record);
+  scheduleAutosave();
+}
+async function deleteRecord(store, id) {
+  const existing = findById(store, id);
+  if (!existing) return;
+  const tx = state.db.transaction(store, 'readwrite');
+  tx.objectStore(store).delete(id);
+  await tx.done?.catch(() => {});
+  await loadStore(store);
+  await logAudit('DELETE', store, id, existing, null);
+  scheduleAutosave();
+}
+async function logAudit(action, entity, entityId, before, after) {
+  const entry = {
+    ts: new Date().toISOString(),
+    user: currentUserName(),
+    action,
+    entity,
+    entity_id: entityId ?? null,
+    before: before ? JSON.stringify(before) : null,
+    after: after ? JSON.stringify(after) : null
+  };
+  const tx = state.db.transaction('audit','readwrite');
+  tx.objectStore('audit').add({...entry, created_at:new Date().toISOString(), updated_at:new Date().toISOString()});
+  await tx.done?.catch(() => {});
+  await loadStore('audit');
+}
+function scheduleAutosave() {
+  if (!state.autosave || !state.boundHandle) return;
+  if (state.autosaveTimer) clearTimeout(state.autosaveTimer);
+  state.autosaveTimer = setTimeout(() => {
+    saveBoundFile().catch(err => console.error(err));
+  }, 1200);
+}
+async function exportData() {
+  const data = {};
+  for (const store of STORES) {
+    data[store] = JSON.parse(JSON.stringify(getCached(store)));
+  }
+  return data;
+}
+async function saveBoundFile() {
+  if (!state.boundHandle) {
+    setStatus('Ingen fil tilknyttet.');
+    return;
+  }
+  const writable = await state.boundHandle.createWritable();
+  const data = await exportData();
+  await writable.write(JSON.stringify(data, null, 2));
+  await writable.close();
+  setStatus('Autogemt kl. ' + new Date().toLocaleTimeString());
+}
+async function manualSave() {
+  try {
+    await saveBoundFile();
+  } catch (err) {
+    console.error(err);
+    alert('Kunne ikke gemme: ' + err.message);
+  }
+}
+async function bindDbFile() {
+  try {
+    const [handle] = await window.showOpenFilePicker({multiple:false, types:[{description:'GlimR-data', accept:{'application/json':['.json']}}]});
+    state.boundHandle = handle;
+    setStatus('Fil tilknyttet: ' + handle.name);
+    const file = await handle.getFile();
+    if (file.size > 0) {
+      const text = await file.text();
+      try {
+        const data = JSON.parse(text);
+        await importData(data, true);
+      } catch (err) {
+        console.error(err);
+        alert('Kunne ikke læse filen: ' + err.message);
+      }
+    }
+  } catch (err) {
+    if (err && err.name !== 'AbortError') {
+      console.error(err);
+      alert('Filtilknytning fejlede: ' + err.message);
+    }
+  }
+  renderDbTab();
+}
+async function importData(data, skipConfirm=false) {
+  if (!currentCanWrite()) {
+    alert('Import kræver login med skrivetilladelse.');
+    return;
+  }
+  const proceed = skipConfirm || confirm('Dette vil overskrive eksisterende data. Fortsæt?');
+  if (!proceed) return;
+  const timestamp = new Date().toISOString();
+  for (const store of STORES) {
+    const tx = state.db.transaction(store, 'readwrite');
+    const objectStore = tx.objectStore(store);
+    const clearReq = objectStore.clear();
+    await requestToPromise(clearReq);
+    const rows = data[store] ?? [];
+    for (const row of rows) {
+      if (!row.created_at) row.created_at = timestamp;
+      if (!row.updated_at) row.updated_at = timestamp;
+      objectStore.add(row);
+    }
+    await tx.done?.catch(() => {});
+  }
+  await loadAllStores();
+  setStatus('Data indlæst.');
+  renderAll();
+}
+async function downloadBackup() {
+  const data = await exportData();
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const filename = withDateStamp('glimr-backup.json');
+  triggerDownload(url, filename);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setStatus(`Fuld backup downloadet som ${filename}.`);
+}
+function exportFilteredJson(filename, rows, meta = {}) {
+  const filters = meta.filters ? Object.fromEntries(Object.entries(meta.filters).filter(([, value]) => value !== '' && value != null)) : undefined;
+  const payload = {
+    titel: meta.title || 'GlimR filtreret eksport',
+    entitet: meta.entity || 'ukendt',
+    antal: rows.length,
+    genereret: new Date().toISOString(),
+    poster: rows
+  };
+  if (filters && Object.keys(filters).length) {
+    payload.filtre = filters;
+  }
+  if (meta.tab) {
+    payload.fane = meta.tab;
+  }
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const stamped = withDateStamp(filename);
+  triggerDownload(url, stamped);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const plural = meta.plural || meta.entity || 'poster';
+  setStatus(`Eksporterede ${rows.length} ${plural} til ${stamped}.`);
+}
+function triggerDownload(url, filename) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+function downloadLogoAsset() {
+  if (!GLIMR_LOGO_BASE64) {
+    alert('Logo-data er ikke tilgængelig i denne GlimR-version.');
+    return;
+  }
+  try {
+    const binary = atob(GLIMR_LOGO_BASE64);
+    const buffer = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      buffer[i] = binary.charCodeAt(i);
+    }
+    const blob = new Blob([buffer], {type: 'image/png'});
+    const url = URL.createObjectURL(blob);
+    const filename = withDateStamp('glimr-logo.png');
+    triggerDownload(url, filename);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setStatus(`Logo downloadet som ${filename}. Placér filen ved siden af glims.html for at se det i headeren.`);
+  } catch (err) {
+    console.error(err);
+    alert('Kunne ikke generere logo-filen. Prøv i stedet kommandolinje-eksemplet i README.');
+  }
+}
+function withDateStamp(filename) {
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0].replace('T', '-');
+  const dot = filename.lastIndexOf('.');
+  if (dot === -1) return `${filename}-${stamp}`;
+  return `${filename.slice(0, dot)}-${stamp}${filename.slice(dot)}`;
+}
+async function restoreFromFile(file) {
+  const text = await file.text();
+  const data = JSON.parse(text);
+  await importData(data);
+}
+function renderAll() {
+  tabs.forEach(tab => renderTab(tab.id));
+}
+function renderTab(id) {
+  const section = document.querySelector(`section[data-tab="${id}"]`);
+  if (!section) return;
+  switch(id) {
+    case 'dashboard': return renderDashboard(section);
+    case 'patients': return renderPatients(section);
+    case 'samples': return renderSamples(section);
+    case 'orders': return renderOrders(section);
+    case 'panels': return renderPanels(section);
+    case 'variants': return renderVariants(section);
+    case 'variant_library': return renderVariantLibrary(section);
+    case 'reports': return renderReports(section);
+    case 'qc': return renderQC(section);
+    case 'responses': return renderResponses(section);
+    case 'users': return renderUsers(section);
+    case 'audit': return renderAudit(section);
+    case 'db': return renderDbTab(section);
+    case 'admin': return renderAdmin(section);
+    case 'tests': return renderTestsTab(section);
+    default:
+      section.innerHTML = '<p>Ingen data.</p>';
+  }
+}
+function renderDashboard(section) {
+  const patients = getCached('patients').length;
+  const samples = getCached('samples').length;
+  const orders = getCached('orders');
+  const reports = getCached('reports');
+  const variants = getCached('variants');
+  const reported = reports.filter(r => r.status === 'final').length;
+  const analysis = orders.filter(o => ['analysis','analysing'].includes(o.status)).length;
+  const seq = orders.filter(o => ['sequencing','sequence'].includes(o.status)).length;
+  const recentOrders = orders.slice().sort((a,b)=> (b.updated_at||'').localeCompare(a.updated_at||'' )).slice(0,5);
+  const audit = getCached('audit').slice(-5).reverse();
+  section.innerHTML = `
+  <div class="panel">
+    <h2>KPI'er</h2>
+    <div class="flex">
+      <div><div class="badge">Patienter</div><h3>${patients}</h3></div>
+      <div><div class="badge">Prøver</div><h3>${samples}</h3></div>
+      <div><div class="badge">Ordinationer</div><h3>${orders.length}</h3></div>
+      <div><div class="badge">Sekventering</div><h3>${seq}</h3></div>
+      <div><div class="badge">Analyse</div><h3>${analysis}</h3></div>
+      <div><div class="badge">Rapporteret</div><h3>${reported}</h3></div>
+      <div><div class="badge">Varianter</div><h3>${variants.length}</h3></div>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>Seneste ordrer</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Patient</th><th>Prøve</th><th>Panel</th><th>Status</th><th>Opdateret</th></tr></thead>
+      <tbody>
+        ${recentOrders.map(o => `<tr><td>${o.id}</td><td>${esc(getName('patients', o.patient_id))}</td><td>${o.sample_id || ''}</td><td>${getName('panels', o.panel_id)}</td><td>${esc(o.status || '')}</td><td>${esc(o.updated_at||'')}</td></tr>`).join('') || '<tr><td colspan="6">Ingen</td></tr>'}
+      </tbody>
+    </table>
+  </div>
+  <div class="panel">
+    <h2>Revision</h2>
+    <table>
+      <thead><tr><th>Tid</th><th>Bruger</th><th>Handling</th><th>Entitet</th><th>ID</th></tr></thead>
+      <tbody>
+        ${audit.map(a => `<tr><td>${esc(a.ts)}</td><td>${esc(a.user)}</td><td>${esc(a.action)}</td><td>${esc(a.entity)}</td><td>${esc(a.entity_id??'')}</td></tr>`).join('') || '<tr><td colspan="5">Ingen</td></tr>'}
+      </tbody>
+    </table>
+  </div>`;
+  applyMetricTooltips(section);
+  annotateHeaders(section);
+  annotateTableCells(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+}
+function getName(store, id) {
+  if (!id) return '';
+  const row = findById(store, typeof id === 'string' ? Number(id) : id);
+  if (!row) return '';
+  return row.name || row.mrn || `#${id}`;
+}
+function fillForm(form, record) {
+  if (!form || !record) return;
+  Array.from(form.elements).forEach(el => {
+    if (!el.name) return;
+    if (!(el.name in record)) {
+      return;
+    }
+    const value = record[el.name];
+    if (el.type === 'checkbox') {
+      el.checked = Boolean(value);
+      return;
+    }
+    if (el.type === 'password') {
+      el.value = '';
+      return;
+    }
+    if (el.tagName === 'SELECT') {
+      const asString = value == null ? '' : String(value);
+      if (el.name === 'role' && asString && !Array.from(el.options).some(opt => opt.value === asString)) {
+        const opt = document.createElement('option');
+        opt.value = asString;
+        opt.textContent = roleWithDescription(asString);
+        opt.dataset.legacy = 'true';
+        el.appendChild(opt);
+      }
+      el.value = asString;
+      return;
+    }
+    el.value = value ?? '';
+  });
+}
+function renderPatients(section) {
+  const list = getCached('patients');
+  section.innerHTML = `
+  <div class="panel">
+    <div class="flex">
+      <div>
+        <label for="patientSearch">Søg</label>
+        <input id="patientSearch" type="search" placeholder="Navn/MRN...">
+        <details class="advanced-filter" id="patientsFilterPanel">
+          <summary>Avanceret filter</summary>
+          <div class="filter-grid">
+            <label>ID<input type="search" data-filter-patients="id" placeholder="Fx 152"></label>
+            <label>MRN<input type="search" data-filter-patients="mrn" placeholder="MRN eller CPR"></label>
+            <label>Navn<input type="search" data-filter-patients="name" placeholder="Patientnavn"></label>
+            <label>Køn<select data-filter-patients="gender"><option value="">Alle</option><option value="male">Mand</option><option value="female">Kvinde</option><option value="other">Andet</option></select></label>
+            <label>Fødselsår<input type="search" data-filter-patients="birth" placeholder="ÅÅÅÅ"></label>
+          </div>
+        </details>
+        <table id="patientsTable"><thead><tr><th>ID</th><th>MRN</th><th>Navn</th><th>Køn</th><th>Født</th></tr></thead><tbody></tbody></table>
+        <div class="table-actions">
+          <button type="button" class="secondary" id="patientsExport">Eksportér filtrerede patienter</button>
+        </div>
+      </div>
+      <div>
+        <h2>Patient</h2>
+        <form id="patientForm">
+          <input type="hidden" name="id">
+          <label>MRN<input name="mrn" required></label>
+          <label>Navn<input name="name" required></label>
+          <label>Køn<select name="gender"><option value="">-</option><option value="male">Mand</option><option value="female">Kvinde</option><option value="other">Andet</option></select></label>
+          <label>Fødselsdato<input type="date" name="birth_date"></label>
+          <label>Noter<textarea name="notes"></textarea></label>
+          <div class="btn-row">
+            <button type="submit" class="primary">Gem</button>
+            <button type="button" id="patientClear" class="secondary">Ny</button>
+            <button type="button" id="patientDelete" class="danger">Slet</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>`;
+  const tbody = section.querySelector('#patientsTable tbody');
+  const form = section.querySelector('#patientForm');
+  const searchInput = section.querySelector('#patientSearch');
+  const deleteBtn = section.querySelector('#patientDelete');
+  const clearBtn = section.querySelector('#patientClear');
+  const filterInputs = {
+    id: section.querySelector('[data-filter-patients="id"]'),
+    mrn: section.querySelector('[data-filter-patients="mrn"]'),
+    name: section.querySelector('[data-filter-patients="name"]'),
+    gender: section.querySelector('[data-filter-patients="gender"]'),
+    birth: section.querySelector('[data-filter-patients="birth"]')
+  };
+  let filteredPatients = list.slice();
+  let activeFilters = {};
+  annotateHeaders(section);
+  annotateSearchInputs(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+  applyFormTooltips(form);
+  const genderMap = {male:'Mand', female:'Kvinde', other:'Andet'};
+  const renderRows = () => {
+    const term = searchInput.value.trim().toLowerCase();
+    const filters = {
+      id: filterInputs.id?.value.trim() || '',
+      mrn: filterInputs.mrn?.value.trim().toLowerCase() || '',
+      name: filterInputs.name?.value.trim().toLowerCase() || '',
+      gender: filterInputs.gender?.value || '',
+      birth: filterInputs.birth?.value.trim().toLowerCase() || ''
+    };
+    const filterSummary = {...filters};
+    if (term) filterSummary.fritekst = term;
+    activeFilters = filterSummary;
+    filteredPatients = list.filter(p => {
+      if (!term) return true;
+      const displayGender = genderMap[p.gender];
+      return [p.name, p.mrn, p.gender, displayGender].some(v => (v||'').toLowerCase().includes(term));
+    }).filter(p => {
+      if (filters.id && !String(p.id).includes(filters.id)) return false;
+      if (filters.mrn && !(p.mrn||'').toLowerCase().includes(filters.mrn)) return false;
+      if (filters.name && !(p.name||'').toLowerCase().includes(filters.name)) return false;
+      if (filters.gender && (p.gender||'') !== filters.gender) return false;
+      if (filters.birth && !(p.birth_date||'').toLowerCase().startsWith(filters.birth)) return false;
+      return true;
+    });
+    tbody.innerHTML = filteredPatients.map(p => {
+      const gender = genderMap[p.gender] || p.gender || '';
+      return `<tr data-id="${p.id}"><td>${p.id}</td><td>${esc(p.mrn)}</td><td>${esc(p.name)}</td><td>${esc(gender)}</td><td>${esc(p.birth_date||'')}</td></tr>`;
+    }).join('');
+    annotateTableCells(section);
+  };
+  renderRows();
+  searchInput.addEventListener('input', renderRows);
+  Object.values(filterInputs).forEach(input => input?.addEventListener('input', renderRows));
+  section.querySelector('#patientsExport').addEventListener('click', () => {
+    exportFilteredJson('glimr-patienter-filtreret.json', filteredPatients, {
+      entity: 'patienter',
+      plural: 'patienter',
+      tab: 'Patienter',
+      filters: activeFilters
+    });
+  });
+  tbody.addEventListener('click', e => {
+    const tr = e.target.closest('tr');
+    if (!tr) return;
+    const id = Number(tr.dataset.id);
+    const patient = list.find(p => p.id === id);
+    if (!patient) return;
+    fillForm(form, patient);
+  });
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!ensureWrite('patients')) return;
+    const data = Object.fromEntries(new FormData(form).entries());
+    if (data.id) {
+      const id = Number(data.id);
+      const before = {...findById('patients', id)};
+      const updated = {...before, ...data, id};
+      await updateRecord('patients', updated, before);
+    } else {
+      delete data.id;
+      await addRecord('patients', data);
+    }
+    await loadStore('patients');
+    renderTab('patients');
+    renderDashboard(document.querySelector('section[data-tab="dashboard"]'));
+  });
+  deleteBtn.addEventListener('click', async () => {
+    const id = Number(form.elements.id.value);
+    if (!id) return alert('Vælg en patient');
+    if (!ensureWrite('patients')) return;
+    if (confirm('Slet patient?')) {
+      await deleteRecord('patients', id);
+      form.reset();
+      renderTab('patients');
+      renderDashboard(document.querySelector('section[data-tab="dashboard"]'));
+    }
+  });
+  clearBtn.addEventListener('click', () => form.reset());
+}
+function renderSamples(section) {
+  const list = getCached('samples');
+  const patients = getCached('patients');
+  const patientMap = new Map(patients.map(p => [p.id, p]));
+  section.innerHTML = `
+  <div class="panel">
+    <div class="flex">
+      <div>
+        <label for="sampleSearch">Søg</label>
+        <input id="sampleSearch" type="search" placeholder="ID/status...">
+        <details class="advanced-filter" id="samplesFilterPanel">
+          <summary>Avanceret filter</summary>
+          <div class="filter-grid">
+            <label>ID<input type="search" data-filter-samples="id" placeholder="Sample-ID"></label>
+            <label>Patient<input type="search" data-filter-samples="patient" placeholder="Patientnavn eller MRN"></label>
+            <label>Prøvetype<input type="search" data-filter-samples="type" placeholder="Type"></label>
+            <label>Status<input type="search" data-filter-samples="status" placeholder="Status"></label>
+            <label>Opsamlet fra<input type="date" data-filter-samples="collected_from"></label>
+            <label>Opsamlet til<input type="date" data-filter-samples="collected_to"></label>
+          </div>
+        </details>
+        <table><thead><tr><th>ID</th><th>Patient</th><th>Prøvetype</th><th>Status</th><th>Opsamlet</th></tr></thead><tbody></tbody></table>
+        <div class="table-actions">
+          <button type="button" class="secondary" id="samplesExport">Eksportér filtrerede prøver</button>
+        </div>
+      </div>
+      <div>
+        <h2>Prøve</h2>
+        <form id="sampleForm">
+          <input type="hidden" name="id">
+          <label>Patient
+            <div class="filterable-select">
+              <input type="search" data-select-filter placeholder="Filtrer patienter">
+              <select name="patient_id" required>${patients.map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.mrn)})</option>`).join('')}</select>
+            </div>
+          </label>
+          <label>Prøvetype<input name="sample_type" required></label>
+          <label>Status<input name="status"></label>
+          <label>Opsamlet<input type="datetime-local" name="collected_at"></label>
+          <label>Noter<textarea name="notes"></textarea></label>
+          <div class="btn-row">
+            <button class="primary" type="submit">Gem</button>
+            <button class="secondary" type="button" id="sampleClear">Ny</button>
+            <button class="danger" type="button" id="sampleDelete">Slet</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>`;
+  const tbody = section.querySelector('tbody');
+  const search = section.querySelector('#sampleSearch');
+  const form = section.querySelector('#sampleForm');
+  const filterInputs = {
+    id: section.querySelector('[data-filter-samples="id"]'),
+    patient: section.querySelector('[data-filter-samples="patient"]'),
+    type: section.querySelector('[data-filter-samples="type"]'),
+    status: section.querySelector('[data-filter-samples="status"]'),
+    collected_from: section.querySelector('[data-filter-samples="collected_from"]'),
+    collected_to: section.querySelector('[data-filter-samples="collected_to"]')
+  };
+  annotateHeaders(section);
+  annotateSearchInputs(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+  applyFormTooltips(form);
+  applySelectFilters(section);
+  let filteredSamples = list.slice();
+  let activeFilters = {};
+  const renderRows = () => {
+    const term = search.value.toLowerCase();
+    const filters = {
+      id: filterInputs.id?.value.trim() || '',
+      patient: filterInputs.patient?.value.trim().toLowerCase() || '',
+      type: filterInputs.type?.value.trim().toLowerCase() || '',
+      status: filterInputs.status?.value.trim().toLowerCase() || '',
+      collected_from: filterInputs.collected_from?.value || '',
+      collected_to: filterInputs.collected_to?.value || ''
+    };
+    const fromDate = filters.collected_from ? new Date(filters.collected_from) : null;
+    const toDate = filters.collected_to ? new Date(filters.collected_to) : null;
+    if (toDate) {
+      toDate.setHours(23, 59, 59, 999);
+    }
+    const filterSummary = {...filters};
+    if (term) filterSummary.fritekst = term;
+    activeFilters = filterSummary;
+    filteredSamples = list.filter(s => {
+      if (!term) return true;
+      return [s.id, s.status, s.sample_type].some(v => (v ?? '').toString().toLowerCase().includes(term));
+    }).filter(s => {
+      const patient = patientMap.get(Number(s.patient_id));
+      const patientString = [patient?.name, patient?.mrn].filter(Boolean).join(' ').toLowerCase();
+      if (filters.id && !String(s.id).includes(filters.id)) return false;
+      if (filters.patient && !patientString.includes(filters.patient)) return false;
+      if (filters.type && !(s.sample_type || '').toLowerCase().includes(filters.type)) return false;
+      if (filters.status && !(s.status || '').toLowerCase().includes(filters.status)) return false;
+      if (fromDate || toDate) {
+        if (!s.collected_at) return false;
+        const collectedAt = new Date(s.collected_at);
+        if (Number.isNaN(collectedAt.getTime())) return false;
+        if (fromDate && collectedAt < fromDate) return false;
+        if (toDate && collectedAt > toDate) return false;
+      }
+      return true;
+    });
+    tbody.innerHTML = filteredSamples.map(s => `<tr data-id="${s.id}"><td>${s.id}</td><td>${esc(getName('patients', Number(s.patient_id)))}</td><td>${esc(s.sample_type)}</td><td>${esc(s.status||'')}</td><td>${esc(s.collected_at||'')}</td></tr>`).join('');
+    annotateTableCells(section);
+  };
+  renderRows();
+  search.addEventListener('input', renderRows);
+  Object.values(filterInputs).forEach(input => input?.addEventListener('input', renderRows));
+  section.querySelector('#samplesExport').addEventListener('click', () => {
+    exportFilteredJson('glimr-proever-filtreret.json', filteredSamples, {
+      entity: 'prøver',
+      plural: 'prøver',
+      tab: 'Prøver',
+      filters: activeFilters
+    });
+  });
+  tbody.addEventListener('click', e => {
+    const tr = e.target.closest('tr');
+    if (!tr) return;
+    const sample = list.find(s => s.id === Number(tr.dataset.id));
+    if (!sample) return;
+    fillForm(form, sample);
+  });
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!ensureWrite('samples')) return;
+    const data = Object.fromEntries(new FormData(form).entries());
+    data.patient_id = Number(data.patient_id);
+    if (data.id) {
+      const id = Number(data.id);
+      const before = {...findById('samples', id)};
+      const updated = {...before, ...data, id};
+      await updateRecord('samples', updated, before);
+    } else {
+      delete data.id;
+      await addRecord('samples', data);
+    }
+    await loadStore('samples');
+    renderTab('samples');
+  });
+  section.querySelector('#sampleDelete').addEventListener('click', async () => {
+    const id = Number(form.elements.id.value);
+    if (!id) return alert('Vælg sample');
+    if (!ensureWrite('samples')) return;
+    if (confirm('Slet sample?')) {
+      await deleteRecord('samples', id);
+      renderTab('samples');
+    }
+  });
+  section.querySelector('#sampleClear').addEventListener('click', () => form.reset());
+}
+function renderPanels(section) {
+  const list = getCached('panels');
+  section.innerHTML = `
+  <div class="panel">
+    <div class="flex">
+      <div>
+        <label for="panelSearch">Søg</label>
+        <input id="panelSearch" type="search" placeholder="Navn...">
+        <table><thead><tr><th>ID</th><th>Navn</th><th>Beskrivelse</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div>
+        <h2>Panel</h2>
+        <form id="panelForm">
+          <input type="hidden" name="id">
+          <label>Navn<input name="name" required></label>
+          <label>Beskrivelse<textarea name="description"></textarea></label>
+          <div class="btn-row">
+            <button class="primary" type="submit">Gem</button>
+            <button class="secondary" type="button" id="panelClear">Ny</button>
+            <button class="danger" type="button" id="panelDelete">Slet</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>`;
+  const tbody = section.querySelector('tbody');
+  const search = section.querySelector('#panelSearch');
+  const form = section.querySelector('#panelForm');
+  annotateHeaders(section);
+  annotateSearchInputs(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+  applyFormTooltips(form);
+  applySelectFilters(section);
+  const renderRows = () => {
+    const term = search.value.toLowerCase();
+    tbody.innerHTML = list.filter(p => !term || (p.name||'').toLowerCase().includes(term)).map(p => `<tr data-id="${p.id}"><td>${p.id}</td><td>${esc(p.name)}</td><td>${esc(p.description||'')}</td></tr>`).join('');
+    annotateTableCells(section);
+  };
+  renderRows();
+  search.addEventListener('input', renderRows);
+  tbody.addEventListener('click', e => {
+    const tr = e.target.closest('tr');
+    if (!tr) return;
+    const panel = list.find(p => p.id === Number(tr.dataset.id));
+    if (!panel) return;
+    fillForm(form, panel);
+  });
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!ensureWrite('panels')) return;
+    const data = Object.fromEntries(new FormData(form).entries());
+    if (data.id) {
+      const id = Number(data.id);
+      const before = {...findById('panels', id)};
+      const updated = {...before, ...data, id};
+      await updateRecord('panels', updated, before);
+    } else {
+      delete data.id;
+      await addRecord('panels', data);
+    }
+    await loadStore('panels');
+    renderTab('panels');
+  });
+  section.querySelector('#panelDelete').addEventListener('click', async () => {
+    const id = Number(form.elements.id.value);
+    if (!id) return alert('Vælg panel');
+    if (!ensureWrite('panels')) return;
+    if (confirm('Slet panel?')) {
+      await deleteRecord('panels', id);
+      renderTab('panels');
+    }
+  });
+  section.querySelector('#panelClear').addEventListener('click', () => form.reset());
+}
+function renderOrders(section) {
+  const list = getCached('orders');
+  const patients = getCached('patients');
+  const samples = getCached('samples');
+  const panels = getCached('panels');
+  const patientMap = new Map(patients.map(p => [p.id, p]));
+  const sampleMap = new Map(samples.map(s => [s.id, s]));
+  const panelMap = new Map(panels.map(p => [p.id, p]));
+  section.innerHTML = `
+  <div class="panel">
+    <div class="flex">
+      <div>
+        <label for="orderSearch">Søg</label>
+        <input id="orderSearch" type="search" placeholder="Status/ID...">
+        <details class="advanced-filter" id="ordersFilterPanel">
+          <summary>Avanceret filter</summary>
+          <div class="filter-grid">
+            <label>ID<input type="search" data-filter-orders="id" placeholder="Ordination-ID"></label>
+            <label>Patient<input type="search" data-filter-orders="patient" placeholder="Patientnavn eller MRN"></label>
+            <label>Prøve<input type="search" data-filter-orders="sample" placeholder="Prøve-ID"></label>
+            <label>Panel<input type="search" data-filter-orders="panel" placeholder="Panelnavn"></label>
+            <label>Status<input type="search" data-filter-orders="status" placeholder="Status"></label>
+            <label>Bestilt fra<input type="date" data-filter-orders="ordered_from"></label>
+            <label>Bestilt til<input type="date" data-filter-orders="ordered_to"></label>
+          </div>
+        </details>
+        <table><thead><tr><th>ID</th><th>Patient</th><th>Prøve</th><th>Panel</th><th>Status</th><th>Bestilt</th></tr></thead><tbody></tbody></table>
+        <div class="table-actions">
+          <button type="button" class="secondary" id="ordersExport">Eksportér filtrerede ordinationer</button>
+        </div>
+      </div>
+      <div>
+        <h2>Ordination</h2>
+        <form id="orderForm">
+          <input type="hidden" name="id">
+          <label>Patient
+            <div class="filterable-select">
+              <input type="search" data-select-filter placeholder="Filtrer patienter">
+              <select name="patient_id" required>${patients.map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.mrn)})</option>`).join('')}</select>
+            </div>
+          </label>
+          <label>Prøve
+            <div class="filterable-select">
+              <input type="search" data-select-filter placeholder="Filtrer prøver">
+              <select name="sample_id" required>${samples.map(s => `<option value="${s.id}">${s.id} – ${esc(getName('patients', s.patient_id))}</option>`).join('')}</select>
+            </div>
+          </label>
+          <label>Panel
+            <div class="filterable-select">
+              <input type="search" data-select-filter placeholder="Filtrer paneler">
+              <select name="panel_id"><option value="">-</option>${panels.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>
+            </div>
+          </label>
+          <label>Rekvirent<input name="clinician"></label>
+          <label>Status<input name="status"></label>
+          <label>Bestillingstidspunkt<input type="datetime-local" name="ordered_at"></label>
+          <div class="btn-row">
+            <button class="primary" type="submit">Gem</button>
+            <button class="secondary" type="button" id="orderClear">Ny</button>
+            <button class="danger" type="button" id="orderDelete">Slet</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>`;
+  const tbody = section.querySelector('tbody');
+  const search = section.querySelector('#orderSearch');
+  const form = section.querySelector('#orderForm');
+  const filterInputs = {
+    id: section.querySelector('[data-filter-orders="id"]'),
+    patient: section.querySelector('[data-filter-orders="patient"]'),
+    sample: section.querySelector('[data-filter-orders="sample"]'),
+    panel: section.querySelector('[data-filter-orders="panel"]'),
+    status: section.querySelector('[data-filter-orders="status"]'),
+    ordered_from: section.querySelector('[data-filter-orders="ordered_from"]'),
+    ordered_to: section.querySelector('[data-filter-orders="ordered_to"]')
+  };
+  annotateHeaders(section);
+  annotateSearchInputs(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+  applyFormTooltips(form);
+  applySelectFilters(section);
+  let filteredOrders = list.slice();
+  let activeFilters = {};
+  const renderRows = () => {
+    const term = search.value.toLowerCase();
+    const filters = {
+      id: filterInputs.id?.value.trim() || '',
+      patient: filterInputs.patient?.value.trim().toLowerCase() || '',
+      sample: filterInputs.sample?.value.trim().toLowerCase() || '',
+      panel: filterInputs.panel?.value.trim().toLowerCase() || '',
+      status: filterInputs.status?.value.trim().toLowerCase() || '',
+      ordered_from: filterInputs.ordered_from?.value || '',
+      ordered_to: filterInputs.ordered_to?.value || ''
+    };
+    const fromDate = filters.ordered_from ? new Date(filters.ordered_from) : null;
+    const toDate = filters.ordered_to ? new Date(filters.ordered_to) : null;
+    if (toDate) toDate.setHours(23, 59, 59, 999);
+    const filterSummary = {...filters};
+    if (term) filterSummary.fritekst = term;
+    activeFilters = filterSummary;
+    filteredOrders = list.filter(o => {
+      if (!term) return true;
+      return [o.status, o.id, o.patient_id, o.sample_id, o.panel_id].some(v => (v ?? '').toString().toLowerCase().includes(term));
+    }).filter(o => {
+      const patient = patientMap.get(Number(o.patient_id));
+      const sample = sampleMap.get(Number(o.sample_id));
+      const panel = panelMap.get(Number(o.panel_id));
+      const patientString = [patient?.name, patient?.mrn].filter(Boolean).join(' ').toLowerCase();
+      const sampleString = [o.sample_id, sample?.sample_type, getName('patients', sample?.patient_id)].filter(Boolean).join(' ').toLowerCase();
+      if (filters.id && !String(o.id).includes(filters.id)) return false;
+      if (filters.patient && !patientString.includes(filters.patient)) return false;
+      if (filters.sample && !sampleString.includes(filters.sample)) return false;
+      if (filters.panel) {
+        const panelString = (panel?.name || String(o.panel_id || '')).toLowerCase();
+        if (!panelString.includes(filters.panel)) return false;
+      }
+      if (filters.status && !(o.status || '').toLowerCase().includes(filters.status)) return false;
+      if (fromDate || toDate) {
+        if (!o.ordered_at) return false;
+        const ordered = new Date(o.ordered_at);
+        if (Number.isNaN(ordered.getTime())) return false;
+        if (fromDate && ordered < fromDate) return false;
+        if (toDate && ordered > toDate) return false;
+      }
+      return true;
+    });
+    tbody.innerHTML = filteredOrders.map(o => `<tr data-id="${o.id}"><td>${o.id}</td><td>${esc(getName('patients', Number(o.patient_id)))}</td><td>${esc(getName('samples', Number(o.sample_id)))}</td><td>${esc(getName('panels', Number(o.panel_id)))}</td><td>${esc(o.status||'')}</td><td>${esc(o.ordered_at||'')}</td></tr>`).join('');
+    annotateTableCells(section);
+  };
+  renderRows();
+  search.addEventListener('input', renderRows);
+  Object.values(filterInputs).forEach(input => input?.addEventListener('input', renderRows));
+  section.querySelector('#ordersExport').addEventListener('click', () => {
+    exportFilteredJson('glimr-ordinationer-filtreret.json', filteredOrders, {
+      entity: 'ordinationer',
+      plural: 'ordinationer',
+      tab: 'Ordinationer',
+      filters: activeFilters
+    });
+  });
+  tbody.addEventListener('click', e => {
+    const tr = e.target.closest('tr');
+    if (!tr) return;
+    const order = list.find(o => o.id === Number(tr.dataset.id));
+    if (!order) return;
+    fillForm(form, order);
+  });
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!ensureWrite('orders')) return;
+    const data = Object.fromEntries(new FormData(form).entries());
+    data.patient_id = Number(data.patient_id);
+    data.sample_id = Number(data.sample_id);
+    data.panel_id = data.panel_id ? Number(data.panel_id) : null;
+    if (data.id) {
+      const id = Number(data.id);
+      const before = {...findById('orders', id)};
+      const updated = {...before, ...data, id};
+      await updateRecord('orders', updated, before);
+    } else {
+      delete data.id;
+      await addRecord('orders', data);
+    }
+    await loadStore('orders');
+    renderTab('orders');
+    renderDashboard(document.querySelector('section[data-tab="dashboard"]'));
+  });
+  section.querySelector('#orderDelete').addEventListener('click', async () => {
+    const id = Number(form.elements.id.value);
+    if (!id) return alert('Vælg ordre');
+    if (!ensureWrite('orders')) return;
+    if (confirm('Slet ordre?')) {
+      await deleteRecord('orders', id);
+      renderTab('orders');
+      renderDashboard(document.querySelector('section[data-tab="dashboard"]'));
+    }
+  });
+  section.querySelector('#orderClear').addEventListener('click', () => form.reset());
+}
+function renderVariants(section) {
+  const list = getCached('variants');
+  const orders = getCached('orders');
+  section.innerHTML = `
+  <div class="panel">
+    <div class="flex">
+      <div>
+        <label for="variantSearch">Søg</label>
+        <input id="variantSearch" type="search" placeholder="Gen/HGVS...">
+        <details class="advanced-filter" id="variantsFilterPanel">
+          <summary>Avanceret filter</summary>
+          <div class="filter-grid">
+            <label>ID<input type="search" data-filter-variants="id" placeholder="Variant-ID"></label>
+            <label>Ordination<input type="search" data-filter-variants="order" placeholder="Ordinations-ID"></label>
+            <label>Gen<input type="search" data-filter-variants="gene" placeholder="Gen"></label>
+            <label>Transkript<input type="search" data-filter-variants="transcript" placeholder="RefSeq/ENST"></label>
+            <label>ACMG<input type="search" data-filter-variants="classification" placeholder="1-5"></label>
+            <label>Kriterier<input type="search" data-filter-variants="criteria" placeholder="PM1,PP3..."></label>
+          </div>
+        </details>
+        <table><thead><tr><th>ID</th><th>Ordination</th><th>Gen</th><th>HGVS c.</th><th>Klasse</th><th>Kriterier</th></tr></thead><tbody></tbody></table>
+        <div class="table-actions">
+          <button type="button" class="secondary" id="variantsExport">Eksportér filtrerede varianter</button>
+        </div>
+      </div>
+      <div>
+        <h2>Variant</h2>
+        <form id="variantForm">
+          <input type="hidden" name="id">
+          <label>Ordination
+            <div class="filterable-select">
+              <input type="search" data-select-filter placeholder="Filtrer ordinationer">
+              <select name="order_id" required>${orders.map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}</select>
+            </div>
+          </label>
+          <label>Gen<input name="gene" required></label>
+          <label>Transkript<input name="transcript"></label>
+          <label>HGVS c.<input name="hgvs_c"></label>
+          <label>HGVS p.<input name="hgvs_p"></label>
+          <label>Zygositet<input name="zygosity"></label>
+          <label>ACMG-klasse<select name="classification" required><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></label>
+          <label>Kriterier<input name="criteria" placeholder="PM1,PP3..."></label>
+          <label>Allelfrekvens<input name="af" type="number" step="0.0001"></label>
+          <label>Tolkning<textarea name="interpretation"></textarea></label>
+          <div class="btn-row">
+            <button class="primary" type="submit">Gem</button>
+            <button class="secondary" type="button" id="variantClear">Ny</button>
+            <button class="danger" type="button" id="variantDelete">Slet</button>
+            <button class="secondary" type="button" id="variantToLibrary">Til bibliotek</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>`;
+  const tbody = section.querySelector('tbody');
+  const search = section.querySelector('#variantSearch');
+  const form = section.querySelector('#variantForm');
+  const filterInputs = {
+    id: section.querySelector('[data-filter-variants="id"]'),
+    order: section.querySelector('[data-filter-variants="order"]'),
+    gene: section.querySelector('[data-filter-variants="gene"]'),
+    transcript: section.querySelector('[data-filter-variants="transcript"]'),
+    classification: section.querySelector('[data-filter-variants="classification"]'),
+    criteria: section.querySelector('[data-filter-variants="criteria"]')
+  };
+  annotateHeaders(section);
+  annotateSearchInputs(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+  applyFormTooltips(form);
+  applySelectFilters(section);
+  let filteredVariants = list.slice();
+  let activeFilters = {};
+  const renderRows = () => {
+    const term = search.value.toLowerCase();
+    const filters = {
+      id: filterInputs.id?.value.trim() || '',
+      order: filterInputs.order?.value.trim().toLowerCase() || '',
+      gene: filterInputs.gene?.value.trim().toLowerCase() || '',
+      transcript: filterInputs.transcript?.value.trim().toLowerCase() || '',
+      classification: filterInputs.classification?.value.trim().toLowerCase() || '',
+      criteria: filterInputs.criteria?.value.trim().toLowerCase() || ''
+    };
+    const filterSummary = {...filters};
+    if (term) filterSummary.fritekst = term;
+    activeFilters = filterSummary;
+    filteredVariants = list.filter(v => !term || [v.gene, v.hgvs_c, v.hgvs_p].some(val => (val || '').toLowerCase().includes(term))).filter(v => {
+      if (filters.id && !String(v.id).includes(filters.id)) return false;
+      if (filters.order && !(String(v.order_id || '')).toLowerCase().includes(filters.order)) return false;
+      if (filters.gene && !(v.gene || '').toLowerCase().includes(filters.gene)) return false;
+      if (filters.transcript && !(v.transcript || '').toLowerCase().includes(filters.transcript)) return false;
+      if (filters.classification && !(String(v.classification || '')).toLowerCase().includes(filters.classification)) return false;
+      if (filters.criteria && !(v.criteria || '').toLowerCase().includes(filters.criteria)) return false;
+      return true;
+    });
+    tbody.innerHTML = filteredVariants.map(v => `<tr data-id="${v.id}"><td>${v.id}</td><td>${v.order_id}</td><td>${esc(v.gene)}</td><td>${esc(v.hgvs_c||'')}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td></tr>`).join('');
+    annotateTableCells(section);
+  };
+  renderRows();
+  search.addEventListener('input', renderRows);
+  Object.values(filterInputs).forEach(input => input?.addEventListener('input', renderRows));
+  section.querySelector('#variantsExport').addEventListener('click', () => {
+    exportFilteredJson('glimr-varianter-filtreret.json', filteredVariants, {
+      entity: 'varianter',
+      plural: 'varianter',
+      tab: 'Varianter',
+      filters: activeFilters
+    });
+  });
+  tbody.addEventListener('click', e => {
+    const tr = e.target.closest('tr');
+    if (!tr) return;
+    const variant = list.find(v => v.id === Number(tr.dataset.id));
+    if (!variant) return;
+    fillForm(form, variant);
+  });
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!ensureWrite('variants')) return;
+    const data = Object.fromEntries(new FormData(form).entries());
+    data.order_id = Number(data.order_id);
+    data.classification = String(data.classification);
+    if (data.af) data.af = Number(data.af);
+    if (data.id) {
+      const id = Number(data.id);
+      const before = {...findById('variants', id)};
+      const updated = {...before, ...data, id};
+      await updateRecord('variants', updated, before);
+    } else {
+      delete data.id;
+      await addRecord('variants', data);
+    }
+    await loadStore('variants');
+    renderTab('variants');
+  });
+  section.querySelector('#variantDelete').addEventListener('click', async () => {
+    const id = Number(form.elements.id.value);
+    if (!id) return alert('Vælg variant');
+    if (!ensureWrite('variants')) return;
+    if (confirm('Slet variant?')) {
+      await deleteRecord('variants', id);
+      renderTab('variants');
+    }
+  });
+  section.querySelector('#variantClear').addEventListener('click', () => form.reset());
+  section.querySelector('#variantToLibrary').addEventListener('click', async () => {
+    if (!ensureWrite('variant_library')) return;
+    const data = Object.fromEntries(new FormData(form).entries());
+    if (!data.gene) return alert('Vælg variant først');
+    const libraryEntry = {
+      gene: data.gene,
+      transcript: data.transcript,
+      hgvs_c: data.hgvs_c,
+      hgvs_p: data.hgvs_p,
+      classification: String(data.classification || ''),
+      criteria: data.criteria,
+      evidence: data.interpretation,
+      condition: '',
+      inheritance: '',
+      curated_by: currentUserName(),
+      last_review: new Date().toISOString().split('T')[0]
+    };
+    await addRecord('variant_library', libraryEntry);
+    await loadStore('variant_library');
+    renderTab('variant_library');
+    alert('Variant tilføjet til biblioteket');
+  });
+}
+function renderVariantLibrary(section) {
+  const list = getCached('variant_library');
+  section.innerHTML = `
+  <div class="panel">
+    <label for="libSearch">Søg</label>
+    <input id="libSearch" type="search" placeholder="Gen/HGVS...">
+    <table><thead><tr><th>ID</th><th>Gen</th><th>HGVS</th><th>Klasse</th><th>Kriterier</th><th>Evidens</th><th>Kurateret af</th></tr></thead><tbody></tbody></table>
+  </div>`;
+  const tbody = section.querySelector('tbody');
+  const search = section.querySelector('#libSearch');
+  annotateHeaders(section);
+  annotateSearchInputs(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+  const renderRows = () => {
+    const term = search.value.toLowerCase();
+    tbody.innerHTML = list.filter(v => !term || [v.gene,v.hgvs_c,v.hgvs_p].some(val => (val||'').toLowerCase().includes(term))).map(v => `<tr data-id="${v.id}"><td>${v.id}</td><td>${esc(v.gene)}</td><td>${esc(v.hgvs_c||v.hgvs_p||'')}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(v.evidence||'')}</td><td>${esc(v.curated_by||'')}</td></tr>`).join('');
+    annotateTableCells(section);
+  };
+  renderRows();
+  search.addEventListener('input', renderRows);
+  tbody.addEventListener('dblclick', async e => {
+    const tr = e.target.closest('tr');
+    if (!tr) return;
+    if (confirm('Slet bibliotekspost?')) {
+      await deleteRecord('variant_library', Number(tr.dataset.id));
+      renderTab('variant_library');
+    }
+  });
+}
+function renderReports(section) {
+  const list = getCached('reports');
+  const orders = getCached('orders');
+  section.innerHTML = `
+  <div class="panel">
+    <div class="flex">
+      <div>
+        <label for="reportSearch">Søg</label>
+        <input id="reportSearch" type="search" placeholder="Status...">
+        <details class="advanced-filter" id="reportsFilterPanel">
+          <summary>Avanceret filter</summary>
+          <div class="filter-grid">
+            <label>ID<input type="search" data-filter-reports="id" placeholder="Rapport-ID"></label>
+            <label>Ordination<input type="search" data-filter-reports="order" placeholder="Ordinations-ID"></label>
+            <label>Status<input type="search" data-filter-reports="status" placeholder="Status"></label>
+            <label>Udstedt fra<input type="date" data-filter-reports="issued_from"></label>
+            <label>Udstedt til<input type="date" data-filter-reports="issued_to"></label>
+          </div>
+        </details>
+        <table><thead><tr><th>ID</th><th>Ordination</th><th>Status</th><th>Udstedt</th></tr></thead><tbody></tbody></table>
+        <div class="table-actions">
+          <button type="button" class="secondary" id="reportsExport">Eksportér filtrerede rapporter</button>
+        </div>
+      </div>
+      <div>
+        <h2>Rapport</h2>
+        <form id="reportForm">
+          <input type="hidden" name="id">
+          <label>Ordination
+            <div class="filterable-select">
+              <input type="search" data-select-filter placeholder="Filtrer ordinationer">
+              <select name="order_id" required>${orders.map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}</select>
+            </div>
+          </label>
+          <label>Status<select name="status"><option value="draft">Udkast</option><option value="final">Endelig</option><option value="amended">Ændret</option></select></label>
+          <label>Udstedt<input type="datetime-local" name="issued_at"></label>
+          <label>Fund<textarea name="findings"></textarea></label>
+          <label>Resumé<textarea name="summary"></textarea></label>
+          <div class="btn-row">
+            <button class="primary" type="submit">Gem</button>
+            <button class="secondary" type="button" id="reportClear">Ny</button>
+            <button class="danger" type="button" id="reportDelete">Slet</button>
+            <button class="secondary" type="button" id="reportPreview">Udskriv/forhåndsvis</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>`;
+  const tbody = section.querySelector('tbody');
+  const search = section.querySelector('#reportSearch');
+  const form = section.querySelector('#reportForm');
+  const filterInputs = {
+    id: section.querySelector('[data-filter-reports="id"]'),
+    order: section.querySelector('[data-filter-reports="order"]'),
+    status: section.querySelector('[data-filter-reports="status"]'),
+    issued_from: section.querySelector('[data-filter-reports="issued_from"]'),
+    issued_to: section.querySelector('[data-filter-reports="issued_to"]')
+  };
+  annotateHeaders(section);
+  annotateSearchInputs(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+  applyFormTooltips(form);
+  applySelectFilters(section);
+  const statusMap = {draft:'Udkast', final:'Endelig', amended:'Ændret'};
+  let filteredReports = list.slice();
+  let activeFilters = {};
+  const renderRows = () => {
+    const term = search.value.toLowerCase();
+    const filters = {
+      id: filterInputs.id?.value.trim() || '',
+      order: filterInputs.order?.value.trim().toLowerCase() || '',
+      status: filterInputs.status?.value.trim().toLowerCase() || '',
+      issued_from: filterInputs.issued_from?.value || '',
+      issued_to: filterInputs.issued_to?.value || ''
+    };
+    const fromDate = filters.issued_from ? new Date(filters.issued_from) : null;
+    const toDate = filters.issued_to ? new Date(filters.issued_to) : null;
+    if (toDate) toDate.setHours(23, 59, 59, 999);
+    const filterSummary = {...filters};
+    if (term) filterSummary.fritekst = term;
+    activeFilters = filterSummary;
+    filteredReports = list.filter(r => {
+      if (!term) return true;
+      const raw = (r.status || '').toLowerCase();
+      const display = (statusMap[r.status] || r.status || '').toLowerCase();
+      return raw.includes(term) || display.includes(term);
+    }).filter(r => {
+      if (filters.id && !String(r.id).includes(filters.id)) return false;
+      if (filters.order && !(String(r.order_id || '')).toLowerCase().includes(filters.order)) return false;
+      const statusStrings = [(r.status || '').toLowerCase(), (statusMap[r.status] || '').toLowerCase()];
+      if (filters.status && !statusStrings.some(v => v.includes(filters.status))) return false;
+      if (fromDate || toDate) {
+        if (!r.issued_at) return false;
+        const issued = new Date(r.issued_at);
+        if (Number.isNaN(issued.getTime())) return false;
+        if (fromDate && issued < fromDate) return false;
+        if (toDate && issued > toDate) return false;
+      }
+      return true;
+    });
+    tbody.innerHTML = filteredReports.map(r => {
+      const displayStatus = statusMap[r.status] || r.status || '';
+      return `<tr data-id="${r.id}"><td>${r.id}</td><td>${r.order_id}</td><td>${esc(displayStatus)}</td><td>${esc(r.issued_at||'')}</td></tr>`;
+    }).join('');
+    annotateTableCells(section);
+  };
+  renderRows();
+  search.addEventListener('input', renderRows);
+  Object.values(filterInputs).forEach(input => input?.addEventListener('input', renderRows));
+  section.querySelector('#reportsExport').addEventListener('click', () => {
+    exportFilteredJson('glimr-rapporter-filtreret.json', filteredReports, {
+      entity: 'rapporter',
+      plural: 'rapporter',
+      tab: 'Rapporter',
+      filters: activeFilters
+    });
+  });
+  tbody.addEventListener('click', e => {
+    const tr = e.target.closest('tr');
+    if (!tr) return;
+    const report = list.find(r => r.id === Number(tr.dataset.id));
+    if (!report) return;
+    fillForm(form, report);
+  });
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!ensureWrite('reports')) return;
+    const data = Object.fromEntries(new FormData(form).entries());
+    data.order_id = Number(data.order_id);
+    if (data.id) {
+      const id = Number(data.id);
+      const before = {...findById('reports', id)};
+      const updated = {...before, ...data, id};
+      await updateRecord('reports', updated, before);
+    } else {
+      delete data.id;
+      await addRecord('reports', data);
+    }
+    await loadStore('reports');
+    renderTab('reports');
+  });
+  section.querySelector('#reportDelete').addEventListener('click', async () => {
+    const id = Number(form.elements.id.value);
+    if (!id) return alert('Vælg rapport');
+    if (!ensureWrite('reports')) return;
+    if (confirm('Slet rapport?')) {
+      await deleteRecord('reports', id);
+      renderTab('reports');
+    }
+  });
+  section.querySelector('#reportClear').addEventListener('click', () => form.reset());
+  section.querySelector('#reportPreview').addEventListener('click', () => {
+    const data = Object.fromEntries(new FormData(form).entries());
+    if (!data.order_id) return alert('Vælg ordre');
+    const html = buildReportHtml(Number(data.order_id), data);
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.write('<!DOCTYPE html><html><head><title>Rapport</title><style>body{font-family:Segoe UI,Arial;margin:2rem;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ccc;padding:0.4rem;}th{background:#f0f0f0;}</style></head><body>' + html + '</body></html>');
+      win.document.close();
+    }
+  });
+}
+function buildReportHtml(orderId, reportData) {
+  const order = findById('orders', orderId);
+  const patient = order ? findById('patients', Number(order.patient_id)) : null;
+  const sample = order ? findById('samples', Number(order.sample_id)) : null;
+  const variants = getCached('variants').filter(v => v.order_id === orderId);
+  const rows = variants.map(v => `<tr><td>${esc(v.gene)}</td><td>${esc(v.hgvs_c||'')}</td><td>${esc(v.hgvs_p||'')}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(v.af??'')}</td><td>${esc(v.interpretation||'')}</td></tr>`).join('') || '<tr><td colspan="7">Ingen fund</td></tr>';
+  return `
+  <h1>Diagnostisk rapport</h1>
+  <p><strong>Ordination:</strong> ${orderId}</p>
+  <p><strong>Patient:</strong> ${esc(patient?.name||'')} (${esc(patient?.mrn||'')})</p>
+  <p><strong>Prøve:</strong> ${esc(sample?.sample_type||'')} (${sample?.id||''})</p>
+  <p><strong>Status:</strong> ${esc(reportData.status||'')}</p>
+  <p><strong>Udstedt:</strong> ${esc(reportData.issued_at||'')}</p>
+  <h2>Resumé</h2>
+  <p>${esc(reportData.summary||'')}</p>
+  <h2>Fund</h2>
+  <table><thead><tr><th>Gen</th><th>HGVS c.</th><th>HGVS p.</th><th>Klasse</th><th>ACMG</th><th>AF</th><th>Tolkning</th></tr></thead><tbody>${rows}</tbody></table>
+  <h2>Detaljer</h2>
+  <pre>${esc(reportData.findings||'')}</pre>`;
+}
+function renderQC(section) {
+  const list = getCached('qc');
+  const samples = getCached('samples');
+  section.innerHTML = `
+  <div class="panel">
+    <div class="flex">
+      <div>
+        <label for="qcSearch">Søg</label>
+        <input id="qcSearch" type="search" placeholder="Måling...">
+        <table><thead><tr><th>ID</th><th>Prøve</th><th>Måling</th><th>Værdi</th><th>Enhed</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div>
+        <h2>Kvalitetsmåling</h2>
+        <form id="qcForm">
+          <input type="hidden" name="id">
+          <label>Prøve
+            <div class="filterable-select">
+              <input type="search" data-select-filter placeholder="Filtrer prøver">
+              <select name="sample_id" required>${samples.map(s => `<option value="${s.id}">${s.id} – ${esc(getName('patients', s.patient_id))}</option>`).join('')}</select>
+            </div>
+          </label>
+          <label>Måling<input name="metric" required></label>
+          <label>Værdi<input name="value" type="number" step="0.0001" required></label>
+          <label>Enhed<input name="unit"></label>
+          <label>Noter<textarea name="notes"></textarea></label>
+          <div class="btn-row">
+            <button class="primary" type="submit">Gem</button>
+            <button class="secondary" type="button" id="qcClear">Ny</button>
+            <button class="danger" type="button" id="qcDelete">Slet</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>`;
+  const tbody = section.querySelector('tbody');
+  const search = section.querySelector('#qcSearch');
+  const form = section.querySelector('#qcForm');
+  annotateHeaders(section);
+  annotateSearchInputs(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+  applyFormTooltips(form);
+  applySelectFilters(section);
+  const renderRows = () => {
+    const term = search.value.toLowerCase();
+    tbody.innerHTML = list.filter(q => !term || [q.metric,q.unit].some(v => (v||'').toLowerCase().includes(term))).map(q => `<tr data-id="${q.id}"><td>${q.id}</td><td>${esc(q.sample_id)}</td><td>${esc(q.metric)}</td><td>${esc(q.value)}</td><td>${esc(q.unit||'')}</td></tr>`).join('');
+    annotateTableCells(section);
+  };
+  renderRows();
+  search.addEventListener('input', renderRows);
+  tbody.addEventListener('click', e => {
+    const tr = e.target.closest('tr');
+    if (!tr) return;
+    const qc = list.find(q => q.id === Number(tr.dataset.id));
+    if (!qc) return;
+    fillForm(form, qc);
+  });
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!ensureWrite('qc')) return;
+    const data = Object.fromEntries(new FormData(form).entries());
+    data.sample_id = Number(data.sample_id);
+    if (data.id) {
+      const id = Number(data.id);
+      const before = {...findById('qc', id)};
+      const updated = {...before, ...data, id};
+      await updateRecord('qc', updated, before);
+    } else {
+      delete data.id;
+      await addRecord('qc', data);
+    }
+    await loadStore('qc');
+    renderTab('qc');
+  });
+  section.querySelector('#qcDelete').addEventListener('click', async () => {
+    const id = Number(form.elements.id.value);
+    if (!id) return alert('Vælg QC-post');
+    if (!ensureWrite('qc')) return;
+    if (confirm('Slet QC-post?')) {
+      await deleteRecord('qc', id);
+      renderTab('qc');
+    }
+  });
+  section.querySelector('#qcClear').addEventListener('click', () => form.reset());
+}
+function renderResponses(section) {
+  const list = getCached('responses').slice().reverse();
+  section.innerHTML = `
+  <div class="panel">
+    <div class="btn-row">
+      <label class="secondary" id="fhirImportLabel" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.4rem 0.8rem;border-radius:0.5rem;cursor:pointer;">Importér FHIR...
+        <input type="file" id="fhirImport" accept="application/json" style="display:none;">
+      </label>
+    </div>
+    <table><thead><tr><th>Tid</th><th>Sender</th><th>Patient</th><th>Rapport</th><th>Varianter</th></tr></thead><tbody>
+      ${list.map(r => `<tr><td>${esc(r.ts)}</td><td>${esc(r.sender||'')}</td><td>${esc(r.patient||'')}</td><td>${esc(r.diagnostic_report_id||'')}</td><td>${esc(r.variant_count||0)}</td></tr>`).join('') || '<tr><td colspan="5">Ingen svar</td></tr>'}
+    </tbody></table>
+  </div>
+  <div class="panel">
+    <h2>Udgående MedCom-svar</h2>
+    <label>Vælg ordre<select id="fhirOrderSelect"><option value="">Vælg...</option>${getCached('orders').map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}</select></label>
+    <div class="btn-row">
+      <button class="primary" id="generateFhir">Generér FHIR-bundle</button>
+      <button class="secondary" id="previewFhir">Forhåndsvis</button>
+    </div>
+    <pre id="fhirPreview" style="display:none"></pre>
+  </div>`;
+  annotateHeaders(section);
+  annotateTableCells(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+  const orderLabel = section.querySelector('#fhirOrderSelect')?.closest('label');
+  if (orderLabel) setTooltip(orderLabel, tooltipCatalog.controls.fhirOrderSelect);
+  section.querySelector('#fhirOrderSelect').addEventListener('change', () => section.querySelector('#fhirPreview').style.display='none');
+  section.querySelector('#generateFhir').addEventListener('click', () => exportFhir(section, true));
+  section.querySelector('#previewFhir').addEventListener('click', () => exportFhir(section, false));
+  section.querySelector('#fhirImport').addEventListener('change', async e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const json = JSON.parse(text);
+      await handleInboundFhir(json, true);
+      alert('FHIR bundle importeret.');
+      await loadStore('responses');
+      renderTab('responses');
+    } catch (err) {
+      console.error(err);
+      alert('Kunne ikke importere: ' + err.message);
+    }
+    e.target.value = '';
+  });
+}
+async function exportFhir(section, download) {
+  const select = section.querySelector('#fhirOrderSelect');
+  const id = Number(select.value);
+  if (!id) return alert('Vælg ordre');
+  const bundle = buildFhirBundle(id);
+  const json = JSON.stringify(bundle, null, 2);
+  const preview = section.querySelector('#fhirPreview');
+  preview.textContent = json;
+  preview.style.display = 'block';
+  if (download) {
+    const blob = new Blob([json], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const filename = withDateStamp(`glimr-ordre-${id}.json`);
+    triggerDownload(url, filename);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setStatus(`FHIR-meddelelse for ordination ${id} downloadet som ${filename}.`);
+  }
+}
+function buildFhirBundle(orderId) {
+  const order = findById('orders', orderId);
+  if (!order) throw new Error('Ordination ikke fundet');
+  const patient = findById('patients', Number(order.patient_id));
+  const sample = findById('samples', Number(order.sample_id));
+  const panel = order.panel_id ? findById('panels', Number(order.panel_id)) : null;
+  const report = getCached('reports').find(r => r.order_id === orderId) || {status:'final', summary:'', findings:''};
+  const variants = getCached('variants').filter(v => v.order_id === orderId);
+  const timestamp = new Date().toISOString();
+  const patientResource = {
+    resourceType:'Patient',
+    id:`patient-${patient?.id||order.patient_id}`,
+    identifier: patient?.mrn ? [{system:'urn:oid:1.2.208.176.1.2', value:patient.mrn}] : undefined,
+    name: patient?.name ? [{text:patient.name}] : undefined,
+    gender: patient?.gender || undefined,
+    birthDate: patient?.birth_date || undefined
+  };
+  const specimenResource = {
+    resourceType:'Specimen',
+    id:`specimen-${sample?.id||order.sample_id}`,
+    status:'available',
+    type: {text: sample?.sample_type || 'Genomic specimen'},
+    receivedTime: sample?.collected_at || undefined,
+    subject: {reference:`Patient/${patientResource.id}`}
+  };
+  const producerOrg = {
+    resourceType:'Organization',
+    id:'org-producer',
+    name:'GenLab Producer'
+  };
+  const requesterOrg = {
+    resourceType:'Organization',
+    id:'org-requester',
+    name: order.clinician || 'Requester'
+  };
+  const diagnosticReport = {
+    resourceType:'DiagnosticReport',
+    id:`dr-${orderId}`,
+    status: report.status || 'final',
+    category:[{coding:[{system:'http://terminology.hl7.org/CodeSystem/v2-0074', code:'LAB', display:'Laboratory'}]}],
+    code:{coding:[{system:'http://loinc.org', code:'51969-4', display:'Genetic analysis report'}]},
+    subject:{reference:`Patient/${patientResource.id}`},
+    effectiveDateTime: report.issued_at || new Date().toISOString(),
+    issued: report.issued_at || new Date().toISOString(),
+    performer:[{reference:'Organization/org-producer'}],
+    resultsInterpreter: requesterOrg.name ? [{reference:'Organization/org-requester'}] : undefined,
+    conclusion: report.summary || undefined,
+    presentedForm: report.findings ? [{contentType:'text/plain', data:btoa(report.findings)}] : undefined
+  };
+  const entries = [];
+  const addEntry = resource => entries.push({fullUrl:`urn:uuid:${crypto.randomUUID?.() || Math.random().toString(36).slice(2)}`, resource});
+  const messageHeader = {
+    resourceType:'MessageHeader',
+    id:`mh-${orderId}`,
+    eventCoding:{system:'http://medcom.dk/fhir/medcom-messaging-communication-event', code:'medcom-lab-reporting', display:'MedCom Lab Report'},
+    source:{name:'GlimR'},
+    destination:[{name:'Recipient'}],
+    sender:{reference:'Organization/org-producer'},
+    focus:[{reference:`DiagnosticReport/${diagnosticReport.id}`}] 
+  };
+  addEntry(messageHeader);
+  addEntry(patientResource);
+  addEntry(producerOrg);
+  addEntry(requesterOrg);
+  addEntry(specimenResource);
+  addEntry(diagnosticReport);
+  variants.forEach((variant, idx) => {
+    const obs = {
+      resourceType:'Observation',
+      id:`var-${orderId}-${idx+1}`,
+      status:'final',
+      category:[{coding:[{system:'http://terminology.hl7.org/CodeSystem/observation-category', code:'laboratory'}]}],
+      code:{coding:[{system:'http://loinc.org', code:'69548-6', display:'Genomic sequence variation interpretation'}]},
+      subject:{reference:`Patient/${patientResource.id}`},
+      specimen:{reference:`Specimen/${specimenResource.id}`},
+      valueCodeableConcept:{text:[variant.hgvs_c, variant.hgvs_p].filter(Boolean).join(' / ') || variant.gene},
+      component:[{code:{text:'Gene'}, valueCodeableConcept:{text:variant.gene}}],
+      interpretation: classificationMap[String(variant.classification)] ? [{coding:[{system:'http://loinc.org', code:classificationMap[String(variant.classification)].code, display:classificationMap[String(variant.classification)].display}]}] : undefined,
+      note: variant.criteria ? [{text:`ACMG: ${variant.criteria}`}]: undefined
+    };
+    addEntry(obs);
+    diagnosticReport.result = diagnosticReport.result || [];
+    diagnosticReport.result.push({reference:`Observation/${obs.id}`});
+  });
+  const bundle = {
+    resourceType:'Bundle',
+    type:'message',
+    timestamp,
+    entry: entries
+  };
+  return bundle;
+}
+async function handleInboundFhir(bundle, offerLibrary=false) {
+  if (!ensureWrite('responses')) return;
+  if (!bundle || bundle.resourceType !== 'Bundle') throw new Error('Ikke en FHIR Bundle');
+  const entries = bundle.entry || [];
+  const findResource = type => entries.map(e => e.resource).find(r => r.resourceType === type);
+  const diagnosticReport = findResource('DiagnosticReport');
+  const patient = findResource('Patient');
+  const observations = entries.map(e => e.resource).filter(r => r.resourceType === 'Observation');
+  const response = {
+    ts: new Date().toISOString(),
+    sender: findResource('MessageHeader')?.sender?.reference || 'ukendt',
+    patient: patient?.name?.[0]?.text || patient?.id || '',
+    diagnostic_report_id: diagnosticReport?.id || '',
+    variant_count: observations.length,
+    variants: JSON.stringify(observations.map(o => ({gene:o.component?.[0]?.valueCodeableConcept?.text, note:o.note?.[0]?.text, value:o.valueCodeableConcept?.text}))),
+    raw: JSON.stringify(bundle)
+  };
+  await addRecord('responses', response);
+  if (offerLibrary && observations.length) {
+    if (ensureWrite('variant_library') && confirm('Tilføj varianter til bibliotek?')) {
+      for (const obs of observations) {
+        const note = obs.note?.[0]?.text || '';
+        await addRecord('variant_library', {
+          gene: obs.component?.[0]?.valueCodeableConcept?.text || '',
+          transcript: '',
+          hgvs_c: obs.valueCodeableConcept?.text || '',
+          hgvs_p: '',
+          classification: note.includes('Pathogenic') ? '5' : '',
+          criteria: note.replace('ACMG: ','') || '',
+          evidence: note,
+          condition: '',
+          inheritance: '',
+          curated_by: 'FHIR import',
+          last_review: new Date().toISOString().split('T')[0]
+        });
+      }
+      await loadStore('variant_library');
+    }
+  }
+}
+function renderUsers(section) {
+  const list = getCached('users');
+  section.innerHTML = `
+  <div class="panel">
+    <div class="flex">
+      <div>
+        <label for="userSearch">Søg</label>
+        <input id="userSearch" type="search" placeholder="Navn/mail...">
+        <table><thead><tr><th>ID</th><th>Navn</th><th>E-mail</th><th>Rolle</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div>
+        <h2>Bruger</h2>
+        <form id="userForm">
+          <input type="hidden" name="id">
+          <label>Navn<input name="name" required></label>
+          <label>E-mail<input type="email" name="email" required></label>
+          <label>Rolle<select name="role" required>${ROLE_OPTIONS.map(opt => `<option value="${opt.value}">${opt.value} – ${opt.description}</option>`).join('')}</select></label>
+          <label>Adgangskode (PIN)<input type="password" name="pin" placeholder="Valgfri kode"></label>
+          <div class="btn-row">
+            <button class="primary" type="submit">Gem</button>
+            <button class="secondary" type="button" id="userClear">Ny</button>
+            <button class="danger" type="button" id="userDelete">Slet</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>`;
+  const tbody = section.querySelector('tbody');
+  const search = section.querySelector('#userSearch');
+  const form = section.querySelector('#userForm');
+  annotateHeaders(section);
+  annotateSearchInputs(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+  applyFormTooltips(form);
+  const renderRows = () => {
+    const term = search.value.toLowerCase();
+    tbody.innerHTML = list.filter(u => !term || [u.name,u.email,u.role].some(v => (v||'').toLowerCase().includes(term))).map(u => `<tr data-id="${u.id}"><td>${u.id}</td><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${esc(roleLabel(u.role))}</td></tr>`).join('');
+    annotateTableCells(section);
+  };
+  renderRows();
+  search.addEventListener('input', renderRows);
+  tbody.addEventListener('click', e => {
+    const tr = e.target.closest('tr');
+    if (!tr) return;
+    const user = list.find(u => u.id === Number(tr.dataset.id));
+    if (!user) return;
+    fillForm(form, user);
+  });
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!ensureWrite('users')) return;
+    const data = Object.fromEntries(new FormData(form).entries());
+    if (data.id) {
+      const id = Number(data.id);
+      const before = {...findById('users', id)};
+      if (!data.pin) data.pin = before?.pin || '';
+      const updated = {...before, ...data, id};
+      await updateRecord('users', updated, before);
+    } else {
+      if (!data.pin) data.pin = '';
+      delete data.id;
+      await addRecord('users', data);
+    }
+    await loadStore('users');
+    refreshLoginOptions();
+    restoreUserSession();
+    renderTab('users');
+  });
+  section.querySelector('#userDelete').addEventListener('click', async () => {
+    const id = Number(form.elements.id.value);
+    if (!id) return alert('Vælg bruger');
+    if (!ensureWrite('users')) return;
+    if (confirm('Slet bruger?')) {
+      await deleteRecord('users', id);
+      refreshLoginOptions();
+      const storedId = localStorage.getItem('glimr-user-id');
+      if (storedId && Number(storedId) === id) {
+        logoutUser();
+      }
+      renderTab('users');
+    }
+  });
+  section.querySelector('#userClear').addEventListener('click', () => form.reset());
+}
+function renderAudit(section) {
+  const list = getCached('audit').slice().reverse();
+  section.innerHTML = `
+  <div class="panel">
+    <table><thead><tr><th>Tid</th><th>Bruger</th><th>Handling</th><th>Entitet</th><th>ID</th><th>Før</th><th>Efter</th></tr></thead><tbody>
+      ${list.map(a => `<tr><td>${esc(a.ts)}</td><td>${esc(a.user)}</td><td>${esc(a.action)}</td><td>${esc(a.entity)}</td><td>${esc(a.entity_id??'')}</td><td>${esc(a.before||'')}</td><td>${esc(a.after||'')}</td></tr>`).join('') || '<tr><td colspan="7">Ingen revisionsposter</td></tr>'}
+    </tbody></table>
+  </div>`;
+  annotateHeaders(section);
+  annotateTableCells(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+}
+function renderDbTab(section) {
+  section = section || document.querySelector('section[data-tab="db"]');
+  const status = state.boundHandle ? `Tilknyttet fil: ${state.boundHandle.name}` : 'Ingen fil tilknyttet';
+  if (!section) return;
+  section.innerHTML = `
+  <div class="panel">
+    <h2>Filbaseret database</h2>
+    <p>${esc(status)}</p>
+    <div class="btn-row">
+      <button class="secondary" id="bindFile">Knyt/åbn DB-fil...</button>
+      <button class="secondary" id="saveNow">Gem nu</button>
+      <label style="display:flex;align-items:center;gap:0.5rem;">
+        <input type="checkbox" id="autosaveToggle" ${state.autosave?'checked':''}> Autogem
+      </label>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>Backup</h2>
+    <div class="btn-row">
+      <button class="secondary" id="downloadBackup">Hent backup (JSON)</button>
+      <label class="secondary" id="restoreLabel" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.4rem 0.8rem;border-radius:0.5rem;cursor:pointer;">Gendan fra backup<input type="file" id="restoreFile" accept="application/json" style="display:none;"></label>
+    </div>
+  </div>`;
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+  section.querySelector('#bindFile').addEventListener('click', bindDbFile);
+  section.querySelector('#saveNow').addEventListener('click', manualSave);
+  section.querySelector('#autosaveToggle').addEventListener('change', e => {
+    state.autosave = e.target.checked;
+    setStatus('Autogemning ' + (state.autosave ? 'aktiveret' : 'deaktiveret'));
+  });
+  section.querySelector('#downloadBackup').addEventListener('click', downloadBackup);
+  section.querySelector('#restoreFile').addEventListener('change', async e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      await restoreFromFile(file);
+      alert('Backup gendannet.');
+    } catch (err) {
+      console.error(err);
+      alert('Kunne ikke gendanne: ' + err.message);
+    }
+    e.target.value = '';
+  });
+}
+function renderAdmin(section) {
+  section.innerHTML = `
+  <div class="panel">
+    <div class="btn-row">
+      <button class="primary" id="downloadSql">Hent glimr.sql</button>
+      <button class="secondary" id="showSchema">Vis skema</button>
+      <button class="secondary" id="downloadZip">Hent ZIP</button>
+      <button class="secondary" id="downloadLogo">Hent logo-fil</button>
+    </div>
+    <textarea id="schemaText" style="width:100%;min-height:200px;margin-top:1rem;display:none;"></textarea>
+  </div>`;
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+  section.querySelector('#downloadSql').addEventListener('click', async () => {
+    const sql = await generateSqlDump();
+    const blob = new Blob([sql], {type:'text/sql'});
+    const url = URL.createObjectURL(blob);
+    const filename = withDateStamp('glimr.sql');
+    triggerDownload(url, filename);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setStatus(`MySQL-dump downloadet som ${filename}.`);
+  });
+  section.querySelector('#showSchema').addEventListener('click', async () => {
+    const sql = await generateSqlDump();
+    const textarea = section.querySelector('#schemaText');
+    textarea.value = sql;
+    textarea.style.display = 'block';
+  });
+  section.querySelector('#downloadZip').addEventListener('click', async () => {
+    const files = await buildZipFiles();
+    const zipBytes = createZip(files);
+    const blob = new Blob([zipBytes], {type:'application/zip'});
+    const url = URL.createObjectURL(blob);
+    const filename = withDateStamp('glimr.zip');
+    triggerDownload(url, filename);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setStatus(`ZIP-arkiv downloadet som ${filename}.`);
+  });
+  section.querySelector('#downloadLogo').addEventListener('click', downloadLogoAsset);
+}
+function renderTestsTab(section) {
+  section.innerHTML = `
+  <div class="panel">
+    <h2>Selvtest</h2>
+    <table><thead><tr><th>Test</th><th>Status</th><th>Detaljer</th></tr></thead><tbody id="testsBody"></tbody></table>
+  </div>`;
+  const tbody = section.querySelector('#testsBody');
+  if (tbody) {
+    tbody.innerHTML = state.testResults.length
+      ? state.testResults.map(([name, pass, detail]) => `<tr><td>${esc(name)}</td><td>${pass ? 'OK' : 'FEJL'}</td><td>${esc(detail||'')}</td></tr>`).join('')
+      : '<tr><td colspan="3">Ingen tests kørt endnu.</td></tr>';
+  }
+  annotateHeaders(section);
+  annotateTableCells(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+}
+async function runTests() {
+  const section = document.querySelector('section[data-tab="tests"]');
+  if (!section) {
+    activateTab('tests');
+    return setTimeout(runTests, 200);
+  }
+  const results = [];
+  try {
+    const patientId = await addRecord('patients', {mrn:'TEST1', name:'Testpatient', gender:'other', birth_date:'1980-01-01', notes:''});
+    const patient = findById('patients', patientId);
+    results.push(['Oprettelse/udlæsning patient', patient?.name === 'Testpatient', `Navn: ${patient?.name}`]);
+    const sampleId = await addRecord('samples', {patient_id:patientId, sample_type:'Blod', status:'received', collected_at:new Date().toISOString(), notes:''});
+    const orderId = await addRecord('orders', {patient_id:patientId, sample_id:sampleId, panel_id:null, clinician:'Testperson', status:'analysis', ordered_at:new Date().toISOString()});
+    results.push(['Oprettelse ordination med FK', !!findById('orders', orderId), `Ordination ${orderId}`]);
+    const reportHtml = buildReportHtml(orderId, {status:'draft', issued_at:new Date().toISOString(), summary:'Test', findings:'Ingen'});
+    results.push(['Generering af rapport HTML', reportHtml.includes('Diagnostisk rapport'), 'HTML længde ' + reportHtml.length]);
+    const bundle = buildFhirBundle(orderId);
+    const hasResources = ['MessageHeader','Patient','DiagnosticReport','Observation'].every(type => (bundle.entry||[]).some(e => e.resource.resourceType === type));
+    results.push(['Udgående FHIR-bundle indhold', hasResources, `Ressourcer: ${(bundle.entry||[]).length}`]);
+    const files = await buildZipFiles();
+    const zip = createZip(files);
+    const view = new DataView(zip.buffer);
+    const centralDirOffset = view.getUint32(zip.length - 6, true);
+    results.push(['ZIP-bytes genereret', centralDirOffset > 0, `Centraldir-offset: ${centralDirOffset}`]);
+    const sql = await generateSqlDump();
+    results.push(['SQL-dump indeholder variants.criteria', sql.includes('`criteria`'), 'Længde ' + sql.length]);
+    results.push(['Filbinding API', 'showOpenFilePicker' in window || 'showSaveFilePicker' in window, 'Filadgang ' + (('showOpenFilePicker' in window) ? 'tilgængelig' : 'ukendt')]);
+  } catch (err) {
+    console.error(err);
+    results.push(['Testfejl', false, err.message]);
+  }
+  state.testResults = results;
+  renderTestsTab(section);
+  await loadAllStores();
+  renderAll();
+  const refreshedSection = document.querySelector('section[data-tab="tests"]');
+  if (refreshedSection) renderTestsTab(refreshedSection);
+}
+async function buildZipFiles() {
+  const backup = JSON.stringify(await exportData(), null, 2);
+  const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+  const readme = 'GlimR - lokalt enkeltfil-LIMS\n\nÅbn glims.html i en moderne browser.\n';
+  return [
+    {name:'glims.html', data:utf8Encode(html)},
+    {name:'glimr-backup.json', data:utf8Encode(backup)},
+    {name:'README.txt', data:utf8Encode(readme)}
+  ];
+}
+function utf8Encode(str) {
+  return new TextEncoder().encode(str);
+}
+function crc32(buf) {
+  let crc = -1;
+  for (let i=0; i<buf.length; i++) {
+    crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ buf[i]) & 0xff];
+  }
+  return (crc ^ -1) >>> 0;
+}
+const CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let n=0; n<256; n++) {
+    let c = n;
+    for (let k=0; k<8; k++) {
+      c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+    }
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+function createZip(files) {
+  let total = 0;
+  files.forEach(f => total += 30 + f.name.length + f.data.length);
+  total += files.length * 46;
+  total += 22;
+  const buffer = new Uint8Array(total + 1024);
+  let offset = 0;
+  const central = [];
+  const now = new Date();
+  const dostime = ((now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() / 2)) & 0xffff;
+  const dosdate = (((now.getFullYear() - 1980) << 9) | ((now.getMonth()+1) << 5) | now.getDate()) & 0xffff;
+  for (const file of files) {
+    const nameBytes = utf8Encode(file.name);
+    const crc = crc32(file.data);
+    const localHeader = new DataView(buffer.buffer, offset, 30);
+    localHeader.setUint32(0, 0x04034b50, true);
+    localHeader.setUint16(4, 20, true);
+    localHeader.setUint16(6, 0, true);
+    localHeader.setUint16(8, 0, true);
+    localHeader.setUint16(10, dostime, true);
+    localHeader.setUint16(12, dosdate, true);
+    localHeader.setUint32(14, crc, true);
+    localHeader.setUint32(18, file.data.length, true);
+    localHeader.setUint32(22, file.data.length, true);
+    localHeader.setUint16(26, nameBytes.length, true);
+    localHeader.setUint16(28, 0, true);
+    offset += 30;
+    buffer.set(nameBytes, offset);
+    offset += nameBytes.length;
+    buffer.set(file.data, offset);
+    offset += file.data.length;
+    central.push({nameBytes, crc, size:file.data.length, offset: offset - file.data.length - nameBytes.length - 30});
+  }
+  const centralStart = offset;
+  for (const entry of central) {
+    const view = new DataView(buffer.buffer, offset, 46);
+    view.setUint32(0, 0x02014b50, true);
+    view.setUint16(4, 0x031E, true);
+    view.setUint16(6, 20, true);
+    view.setUint16(8, 0, true);
+    view.setUint16(10, 0, true);
+    view.setUint16(12, dostime, true);
+    view.setUint16(14, dosdate, true);
+    view.setUint32(16, entry.crc, true);
+    view.setUint32(20, entry.size, true);
+    view.setUint32(24, entry.size, true);
+    view.setUint16(28, entry.nameBytes.length, true);
+    view.setUint16(30, 0, true);
+    view.setUint16(32, 0, true);
+    view.setUint16(34, 0, true);
+    view.setUint16(36, 0, true);
+    view.setUint32(38, 0, true);
+    view.setUint32(42, entry.offset, true);
+    offset += 46;
+    buffer.set(entry.nameBytes, offset);
+    offset += entry.nameBytes.length;
+  }
+  const centralSize = offset - centralStart;
+  const view = new DataView(buffer.buffer, offset, 22);
+  view.setUint32(0, 0x06054b50, true);
+  view.setUint16(4, 0, true);
+  view.setUint16(6, 0, true);
+  view.setUint16(8, central.length, true);
+  view.setUint16(10, central.length, true);
+  view.setUint32(12, centralSize, true);
+  view.setUint32(16, centralStart, true);
+  view.setUint16(20, 0, true);
+  offset += 22;
+  return buffer.slice(0, offset);
+}
+async function generateSqlDump() {
+  const createStatements = `SET NAMES utf8mb4;\nSET FOREIGN_KEY_CHECKS=0;\nCREATE TABLE IF NOT EXISTS \`patients\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`mrn\` VARCHAR(64),\n  \`name\` VARCHAR(255),\n  \`gender\` VARCHAR(32),\n  \`birth_date\` DATE,\n  \`notes\` TEXT,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`users\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`name\` VARCHAR(255),\n  \`email\` VARCHAR(255),\n  \`role\` VARCHAR(128),\n  \`pin\` VARCHAR(128),\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`panels\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`name\` VARCHAR(255),\n  \`description\` TEXT,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`samples\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`patient_id\` INT,\n  \`sample_type\` VARCHAR(128),\n  \`collected_at\` DATETIME,\n  \`status\` VARCHAR(64),\n  \`notes\` TEXT,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME,\n  CONSTRAINT fk_samples_patient FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`orders\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`patient_id\` INT,\n  \`sample_id\` INT,\n  \`panel_id\` INT NULL,\n  \`clinician\` VARCHAR(255),\n  \`status\` VARCHAR(64),\n  \`ordered_at\` DATETIME,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME,\n  CONSTRAINT fk_orders_patient FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,\n  CONSTRAINT fk_orders_sample FOREIGN KEY (sample_id) REFERENCES samples(id) ON DELETE CASCADE ON UPDATE CASCADE,\n  CONSTRAINT fk_orders_panel FOREIGN KEY (panel_id) REFERENCES panels(id) ON DELETE SET NULL ON UPDATE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`reports\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`order_id\` INT,\n  \`findings\` TEXT,\n  \`summary\` TEXT,\n  \`status\` VARCHAR(32),\n  \`issued_at\` DATETIME,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME,\n  CONSTRAINT fk_reports_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE ON UPDATE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`qc_metrics\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`sample_id\` INT,\n  \`metric\` VARCHAR(128),\n  \`value\` DECIMAL(18,6),\n  \`unit\` VARCHAR(64),\n  \`notes\` TEXT,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME,\n  CONSTRAINT fk_qc_sample FOREIGN KEY (sample_id) REFERENCES samples(id) ON DELETE CASCADE ON UPDATE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`variants\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`order_id\` INT,\n  \`gene\` VARCHAR(128),\n  \`transcript\` VARCHAR(128),\n  \`hgvs_c\` VARCHAR(255),\n  \`hgvs_p\` VARCHAR(255),\n  \`zygosity\` VARCHAR(64),\n  \`classification\` VARCHAR(8),\n  \`criteria\` VARCHAR(255),\n  \`af\` DECIMAL(18,6),\n  \`interpretation\` TEXT,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME,\n  CONSTRAINT fk_variants_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE ON UPDATE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`variant_library\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`gene\` VARCHAR(128),\n  \`transcript\` VARCHAR(128),\n  \`hgvs_c\` VARCHAR(255),\n  \`hgvs_p\` VARCHAR(255),\n  \`classification\` VARCHAR(8),\n  \`criteria\` VARCHAR(255),\n  \`evidence\` TEXT,\n  \`condition\` VARCHAR(255),\n  \`inheritance\` VARCHAR(128),\n  \`curated_by\` VARCHAR(255),\n  \`last_review\` DATE,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`responses\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`ts\` DATETIME,\n  \`sender\` VARCHAR(255),\n  \`patient\` VARCHAR(255),\n  \`diagnostic_report_id\` VARCHAR(255),\n  \`variant_count\` INT,\n  \`variants\` TEXT,\n  \`raw\` LONGTEXT,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nCREATE TABLE IF NOT EXISTS \`audit_log\` (\n  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n  \`ts\` DATETIME,\n  \`user\` VARCHAR(128),\n  \`action\` VARCHAR(64),\n  \`entity\` VARCHAR(64),\n  \`entity_id\` INT,\n  \`before\` LONGTEXT,\n  \`after\` LONGTEXT,\n  \`created_at\` DATETIME,\n  \`updated_at\` DATETIME\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\nSET FOREIGN_KEY_CHECKS=1;\n`;
+  const rows = await exportData();
+  const inserts = [];
+  const mapTable = {
+    patients:'patients', users:'users', samples:'samples', panels:'panels', orders:'orders', reports:'reports', qc:'qc_metrics', variants:'variants', variant_library:'variant_library', responses:'responses', audit:'audit_log'
+  };
+  for (const [store, table] of Object.entries(mapTable)) {
+    const data = rows[store] || [];
+    if (!data.length) continue;
+    const fields = schemaFields[store];
+    const values = data.map(row => `(${fields.map(field => sqlValue(row[field])).join(',')})`).join(',\n');
+    inserts.push(`INSERT INTO \`${table}\` (${fields.map(f => `\`${f}\``).join(',')}) VALUES\n${values};`);
+  }
+  return createStatements + inserts.join('\n') + '\n';
+}
+function sqlValue(val) {
+  if (val === null || val === undefined || val === '') return 'NULL';
+  if (typeof val === 'number') return String(val);
+  const str = String(val).replace(/'/g, "''");
+  return `'${str}'`;
+}
+async function loadDemoData() {
+  if (!ensureWrite('patients')) return;
+  if (!confirm('Indlæse demo-data? Dette overskriver ikke eksisterende poster men tilføjer hvis tomt.')) return;
+  if (!getCached('patients').length) {
+    const p1 = await addRecord('patients', {mrn:'MRN001', name:'Anna Jensen', gender:'female', birth_date:'1985-03-12', notes:'Familiehistorik positiv'});
+    const p2 = await addRecord('patients', {mrn:'MRN002', name:'Lars Petersen', gender:'male', birth_date:'1978-11-03', notes:''});
+    const s1 = await addRecord('samples', {patient_id:p1, sample_type:'Blod', status:'sequencing', collected_at:new Date().toISOString(), notes:''});
+    const s2 = await addRecord('samples', {patient_id:p2, sample_type:'Spyt', status:'analysis', collected_at:new Date().toISOString(), notes:''});
+    const panel = await addRecord('panels', {name:'Onko-panel', description:'50 gener'});
+    const o1 = await addRecord('orders', {patient_id:p1, sample_id:s1, panel_id:panel, clinician:'Dr. Holm', status:'analysis', ordered_at:new Date().toISOString()});
+    const o2 = await addRecord('orders', {patient_id:p2, sample_id:s2, panel_id:panel, clinician:'Dr. Holm', status:'reported', ordered_at:new Date().toISOString()});
+    await addRecord('variants', {order_id:o1, gene:'BRCA1', transcript:'NM_007294.3', hgvs_c:'c.5266dupC', hgvs_p:'p.Gln1756Profs', zygosity:'heterozygot', classification:'5', criteria:'PVS1,PS3,PM2,PP3', af:0.0001, interpretation:'Patogen variant med høj risiko'});
+    await addRecord('qc', {sample_id:s1, metric:'Dækning', value:98.5, unit:'%', notes:''});
+    await addRecord('reports', {order_id:o2, findings:'Ingen klinisk signifikante varianter', summary:'Negativ rapport', status:'final', issued_at:new Date().toISOString()});
+    await addRecord('users', {name:'Admin', email:'admin@example.com', role:'Administrator', pin:'admin'});
+  } else {
+    alert('Demo-data allerede til stede.');
+  }
+  await loadAllStores();
+  renderAll();
+  refreshLoginOptions();
+  updateAuthUi();
+}
+function hookUi() {
+  const loginForm = document.getElementById('loginForm');
+  if (loginForm) loginForm.addEventListener('submit', handleLogin);
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', logoutUser);
+    setTooltip(logoutBtn, tooltipCatalog.buttons.logoutBtn);
+  }
+  const themeBtn = document.getElementById('themeToggle');
+  if (themeBtn) {
+    themeBtn.addEventListener('click', toggleTheme);
+    setTooltip(themeBtn, tooltipCatalog.buttons.themeToggle);
+  }
+  const demoBtn = document.getElementById('demoDataBtn');
+  if (demoBtn) {
+    demoBtn.addEventListener('click', () => {
+      if (!ensureWrite('patients')) return;
+      loadDemoData();
+    });
+    setTooltip(demoBtn, tooltipCatalog.buttons.demoDataBtn);
+  }
+  const testsBtn = document.getElementById('runTestsBtn');
+  if (testsBtn) {
+    testsBtn.addEventListener('click', () => {
+      activateTab('tests');
+      setTimeout(runTests, 200);
+    });
+    setTooltip(testsBtn, tooltipCatalog.buttons.runTestsBtn);
+  }
+  const logoImg = document.getElementById('glimrLogo');
+  if (logoImg) {
+    const brand = logoImg.closest('.brand');
+    logoImg.addEventListener('error', () => {
+      if (brand) {
+        brand.classList.add('logo-missing');
+      }
+      logoImg.remove();
+    }, { once: true });
+    if (brand && logoImg.complete && logoImg.naturalWidth === 0) {
+      brand.classList.add('logo-missing');
+      logoImg.remove();
+    }
+  }
+  applyTheme();
+  refreshLoginOptions();
+  updateAuthUi();
+  applyControlTooltips(document.body);
+}
+async function init() {
+  initTabs();
+  try {
+    state.db = await openDb();
+    setStatus('Database åben');
+    await loadAllStores();
+    hookUi();
+    restoreUserSession();
+    renderAll();
+    activateTab('dashboard');
+  } catch (err) {
+    console.error(err);
+    setStatus('Kunne ikke åbne database: ' + err.message);
+  }
+}
+document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>
