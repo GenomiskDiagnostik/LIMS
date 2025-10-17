@@ -1215,19 +1215,55 @@ async function backupAndResetData() {
   const data = await exportData();
   const filename = downloadJsonFile(data, 'glimr-backup-pre-reset.json');
   const storesToClear = STORES.filter(store => store !== 'users');
-  for (const store of storesToClear) {
-    const tx = state.db.transaction(store, 'readwrite');
-    const objectStore = tx.objectStore(store);
-    const clearReq = objectStore.clear();
-    await requestToPromise(clearReq);
-    await tx.done?.catch(() => {});
+  const preservedUsers = JSON.parse(JSON.stringify(getCached('users') || []));
+  try {
+    if (state.db) {
+      state.db.close();
+      state.db = null;
+    }
+    await new Promise((resolve, reject) => {
+      const req = indexedDB.deleteDatabase(DB_NAME);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+      req.onblocked = () => {
+        alert('Databasen kunne ikke nulstilles, fordi den er åben i en anden fane. Luk andre GlimR-vinduer og prøv igen.');
+      };
+    });
+    state.cache.clear();
+    state.db = await openDb();
+    await loadAllStores();
+    if (preservedUsers.length) {
+      const tx = state.db.transaction('users', 'readwrite');
+      const store = tx.objectStore('users');
+      const now = new Date().toISOString();
+      for (const user of preservedUsers) {
+        if (!user.created_at) user.created_at = now;
+        if (!user.updated_at) user.updated_at = now;
+        store.put(user);
+      }
+      await tx.done?.catch(() => {});
+    }
+    await loadAllStores();
+    await logAudit('RESET', 'system', null, null, {clearedStores: storesToClear});
+    renderAll();
+    restoreUserSession();
+    scheduleAutosave();
+    setStatus(`Data ryddet (undtagen brugere). Backup: ${filename}.`);
+    alert(`Alle data undtagen brugere er nu ryddet. Backup er downloadet som ${filename}.`);
+  } catch (err) {
+    console.error(err);
+    setStatus('Kunne ikke nulstille databasen: ' + err.message);
+    alert('Kunne ikke nulstille databasen: ' + err.message);
+    if (!state.db) {
+      try {
+        state.db = await openDb();
+        await loadAllStores();
+        restoreUserSession();
+      } catch (reopenErr) {
+        console.error(reopenErr);
+      }
+    }
   }
-  await loadAllStores();
-  await logAudit('RESET', 'system', null, null, {clearedStores: storesToClear});
-  renderAll();
-  scheduleAutosave();
-  setStatus(`Data ryddet (undtagen brugere). Backup: ${filename}.`);
-  alert(`Alle data undtagen brugere er nu ryddet. Backup er downloadet som ${filename}.`);
 }
 function exportFilteredJson(filename, rows, meta = {}) {
   const filters = meta.filters ? Object.fromEntries(Object.entries(meta.filters).filter(([, value]) => value !== '' && value != null)) : undefined;
