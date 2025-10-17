@@ -1607,7 +1607,10 @@ function renderSamples(section) {
           <label>Patient
             <div class="filterable-select">
               <input type="search" data-select-filter placeholder="Filtrer patienter">
-              <select name="patient_id" required>${patients.map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.mrn)})</option>`).join('')}</select>
+              <select name="patient_id" required>
+                <option value="" selected>Vælg patient</option>
+                ${patients.map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.mrn)})</option>`).join('')}
+              </select>
             </div>
           </label>
           <label>PMB-nummer<input name="pmb_number" required></label>
@@ -1870,13 +1873,19 @@ function renderOrders(section) {
           <label>Patient
             <div class="filterable-select">
               <input type="search" data-select-filter placeholder="Filtrer patienter">
-              <select name="patient_id" required>${patients.map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.mrn)})</option>`).join('')}</select>
+              <select name="patient_id" required>
+                <option value="" selected>Vælg patient</option>
+                ${patients.map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.mrn)})</option>`).join('')}
+              </select>
             </div>
           </label>
           <label>Prøve
             <div class="filterable-select">
               <input type="search" data-select-filter placeholder="Filtrer prøver">
-              <select name="sample_id" required>${samples.map(s => `<option value="${s.id}">${s.id} (${esc(s.pmb_number||'–')}) – ${esc(getName('patients', s.patient_id))}</option>`).join('')}</select>
+              <select name="sample_id" required>
+                <option value="" selected>Vælg prøve</option>
+                ${samples.map(s => `<option value="${s.id}">${s.id} (${esc(s.pmb_number||'–')}) – ${esc(getName('patients', s.patient_id))}</option>`).join('')}
+              </select>
             </div>
           </label>
           <label>Panel
@@ -2046,7 +2055,10 @@ function renderVariants(section) {
           <label>Ordination
             <div class="filterable-select">
               <input type="search" data-select-filter placeholder="Filtrer ordinationer">
-              <select name="order_id" required>${orders.map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}</select>
+              <select name="order_id" required>
+                <option value="" selected>Vælg ordination</option>
+                ${orders.map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}
+              </select>
             </div>
           </label>
           <label>Gen<input name="gene" required></label>
@@ -2243,7 +2255,10 @@ function renderReports(section) {
           <label>Ordination
             <div class="filterable-select">
               <input type="search" data-select-filter placeholder="Filtrer ordinationer">
-              <select name="order_id" required>${orders.map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}</select>
+              <select name="order_id" required>
+                <option value="" selected>Vælg ordination</option>
+                ${orders.map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}
+              </select>
             </div>
           </label>
           <label>Status<select name="status"><option value="draft">Udkast</option><option value="final">Endelig</option><option value="amended">Ændret</option></select></label>
@@ -2417,7 +2432,10 @@ function renderQC(section) {
           <label>Prøve
             <div class="filterable-select">
               <input type="search" data-select-filter placeholder="Filtrer prøver">
-              <select name="sample_id" required>${samples.map(s => `<option value="${s.id}">${s.id} (${esc(s.pmb_number||'–')}) – ${esc(getName('patients', s.patient_id))}</option>`).join('')}</select>
+              <select name="sample_id" required>
+                <option value="" selected>Vælg prøve</option>
+                ${samples.map(s => `<option value="${s.id}">${s.id} (${esc(s.pmb_number||'–')}) – ${esc(getName('patients', s.patient_id))}</option>`).join('')}
+              </select>
             </div>
           </label>
           <label>Måling<input name="metric" required></label>
