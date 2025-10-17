@@ -254,6 +254,11 @@ form textarea {
   gap: 0.6rem;
   flex-wrap: wrap;
 }
+.panel-hint {
+  margin-top: 0.4rem;
+  color: var(--muted-text);
+  font-size: 0.85rem;
+}
 .table-actions {
   margin-top: 0.8rem;
   display: flex;
@@ -718,6 +723,7 @@ const tooltipCatalog = {
   buttons: {
     demoDataBtn: 'Indlæser et demodatasæt til hurtig afprøvning (kræver skriveadgang).',
     runTestsBtn: 'Kører den indbyggede selvtest og viser resultater.',
+    resetDataBtn: 'Downloader en fuld backup og rydder alle data undtagen brugerlisten.',
     patientClear: 'Ryd formularen for at registrere en ny patient.',
     patientDelete: 'Slet den valgte patient permanent.',
     sampleClear: 'Ryd formularen for at registrere en ny prøve.',
@@ -1242,13 +1248,7 @@ async function bindDbFile() {
   }
   renderDbTab();
 }
-async function importData(data, skipConfirm=false) {
-  if (!currentCanWrite()) {
-    alert('Import kræver login med skrivetilladelse.');
-    return;
-  }
-  const proceed = skipConfirm || confirm('Dette vil overskrive eksisterende data. Fortsæt?');
-  if (!proceed) return;
+async function replaceAllData(data) {
   const timestamp = new Date().toISOString();
   for (const store of STORES) {
     const tx = state.db.transaction(store, 'readwrite');
@@ -1264,17 +1264,43 @@ async function importData(data, skipConfirm=false) {
     await tx.done?.catch(() => {});
   }
   await loadAllStores();
+}
+async function importData(data, skipConfirm=false) {
+  if (!currentCanWrite()) {
+    alert('Import kræver login med skrivetilladelse.');
+    return;
+  }
+  const proceed = skipConfirm || confirm('Dette vil overskrive eksisterende data. Fortsæt?');
+  if (!proceed) return;
+  await replaceAllData(data);
   setStatus('Data indlæst.');
   renderAll();
 }
 async function downloadBackup() {
   const data = await exportData();
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const filename = withDateStamp('glimr-backup.json');
-  triggerDownload(url, filename);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const filename = downloadJsonFile(data, 'glimr-backup.json');
   setStatus(`Fuld backup downloadet som ${filename}.`);
+}
+async function backupAndResetData() {
+  if (!ensureWrite('patients')) return;
+  const confirmReset = confirm('Dette vil hente en fuld backup og derefter slette alle data undtagen brugere. Fortsæt?');
+  if (!confirmReset) return;
+  const data = await exportData();
+  const filename = downloadJsonFile(data, 'glimr-backup-pre-reset.json');
+  const storesToClear = STORES.filter(store => store !== 'users');
+  for (const store of storesToClear) {
+    const tx = state.db.transaction(store, 'readwrite');
+    const objectStore = tx.objectStore(store);
+    const clearReq = objectStore.clear();
+    await requestToPromise(clearReq);
+    await tx.done?.catch(() => {});
+  }
+  await loadAllStores();
+  await logAudit('RESET', 'system', null, null, {clearedStores: storesToClear});
+  renderAll();
+  scheduleAutosave();
+  setStatus(`Data ryddet (undtagen brugere). Backup: ${filename}.`);
+  alert(`Alle data undtagen brugere er nu ryddet. Backup er downloadet som ${filename}.`);
 }
 function exportFilteredJson(filename, rows, meta = {}) {
   const filters = meta.filters ? Object.fromEntries(Object.entries(meta.filters).filter(([, value]) => value !== '' && value != null)) : undefined;
@@ -1306,6 +1332,14 @@ function triggerDownload(url, filename) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+}
+function downloadJsonFile(data, baseName) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const filename = withDateStamp(baseName);
+  triggerDownload(url, filename);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return filename;
 }
 function downloadLogoAsset() {
   if (!GLIMR_LOGO_BASE64) {
@@ -2785,6 +2819,10 @@ function renderDbTab(section) {
       <button class="secondary" id="downloadBackup">Hent backup (JSON)</button>
       <label class="secondary" id="restoreLabel" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.4rem 0.8rem;border-radius:0.5rem;cursor:pointer;">Gendan fra backup<input type="file" id="restoreFile" accept="application/json" style="display:none;"></label>
     </div>
+    <div class="btn-row">
+      <button class="danger" id="resetDataBtn">Backup &amp; ryd data (undtagen brugere)</button>
+    </div>
+    <p class="panel-hint">Downloader en fuld backup og nulstiller alle andre data. Kræver skriveadgang.</p>
   </div>`;
   applyButtonTooltips(section);
   applyControlTooltips(section);
@@ -2807,6 +2845,10 @@ function renderDbTab(section) {
     }
     e.target.value = '';
   });
+  const resetBtn = section.querySelector('#resetDataBtn');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', backupAndResetData);
+  }
 }
 function renderAdmin(section) {
   section.innerHTML = `
@@ -2885,11 +2927,14 @@ function renderTestsTab(section) {
   }
 }
 async function runTests() {
-  const section = document.querySelector('section[data-tab="tests"]');
+  if (!ensureWrite('patients')) return;
+  let section = document.querySelector('section[data-tab="tests"]');
   if (!section) {
     activateTab('tests');
     return setTimeout(runTests, 200);
   }
+  setStatus('Kører selvtest...');
+  const snapshot = await exportData();
   const results = [];
   try {
     const patientId = await addRecord('patients', {mrn:'TEST1', name:'Testpatient', gender:'other', birth_date:'1980-01-01', notes:''});
@@ -2914,13 +2959,14 @@ async function runTests() {
   } catch (err) {
     console.error(err);
     results.push(['Testfejl', false, err.message]);
+  } finally {
+    state.testResults = results;
+    await replaceAllData(snapshot);
+    renderAll();
+    section = document.querySelector('section[data-tab="tests"]');
+    if (section) renderTestsTab(section);
+    setStatus('Selvtest gennemført. Data gendannet til udgangspunktet.');
   }
-  state.testResults = results;
-  renderTestsTab(section);
-  await loadAllStores();
-  renderAll();
-  const refreshedSection = document.querySelector('section[data-tab="tests"]');
-  if (refreshedSection) renderTestsTab(refreshedSection);
 }
 async function buildZipFiles() {
   const backup = JSON.stringify(await exportData(), null, 2);
