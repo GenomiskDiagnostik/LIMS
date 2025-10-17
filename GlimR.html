@@ -92,12 +92,6 @@ header {
   height: 64px;
   object-fit: contain;
 }
-.brand.logo-missing::after {
-  content: 'Logo mangler – brug Administration → Hent logo-fil og placer glimr-logo.png ved siden af GlimR.html.';
-  display: block;
-  font-size: 0.75rem;
-  color: var(--muted-text);
-}
 header h1 {
   margin: 0;
   font-size: 1.8rem;
@@ -400,7 +394,7 @@ pre {
 <body>
 <header>
   <div class="brand">
-    <img id="glimrLogo" src="glimr-logo.png" alt="GlimR logo" loading="lazy">
+    <img id="glimrLogo" src="data:image/png;base64,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" alt="GlimR logo" loading="lazy">
     <div>
       <h1>GlimR – Genetic LIMS Reporter</h1>
       <div id="statusBar">Initialiserer...</div>
@@ -431,84 +425,6 @@ pre {
 const DB_NAME = 'glims';
 const DB_VER = 2;
 const STORES = ['patients','samples','orders','panels','variants','qc','reports','users','audit','variant_library','responses'];
-const GLIMR_LOGO_BASE64 = `
-iVBORw0KGgoAAAANSUhEUgAAAUAAAAFACAYAAADNkKWqAAAXMklEQVR4nO3dd3iV9d3H8c9JTk4m
-ISEBEkQIQwgCynai4tZarBW1DlQcLa2jbrFYtWrr5agDdx042lq19vGCB0e14sCByFKgQaAhYSQh
-ZJA9z3n+oPg4ss45v5PB9/26Lv/Q5Nz3HcA39/j9frcnddDhAQGAQVFdfQAA0FUIIACzCCAAswgg
-ALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAA
-swggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACz
-CCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMI
-IACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswgg
-ALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAA
-swggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACz
-CCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMI
-IACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswgg
-ALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALMIIACzCCAAswggALO8XX0Ae7PN
-r32m5MSmkD+/cWu8plwysccfA9BddZsApvZq0gHDqjRycI0GpDdoQHq9BqQ3qH+fBsX5/IqL9Sve
-51dcbLP8fo8aGqPU0ORRTV20yiq9Kq3wqrQiRlt3xGrLjljlF8Xp6/wE5RbEKRDo6p8OQHfUZQHM
-yqzTcZPLNHVcuQ4cXqV9+9V3+LNR0QF5o5uVICklqUkD0lv/bE1dtHLyErRyQ5KWrk3W0rXJ2rIj
-1sFPAKCn69QADh9Yq/NOKNJJB5dov31rO2WfCXHNmjCyUhNGVuriUwokSflFcXp3WareWZaqD1el
-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
-`.replace(/\s+/g, '');
 const state = {
   db: null,
   cache: new Map(),
@@ -754,7 +670,6 @@ const tooltipCatalog = {
     downloadSql: 'Download komplet MySQL-dump af GlimR-data.',
     showSchema: 'Vis MySQL-skemaet direkte på siden.',
     downloadZip: 'Download ZIP med GlimR og aktuelle data.',
-    downloadLogo: 'Download den officielle GlimR-logo PNG til placering ved siden af GlimR.html.',
     bindFile: 'Vælg eller opret en lokal databasefil til autogem.',
     saveNow: 'Gem straks til den tilknyttede databasefil.',
     downloadBackup: 'Eksportér alle data som JSON-backup.',
@@ -1340,28 +1255,6 @@ function downloadJsonFile(data, baseName) {
   triggerDownload(url, filename);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   return filename;
-}
-function downloadLogoAsset() {
-  if (!GLIMR_LOGO_BASE64) {
-    alert('Logo-data er ikke tilgængelig i denne GlimR-version.');
-    return;
-  }
-  try {
-    const binary = atob(GLIMR_LOGO_BASE64);
-    const buffer = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      buffer[i] = binary.charCodeAt(i);
-    }
-    const blob = new Blob([buffer], {type: 'image/png'});
-    const url = URL.createObjectURL(blob);
-    const filename = withDateStamp('glimr-logo.png');
-    triggerDownload(url, filename);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setStatus(`Logo downloadet som ${filename}. Placér filen ved siden af GlimR.html for at se det i headeren.`);
-  } catch (err) {
-    console.error(err);
-    alert('Kunne ikke generere logo-filen. Prøv i stedet kommandolinje-eksemplet i README.');
-  }
 }
 function withDateStamp(filename) {
   const stamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0].replace('T', '-');
@@ -2860,7 +2753,6 @@ function renderAdmin(section) {
       <button class="primary" id="downloadSql">Hent glimr.sql</button>
       <button class="secondary" id="showSchema">Vis skema</button>
       <button class="secondary" id="downloadZip">Hent ZIP</button>
-      <button class="secondary" id="downloadLogo">Hent logo-fil</button>
     </div>
     <textarea id="schemaText" style="width:100%;min-height:200px;margin-top:1rem;display:none;"></textarea>
   </div>`;
@@ -2898,7 +2790,6 @@ function renderAdmin(section) {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     setStatus(`ZIP-arkiv downloadet som ${filename}.`);
   });
-  section.querySelector('#downloadLogo').addEventListener('click', downloadLogoAsset);
 }
 function renderTestsTab(section) {
   section.innerHTML = `
@@ -3126,20 +3017,6 @@ function hookUi() {
   if (themeBtn) {
     themeBtn.addEventListener('click', toggleTheme);
     setTooltip(themeBtn, tooltipCatalog.buttons.themeToggle);
-  }
-  const logoImg = document.getElementById('glimrLogo');
-  if (logoImg) {
-    const brand = logoImg.closest('.brand');
-    logoImg.addEventListener('error', () => {
-      if (brand) {
-        brand.classList.add('logo-missing');
-      }
-      logoImg.remove();
-    }, { once: true });
-    if (brand && logoImg.complete && logoImg.naturalWidth === 0) {
-      brand.classList.add('logo-missing');
-      logoImg.remove();
-    }
   }
   applyTheme();
   refreshLoginOptions();
