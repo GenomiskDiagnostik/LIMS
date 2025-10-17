@@ -429,7 +429,7 @@ pre {
 (() => {
 'use strict';
 const DB_NAME = 'glims';
-const DB_VER = 3;
+const DB_VER = 2;
 const STORES = ['patients','samples','orders','panels','variants','qc','reports','users','audit','variant_library','responses'];
 const state = {
   db: null,
@@ -492,10 +492,9 @@ const tabs = [
   {id:'admin', label:'Administration'},
   {id:'tests', label:'Selvtest'}
 ];
-const SAMPLE_TYPES = ['Blod','Kindskrab','Biopsi','Kontrol'];
 const schemaFields = {
   patients: ['id','mrn','name','gender','birth_date','notes','created_at','updated_at'],
-  samples: ['id','pmb_number','patient_id','sample_type','collected_at','status','notes','created_at','updated_at'],
+  samples: ['id','patient_id','sample_type','collected_at','status','notes','created_at','updated_at'],
   panels: ['id','name','description','created_at','updated_at'],
   orders: ['id','patient_id','sample_id','panel_id','clinician','status','ordered_at','created_at','updated_at'],
   variants: ['id','order_id','gene','transcript','hgvs_c','hgvs_p','zygosity','classification','criteria','af','interpretation','created_at','updated_at'],
@@ -574,7 +573,7 @@ const tooltipCatalog = {
   },
   search: {
     patientSearch: 'Filtrer patientlisten efter navn, MRN eller køn.',
-    sampleSearch: 'Filtrer prøver efter ID, PMB-nummer, status eller type.',
+    sampleSearch: 'Filtrer prøver efter ID, status eller type.',
     panelSearch: 'Find paneler efter navn.',
     orderSearch: 'Søg efter ordination ud fra status eller ID.',
     variantSearch: 'Søg efter varianter baseret på gen eller HGVS.',
@@ -593,8 +592,7 @@ const tooltipCatalog = {
     },
     sampleForm: {
       patient_id: 'Vælg hvilken patient prøven tilhører.',
-      pmb_number: 'Unikt PMB-nummer anvendt i andre systemer.',
-      sample_type: 'Vælg prøvetype fra listen.',
+      sample_type: 'Angiv hvilken type materiale der er indsamlet.',
       status: 'Prøvens aktuelle laboratoriestatus.',
       collected_at: 'Dato og tidspunkt for prøveindsamling.',
       notes: 'Evt. bemærkninger til prøven.'
@@ -1021,9 +1019,6 @@ function openDb() {
       };
       withTimestamps(ensureStore('patients', {keyPath:'id', autoIncrement:true}));
       const samplesStore = withTimestamps(ensureStore('samples',{keyPath:'id',autoIncrement:true}));
-      if (!samplesStore.indexNames.contains('pmb_number')) {
-        try { samplesStore.createIndex('pmb_number','pmb_number',{unique:true}); } catch (e) {}
-      }
       if (!samplesStore.indexNames.contains('patient_id')) samplesStore.createIndex('patient_id','patient_id');
       const ordersStore = withTimestamps(ensureStore('orders',{keyPath:'id',autoIncrement:true}));
       ['patient_id','sample_id','panel_id'].forEach(idx => {
@@ -1356,7 +1351,7 @@ function getName(store, id) {
   if (!id) return '';
   const row = findById(store, typeof id === 'string' ? Number(id) : id);
   if (!row) return '';
-  return row.pmb_number || row.name || row.mrn || `#${id}`;
+  return row.name || row.mrn || `#${id}`;
 }
 function fillForm(form, record) {
   if (!form || !record) return;
@@ -1380,13 +1375,6 @@ function fillForm(form, record) {
         const opt = document.createElement('option');
         opt.value = asString;
         opt.textContent = roleWithDescription(asString);
-        opt.dataset.legacy = 'true';
-        el.appendChild(opt);
-      }
-      if (el.name === 'sample_type' && asString && !Array.from(el.options).some(opt => opt.value === asString)) {
-        const opt = document.createElement('option');
-        opt.value = asString;
-        opt.textContent = asString;
         opt.dataset.legacy = 'true';
         el.appendChild(opt);
       }
@@ -1545,12 +1533,11 @@ function renderSamples(section) {
     <div class="flex">
       <div>
         <label for="sampleSearch">Søg</label>
-        <input id="sampleSearch" type="search" placeholder="ID/PMB/status...">
+        <input id="sampleSearch" type="search" placeholder="ID/status...">
         <details class="advanced-filter" id="samplesFilterPanel">
           <summary>Avanceret filter</summary>
           <div class="filter-grid">
             <label>ID<input type="search" data-filter-samples="id" placeholder="Sample-ID"></label>
-            <label>PMB-nummer<input type="search" data-filter-samples="pmb" placeholder="PMB"></label>
             <label>Patient<input type="search" data-filter-samples="patient" placeholder="Patientnavn eller MRN"></label>
             <label>Prøvetype<input type="search" data-filter-samples="type" placeholder="Type"></label>
             <label>Status<input type="search" data-filter-samples="status" placeholder="Status"></label>
@@ -1558,7 +1545,7 @@ function renderSamples(section) {
             <label>Opsamlet til<input type="date" data-filter-samples="collected_to"></label>
           </div>
         </details>
-        <table><thead><tr><th>ID</th><th>PMB-nummer</th><th>Patient</th><th>Prøvetype</th><th>Status</th><th>Opsamlet</th></tr></thead><tbody></tbody></table>
+        <table><thead><tr><th>ID</th><th>Patient</th><th>Prøvetype</th><th>Status</th><th>Opsamlet</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
           <button type="button" class="secondary" id="samplesExport">Eksportér filtrerede prøver</button>
         </div>
@@ -1573,13 +1560,7 @@ function renderSamples(section) {
               <select name="patient_id" required>${patients.map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.mrn)})</option>`).join('')}</select>
             </div>
           </label>
-          <label>PMB-nummer<input name="pmb_number" required></label>
-          <label>Prøvetype
-            <select name="sample_type" required>
-              <option value="">Vælg prøvetype</option>
-              ${SAMPLE_TYPES.map(type => `<option value="${type}">${type}</option>`).join('')}
-            </select>
-          </label>
+          <label>Prøvetype<input name="sample_type" required></label>
           <label>Status<input name="status"></label>
           <label>Opsamlet<input type="datetime-local" name="collected_at"></label>
           <label>Noter<textarea name="notes"></textarea></label>
@@ -1597,7 +1578,6 @@ function renderSamples(section) {
   const form = section.querySelector('#sampleForm');
   const filterInputs = {
     id: section.querySelector('[data-filter-samples="id"]'),
-    pmb: section.querySelector('[data-filter-samples="pmb"]'),
     patient: section.querySelector('[data-filter-samples="patient"]'),
     type: section.querySelector('[data-filter-samples="type"]'),
     status: section.querySelector('[data-filter-samples="status"]'),
@@ -1616,7 +1596,6 @@ function renderSamples(section) {
     const term = search.value.toLowerCase();
     const filters = {
       id: filterInputs.id?.value.trim() || '',
-      pmb: filterInputs.pmb?.value.trim().toLowerCase() || '',
       patient: filterInputs.patient?.value.trim().toLowerCase() || '',
       type: filterInputs.type?.value.trim().toLowerCase() || '',
       status: filterInputs.status?.value.trim().toLowerCase() || '',
@@ -1633,12 +1612,11 @@ function renderSamples(section) {
     activeFilters = filterSummary;
     filteredSamples = list.filter(s => {
       if (!term) return true;
-      return [s.id, s.pmb_number, s.status, s.sample_type].some(v => (v ?? '').toString().toLowerCase().includes(term));
+      return [s.id, s.status, s.sample_type].some(v => (v ?? '').toString().toLowerCase().includes(term));
     }).filter(s => {
       const patient = patientMap.get(Number(s.patient_id));
       const patientString = [patient?.name, patient?.mrn].filter(Boolean).join(' ').toLowerCase();
       if (filters.id && !String(s.id).includes(filters.id)) return false;
-      if (filters.pmb && !(s.pmb_number || '').toLowerCase().includes(filters.pmb)) return false;
       if (filters.patient && !patientString.includes(filters.patient)) return false;
       if (filters.type && !(s.sample_type || '').toLowerCase().includes(filters.type)) return false;
       if (filters.status && !(s.status || '').toLowerCase().includes(filters.status)) return false;
@@ -1651,7 +1629,7 @@ function renderSamples(section) {
       }
       return true;
     });
-    tbody.innerHTML = filteredSamples.map(s => `<tr data-id="${s.id}"><td>${s.id}</td><td>${esc(s.pmb_number||'')}</td><td>${esc(getName('patients', Number(s.patient_id)))}</td><td>${esc(s.sample_type)}</td><td>${esc(s.status||'')}</td><td>${esc(s.collected_at||'')}</td></tr>`).join('');
+    tbody.innerHTML = filteredSamples.map(s => `<tr data-id="${s.id}"><td>${s.id}</td><td>${esc(getName('patients', Number(s.patient_id)))}</td><td>${esc(s.sample_type)}</td><td>${esc(s.status||'')}</td><td>${esc(s.collected_at||'')}</td></tr>`).join('');
     annotateTableCells(section);
   };
   renderRows();
@@ -1676,24 +1654,9 @@ function renderSamples(section) {
     e.preventDefault();
     if (!ensureWrite('samples')) return;
     const data = Object.fromEntries(new FormData(form).entries());
-    const currentId = data.id ? Number(data.id) : null;
     data.patient_id = Number(data.patient_id);
-    data.pmb_number = (data.pmb_number || '').trim();
-    if (!data.pmb_number) {
-      alert('Angiv et PMB-nummer.');
-      return;
-    }
-    const existingSamples = getCached('samples');
-    const conflict = existingSamples.find(s => (s.pmb_number || '').toLowerCase() === data.pmb_number.toLowerCase() && s.id !== currentId);
-    if (conflict) {
-      alert('PMB-nummeret er allerede i brug.');
-      return;
-    }
-    if (data.sample_type) data.sample_type = data.sample_type.trim();
-    if (data.status) data.status = data.status.trim();
-    if (data.notes) data.notes = data.notes.trim();
-    if (currentId) {
-      const id = currentId;
+    if (data.id) {
+      const id = Number(data.id);
       const before = {...findById('samples', id)};
       const updated = {...before, ...data, id};
       await updateRecord('samples', updated, before);
@@ -1803,13 +1766,13 @@ function renderOrders(section) {
     <div class="flex">
       <div>
         <label for="orderSearch">Søg</label>
-        <input id="orderSearch" type="search" placeholder="Status/ID/PMB...">
+        <input id="orderSearch" type="search" placeholder="Status/ID...">
         <details class="advanced-filter" id="ordersFilterPanel">
           <summary>Avanceret filter</summary>
           <div class="filter-grid">
             <label>ID<input type="search" data-filter-orders="id" placeholder="Ordination-ID"></label>
             <label>Patient<input type="search" data-filter-orders="patient" placeholder="Patientnavn eller MRN"></label>
-            <label>Prøve<input type="search" data-filter-orders="sample" placeholder="Prøve-ID eller PMB"></label>
+            <label>Prøve<input type="search" data-filter-orders="sample" placeholder="Prøve-ID"></label>
             <label>Panel<input type="search" data-filter-orders="panel" placeholder="Panelnavn"></label>
             <label>Status<input type="search" data-filter-orders="status" placeholder="Status"></label>
             <label>Bestilt fra<input type="date" data-filter-orders="ordered_from"></label>
@@ -1834,7 +1797,7 @@ function renderOrders(section) {
           <label>Prøve
             <div class="filterable-select">
               <input type="search" data-select-filter placeholder="Filtrer prøver">
-              <select name="sample_id" required>${samples.map(s => `<option value="${s.id}">${s.id} (${esc(s.pmb_number||'–')}) – ${esc(getName('patients', s.patient_id))}</option>`).join('')}</select>
+              <select name="sample_id" required>${samples.map(s => `<option value="${s.id}">${s.id} – ${esc(getName('patients', s.patient_id))}</option>`).join('')}</select>
             </div>
           </label>
           <label>Panel
@@ -1894,14 +1857,13 @@ function renderOrders(section) {
     activeFilters = filterSummary;
     filteredOrders = list.filter(o => {
       if (!term) return true;
-      const sample = sampleMap.get(Number(o.sample_id));
-      return [o.status, o.id, o.patient_id, o.sample_id, o.panel_id, sample?.pmb_number].some(v => (v ?? '').toString().toLowerCase().includes(term));
+      return [o.status, o.id, o.patient_id, o.sample_id, o.panel_id].some(v => (v ?? '').toString().toLowerCase().includes(term));
     }).filter(o => {
       const patient = patientMap.get(Number(o.patient_id));
       const sample = sampleMap.get(Number(o.sample_id));
       const panel = panelMap.get(Number(o.panel_id));
       const patientString = [patient?.name, patient?.mrn].filter(Boolean).join(' ').toLowerCase();
-      const sampleString = [o.sample_id, sample?.pmb_number, sample?.sample_type, getName('patients', sample?.patient_id)].filter(Boolean).join(' ').toLowerCase();
+      const sampleString = [o.sample_id, sample?.sample_type, getName('patients', sample?.patient_id)].filter(Boolean).join(' ').toLowerCase();
       if (filters.id && !String(o.id).includes(filters.id)) return false;
       if (filters.patient && !patientString.includes(filters.patient)) return false;
       if (filters.sample && !sampleString.includes(filters.sample)) return false;
@@ -2338,16 +2300,12 @@ function buildReportHtml(orderId, reportData) {
   const patient = order ? findById('patients', Number(order.patient_id)) : null;
   const sample = order ? findById('samples', Number(order.sample_id)) : null;
   const variants = getCached('variants').filter(v => v.order_id === orderId);
-  const sampleIdentifierParts = [];
-  if (sample?.pmb_number) sampleIdentifierParts.push(sample.pmb_number);
-  if (sample?.id != null) sampleIdentifierParts.push(`ID ${sample.id}`);
-  const sampleIdentifier = sampleIdentifierParts.join(' / ');
   const rows = variants.map(v => `<tr><td>${esc(v.gene)}</td><td>${esc(v.hgvs_c||'')}</td><td>${esc(v.hgvs_p||'')}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(v.af??'')}</td><td>${esc(v.interpretation||'')}</td></tr>`).join('') || '<tr><td colspan="7">Ingen fund</td></tr>';
   return `
   <h1>Diagnostisk rapport</h1>
   <p><strong>Ordination:</strong> ${orderId}</p>
   <p><strong>Patient:</strong> ${esc(patient?.name||'')} (${esc(patient?.mrn||'')})</p>
-  <p><strong>Prøve:</strong> ${esc(sample?.sample_type||'')}${sampleIdentifier ? ` (${esc(sampleIdentifier)})` : ''}</p>
+  <p><strong>Prøve:</strong> ${esc(sample?.sample_type||'')} (${sample?.id||''})</p>
   <p><strong>Status:</strong> ${esc(reportData.status||'')}</p>
   <p><strong>Udstedt:</strong> ${esc(reportData.issued_at||'')}</p>
   <h2>Resumé</h2>
@@ -2375,7 +2333,7 @@ function renderQC(section) {
           <label>Prøve
             <div class="filterable-select">
               <input type="search" data-select-filter placeholder="Filtrer prøver">
-              <select name="sample_id" required>${samples.map(s => `<option value="${s.id}">${s.id} (${esc(s.pmb_number||'–')}) – ${esc(getName('patients', s.patient_id))}</option>`).join('')}</select>
+              <select name="sample_id" required>${samples.map(s => `<option value="${s.id}">${s.id} – ${esc(getName('patients', s.patient_id))}</option>`).join('')}</select>
             </div>
           </label>
           <label>Måling<input name="metric" required></label>
@@ -2529,7 +2487,6 @@ function buildFhirBundle(orderId) {
     resourceType:'Specimen',
     id:`specimen-${sample?.id||order.sample_id}`,
     status:'available',
-    identifier: sample?.pmb_number ? [{system:'urn:glimr:pmb', value: sample.pmb_number}] : undefined,
     type: {text: sample?.sample_type || 'Genomic specimen'},
     receivedTime: sample?.collected_at || undefined,
     subject: {reference:`Patient/${patientResource.id}`}
@@ -2880,7 +2837,7 @@ async function runTests() {
     const patientId = await addRecord('patients', {mrn:'TEST1', name:'Testpatient', gender:'other', birth_date:'1980-01-01', notes:''});
     const patient = findById('patients', patientId);
     results.push(['Oprettelse/udlæsning patient', patient?.name === 'Testpatient', `Navn: ${patient?.name}`]);
-    const sampleId = await addRecord('samples', {patient_id:patientId, pmb_number:`PMB-SELFTST-${Date.now()}`, sample_type:'Blod', status:'received', collected_at:new Date().toISOString(), notes:''});
+    const sampleId = await addRecord('samples', {patient_id:patientId, sample_type:'Blod', status:'received', collected_at:new Date().toISOString(), notes:''});
     const orderId = await addRecord('orders', {patient_id:patientId, sample_id:sampleId, panel_id:null, clinician:'Testperson', status:'analysis', ordered_at:new Date().toISOString()});
     results.push(['Oprettelse ordination med FK', !!findById('orders', orderId), `Ordination ${orderId}`]);
     const reportHtml = buildReportHtml(orderId, {status:'draft', issued_at:new Date().toISOString(), summary:'Test', findings:'Ingen'});
@@ -3037,8 +2994,8 @@ async function loadDemoData() {
   if (!getCached('patients').length) {
     const p1 = await addRecord('patients', {mrn:'MRN001', name:'Anna Jensen', gender:'female', birth_date:'1985-03-12', notes:'Familiehistorik positiv'});
     const p2 = await addRecord('patients', {mrn:'MRN002', name:'Lars Petersen', gender:'male', birth_date:'1978-11-03', notes:''});
-    const s1 = await addRecord('samples', {patient_id:p1, pmb_number:'PMB-0001', sample_type:'Blod', status:'sequencing', collected_at:new Date().toISOString(), notes:''});
-    const s2 = await addRecord('samples', {patient_id:p2, pmb_number:'PMB-0002', sample_type:'Kindskrab', status:'analysis', collected_at:new Date().toISOString(), notes:''});
+    const s1 = await addRecord('samples', {patient_id:p1, sample_type:'Blod', status:'sequencing', collected_at:new Date().toISOString(), notes:''});
+    const s2 = await addRecord('samples', {patient_id:p2, sample_type:'Spyt', status:'analysis', collected_at:new Date().toISOString(), notes:''});
     const panel = await addRecord('panels', {name:'Onko-panel', description:'50 gener'});
     const o1 = await addRecord('orders', {patient_id:p1, sample_id:s1, panel_id:panel, clinician:'Dr. Holm', status:'analysis', ordered_at:new Date().toISOString()});
     const o2 = await addRecord('orders', {patient_id:p2, sample_id:s2, panel_id:panel, clinician:'Dr. Holm', status:'reported', ordered_at:new Date().toISOString()});
