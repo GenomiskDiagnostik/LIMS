@@ -376,6 +376,18 @@ input[type="search"] {
 .filterable-select select {
   max-height: 220px;
 }
+.family-combo {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin-top: 0.3rem;
+}
+.family-combo select {
+  flex: 0 0 12rem;
+}
+.family-combo input {
+  flex: 1 1 auto;
+}
 .advanced-filter {
   margin-top: 0.6rem;
   border: 1px solid var(--panel-border);
@@ -923,6 +935,50 @@ function applySelectFilters(root) {
       }
     });
     wrapper.dataset.filterInit = 'true';
+  });
+}
+function initFamilyCombos(root) {
+  if (!root) return;
+  root.querySelectorAll('.family-combo').forEach(combo => {
+    if (combo.dataset.familyInit) return;
+    const select = combo.querySelector('[data-family-select]');
+    const input = combo.querySelector('[data-family-input]');
+    if (!select || !input) return;
+    const syncSelect = () => {
+      const value = input.value.trim();
+      if (!value) {
+        select.value = '';
+        return;
+      }
+      const match = Array.from(select.options).find(opt => opt.value === value);
+      select.value = match ? value : '__custom__';
+    };
+    select.addEventListener('change', () => {
+      if (!select.value) {
+        input.value = '';
+      } else if (select.value !== '__custom__') {
+        input.value = select.value;
+      }
+      if (select.value === '__custom__') {
+        input.focus();
+      } else {
+        input.dispatchEvent(new Event('input', {bubbles: false}));
+      }
+    });
+    input.addEventListener('input', () => syncSelect());
+    combo.dataset.familyInit = 'true';
+    const form = combo.closest('form');
+    if (form && !form.dataset.familyResetInit) {
+      form.addEventListener('reset', () => {
+        setTimeout(() => {
+          form.querySelectorAll('[data-family-input]').forEach(field => {
+            field.dispatchEvent(new Event('input', {bubbles: false}));
+          });
+        }, 0);
+      });
+      form.dataset.familyResetInit = 'true';
+    }
+    syncSelect();
   });
 }
 function hasWriteRole(user) {
@@ -1530,8 +1586,10 @@ function renderCreateCase(section) {
   const panels = getCached('panels').slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   const users = getCached('users').slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   const families = Array.from(new Set(getCached('patients').map(p => (p.family_number || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'da'));
-  const familyListId = 'caseFamilyNumbers';
-  const familyOptions = families.map(num => `<option value="${esc(num)}"></option>`).join('');
+  const familySelectOptions = ['<option value="">Vælg familienummer</option>']
+    .concat(families.map(num => `<option value="${esc(num)}">${esc(num)}</option>`))
+    .concat('<option value="__custom__">Tilføj nyt familienummer…</option>')
+    .join('');
   const panelOptions = panels.length
     ? panels.map(p => `<option value="${p.id}">${esc(p.name || `Panel #${p.id}`)}</option>`).join('')
     : '<option value="" disabled>Ingen paneler tilgængelige</option>';
@@ -1551,9 +1609,15 @@ function renderCreateCase(section) {
         <div class="inline-group">
           <label class="inline">MRN<input name="patient_mrn" required placeholder="Fx 010170-1234"></label>
           <label class="inline">Navn<input name="patient_name" required placeholder="Patientnavn"></label>
-          <label class="inline">Familienummer<input name="patient_family" list="${familyListId}" placeholder="Fx FAM-001"></label>
+          <label class="inline">Familienummer
+            <div class="family-combo">
+              <select data-family-select>
+                ${familySelectOptions}
+              </select>
+              <input name="patient_family" data-family-input placeholder="Fx FAM-001">
+            </div>
+          </label>
         </div>
-        <datalist id="${familyListId}">${familyOptions}</datalist>
         <div class="inline-group">
           <label class="inline">Køn<select name="patient_gender"><option value="">-</option><option value="male">Mand</option><option value="female">Kvinde</option><option value="other">Andet</option></select></label>
           <label class="inline">Fødselsdato<input type="date" name="patient_birth"></label>
@@ -1781,6 +1845,7 @@ function renderCreateCase(section) {
   applyButtonTooltips(section);
   applyControlTooltips(section);
   applyFormTooltips(form);
+  initFamilyCombos(form);
   applySelectFilters(section);
   updateControlVisibility();
   updateStatusPreview();
@@ -2173,13 +2238,18 @@ function fillForm(form, record) {
       return;
     }
     el.value = value ?? '';
+    if (el.dataset.familyInput !== undefined) {
+      el.dispatchEvent(new Event('input', {bubbles: false}));
+    }
   });
 }
 function renderPatients(section) {
   const list = getCached('patients');
   const existingFamilyNumbers = Array.from(new Set(list.map(p => (p.family_number || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'da'));
-  const familyListId = 'patientFamilyNumbers';
-  const familyOptions = existingFamilyNumbers.map(num => `<option value="${esc(num)}"></option>`).join('');
+  const familySelectOptions = ['<option value="">Vælg familienummer</option>']
+    .concat(existingFamilyNumbers.map(num => `<option value="${esc(num)}">${esc(num)}</option>`))
+    .concat('<option value="__custom__">Tilføj nyt familienummer…</option>')
+    .join('');
   section.innerHTML = `
   <div class="panel">
     <div class="flex">
@@ -2207,8 +2277,14 @@ function renderPatients(section) {
         <form id="patientForm">
           <input type="hidden" name="id">
           <label>MRN<input name="mrn" required></label>
-          <label>Familienummer<input name="family_number" list="${familyListId}" placeholder="Fx FAM-001"></label>
-          <datalist id="${familyListId}">${familyOptions}</datalist>
+          <label>Familienummer
+            <div class="family-combo">
+              <select data-family-select>
+                ${familySelectOptions}
+              </select>
+              <input name="family_number" data-family-input placeholder="Fx FAM-001">
+            </div>
+          </label>
           <label>Navn<input name="name" required></label>
           <label>Køn<select name="gender"><option value="">-</option><option value="male">Mand</option><option value="female">Kvinde</option><option value="other">Andet</option></select></label>
           <label>Fødselsdato<input type="date" name="birth_date"></label>
@@ -2242,6 +2318,7 @@ function renderPatients(section) {
   applyButtonTooltips(section);
   applyControlTooltips(section);
   applyFormTooltips(form);
+  initFamilyCombos(form);
   const genderMap = {male:'Mand', female:'Kvinde', other:'Andet'};
   const renderRows = () => {
     const term = searchInput.value.trim().toLowerCase();
