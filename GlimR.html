@@ -3997,7 +3997,20 @@ async function runTests() {
     const patient = findById('patients', patientId);
     results.push(['Oprettelse/udlæsning patient', patient?.name === 'Testpatient', `Navn: ${patient?.name}`]);
     const sampleId = await addRecord('samples', {patient_id:patientId, pmb_number:`PMB-SELFTST-${Date.now()}`, sample_type:'Blod', status:'Modtaget', collected_at:new Date().toISOString(), notes:''});
-    const orderId = await addRecord('orders', {patient_id:patientId, sample_id:sampleId, panel_id:null, clinician:'Testperson', status:'analysis', ordered_at:new Date().toISOString()});
+    const orderId = await addRecord('orders', {patient_id:patientId, sample_id:sampleId, panel_id:null, clinician:'Testperson', status:'Analyse', ordered_at:new Date().toISOString()});
+    await addRecord('variants', {
+      order_id: orderId,
+      gene: 'BRCA1',
+      transcript: '',
+      hgvs_c: 'c.5266dupC',
+      hgvs_p: 'p.(Gln1756Profs*74)',
+      classification: '5',
+      criteria: 'PVS1',
+      af: '',
+      interpretation: ''
+    });
+    const variantCount = getCached('variants').filter(v => v.order_id === orderId).length;
+    results.push(['Tilføj testvariant', variantCount > 0, `Varianter: ${variantCount}`]);
     results.push(['Oprettelse ordination med FK', !!findById('orders', orderId), `Ordination ${orderId}`]);
     const reportHtml = buildReportHtml(orderId, {status:'draft', issued_at:new Date().toISOString(), summary:'Test', findings:'Ingen'});
     results.push(['Generering af rapport HTML', reportHtml.includes('Diagnostisk rapport'), 'HTML længde ' + reportHtml.length]);
