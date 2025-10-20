@@ -4512,9 +4512,9 @@ async function createReportPdfBlob(orderId, reportData, exportedAt = new Date())
       secondLineStart = Math.max(secondLineEnd - 80, secondLineStart);
     }
     builder.addLine(firstLineStart, signatureLineY, firstLineEnd, signatureLineY, 1, PDF_SIGNATURE_LINE_COLOR);
-    builder.addText(`Tolker: ${interpreterName || 'Ikke angivet'}`, firstLineStart, signatureLineY + 14, PDF_BODY_FONT_SIZE, PDF_TEXT_COLOR);
+    builder.addText(`Tolker: ${interpreterName || 'Ikke angivet'}`, firstLineStart, signatureLineY + 24, PDF_BODY_FONT_SIZE, PDF_TEXT_COLOR);
     builder.addLine(secondLineStart, signatureLineY, secondLineEnd, signatureLineY, 1, PDF_SIGNATURE_LINE_COLOR);
-    builder.addText(`Godkender: ${approverName || 'Ikke angivet'}`, secondLineStart, signatureLineY + 14, PDF_BODY_FONT_SIZE, PDF_TEXT_COLOR);
+    builder.addText(`Godkender: ${approverName || 'Ikke angivet'}`, secondLineStart, signatureLineY + 24, PDF_BODY_FONT_SIZE, PDF_TEXT_COLOR);
     const bytes = builder.build();
     return new Blob([bytes], {type: 'application/pdf'});
   } catch (err) {
