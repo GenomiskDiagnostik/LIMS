@@ -807,7 +807,7 @@ const tooltipCatalog = {
       status: 'Rapportstatus (udkast, endelig eller ændret).',
       issued_at: 'Dato og tidspunkt for rapportens udsendelse.',
       variant_ids: 'Tilføj de registrerede varianter, der skal indgå i rapporten.',
-      summary: 'Kort klinisk resumé til modtageren.'
+      summary: 'Kort konklusion til modtageren.'
     },
     qcForm: {
       sample_id: 'Vælg den prøve QC-målingen relaterer til.',
@@ -3484,12 +3484,13 @@ function renderReports(section) {
             <p class="report-variant-empty">Ingen varianter valgt.</p>
           </div>
           <input type="hidden" name="variant_ids" value="[]">
-          <label>Resumé<textarea name="summary"></textarea></label>
+          <label>Konklusion<textarea name="summary"></textarea></label>
           <div class="btn-row">
             <button class="primary" type="submit">Gem</button>
             <button class="secondary" type="button" id="reportClear">Ny</button>
             <button class="danger" type="button" id="reportDelete">Slet</button>
             <button class="secondary" type="button" id="reportPreview">Udskriv/forhåndsvis</button>
+            <button class="secondary" type="button" id="reportDownloadPdf">Hent PDF</button>
           </div>
         </form>
       </div>
@@ -3800,6 +3801,37 @@ function renderReports(section) {
       win.document.close();
     }
   });
+  const downloadPdfButton = section.querySelector('#reportDownloadPdf');
+  if (downloadPdfButton) {
+    downloadPdfButton.addEventListener('click', () => {
+      const data = Object.fromEntries(new FormData(form).entries());
+      if (!data.order_id) {
+        alert('Vælg ordre');
+        return;
+      }
+      const orderId = Number(data.order_id);
+      data.order_id = orderId;
+      const variantStore = getCached('variants');
+      const variantSnapshots = selectedReportVariants.map(item => {
+        const source = variantStore.find(v => v.id === item.id) || item;
+        const snapshot = snapshotVariant(source);
+        if (!snapshot.order_id) snapshot.order_id = orderId || item.order_id || currentReportOrderId || null;
+        return snapshot;
+      });
+      data.variant_details = variantSnapshots;
+      data.variant_ids = JSON.stringify(variantSnapshots.map(v => v.id).filter(id => id != null));
+      const blob = createReportPdfBlob(orderId, data);
+      if (!blob) {
+        alert('Kunne ikke generere PDF for rapporten.');
+        return;
+      }
+      const filename = withDateStamp(`glimr-rapport-${orderId}.pdf`);
+      const url = URL.createObjectURL(blob);
+      triggerDownload(url, filename);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setStatus(`Rapport PDF hentet som ${filename}.`);
+    });
+  }
 }
 function buildReportHtml(orderId, reportData) {
   const order = findById('orders', orderId);
@@ -3834,12 +3866,254 @@ function buildReportHtml(orderId, reportData) {
   <p><strong>Prøve:</strong> ${esc(sample?.sample_type||'')}${sampleIdentifier ? ` (${esc(sampleIdentifier)})` : ''}</p>
   <p><strong>Status:</strong> ${esc(reportData.status||'')}</p>
   <p><strong>Udstedt:</strong> ${esc(reportData.issued_at||'')}</p>
-  <h2>Resumé</h2>
+  <h2>Konklusion</h2>
   <p>${esc(reportData.summary||'')}</p>
   <h2>Fund</h2>
   <table><thead><tr><th>Gen</th><th>HGVS c.</th><th>HGVS p.</th><th>Klasse</th><th>ACMG</th><th>AF</th><th>Tolkning</th></tr></thead><tbody>${rows}</tbody></table>
   <h2>Detaljer</h2>
   ${detailSections}`;
+}
+function wrapPlainText(text, maxWidth = 88) {
+  const value = String(text || '');
+  const words = value.split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const lines = [];
+  let current = '';
+  const flush = () => {
+    if (current) {
+      lines.push(current);
+      current = '';
+    }
+  };
+  const pushLongWord = word => {
+    let start = 0;
+    while (start < word.length) {
+      const slice = word.slice(start, start + maxWidth);
+      if (slice.length === maxWidth) {
+        lines.push(slice);
+        start += maxWidth;
+        continue;
+      }
+      current = slice;
+      start += maxWidth;
+    }
+    if (word.length % maxWidth === 0) {
+      current = '';
+    }
+  };
+  for (const word of words) {
+    if (!current) {
+      if (word.length <= maxWidth) {
+        current = word;
+      } else {
+        pushLongWord(word);
+      }
+      continue;
+    }
+    if ((current + ' ' + word).length <= maxWidth) {
+      current += ' ' + word;
+      continue;
+    }
+    flush();
+    if (word.length <= maxWidth) {
+      current = word;
+    } else {
+      pushLongWord(word);
+    }
+  }
+  flush();
+  return lines;
+}
+function addFieldLine(lines, label, value, options = {}) {
+  const indent = options.indent || '';
+  const width = options.width || 88;
+  const fallback = options.fallback ?? '-';
+  const display = value !== undefined && value !== null && value !== '' ? String(value) : fallback;
+  const prefix = `${indent}${label}: `;
+  const available = Math.max(20, width - prefix.length);
+  const wrapped = wrapPlainText(display, available);
+  if (!wrapped.length) {
+    lines.push(prefix.trimEnd());
+    return;
+  }
+  lines.push(prefix + wrapped[0]);
+  const continuation = ' '.repeat(prefix.length);
+  for (let i = 1; i < wrapped.length; i++) {
+    lines.push(continuation + wrapped[i]);
+  }
+}
+function addParagraphLines(lines, heading, text, options = {}) {
+  const indent = options.indent || '  ';
+  const width = options.width || 88;
+  const emptyText = options.emptyText || 'Ingen oplysninger.';
+  lines.push(heading);
+  if (!text) {
+    lines.push(`${indent}${emptyText}`);
+    return;
+  }
+  const wrapped = wrapPlainText(text, Math.max(20, width - indent.length));
+  if (!wrapped.length) {
+    lines.push(`${indent}${emptyText}`);
+    return;
+  }
+  for (const segment of wrapped) {
+    lines.push(`${indent}${segment}`);
+  }
+}
+function escapePdfText(text) {
+  return String(text || '').replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)').replace(/\r/g, '').replace(/\n/g, '\\n');
+}
+function stringToPdfBytes(str) {
+  const bytes = new Uint8Array(str.length);
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    bytes[i] = code <= 0xFF ? code : 0x3F;
+  }
+  return bytes;
+}
+function createPdfFromLines(lines) {
+  const sanitizedLines = Array.isArray(lines) ? lines.slice() : [];
+  if (!sanitizedLines.length) sanitizedLines.push('');
+  const top = 806;
+  const bottomMargin = 40;
+  const lineHeight = 14;
+  const left = 40;
+  const maxLinesPerPage = Math.max(1, Math.floor((top - bottomMargin) / lineHeight));
+  const pages = [[]];
+  for (const line of sanitizedLines) {
+    let currentPage = pages[pages.length - 1];
+    if (currentPage.length >= maxLinesPerPage) {
+      currentPage = [];
+      pages.push(currentPage);
+    }
+    currentPage.push(line);
+  }
+  const contentStreams = pages.map(pageLines => {
+    let content = 'BT\n/F1 11 Tf\n';
+    pageLines.forEach((line, index) => {
+      const y = top - index * lineHeight;
+      content += `1 0 0 1 ${left} ${y} Tm (${escapePdfText(line)}) Tj\n`;
+    });
+    content += 'ET';
+    return content;
+  });
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  function addObject(str) {
+    offsets.push(pdf.length);
+    pdf += str;
+  }
+  const pageCount = pages.length;
+  const kids = pages.map((_, idx) => `${3 + idx} 0 R`).join(' ');
+  addObject('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+  addObject(`2 0 obj\n<< /Type /Pages /Count ${pageCount} /Kids [${kids}] >>\nendobj\n`);
+  pages.forEach((_, idx) => {
+    const contentRef = 3 + pageCount + idx;
+    addObject(`${3 + idx} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents ${contentRef} 0 R /Resources << /Font << /F1 ${3 + pageCount * 2} 0 R >> >> >>\nendobj\n`);
+  });
+  contentStreams.forEach((content, idx) => {
+    addObject(`${3 + pageCount + idx} 0 obj\n<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n`);
+  });
+  addObject(`${3 + pageCount * 2} 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n`);
+  const totalObjects = 3 + pageCount * 2;
+  const xrefOffset = pdf.length;
+  pdf += `xref\n0 ${totalObjects + 1}\n0000000000 65535 f \n`;
+  for (let i = 1; i <= totalObjects; i++) {
+    const offset = offsets[i] || 0;
+    pdf += `${String(offset).padStart(10, '0')} 00000 n \n`;
+  }
+  pdf += `trailer\n<< /Size ${totalObjects + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  return stringToPdfBytes(pdf);
+}
+function createReportPdfBlob(orderId, reportData) {
+  const order = findById('orders', orderId);
+  const patient = order ? findById('patients', Number(order.patient_id)) : null;
+  const sample = order ? findById('samples', Number(order.sample_id)) : null;
+  const panel = order?.panel_id ? findById('panels', Number(order.panel_id)) : null;
+  const interpreterName = order?.interpreter_id ? getName('users', order.interpreter_id) : '';
+  const approverName = order?.approver_id ? getName('users', order.approver_id) : '';
+  const analysisResponsible = order?.analysis_responsible_id ? getName('users', order.analysis_responsible_id) : '';
+  const clinician = order?.clinician || '';
+  const qcEntries = sample ? getCached('qc').filter(q => Number(q.sample_id) === Number(sample.id)) : [];
+  let variants = getReportVariantSnapshots(reportData, orderId);
+  if (!variants.length && order) {
+    variants = getCached('variants').filter(v => Number(v.order_id) === Number(order.id)).map(snapshotVariant);
+  }
+  const lines = [];
+  lines.push('GlimR diagnostisk rapport');
+  addFieldLine(lines, 'Genereret', new Date().toISOString());
+  addFieldLine(lines, 'Ordination', orderId);
+  if (reportData.id) addFieldLine(lines, 'Rapport-ID', reportData.id);
+  addFieldLine(lines, 'Rapportstatus', reportData.status || (order?.status || '-'));
+  addFieldLine(lines, 'Udstedt', reportData.issued_at || '-');
+  lines.push('');
+  lines.push('Patientoplysninger');
+  addFieldLine(lines, 'Navn', patient?.name || '', {indent: '  '});
+  addFieldLine(lines, 'MRN/CPR', patient?.mrn || '', {indent: '  '});
+  addFieldLine(lines, 'Familienummer', patient?.family_number || '', {indent: '  '});
+  addFieldLine(lines, 'Køn', patient?.gender || '', {indent: '  '});
+  addFieldLine(lines, 'Fødselsdato', patient?.birth_date || '', {indent: '  '});
+  addParagraphLines(lines, '  Patientnoter', patient?.notes || '', {indent: '    ', emptyText: 'Ingen noter.'});
+  lines.push('');
+  lines.push('Prøvedata');
+  addFieldLine(lines, 'Prøve-ID', sample?.id ?? '', {indent: '  '});
+  addFieldLine(lines, 'PMB-nummer', sample?.pmb_number || '', {indent: '  '});
+  addFieldLine(lines, 'Prøvetype', sample?.sample_type || '', {indent: '  '});
+  addFieldLine(lines, 'Status', sample?.status || '', {indent: '  '});
+  addFieldLine(lines, 'Opsamlet', sample?.collected_at || '', {indent: '  '});
+  addParagraphLines(lines, '  Prøvenoter', sample?.notes || '', {indent: '    ', emptyText: 'Ingen noter.'});
+  lines.push('');
+  lines.push('Kvalitetsmålinger');
+  if (qcEntries.length) {
+    qcEntries.forEach((qc, index) => {
+      const unit = qc.unit ? ` ${qc.unit}` : '';
+      addParagraphLines(lines, `  ${index + 1}. ${qc.metric}: ${qc.value}${unit}`, qc.notes || '', {indent: '      ', emptyText: 'Ingen noter.', width: 88});
+    });
+  } else {
+    lines.push('  Ingen registrerede kvalitetsmålinger for prøven.');
+  }
+  lines.push('');
+  lines.push('Ordinationsdata');
+  addFieldLine(lines, 'Panel', panel?.name || '', {indent: '  '});
+  addParagraphLines(lines, '  Panelbeskrivelse', panel?.description || '', {indent: '    ', emptyText: 'Ingen beskrivelse.'});
+  addFieldLine(lines, 'Analyseansvarlig', analysisResponsible || '', {indent: '  '});
+  addFieldLine(lines, 'Tolker', interpreterName || '', {indent: '  '});
+  addFieldLine(lines, 'Godkender', approverName || '', {indent: '  '});
+  addFieldLine(lines, 'Rekvirent', clinician || '', {indent: '  '});
+  addFieldLine(lines, 'Ordinationsstatus', order?.status || '', {indent: '  '});
+  addFieldLine(lines, 'Bestilt', order?.ordered_at || '', {indent: '  '});
+  lines.push('');
+  lines.push('Varianter');
+  if (variants.length) {
+    variants.forEach((variant, index) => {
+      const headingParts = [variant.gene, variant.hgvs_c, variant.hgvs_p].filter(Boolean);
+      const heading = headingParts.length ? headingParts.join(' · ') : `Variant ${variant.id ?? index + 1}`;
+      lines.push(`  ${index + 1}. ${heading}`);
+      const meta = [];
+      if (variant.transcript) meta.push(`Transkript: ${variant.transcript}`);
+      if (variant.zygosity) meta.push(`Zygositet: ${variant.zygosity}`);
+      if (variant.classification) meta.push(`Klasse: ${variant.classification}`);
+      if (variant.criteria) meta.push(`ACMG: ${variant.criteria}`);
+      if (variant.af !== undefined && variant.af !== null && variant.af !== '') meta.push(`AF: ${variant.af}`);
+      if (meta.length) {
+        addParagraphLines(lines, '    Metadata', meta.join('; '), {indent: '      ', emptyText: ''});
+      }
+      if (variant.interpretation) {
+        addParagraphLines(lines, '    Tolkning', variant.interpretation, {indent: '      ', emptyText: ''});
+      }
+    });
+  } else {
+    lines.push('  Ingen registrerede varianter.');
+  }
+  lines.push('');
+  addParagraphLines(lines, 'Konklusion', reportData.summary || '', {indent: '  ', emptyText: 'Ingen konklusion angivet.'});
+  lines.push('');
+  lines.push('Signering');
+  addFieldLine(lines, 'Tolker', interpreterName || '', {indent: '  ', fallback: 'Ikke angivet'});
+  addFieldLine(lines, 'Godkender', approverName || '', {indent: '  ', fallback: 'Ikke angivet'});
+  addFieldLine(lines, 'Analyseansvarlig', analysisResponsible || '', {indent: '  ', fallback: 'Ikke angivet'});
+  addFieldLine(lines, 'Rekvirent', clinician || '', {indent: '  ', fallback: 'Ikke angivet'});
+  return new Blob([createPdfFromLines(lines)], {type: 'application/pdf'});
 }
 function renderQC(section) {
   const list = getCached('qc');
