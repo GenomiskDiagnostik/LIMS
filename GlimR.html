@@ -259,6 +259,71 @@ form textarea {
   color: var(--muted-text);
   font-size: 0.85rem;
 }
+.case-form fieldset {
+  border: 1px solid var(--panel-border);
+  border-radius: 0.65rem;
+  padding: 1rem;
+  margin: 0 0 1rem 0;
+}
+.case-form legend {
+  font-weight: 600;
+  padding: 0 0.4rem;
+  color: var(--text);
+}
+.case-form .inline-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+.case-form .inline-group > label,
+.case-form label.inline {
+  flex: 1 1 220px;
+}
+.case-form label.inline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.case-form .form-hint {
+  margin: 0.2rem 0 0.6rem 0;
+  color: var(--muted-text);
+  font-size: 0.85rem;
+}
+.case-form .case-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+  margin-bottom: 0.75rem;
+}
+.case-form .case-row > label {
+  flex: 1 1 180px;
+}
+.case-form .case-row > label.wide {
+  flex: 1 1 100%;
+}
+.case-form .case-row textarea {
+  min-height: 60px;
+}
+.case-form .case-row button {
+  align-self: flex-start;
+}
+.case-form .toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.6rem 0;
+  font-weight: 600;
+  color: var(--muted-text);
+}
+.case-form .toggle input[type="checkbox"] {
+  width: auto;
+  accent-color: var(--accent);
+}
+.case-form textarea.small {
+  min-height: 48px;
+}
 .table-actions {
   margin-top: 0.8rem;
   display: flex;
@@ -477,6 +542,7 @@ const classificationMap = {
 };
 const tabs = [
   {id:'dashboard', label:'Overblik'},
+  {id:'case_create', label:'Opret'},
   {id:'patients', label:'Patienter'},
   {id:'samples', label:'Prøver'},
   {id:'orders', label:'Ordinationer'},
@@ -510,6 +576,7 @@ const schemaFields = {
 const tooltipCatalog = {
   tabs: {
     dashboard: 'Viser nøgletal, seneste ordinationer og seneste revisionshændelser.',
+    case_create: 'Opret patient, prøve, ordination, QC og varianter i ét samlet flow.',
     patients: 'Administrer patientoplysninger og søg i patientlisten.',
     samples: 'Registrer og vedligehold prøver knyttet til patienter.',
     orders: 'Administrer analyseordinationer og deres status.',
@@ -647,6 +714,29 @@ const tooltipCatalog = {
       unit: 'Måleenhed (fx %, ng/µl).',
       notes: 'Supplerende noter om målingen.'
     },
+    createCaseForm: {
+      patient_mrn: 'Patientens MRN eller CPR til entydig identifikation.',
+      patient_name: 'Patientens fulde navn.',
+      patient_gender: 'Patientens registrerede køn.',
+      patient_birth: 'Patientens fødselsdato.',
+      patient_notes: 'Evt. kliniske noter om patienten.',
+      sample_pmb: 'Unikt PMB-nummer for den primære prøve.',
+      sample_type: 'Vælg prøvetype for hovedprøven.',
+      sample_status: 'Status for prøven og den tilknyttede ordination.',
+      sample_collected: 'Dato og tidspunkt for prøveindsamlingen.',
+      sample_notes: 'Noter om hovedprøven.',
+      control_pmb: 'PMB-nummer for kontrolprøven.',
+      control_type: 'Prøvetype for kontrolprøven.',
+      control_status: 'Status for kontrolprøven.',
+      control_collected: 'Dato og tidspunkt for kontrolprøven.',
+      control_notes: 'Noter om kontrolprøven.',
+      order_panel_id: 'Vælg hvilket panel ordinationen omfatter.',
+      order_analysis_responsible: 'Vælg analyseansvarlig bruger.',
+      order_interpreter: 'Vælg den bruger der tolker fundene.',
+      order_approver: 'Vælg den bruger der godkender ordinationen.',
+      order_clinician: 'Rekvirerende kliniker eller afdeling.',
+      order_ordered_at: 'Tidspunkt hvor ordinationen registreres.'
+    },
     userForm: {
       name: 'Brugerens fulde navn.',
       email: 'Brugerens arbejds-e-mailadresse.',
@@ -691,7 +781,11 @@ const tooltipCatalog = {
     bindFile: 'Vælg eller opret en lokal databasefil til autogem.',
     saveNow: 'Gem straks til den tilknyttede databasefil.',
     downloadBackup: 'Eksportér alle data som JSON-backup.',
-    submit: 'Gemmer formularens indhold i databasen.'
+    submit: 'Gemmer formularens indhold i databasen.',
+    addQcRow: 'Tilføj en ekstra QC-måling til prøven.',
+    addVariantRow: 'Tilføj endnu en variant til ordinationen.',
+    createCaseSubmit: 'Opretter patient, prøve, ordination, QC og varianter i ét trin.',
+    createCaseReset: 'Ryd alle felter i oprettelsesformularen.'
   },
   controls: {
     autosaveToggle: 'Aktiver eller deaktiver automatisk gemning til fil.',
@@ -706,7 +800,10 @@ const tooltipCatalog = {
     variantsFilterPanel: 'Indsnævr variantoversigten efter gen, ordination og ACMG-klasse.',
     reportsFilterPanel: 'Begræns rapportlisten efter status, ordination og udstedelsesdato.',
     loginUser: 'Vælg hvilken GlimR-bruger der skal logges ind.',
-    loginPass: 'Indtast brugerens adgangskode hvis der er opsat en PIN.'
+    loginPass: 'Indtast brugerens adgangskode hvis der er opsat en PIN.',
+    includeControlSample: 'Aktiver for at registrere en ekstra kontrolprøve på samme patient.',
+    caseVariantHint: 'Information om tilknyttede varianter i den nye sag.',
+    orderStatusPreview: 'Viser hvilken status den nye ordination får. Status følger prøvens valg.'
   }
 };
 function setTooltip(el, text) {
@@ -1332,6 +1429,7 @@ function renderTab(id) {
   if (!section) return;
   switch(id) {
     case 'dashboard': return renderDashboard(section);
+    case 'case_create': return renderCreateCase(section);
     case 'patients': return renderPatients(section);
     case 'samples': return renderSamples(section);
     case 'orders': return renderOrders(section);
@@ -1413,6 +1511,521 @@ function renderDashboard(section) {
   annotateTableCells(section);
   applyButtonTooltips(section);
   applyControlTooltips(section);
+}
+
+function renderCreateCase(section) {
+  const panels = getCached('panels').slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const users = getCached('users').slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const panelOptions = panels.length
+    ? panels.map(p => `<option value="${p.id}">${esc(p.name || `Panel #${p.id}`)}</option>`).join('')
+    : '<option value="" disabled>Ingen paneler tilgængelige</option>';
+  const userOptions = users.map(u => `<option value="${u.id}">${esc(u.name || `Bruger #${u.id}`)}</option>`).join('');
+  const typeOptions = SAMPLE_TYPES.map(type => `<option value="${type}">${type}</option>`).join('');
+  const controlTypeOptions = SAMPLE_TYPES.map(type => {
+    const selected = type.toLowerCase() === 'kontrol' ? ' selected' : '';
+    return `<option value="${type}"${selected}>${type}</option>`;
+  }).join('');
+  const statusOptions = SAMPLE_STATUSES.map(status => `<option value="${status}">${status}</option>`).join('');
+  section.innerHTML = `
+  <div class="panel">
+    <h2>Opret komplet sag</h2>
+    <form id="createCaseForm" class="case-form">
+      <fieldset>
+        <legend>Patient</legend>
+        <div class="inline-group">
+          <label class="inline">MRN<input name="patient_mrn" required placeholder="Fx 010170-1234"></label>
+          <label class="inline">Navn<input name="patient_name" required placeholder="Patientnavn"></label>
+        </div>
+        <div class="inline-group">
+          <label class="inline">Køn<select name="patient_gender"><option value="">-</option><option value="male">Mand</option><option value="female">Kvinde</option><option value="other">Andet</option></select></label>
+          <label class="inline">Fødselsdato<input type="date" name="patient_birth"></label>
+        </div>
+        <label class="inline">Noter<textarea name="patient_notes" class="small" placeholder="Valgfrit"></textarea></label>
+      </fieldset>
+      <fieldset>
+        <legend>Prøve</legend>
+        <div class="inline-group">
+          <label class="inline">PMB-nummer<input name="sample_pmb" required placeholder="PMB-12345"></label>
+          <label class="inline">Prøvetype<select name="sample_type" required><option value="" selected>Vælg type</option>${typeOptions}</select></label>
+        </div>
+        <div class="inline-group">
+          <label class="inline">Status<select name="sample_status" required><option value="" selected>Vælg status</option>${statusOptions}</select></label>
+          <label class="inline">Opsamlet<input type="datetime-local" name="sample_collected"></label>
+        </div>
+        <label class="inline">Noter<textarea name="sample_notes" class="small" placeholder="Valgfrit"></textarea></label>
+        <label class="toggle"><input type="checkbox" id="includeControlSample"> Tilføj kontrolprøve</label>
+        <div id="controlSampleFields" hidden>
+          <div class="inline-group">
+            <label class="inline">PMB-nummer<input name="control_pmb" placeholder="PMB-KONTROL"></label>
+            <label class="inline">Prøvetype<select name="control_type">${controlTypeOptions}</select></label>
+          </div>
+          <div class="inline-group">
+            <label class="inline">Status<select name="control_status"><option value="" selected>Vælg status</option>${statusOptions}</select></label>
+            <label class="inline">Opsamlet<input type="datetime-local" name="control_collected"></label>
+          </div>
+          <label class="inline">Noter<textarea name="control_notes" class="small" placeholder="Valgfrit"></textarea></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Ordination</legend>
+        <div class="inline-group">
+          <label class="inline">Panel
+            <div class="filterable-select">
+              <input type="search" data-select-filter placeholder="Filtrer paneler">
+              <select name="order_panel_id" ${panels.length ? 'required' : ''}>
+                <option value="" selected>Vælg panel</option>
+                ${panelOptions}
+              </select>
+            </div>
+          </label>
+          <label class="inline">Rekvirent<input name="order_clinician" placeholder="Afdeling/Læge"></label>
+        </div>
+        <div class="inline-group">
+          <label class="inline">Analyseansvarlig
+            <div class="filterable-select">
+              <input type="search" data-select-filter placeholder="Filtrer brugere">
+              <select name="order_analysis_responsible">
+                <option value="" selected>Vælg bruger</option>
+                ${userOptions}
+              </select>
+            </div>
+          </label>
+          <label class="inline">Tolker
+            <div class="filterable-select">
+              <input type="search" data-select-filter placeholder="Filtrer brugere">
+              <select name="order_interpreter">
+                <option value="" selected>Vælg bruger</option>
+                ${userOptions}
+              </select>
+            </div>
+          </label>
+        </div>
+        <div class="inline-group">
+          <label class="inline">Godkender
+            <div class="filterable-select">
+              <input type="search" data-select-filter placeholder="Filtrer brugere">
+              <select name="order_approver">
+                <option value="" selected>Vælg bruger</option>
+                ${userOptions}
+              </select>
+            </div>
+          </label>
+          <label class="inline">Bestilt<input type="datetime-local" name="order_ordered_at"></label>
+        </div>
+        <p class="form-hint" id="orderStatusPreview">Ordinationsstatus følger prøven: <strong id="orderStatusValue">–</strong></p>
+      </fieldset>
+      <fieldset>
+        <legend>Kvalitetskontrol</legend>
+        <p class="form-hint">Tilføj QC-målinger for prøven (valgfrit).</p>
+        <div id="qcList" class="repeater"></div>
+        <button type="button" class="secondary" id="addQcRow">Tilføj måling</button>
+      </fieldset>
+      <fieldset>
+        <legend>Varianter</legend>
+        <p class="form-hint" id="caseVariantHint">Registrer varianter fundet ved analysen. Tomme rækker ignoreres.</p>
+        <div id="variantList" class="repeater"></div>
+        <button type="button" class="secondary" id="addVariantRow">Tilføj variant</button>
+      </fieldset>
+      <div class="btn-row">
+        <button type="submit" class="primary" id="createCaseSubmit">Opret sag</button>
+        <button type="reset" class="secondary" id="createCaseReset">Ryd formular</button>
+      </div>
+    </form>
+    <div id="createCaseMessage" class="form-hint" role="status" aria-live="polite"></div>
+  </div>`;
+  const form = section.querySelector('#createCaseForm');
+  const message = section.querySelector('#createCaseMessage');
+  if (!form) return;
+  const controlToggle = form.querySelector('#includeControlSample');
+  const controlFields = form.querySelector('#controlSampleFields');
+  const controlTypeSelect = form.elements.control_type;
+  const controlStatusSelect = form.elements.control_status;
+  const sampleStatusSelect = form.elements.sample_status;
+  const orderedAtInput = form.elements.order_ordered_at;
+  const addQcBtn = section.querySelector('#addQcRow');
+  const qcList = section.querySelector('#qcList');
+  const addVariantBtn = section.querySelector('#addVariantRow');
+  const variantList = section.querySelector('#variantList');
+  const submitBtn = section.querySelector('#createCaseSubmit');
+  const resetBtn = section.querySelector('#createCaseReset');
+  const statusPreviewValue = section.querySelector('#orderStatusValue');
+  const setMessage = (text, tone = 'info') => {
+    if (!message) return;
+    message.textContent = text;
+    const color = tone === 'success' ? 'var(--accent-strong)' : tone === 'error' ? 'var(--danger)' : 'var(--muted-text)';
+    message.style.color = color;
+  };
+  const toLocalDateTimeValue = (date = new Date()) => {
+    const pad = value => String(value).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+  const disableButtons = disabled => {
+    if (submitBtn) submitBtn.disabled = disabled;
+    if (resetBtn) resetBtn.disabled = disabled;
+  };
+  const updateControlVisibility = () => {
+    if (!controlFields) return;
+    const enabled = Boolean(controlToggle?.checked);
+    controlFields.hidden = !enabled;
+    controlFields.querySelectorAll('input, select, textarea').forEach(el => {
+      el.disabled = !enabled;
+    });
+    if (enabled) {
+      if (controlTypeSelect && !controlTypeSelect.value) {
+        const defaultType = SAMPLE_TYPES.find(type => type.toLowerCase() === 'kontrol') || SAMPLE_TYPES[0] || '';
+        if (defaultType) controlTypeSelect.value = defaultType;
+      }
+      if (controlStatusSelect && !controlStatusSelect.value && sampleStatusSelect) {
+        controlStatusSelect.value = sampleStatusSelect.value;
+      }
+    }
+  };
+  const updateStatusPreview = () => {
+    const value = sampleStatusSelect?.value || '';
+    if (statusPreviewValue) statusPreviewValue.textContent = value || '–';
+    if (controlStatusSelect && controlToggle?.checked && !controlStatusSelect.value) {
+      controlStatusSelect.value = value;
+    }
+  };
+  controlToggle?.addEventListener('change', updateControlVisibility);
+  sampleStatusSelect?.addEventListener('change', updateStatusPreview);
+  const addQcRow = (values = {}) => {
+    if (!qcList) return;
+    const row = document.createElement('div');
+    row.className = 'case-row qc-row';
+    row.innerHTML = `
+      <label class="inline">Måling<input type="text" data-field="metric" placeholder="DNA-koncentration"></label>
+      <label class="inline">Værdi<input type="number" step="0.0001" data-field="value" placeholder="42.0"></label>
+      <label class="inline">Enhed<input type="text" data-field="unit" placeholder="ng/µl"></label>
+      <label class="inline wide">Noter<input type="text" data-field="notes" placeholder="Valgfrit"></label>
+      <button type="button" class="secondary case-remove-row">Fjern</button>`;
+    const metricInput = row.querySelector('[data-field="metric"]');
+    const valueInput = row.querySelector('[data-field="value"]');
+    const unitInput = row.querySelector('[data-field="unit"]');
+    const notesInput = row.querySelector('[data-field="notes"]');
+    if (metricInput) metricInput.value = values.metric || '';
+    if (valueInput) valueInput.value = values.value != null ? values.value : '';
+    if (unitInput) unitInput.value = values.unit || '';
+    if (notesInput) notesInput.value = values.notes || '';
+    const removeBtn = row.querySelector('.case-remove-row');
+    removeBtn?.addEventListener('click', () => row.remove());
+    if (removeBtn) setTooltip(removeBtn, 'Fjern denne måling');
+    qcList.appendChild(row);
+    applyButtonTooltips(row);
+  };
+  const addVariantRow = (values = {}) => {
+    if (!variantList) return;
+    const defaultClass = values.classification != null ? String(values.classification) : '3';
+    const classificationOptions = ['1','2','3','4','5'].map(v => `<option value="${v}"${defaultClass === String(v) ? ' selected' : ''}>${v}</option>`).join('');
+    const row = document.createElement('div');
+    row.className = 'case-row variant-row';
+    row.innerHTML = `
+      <label class="inline">Gen<input type="text" data-field="gene" placeholder="BRCA1"></label>
+      <label class="inline">Transkript<input type="text" data-field="transcript" placeholder="NM_007294.3"></label>
+      <label class="inline">HGVS c.<input type="text" data-field="hgvs_c" placeholder="c.5266dupC"></label>
+      <label class="inline">HGVS p.<input type="text" data-field="hgvs_p" placeholder="p.(Gln1756Profs*74)"></label>
+      <label class="inline">Zygositet<input type="text" data-field="zygosity" placeholder="Heterozygot"></label>
+      <label class="inline">ACMG<select data-field="classification">${classificationOptions}</select></label>
+      <label class="inline">Kriterier<input type="text" data-field="criteria" placeholder="PM1,PP3"></label>
+      <label class="inline">Allelfrekvens<input type="number" step="0.0001" data-field="af" placeholder="0.125"></label>
+      <label class="inline wide">Tolkning<textarea class="small" data-field="interpretation" placeholder="Kort tolkning"></textarea></label>
+      <button type="button" class="secondary case-remove-row">Fjern</button>`;
+    const setValue = (selector, value) => {
+      const el = row.querySelector(selector);
+      if (el) el.value = value || '';
+    };
+    setValue('[data-field="gene"]', values.gene);
+    setValue('[data-field="transcript"]', values.transcript);
+    setValue('[data-field="hgvs_c"]', values.hgvs_c);
+    setValue('[data-field="hgvs_p"]', values.hgvs_p);
+    setValue('[data-field="zygosity"]', values.zygosity);
+    setValue('[data-field="criteria"]', values.criteria);
+    const afField = row.querySelector('[data-field="af"]');
+    if (afField) {
+      if (values.af !== undefined && values.af !== null && values.af !== '') {
+        afField.value = values.af;
+      } else {
+        afField.value = '';
+      }
+    }
+    const interpretationField = row.querySelector('[data-field="interpretation"]');
+    if (interpretationField) interpretationField.value = values.interpretation || '';
+    const removeBtn = row.querySelector('.case-remove-row');
+    removeBtn?.addEventListener('click', () => row.remove());
+    if (removeBtn) setTooltip(removeBtn, 'Fjern varianten fra oprettelsen.');
+    variantList.appendChild(row);
+    applyButtonTooltips(row);
+  };
+  addQcBtn?.addEventListener('click', () => addQcRow());
+  addVariantBtn?.addEventListener('click', () => addVariantRow());
+  addQcRow();
+  addVariantRow();
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+  applyFormTooltips(form);
+  applySelectFilters(section);
+  updateControlVisibility();
+  updateStatusPreview();
+  if (orderedAtInput && !orderedAtInput.value) {
+    orderedAtInput.value = toLocalDateTimeValue();
+  }
+  form.addEventListener('reset', () => {
+    setTimeout(() => {
+      setMessage('');
+      updateControlVisibility();
+      updateStatusPreview();
+      if (qcList) {
+        qcList.innerHTML = '';
+        addQcRow();
+      }
+      if (variantList) {
+        variantList.innerHTML = '';
+        addVariantRow();
+      }
+      if (orderedAtInput) orderedAtInput.value = toLocalDateTimeValue();
+    }, 0);
+  });
+  let submitting = false;
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (submitting) return;
+    submitting = true;
+    disableButtons(true);
+    setMessage('');
+    const patientMrn = form.elements.patient_mrn.value.trim();
+    if (!patientMrn) {
+      setMessage('Angiv patientens MRN.', 'error');
+      form.elements.patient_mrn.focus();
+      disableButtons(false);
+      submitting = false;
+      return;
+    }
+    const patientName = form.elements.patient_name.value.trim();
+    if (!patientName) {
+      setMessage('Angiv patientens navn.', 'error');
+      form.elements.patient_name.focus();
+      disableButtons(false);
+      submitting = false;
+      return;
+    }
+    const patient = {
+      mrn: patientMrn,
+      name: patientName,
+      gender: form.elements.patient_gender.value || '',
+      birth_date: form.elements.patient_birth.value || '',
+      notes: form.elements.patient_notes.value.trim()
+    };
+    const samplePmb = form.elements.sample_pmb.value.trim();
+    if (!samplePmb) {
+      setMessage('Angiv et PMB-nummer for prøven.', 'error');
+      form.elements.sample_pmb.focus();
+      disableButtons(false);
+      submitting = false;
+      return;
+    }
+    const sampleTypeValue = form.elements.sample_type.value.trim();
+    if (!sampleTypeValue) {
+      setMessage('Vælg prøvetype.', 'error');
+      form.elements.sample_type.focus();
+      disableButtons(false);
+      submitting = false;
+      return;
+    }
+    const sampleStatusValue = form.elements.sample_status.value.trim();
+    if (!sampleStatusValue) {
+      setMessage('Vælg prøvens status.', 'error');
+      form.elements.sample_status.focus();
+      disableButtons(false);
+      submitting = false;
+      return;
+    }
+    const sample = {
+      pmb_number: samplePmb,
+      sample_type: sampleTypeValue,
+      status: sampleStatusValue,
+      collected_at: form.elements.sample_collected.value || '',
+      notes: form.elements.sample_notes.value.trim()
+    };
+    let controlSample = null;
+    if (controlToggle?.checked) {
+      const controlPmb = form.elements.control_pmb.value.trim();
+      if (!controlPmb) {
+        setMessage('Angiv PMB-nummer for kontrolprøven.', 'error');
+        form.elements.control_pmb.focus();
+        disableButtons(false);
+        submitting = false;
+        return;
+      }
+      const controlTypeValue = (form.elements.control_type?.value || '').trim();
+      const controlStatusValue = (form.elements.control_status?.value || '').trim();
+      controlSample = {
+        pmb_number: controlPmb,
+        sample_type: controlTypeValue || (SAMPLE_TYPES.find(type => type.toLowerCase() === 'kontrol') || sample.sample_type),
+        status: controlStatusValue || sample.status,
+        collected_at: form.elements.control_collected.value || '',
+        notes: form.elements.control_notes.value.trim()
+      };
+    }
+    const panelIdValue = form.elements.order_panel_id.value;
+    if (!panelIdValue) {
+      setMessage('Vælg panel til ordinationen.', 'error');
+      form.elements.order_panel_id.focus();
+      disableButtons(false);
+      submitting = false;
+      return;
+    }
+    let orderedAt = form.elements.order_ordered_at.value;
+    if (!orderedAt) orderedAt = toLocalDateTimeValue();
+    const order = {
+      panel_id: Number(panelIdValue),
+      analysis_responsible_id: form.elements.order_analysis_responsible.value ? Number(form.elements.order_analysis_responsible.value) : null,
+      interpreter_id: form.elements.order_interpreter.value ? Number(form.elements.order_interpreter.value) : null,
+      approver_id: form.elements.order_approver.value ? Number(form.elements.order_approver.value) : null,
+      clinician: form.elements.order_clinician.value.trim(),
+      status: sample.status,
+      ordered_at: orderedAt
+    };
+    const qcEntries = [];
+    if (qcList) {
+      for (const row of qcList.querySelectorAll('.qc-row')) {
+        const metric = row.querySelector('[data-field="metric"]')?.value.trim() || '';
+        const value = row.querySelector('[data-field="value"]')?.value.trim() || '';
+        const unit = row.querySelector('[data-field="unit"]')?.value.trim() || '';
+        const notes = row.querySelector('[data-field="notes"]')?.value.trim() || '';
+        if (!metric && !value && !unit && !notes) continue;
+        if (!metric || !value) {
+          setMessage('Angiv både måling og værdi for QC-poster.', 'error');
+          row.querySelector('[data-field="metric"]')?.focus();
+          disableButtons(false);
+          submitting = false;
+          return;
+        }
+        qcEntries.push({metric, value, unit, notes});
+      }
+    }
+    const variantEntries = [];
+    if (variantList) {
+      for (const row of variantList.querySelectorAll('.variant-row')) {
+        const gene = row.querySelector('[data-field="gene"]')?.value.trim() || '';
+        const transcript = row.querySelector('[data-field="transcript"]')?.value.trim() || '';
+        const hgvsC = row.querySelector('[data-field="hgvs_c"]')?.value.trim() || '';
+        const hgvsP = row.querySelector('[data-field="hgvs_p"]')?.value.trim() || '';
+        const zygosity = row.querySelector('[data-field="zygosity"]')?.value.trim() || '';
+        const classification = row.querySelector('[data-field="classification"]')?.value || '3';
+        const criteria = row.querySelector('[data-field="criteria"]')?.value.trim() || '';
+        const afRaw = row.querySelector('[data-field="af"]')?.value.trim() || '';
+        const interpretation = row.querySelector('[data-field="interpretation"]')?.value.trim() || '';
+        const isEmpty = !gene && !transcript && !hgvsC && !hgvsP && !zygosity && !criteria && !afRaw && !interpretation;
+        if (isEmpty) continue;
+        if (!gene) {
+          setMessage('Angiv gen for hver registreret variant.', 'error');
+          row.querySelector('[data-field="gene"]')?.focus();
+          disableButtons(false);
+          submitting = false;
+          return;
+        }
+        const variant = {
+          gene,
+          transcript,
+          hgvs_c: hgvsC,
+          hgvs_p: hgvsP,
+          zygosity,
+          classification: String(classification || '3'),
+          criteria,
+          interpretation
+        };
+        if (afRaw) {
+          const afNumber = Number(afRaw);
+          if (!Number.isFinite(afNumber)) {
+            setMessage('Allelfrekvens skal være et tal.', 'error');
+            row.querySelector('[data-field="af"]')?.focus();
+            disableButtons(false);
+            submitting = false;
+            return;
+          }
+          variant.af = afNumber;
+        }
+        variantEntries.push(variant);
+      }
+    }
+    const requiredStores = new Set(['patients','samples','orders']);
+    if (qcEntries.length) requiredStores.add('qc');
+    if (variantEntries.length) requiredStores.add('variants');
+    for (const store of requiredStores) {
+      if (!ensureWrite(store)) {
+        setMessage('Handling kræver skriveadgang. Kontakt en administrator.', 'error');
+        disableButtons(false);
+        submitting = false;
+        return;
+      }
+    }
+    const existingSamples = getCached('samples');
+    const primaryPmbLower = sample.pmb_number.toLowerCase();
+    if (existingSamples.some(s => (s.pmb_number || '').toLowerCase() === primaryPmbLower)) {
+      setMessage('PMB-nummeret for hovedprøven er allerede i brug.', 'error');
+      form.elements.sample_pmb.focus();
+      disableButtons(false);
+      submitting = false;
+      return;
+    }
+    if (controlSample) {
+      const controlPmbLower = controlSample.pmb_number.toLowerCase();
+      if (controlPmbLower === primaryPmbLower) {
+        setMessage('Kontrolprøven skal have et andet PMB-nummer end hovedprøven.', 'error');
+        form.elements.control_pmb.focus();
+        disableButtons(false);
+        submitting = false;
+        return;
+      }
+      if (existingSamples.some(s => (s.pmb_number || '').toLowerCase() === controlPmbLower)) {
+        setMessage('Kontrolprøvens PMB-nummer er allerede i brug.', 'error');
+        form.elements.control_pmb.focus();
+        disableButtons(false);
+        submitting = false;
+        return;
+      }
+    }
+    try {
+      setMessage('Opretter sag...', 'info');
+      const patientId = await addRecord('patients', patient);
+      const sampleId = await addRecord('samples', {...sample, patient_id: patientId});
+      if (controlSample) {
+        await addRecord('samples', {...controlSample, patient_id: patientId});
+      }
+      const orderId = await addRecord('orders', {...order, patient_id: patientId, sample_id: sampleId});
+      for (const qc of qcEntries) {
+        await addRecord('qc', {...qc, sample_id: sampleId});
+      }
+      for (const variant of variantEntries) {
+        await addRecord('variants', {...variant, order_id: orderId});
+      }
+      form.reset();
+      setMessage(`Sag ${orderId} oprettet for ${patient.name} med PMB ${sample.pmb_number}.`, 'success');
+      setStatus(`Sag ${orderId} oprettet for ${patient.name}.`);
+      const dashboardSection = document.querySelector('section[data-tab="dashboard"]');
+      if (dashboardSection) renderDashboard(dashboardSection);
+      ['patients','samples','orders','qc','variants'].forEach(id => {
+        const target = document.querySelector(`section[data-tab="${id}"]`);
+        if (target && target.classList.contains('active')) {
+          renderTab(id);
+        }
+      });
+    } catch (err) {
+      console.error(err);
+      setMessage('Kunne ikke oprette sag: ' + (err?.message || err), 'error');
+      setStatus('Fejl under oprettelse: ' + (err?.message || err));
+    } finally {
+      disableButtons(false);
+      submitting = false;
+    }
+  });
+  if (!panels.length) {
+    setMessage('Opret først et panel under "Analyser/Panels" for at kunne oprette en sag.', 'error');
+    disableButtons(true);
+  } else {
+    setMessage('');
+    disableButtons(false);
+  }
 }
 function getName(store, id) {
   if (!id) return '';
@@ -2989,6 +3602,7 @@ function renderAudit(section) {
   applyButtonTooltips(section);
   applyControlTooltips(section);
 }
+
 function renderDbTab(section) {
   section = section || document.querySelector('section[data-tab="db"]');
   const status = state.boundHandle ? `Tilknyttet fil: ${state.boundHandle.name}` : 'Ingen fil tilknyttet';
