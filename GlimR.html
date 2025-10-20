@@ -3904,7 +3904,7 @@ const PDF_SECTION_CARD_PADDING_TOP = 14;
 const PDF_SECTION_CARD_PADDING_BOTTOM = 16;
 const PDF_SECTION_CARD_INSET = 6;
 const PDF_HEADER_BAND_HEIGHT = 132;
-const PDF_HEADER_TITLE_OFFSET = 36;
+const PDF_HEADER_TITLE_BASELINE_OFFSET = 26;
 const PDF_TEXT_COLOR = '#1b2c45';
 const PDF_MUTED_TEXT_COLOR = '#4a6080';
 const PDF_HEADING_TEXT_COLOR = '#124c87';
@@ -3915,6 +3915,8 @@ const PDF_CARD_BORDER_COLOR = '#c5d7ed';
 const PDF_CARD_HEADING_COLOR = '#cfe0f6';
 const PDF_SIGNATURE_BAND_COLOR = '#ecf2fb';
 const PDF_SIGNATURE_LINE_COLOR = '#8ea8c7';
+const PDF_HEADING_TEXT_OFFSET = 2;
+const PDF_HEADING_BAR_OFFSET = 3;
 const PT_TO_PX = 96 / 72;
 
 function pdfColorToRgb(color) {
@@ -4034,6 +4036,18 @@ function formatDanishDate(value) {
     }
   }
   return '';
+}
+
+function translateGender(value) {
+  if (value === null || value === undefined) return '';
+  const text = String(value).trim();
+  if (!text) return '';
+  const normalized = text.toLowerCase();
+  if (['male', 'mand', 'm'].includes(normalized)) return 'Mand';
+  if (['female', 'kvinde', 'f'].includes(normalized)) return 'Kvinde';
+  if (['other', 'andet'].includes(normalized)) return 'Andet';
+  if (['unknown', 'ukendt'].includes(normalized)) return 'Uoplyst';
+  return text;
 }
 
 class SimplePdfBuilder {
@@ -4199,8 +4213,8 @@ async function loadReportLogoImage() {
 function drawReportHeader(builder, logo, exportedAt) {
   const margin = builder.margin;
   const pageHeight = builder.height;
-  const titleBaseline = pageHeight - margin - PDF_HEADER_TITLE_OFFSET;
   const headerBottom = pageHeight - margin - PDF_HEADER_BAND_HEIGHT;
+  const titleBaseline = headerBottom + PDF_HEADER_TITLE_BASELINE_OFFSET;
   builder.fillRect(0, headerBottom, builder.width, PDF_HEADER_BAND_HEIGHT, PDF_HEADER_BAND_COLOR);
   let imageWidth = 0;
   let imageHeight = 0;
@@ -4249,7 +4263,7 @@ function buildSectionLayout(heading, rows, width) {
     width,
     contentWidth,
     blocks: [],
-    height: PDF_SECTION_CARD_PADDING_TOP + PDF_HEADING_LEADING + PDF_HEADING_GAP + PDF_SECTION_CARD_PADDING_BOTTOM + PDF_SECTION_SPACING
+    height: PDF_SECTION_CARD_PADDING_TOP + PDF_HEADING_TEXT_OFFSET + PDF_HEADING_LEADING + PDF_HEADING_GAP + PDF_SECTION_CARD_PADDING_BOTTOM + PDF_SECTION_SPACING
   };
   rows.forEach((row, index) => {
     switch (row.type) {
@@ -4318,13 +4332,15 @@ function renderSection(builder, column, section) {
   builder.fillRect(cardX, cardBottom, cardWidth, bodyHeight, PDF_CARD_BACKGROUND_COLOR);
   builder.strokeRect(cardX, cardBottom, cardWidth, bodyHeight, 0.8, PDF_CARD_BORDER_COLOR);
   const headingBaseline = startCursor - PDF_SECTION_CARD_PADDING_TOP;
-  const headingBarBottom = Math.max(cardBottom, headingBaseline - (PDF_HEADING_FONT_SIZE + 2));
-  const headingBarTop = Math.min(startCursor - 2, headingBaseline + PDF_SECTION_CARD_PADDING_TOP - 2);
+  const baseHeadingBarBottom = Math.max(cardBottom, headingBaseline - (PDF_HEADING_FONT_SIZE + 2));
+  const baseHeadingBarTop = Math.min(startCursor - 2, headingBaseline + PDF_SECTION_CARD_PADDING_TOP - 2);
+  const headingBarBottom = baseHeadingBarBottom + PDF_HEADING_BAR_OFFSET;
+  const headingBarTop = baseHeadingBarTop + PDF_HEADING_BAR_OFFSET;
   const headingFillHeight = headingBarTop - headingBarBottom;
   if (headingFillHeight > 0.1) {
     builder.fillRect(cardX, headingBarBottom, cardWidth, headingFillHeight, PDF_CARD_HEADING_COLOR);
   }
-  let cursor = headingBaseline;
+  let cursor = headingBaseline - PDF_HEADING_TEXT_OFFSET;
   const textX = column.x + PDF_SECTION_CARD_PADDING_X;
   builder.addText(section.heading, textX, cursor, PDF_HEADING_FONT_SIZE, PDF_HEADING_TEXT_COLOR);
   cursor -= (PDF_HEADING_LEADING + PDF_HEADING_GAP);
@@ -4384,7 +4400,7 @@ async function createReportPdfBlob(orderId, reportData, exportedAt = new Date())
       {type: 'kv', label: 'Navn', value: patient?.name},
       {type: 'kv', label: 'MRN', value: patient?.mrn},
       {type: 'kv', label: 'Familienummer', value: patient?.family_number},
-      {type: 'kv', label: 'Køn', value: patient?.gender},
+      {type: 'kv', label: 'Køn', value: translateGender(patient?.gender)},
       {type: 'kv', label: 'Fødselsdato', value: patientBirthDate}
     ];
     const sampleRows = [
@@ -4397,8 +4413,6 @@ async function createReportPdfBlob(orderId, reportData, exportedAt = new Date())
     const analysisRows = [
       {type: 'kv', label: 'Panel', value: panel?.name},
       {type: 'kv', label: 'Analyseansvarlig', value: analysisResponsible},
-      {type: 'kv', label: 'Tolker', value: interpreterName},
-      {type: 'kv', label: 'Godkender', value: approverName},
       {type: 'kv', label: 'Rekvirent', value: clinician},
       {type: 'kv', label: 'Ordinationsstatus', value: order?.status},
       {type: 'kv', label: 'Bestilt', value: order?.ordered_at}
