@@ -376,6 +376,92 @@ input[type="search"] {
 .filterable-select select {
   max-height: 220px;
 }
+.report-variant-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: flex-end;
+  margin-top: 0.4rem;
+}
+.report-variant-selector .filterable-select {
+  flex: 1 1 260px;
+  margin-top: 0;
+}
+.report-variant-list {
+  margin-top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.report-variant-item {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 0.65rem;
+  padding: 0.6rem 0.75rem;
+  box-shadow: inset 0 1px 0 rgba(15, 27, 45, 0.04);
+}
+[data-theme="dark"] .report-variant-item {
+  background: rgba(15, 23, 42, 0.45);
+}
+.report-variant-item header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+.report-variant-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.8rem;
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted-text);
+}
+.report-variant-meta strong {
+  font-weight: 600;
+}
+.report-variant-item p {
+  margin: 0.35rem 0 0;
+}
+.report-variant-remove {
+  background: none;
+  border: none;
+  color: var(--danger);
+  cursor: pointer;
+  padding: 0.15rem 0.35rem;
+  border-radius: 0.4rem;
+  font-size: 0.85rem;
+}
+.report-variant-remove:hover,
+.report-variant-remove:focus {
+  text-decoration: underline;
+}
+.report-variant-empty {
+  color: var(--muted-text);
+  font-style: italic;
+  font-size: 0.9rem;
+}
+.report-variant-detail {
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  border-left: 3px solid var(--accent);
+  border-radius: 0.6rem;
+  background: var(--panel-bg);
+}
+[data-theme="dark"] .report-variant-detail {
+  background: rgba(15, 23, 42, 0.45);
+}
+.report-variant-detail h3 {
+  margin: 0;
+}
+.report-variant-detail ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.2rem;
+}
+.report-variant-detail p {
+  margin: 0.5rem 0 0;
+}
 .family-combo {
   display: flex;
   gap: 0.4rem;
@@ -581,7 +667,7 @@ const schemaFields = {
   orders: ['id','patient_id','sample_id','panel_id','analysis_responsible_id','interpreter_id','approver_id','clinician','status','ordered_at','created_by','created_at','updated_at'],
   variants: ['id','order_id','gene','transcript','hgvs_c','hgvs_p','zygosity','classification','criteria','af','interpretation','created_by','created_at','updated_at'],
   qc: ['id','sample_id','metric','value','unit','notes','created_by','created_at','updated_at'],
-  reports: ['id','order_id','findings','summary','status','issued_at','created_by','created_at','updated_at'],
+  reports: ['id','order_id','findings','variant_ids','variant_details','summary','status','issued_at','created_by','created_at','updated_at'],
   users: ['id','name','email','role','pin','created_at','updated_at'],
   audit: ['id','ts','user','action','entity','entity_id','before','after','created_at','updated_at'],
   variant_library: ['id','gene','transcript','hgvs_c','hgvs_p','classification','criteria','evidence','condition','inheritance','curated_by','last_review','created_at','updated_at'],
@@ -720,7 +806,7 @@ const tooltipCatalog = {
       order_id: 'Ordinationen som rapporten beskriver.',
       status: 'Rapportstatus (udkast, endelig eller ændret).',
       issued_at: 'Dato og tidspunkt for rapportens udsendelse.',
-      findings: 'Detaljerede fund til rapportens bilag.',
+      variant_ids: 'Tilføj de registrerede varianter, der skal indgå i rapporten.',
       summary: 'Kort klinisk resumé til modtageren.'
     },
     qcForm: {
@@ -780,6 +866,7 @@ const tooltipCatalog = {
     reportClear: 'Ryd formularen for at skrive en ny rapport.',
     reportDelete: 'Slet den valgte rapport.',
     reportPreview: 'Åbn rapporten i en ny fane til forhåndsvisning.',
+    reportAddVariant: 'Tilføj den valgte variant til rapporten.',
     qcClear: 'Ryd formularen for at registrere en ny QC-måling.',
     qcDelete: 'Slet den valgte QC-måling.',
     userClear: 'Ryd formularen for at oprette en ny bruger.',
@@ -810,6 +897,8 @@ const tooltipCatalog = {
     fhirOrderSelect: 'Vælg hvilken ordination der skal bruges til FHIR-svar.',
     fhirImportLabel: 'Importer en modtaget FHIR JSON-fil.',
     fhirPreview: 'JSON-visning af den genererede FHIR-bundle.',
+    reportVariantSelect: 'Vælg blandt ordinationens registrerede varianter.',
+    reportVariantList: 'Varianter der er føjet til rapportens fund.',
     restoreLabel: 'Gendan databasen fra en tidligere JSON-backup.',
     schemaText: 'Viser MySQL-skema og INSERT-statements til reference.',
     patientsFilterPanel: 'Åbn avancerede filtre for at søge præcist i patientlisten.',
@@ -3270,6 +3359,77 @@ function renderVariantLibrary(section) {
     }
   });
 }
+function snapshotVariant(variant) {
+  if (!variant) {
+    return {id: null, order_id: null, gene: '', transcript: '', hgvs_c: '', hgvs_p: '', zygosity: '', classification: '', criteria: '', af: '', interpretation: ''};
+  }
+  return {
+    id: variant.id ?? null,
+    order_id: variant.order_id ?? null,
+    gene: variant.gene || '',
+    transcript: variant.transcript || '',
+    hgvs_c: variant.hgvs_c || '',
+    hgvs_p: variant.hgvs_p || '',
+    zygosity: variant.zygosity || '',
+    classification: variant.classification || '',
+    criteria: variant.criteria || '',
+    af: variant.af ?? '',
+    interpretation: variant.interpretation || ''
+  };
+}
+function parseReportVariantIds(value) {
+  if (Array.isArray(value)) {
+    return value.map(Number).filter(id => Number.isFinite(id));
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      return parseReportVariantIds(parsed);
+    } catch (err) {
+      return trimmed.split(/[^0-9]+/).map(Number).filter(id => Number.isFinite(id));
+    }
+  }
+  return [];
+}
+function getReportVariantSnapshots(report, orderId) {
+  if (!report) return [];
+  const detailsRaw = report.variant_details;
+  if (Array.isArray(detailsRaw) && detailsRaw.length) {
+    return detailsRaw.map(snapshotVariant);
+  }
+  if (typeof detailsRaw === 'string' && detailsRaw.trim()) {
+    try {
+      const parsed = JSON.parse(detailsRaw);
+      if (Array.isArray(parsed) && parsed.length) {
+        return parsed.map(snapshotVariant);
+      }
+    } catch (err) {
+      console.warn('Kunne ikke parse variant_details', err);
+    }
+  }
+  const ids = parseReportVariantIds(report.variant_ids);
+  if (!ids.length) return [];
+  const orderVariants = getCached('variants').filter(v => !orderId || v.order_id === orderId);
+  return ids.map(id => {
+    const found = orderVariants.find(v => v.id === id) || getCached('variants').find(v => v.id === id);
+    if (!found) return null;
+    return snapshotVariant(found);
+  }).filter(Boolean);
+}
+function describeVariantNarrative(variant) {
+  if (!variant) return '';
+  const nameParts = [variant.gene, variant.hgvs_c, variant.hgvs_p].filter(Boolean);
+  const summaryParts = [];
+  if (variant.classification) summaryParts.push(`Klasse ${variant.classification}`);
+  if (variant.criteria) summaryParts.push(`ACMG: ${variant.criteria}`);
+  if (variant.af !== undefined && variant.af !== null && variant.af !== '') summaryParts.push(`AF: ${variant.af}`);
+  if (variant.zygosity) summaryParts.push(`Zygositet: ${variant.zygosity}`);
+  if (variant.interpretation) summaryParts.push(variant.interpretation);
+  const title = nameParts.join(' · ');
+  return [title, summaryParts.join(' – ')].filter(Boolean).join(' – ');
+}
 function renderReports(section) {
   const list = getCached('reports');
   const orders = getCached('orders');
@@ -3309,7 +3469,21 @@ function renderReports(section) {
           </label>
           <label>Status<select name="status"><option value="draft">Udkast</option><option value="final">Endelig</option><option value="amended">Ændret</option></select></label>
           <label>Udstedt<input type="datetime-local" name="issued_at"></label>
-          <label>Fund<textarea name="findings"></textarea></label>
+          <label>Fund
+            <div class="report-variant-selector">
+              <div class="filterable-select">
+                <input type="search" placeholder="Filtrer varianter" data-report-variant-filter>
+                <select id="reportVariantSelect" disabled>
+                  <option value="" selected>Vælg variant</option>
+                </select>
+              </div>
+              <button class="secondary" type="button" id="reportAddVariant" disabled>Tilføj</button>
+            </div>
+          </label>
+          <div class="report-variant-list" id="reportVariantList">
+            <p class="report-variant-empty">Ingen varianter valgt.</p>
+          </div>
+          <input type="hidden" name="variant_ids" value="[]">
           <label>Resumé<textarea name="summary"></textarea></label>
           <div class="btn-row">
             <button class="primary" type="submit">Gem</button>
@@ -3324,6 +3498,109 @@ function renderReports(section) {
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#reportSearch');
   const form = section.querySelector('#reportForm');
+  const orderSelect = form?.elements.order_id;
+  const variantSelect = form?.querySelector('#reportVariantSelect');
+  const variantFilterInput = form?.querySelector('[data-report-variant-filter]');
+  const variantAddButton = form?.querySelector('#reportAddVariant');
+  const variantList = form?.querySelector('#reportVariantList');
+  const variantIdsInput = form?.elements.variant_ids;
+  let selectedReportVariants = [];
+  let currentReportOrderId = null;
+  let variantOptionState = [];
+  const updateAddButtonState = () => {
+    if (!variantAddButton || !variantSelect) return;
+    const id = Number(variantSelect.value);
+    const exists = selectedReportVariants.some(v => v.id === id);
+    variantAddButton.disabled = variantSelect.disabled || !variantSelect.value || exists;
+  };
+  const syncVariantIdsInput = () => {
+    if (!variantIdsInput) return;
+    const ids = selectedReportVariants.map(v => v.id).filter(id => id != null);
+    variantIdsInput.value = JSON.stringify(ids);
+  };
+  const renderSelectedReportVariants = () => {
+    if (!variantList) return;
+    if (!selectedReportVariants.length) {
+      variantList.innerHTML = '<p class="report-variant-empty">Ingen varianter valgt.</p>';
+      return;
+    }
+    const items = selectedReportVariants.map(variant => {
+      const titleParts = [variant.gene, variant.hgvs_c, variant.hgvs_p].filter(Boolean);
+      const title = titleParts.length ? titleParts.join(' · ') : `Variant ${variant.id ?? ''}`.trim();
+      const metaParts = [];
+      if (variant.id != null) metaParts.push(`<span><strong>ID:</strong> ${esc(variant.id)}</span>`);
+      if (variant.transcript) metaParts.push(`<span><strong>Transkript:</strong> ${esc(variant.transcript)}</span>`);
+      if (variant.classification) metaParts.push(`<span><strong>Klasse:</strong> ${esc(variant.classification)}</span>`);
+      if (variant.criteria) metaParts.push(`<span><strong>ACMG:</strong> ${esc(variant.criteria)}</span>`);
+      if (variant.af !== undefined && variant.af !== null && variant.af !== '') metaParts.push(`<span><strong>AF:</strong> ${esc(variant.af)}</span>`);
+      if (variant.zygosity) metaParts.push(`<span><strong>Zygositet:</strong> ${esc(variant.zygosity)}</span>`);
+      const metaHtml = metaParts.length ? `<div class="report-variant-meta">${metaParts.join('')}</div>` : '';
+      const interpretationHtml = variant.interpretation ? `<p>${esc(variant.interpretation)}</p>` : '';
+      return `<div class="report-variant-item" data-variant-id="${variant.id}"><header><span>${esc(title)}</span><button type="button" class="report-variant-remove" data-action="remove" data-variant-id="${variant.id}">Fjern</button></header>${metaHtml}${interpretationHtml}</div>`;
+    }).join('');
+    variantList.innerHTML = items;
+  };
+  const setSelectedReportVariants = variants => {
+    selectedReportVariants = (variants || []).map(v => ({...v}));
+    syncVariantIdsInput();
+    renderSelectedReportVariants();
+    updateAddButtonState();
+  };
+  const buildVariantOptionLabel = variant => {
+    const parts = [variant.gene, variant.hgvs_c, variant.hgvs_p].filter(Boolean);
+    if (parts.length) return parts.join(' · ');
+    return `Variant ${variant.id}`;
+  };
+  const applyVariantFilter = () => {
+    if (!variantFilterInput) return;
+    const term = variantFilterInput.value.trim().toLowerCase();
+    variantOptionState.forEach(({option, text}) => {
+      const matches = !term || text.includes(term) || option.selected;
+      option.hidden = !matches;
+    });
+    if (term && variantSelect) {
+      const firstVisible = variantOptionState.find(({option}) => !option.hidden);
+      if (firstVisible && !firstVisible.option.selected) {
+        variantSelect.value = firstVisible.option.value;
+      }
+    }
+    updateAddButtonState();
+  };
+  const refreshVariantOptions = () => {
+    if (!variantSelect) return;
+    const orderId = Number(orderSelect?.value || '');
+    currentReportOrderId = Number.isFinite(orderId) && orderId ? orderId : null;
+    variantOptionState = [];
+    variantSelect.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Vælg variant';
+    variantSelect.appendChild(placeholder);
+    if (!currentReportOrderId) {
+      variantSelect.disabled = true;
+      if (variantFilterInput) {
+        variantFilterInput.value = '';
+        variantFilterInput.disabled = true;
+      }
+      updateAddButtonState();
+      return;
+    }
+    const variantsForOrder = getCached('variants').filter(v => v.order_id === currentReportOrderId);
+    variantsForOrder.forEach(variant => {
+      const option = document.createElement('option');
+      option.value = variant.id;
+      option.textContent = buildVariantOptionLabel(variant);
+      variantSelect.appendChild(option);
+      variantOptionState.push({option, text: option.textContent.toLowerCase()});
+    });
+    variantSelect.disabled = variantsForOrder.length === 0;
+    if (variantFilterInput) {
+      variantFilterInput.value = '';
+      variantFilterInput.disabled = variantsForOrder.length === 0;
+    }
+    variantSelect.value = '';
+    applyVariantFilter();
+  };
   const filterInputs = {
     id: section.querySelector('[data-filter-reports="id"]'),
     order: section.querySelector('[data-filter-reports="order"]'),
@@ -3337,6 +3614,64 @@ function renderReports(section) {
   applyControlTooltips(section);
   applyFormTooltips(form);
   applySelectFilters(section);
+  setSelectedReportVariants([]);
+  refreshVariantOptions();
+  if (variantFilterInput) {
+    variantFilterInput.addEventListener('input', applyVariantFilter);
+    variantFilterInput.addEventListener('keydown', evt => {
+      if (evt.key === 'Escape') {
+        variantFilterInput.value = '';
+        applyVariantFilter();
+      }
+    });
+  }
+  if (variantSelect) {
+    variantSelect.addEventListener('change', updateAddButtonState);
+  }
+  if (variantAddButton) {
+    variantAddButton.addEventListener('click', () => {
+      if (!variantSelect) return;
+      const id = Number(variantSelect.value);
+      if (!id || selectedReportVariants.some(v => v.id === id)) {
+        updateAddButtonState();
+        return;
+      }
+      const storeVariant = getCached('variants').find(v => v.id === id);
+      const snapshot = snapshotVariant(storeVariant || {id, order_id: currentReportOrderId || Number(orderSelect?.value) || null});
+      if (!snapshot.order_id) snapshot.order_id = currentReportOrderId || Number(orderSelect?.value) || null;
+      setSelectedReportVariants(selectedReportVariants.concat(snapshot));
+      variantSelect.value = '';
+      applyVariantFilter();
+    });
+  }
+  if (variantList) {
+    variantList.addEventListener('click', evt => {
+      const btn = evt.target.closest('[data-action="remove"]');
+      if (!btn) return;
+      const id = Number(btn.dataset.variantId);
+      if (!id) return;
+      setSelectedReportVariants(selectedReportVariants.filter(v => v.id !== id));
+      updateAddButtonState();
+    });
+  }
+  if (orderSelect) {
+    orderSelect.addEventListener('change', () => {
+      refreshVariantOptions();
+      const orderId = Number(orderSelect.value);
+      if (!orderId) {
+        setSelectedReportVariants([]);
+        return;
+      }
+      const filtered = selectedReportVariants.filter(v => Number(v.order_id) === orderId);
+      if (filtered.length !== selectedReportVariants.length) {
+        setSelectedReportVariants(filtered);
+      } else {
+        syncVariantIdsInput();
+        renderSelectedReportVariants();
+        updateAddButtonState();
+      }
+    });
+  }
   const statusMap = {draft:'Udkast', final:'Endelig', amended:'Ændret'};
   let filteredReports = list.slice();
   let activeFilters = {};
@@ -3399,12 +3734,25 @@ function renderReports(section) {
     const report = list.find(r => r.id === Number(tr.dataset.id));
     if (!report) return;
     fillForm(form, report);
+    refreshVariantOptions();
+    const variants = getReportVariantSnapshots(report, Number(report.order_id));
+    setSelectedReportVariants(variants);
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
     if (!ensureWrite('reports')) return;
     const data = Object.fromEntries(new FormData(form).entries());
     data.order_id = Number(data.order_id);
+    const orderId = data.order_id;
+    const variantStore = getCached('variants');
+    const variantSnapshots = selectedReportVariants.map(item => {
+      const source = variantStore.find(v => v.id === item.id) || item;
+      const snapshot = snapshotVariant(source);
+      if (!snapshot.order_id) snapshot.order_id = orderId || item.order_id || currentReportOrderId || null;
+      return snapshot;
+    });
+    data.variant_ids = JSON.stringify(variantSnapshots.map(v => v.id).filter(id => id != null));
+    data.variant_details = variantSnapshots;
     if (data.id) {
       const id = Number(data.id);
       const before = {...findById('reports', id)};
@@ -3426,11 +3774,26 @@ function renderReports(section) {
       renderTab('reports');
     }
   });
-  section.querySelector('#reportClear').addEventListener('click', () => form.reset());
+  section.querySelector('#reportClear').addEventListener('click', () => {
+    form.reset();
+    setSelectedReportVariants([]);
+    refreshVariantOptions();
+  });
   section.querySelector('#reportPreview').addEventListener('click', () => {
     const data = Object.fromEntries(new FormData(form).entries());
     if (!data.order_id) return alert('Vælg ordre');
-    const html = buildReportHtml(Number(data.order_id), data);
+    const orderId = Number(data.order_id);
+    data.order_id = orderId;
+    const variantStore = getCached('variants');
+    const variantSnapshots = selectedReportVariants.map(item => {
+      const source = variantStore.find(v => v.id === item.id) || item;
+      const snapshot = snapshotVariant(source);
+      if (!snapshot.order_id) snapshot.order_id = orderId || item.order_id || currentReportOrderId || null;
+      return snapshot;
+    });
+    data.variant_details = variantSnapshots;
+    data.variant_ids = JSON.stringify(variantSnapshots.map(v => v.id).filter(id => id != null));
+    const html = buildReportHtml(orderId, data);
     const win = window.open('', '_blank');
     if (win) {
       win.document.write('<!DOCTYPE html><html><head><title>Rapport</title><style>body{font-family:Segoe UI,Arial;margin:2rem;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ccc;padding:0.4rem;}th{background:#f0f0f0;}</style></head><body>' + html + '</body></html>');
@@ -3442,12 +3805,28 @@ function buildReportHtml(orderId, reportData) {
   const order = findById('orders', orderId);
   const patient = order ? findById('patients', Number(order.patient_id)) : null;
   const sample = order ? findById('samples', Number(order.sample_id)) : null;
-  const variants = getCached('variants').filter(v => v.order_id === orderId);
+  let variants = getReportVariantSnapshots(reportData, orderId);
+  if (!variants.length) {
+    variants = getCached('variants').filter(v => v.order_id === orderId).map(snapshotVariant);
+  }
   const sampleIdentifierParts = [];
   if (sample?.pmb_number) sampleIdentifierParts.push(sample.pmb_number);
   if (sample?.id != null) sampleIdentifierParts.push(`ID ${sample.id}`);
   const sampleIdentifier = sampleIdentifierParts.join(' / ');
   const rows = variants.map(v => `<tr><td>${esc(v.gene)}</td><td>${esc(v.hgvs_c||'')}</td><td>${esc(v.hgvs_p||'')}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(v.af??'')}</td><td>${esc(v.interpretation||'')}</td></tr>`).join('') || '<tr><td colspan="7">Ingen fund</td></tr>';
+  const detailSections = variants.length ? variants.map(variant => {
+    const headingParts = [variant.gene, variant.hgvs_c, variant.hgvs_p].filter(Boolean);
+    const heading = headingParts.length ? headingParts.join(' · ') : `Variant ${variant.id ?? ''}`.trim();
+    const meta = [];
+    if (variant.transcript) meta.push(`<li><strong>Transkript:</strong> ${esc(variant.transcript)}</li>`);
+    if (variant.zygosity) meta.push(`<li><strong>Zygositet:</strong> ${esc(variant.zygosity)}</li>`);
+    if (variant.classification) meta.push(`<li><strong>Klasse:</strong> ${esc(variant.classification)}</li>`);
+    if (variant.criteria) meta.push(`<li><strong>ACMG:</strong> ${esc(variant.criteria)}</li>`);
+    if (variant.af !== undefined && variant.af !== null && variant.af !== '') meta.push(`<li><strong>AF:</strong> ${esc(variant.af)}</li>`);
+    const interpretation = variant.interpretation ? `<p>${esc(variant.interpretation)}</p>` : '';
+    const metaList = meta.length ? `<ul>${meta.join('')}</ul>` : '';
+    return `<div class="report-variant-detail"><h3>${esc(heading)}</h3>${metaList}${interpretation}</div>`;
+  }).join('') : '<p>Ingen variantdetaljer registreret.</p>';
   return `
   <h1>Diagnostisk rapport</h1>
   <p><strong>Ordination:</strong> ${orderId}</p>
@@ -3460,7 +3839,7 @@ function buildReportHtml(orderId, reportData) {
   <h2>Fund</h2>
   <table><thead><tr><th>Gen</th><th>HGVS c.</th><th>HGVS p.</th><th>Klasse</th><th>ACMG</th><th>AF</th><th>Tolkning</th></tr></thead><tbody>${rows}</tbody></table>
   <h2>Detaljer</h2>
-  <pre>${esc(reportData.findings||'')}</pre>`;
+  ${detailSections}`;
 }
 function renderQC(section) {
   const list = getCached('qc');
@@ -3629,8 +4008,11 @@ function buildFhirBundle(orderId) {
   const patient = findById('patients', Number(order.patient_id));
   const sample = findById('samples', Number(order.sample_id));
   const panel = order.panel_id ? findById('panels', Number(order.panel_id)) : null;
-  const report = getCached('reports').find(r => r.order_id === orderId) || {status:'final', summary:'', findings:''};
-  const variants = getCached('variants').filter(v => v.order_id === orderId);
+  const report = getCached('reports').find(r => r.order_id === orderId) || {status:'final', summary:'', variant_ids:'[]', variant_details:[]};
+  let variants = getReportVariantSnapshots(report, orderId);
+  if (!variants.length) {
+    variants = getCached('variants').filter(v => v.order_id === orderId).map(snapshotVariant);
+  }
   const timestamp = new Date().toISOString();
   const patientResource = {
     resourceType:'Patient',
@@ -3670,9 +4052,12 @@ function buildFhirBundle(orderId) {
     issued: report.issued_at || new Date().toISOString(),
     performer:[{reference:'Organization/org-producer'}],
     resultsInterpreter: requesterOrg.name ? [{reference:'Organization/org-requester'}] : undefined,
-    conclusion: report.summary || undefined,
-    presentedForm: report.findings ? [{contentType:'text/plain', data:btoa(report.findings)}] : undefined
+    conclusion: report.summary || undefined
   };
+  const narrative = variants.map(describeVariantNarrative).filter(Boolean).join('\n');
+  if (narrative) {
+    diagnosticReport.presentedForm = [{contentType:'text/plain', data:btoa(narrative)}];
+  }
   const entries = [];
   const addEntry = resource => entries.push({fullUrl:`urn:uuid:${crypto.randomUUID?.() || Math.random().toString(36).slice(2)}`, resource});
   const messageHeader = {
@@ -4012,7 +4397,8 @@ async function runTests() {
     const variantCount = getCached('variants').filter(v => v.order_id === orderId).length;
     results.push(['Tilføj testvariant', variantCount > 0, `Varianter: ${variantCount}`]);
     results.push(['Oprettelse ordination med FK', !!findById('orders', orderId), `Ordination ${orderId}`]);
-    const reportHtml = buildReportHtml(orderId, {status:'draft', issued_at:new Date().toISOString(), summary:'Test', findings:'Ingen'});
+    const variantDetails = getCached('variants').filter(v => v.order_id === orderId).map(snapshotVariant);
+    const reportHtml = buildReportHtml(orderId, {status:'draft', issued_at:new Date().toISOString(), summary:'Test', variant_details: variantDetails});
     results.push(['Generering af rapport HTML', reportHtml.includes('Diagnostisk rapport'), 'HTML længde ' + reportHtml.length]);
     const bundle = buildFhirBundle(orderId);
     const hasResources = ['MessageHeader','Patient','DiagnosticReport','Observation'].every(type => (bundle.entry||[]).some(e => e.resource.resourceType === type));
@@ -4207,6 +4593,8 @@ CREATE TABLE IF NOT EXISTS \`reports\` (
   \`id\` INT AUTO_INCREMENT PRIMARY KEY,
   \`order_id\` INT,
   \`findings\` TEXT,
+  \`variant_ids\` TEXT,
+  \`variant_details\` LONGTEXT,
   \`summary\` TEXT,
   \`status\` VARCHAR(32),
   \`issued_at\` DATETIME,
@@ -4334,7 +4722,7 @@ async function loadDemoData() {
     const o2 = await addRecord('orders', {patient_id:p2, sample_id:s2, panel_id:panel, analysis_responsible_id:null, interpreter_id:null, approver_id:null, clinician:'Dr. Holm', status:'Rapport', ordered_at:new Date().toISOString()});
     await addRecord('variants', {order_id:o1, gene:'BRCA1', transcript:'NM_007294.3', hgvs_c:'c.5266dupC', hgvs_p:'p.Gln1756Profs', zygosity:'heterozygot', classification:'5', criteria:'PVS1,PS3,PM2,PP3', af:0.0001, interpretation:'Patogen variant med høj risiko'});
     await addRecord('qc', {sample_id:s1, metric:'Dækning', value:98.5, unit:'%', notes:''});
-    await addRecord('reports', {order_id:o2, findings:'Ingen klinisk signifikante varianter', summary:'Negativ rapport', status:'final', issued_at:new Date().toISOString()});
+    await addRecord('reports', {order_id:o2, variant_ids:'[]', variant_details:[], summary:'Negativ rapport', status:'final', issued_at:new Date().toISOString()});
     await addRecord('users', {name:'Admin', email:'admin@example.com', role:'Administrator', pin:'admin'});
   } else {
     alert('Demo-data allerede til stede.');
