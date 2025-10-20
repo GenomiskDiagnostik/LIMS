@@ -189,6 +189,80 @@ section[data-tab].active {
   margin-bottom: 1.2rem;
   border: 1px solid var(--panel-border);
 }
+.variant-picker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1.5rem;
+}
+[data-theme="dark"] .variant-picker-overlay {
+  background: rgba(8, 13, 23, 0.75);
+}
+.variant-picker {
+  background: var(--panel-bg);
+  color: var(--text);
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--panel-border);
+  max-width: 960px;
+  width: 100%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+.variant-picker header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--panel-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.variant-picker header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.variant-picker .picker-body {
+  padding: 1rem 1.25rem 1.25rem;
+  overflow: auto;
+}
+.variant-picker .picker-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 1.25rem 1rem;
+}
+.variant-picker table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.75rem;
+}
+.variant-picker table th,
+.variant-picker table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--table-row-border);
+  text-align: left;
+}
+.variant-picker table tbody tr {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.variant-picker table tbody tr:hover,
+.variant-picker table tbody tr:focus-within {
+  background: var(--table-header-bg);
+}
+.variant-picker table tbody tr:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.variant-picker-empty {
+  text-align: center;
+  padding: 1.5rem 0.5rem;
+  color: var(--muted-text);
+}
 .panel h2 {
   margin-top: 0;
 }
@@ -863,6 +937,7 @@ const tooltipCatalog = {
     variantSaveNew: 'Gem varianten som en ny registrering uden at overskrive den valgte.',
     variantDelete: 'Slet den valgte variant.',
     variantToLibrary: 'Tilføj varianten til det kuraterede bibliotek.',
+    variantFromLibrary: 'Hent variantoplysninger fra biblioteket.',
     reportClear: 'Ryd formularen for at skrive en ny rapport.',
     reportDelete: 'Slet den valgte rapport.',
     reportPreview: 'Åbn rapporten i en ny fane til forhåndsvisning.',
@@ -890,7 +965,8 @@ const tooltipCatalog = {
     addQcRow: 'Tilføj en ekstra QC-måling til prøven.',
     addVariantRow: 'Tilføj endnu en variant til ordinationen.',
     createCaseSubmit: 'Opretter patient, prøve, ordination, QC og varianter i ét trin.',
-    createCaseReset: 'Ryd alle felter i oprettelsesformularen.'
+    createCaseReset: 'Ryd alle felter i oprettelsesformularen.',
+    'Vælg fra bibliotek': 'Hent variantoplysninger fra biblioteket.'
   },
   controls: {
     autosaveToggle: 'Aktiver eller deaktiver automatisk gemning til fil.',
@@ -1025,6 +1101,113 @@ function applySelectFilters(root) {
     });
     wrapper.dataset.filterInit = 'true';
   });
+}
+
+function openVariantLibraryPicker(onSelect) {
+  const library = (getCached('variant_library') || []).slice();
+  if (!library.length) {
+    alert('Variantbiblioteket er tomt.');
+    return;
+  }
+  const existing = document.querySelector('.variant-picker-overlay');
+  if (existing) existing.remove();
+  const sorted = library.sort((a, b) => {
+    const geneCompare = (a.gene || '').localeCompare(b.gene || '');
+    if (geneCompare) return geneCompare;
+    const hgvsCompare = (a.hgvs_c || '').localeCompare(b.hgvs_c || '');
+    if (hgvsCompare) return hgvsCompare;
+    return (a.id || 0) - (b.id || 0);
+  });
+  const overlay = document.createElement('div');
+  overlay.className = 'variant-picker-overlay';
+  overlay.innerHTML = `
+    <div class="variant-picker" role="dialog" aria-modal="true" aria-label="Vælg variant fra bibliotek">
+      <header>
+        <h3>Vælg variant fra bibliotek</h3>
+        <button type="button" class="secondary" data-action="close">Luk</button>
+      </header>
+      <div class="picker-body">
+        <label class="inline">Søg
+          <input type="search" placeholder="Filtrer på gen, HGVS eller kriterier">
+        </label>
+        <p class="form-hint">Klik på en variant for at kopiere oplysningerne til formularen.</p>
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Gen</th><th>Transkript</th><th>HGVS c.</th><th>HGVS p.</th><th>Klasse</th><th>Kriterier</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>`;
+  const previousOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+  document.body.appendChild(overlay);
+  const dialog = overlay.querySelector('.variant-picker');
+  const searchInput = overlay.querySelector('input[type="search"]');
+  const tbody = overlay.querySelector('tbody');
+  const closeBtn = overlay.querySelector('[data-action="close"]');
+  const cleanup = () => {
+    document.body.style.overflow = previousOverflow;
+    overlay.remove();
+    document.removeEventListener('keydown', onKeyDown, true);
+  };
+  const onKeyDown = evt => {
+    if (evt.key === 'Escape') {
+      evt.preventDefault();
+      cleanup();
+    }
+  };
+  document.addEventListener('keydown', onKeyDown, true);
+  const handleSelect = id => {
+    const variant = sorted.find(item => item.id === id);
+    if (!variant) return;
+    if (onSelect) onSelect({...variant});
+    cleanup();
+  };
+  const renderRows = () => {
+    const term = (searchInput?.value || '').trim().toLowerCase();
+    const filtered = sorted.filter(item => {
+      if (!term) return true;
+      return [item.gene, item.transcript, item.hgvs_c, item.hgvs_p, item.criteria, item.evidence]
+        .some(value => (value || '').toLowerCase().includes(term));
+    });
+    if (!filtered.length) {
+      tbody.innerHTML = '<tr><td colspan="7"><div class="variant-picker-empty">Ingen varianter matcher søgningen.</div></td></tr>';
+      return;
+    }
+    tbody.innerHTML = filtered.map(item => `
+      <tr tabindex="0" data-id="${item.id}">
+        <td>${esc(item.id)}</td>
+        <td>${esc(item.gene)}</td>
+        <td>${esc(item.transcript || '')}</td>
+        <td>${esc(item.hgvs_c || '')}</td>
+        <td>${esc(item.hgvs_p || '')}</td>
+        <td>${esc(item.classification || '')}</td>
+        <td>${esc(item.criteria || '')}</td>
+      </tr>`).join('');
+    annotateTableCells(dialog);
+  };
+  renderRows();
+  annotateHeaders(dialog);
+  applyButtonTooltips(dialog);
+  overlay.addEventListener('click', evt => {
+    if (evt.target === overlay) cleanup();
+  });
+  closeBtn?.addEventListener('click', cleanup);
+  searchInput?.addEventListener('input', renderRows);
+  tbody.addEventListener('click', evt => {
+    const tr = evt.target.closest('tr[data-id]');
+    if (!tr) return;
+    handleSelect(Number(tr.dataset.id));
+  });
+  tbody.addEventListener('keydown', evt => {
+    if (evt.key === 'Enter' || evt.key === ' ') {
+      evt.preventDefault();
+      const tr = evt.target.closest('tr[data-id]');
+      if (tr) handleSelect(Number(tr.dataset.id));
+    }
+  });
+  setTimeout(() => searchInput?.focus(), 50);
 }
 function initFamilyCombos(root) {
   if (!root) return;
@@ -1900,6 +2083,7 @@ function renderCreateCase(section) {
       <label class="inline">Kriterier<input type="text" data-field="criteria" placeholder="PM1,PP3"></label>
       <label class="inline">Allelfrekvens<input type="number" step="0.0001" data-field="af" placeholder="0.125"></label>
       <label class="inline wide">Tolkning<textarea class="small" data-field="interpretation" placeholder="Kort tolkning"></textarea></label>
+      <button type="button" class="secondary case-choose-library">Vælg fra bibliotek</button>
       <button type="button" class="secondary case-remove-row">Fjern</button>`;
     const setValue = (selector, value) => {
       const el = row.querySelector(selector);
@@ -1924,6 +2108,23 @@ function renderCreateCase(section) {
     const removeBtn = row.querySelector('.case-remove-row');
     removeBtn?.addEventListener('click', () => row.remove());
     if (removeBtn) setTooltip(removeBtn, 'Fjern varianten fra oprettelsen.');
+    const libraryBtn = row.querySelector('.case-choose-library');
+    libraryBtn?.addEventListener('click', () => {
+      openVariantLibraryPicker(variant => {
+        setValue('[data-field="gene"]', variant.gene);
+        setValue('[data-field="transcript"]', variant.transcript);
+        setValue('[data-field="hgvs_c"]', variant.hgvs_c);
+        setValue('[data-field="hgvs_p"]', variant.hgvs_p);
+        setValue('[data-field="criteria"]', variant.criteria);
+        const classField = row.querySelector('[data-field="classification"]');
+        if (classField && variant.classification != null && variant.classification !== '') {
+          classField.value = String(variant.classification);
+        }
+        const interpretationField = row.querySelector('[data-field="interpretation"]');
+        if (interpretationField) interpretationField.value = variant.evidence || variant.interpretation || '';
+      });
+    });
+    if (libraryBtn) setTooltip(libraryBtn, 'Vælg en variant fra biblioteket.');
     variantList.appendChild(row);
     applyButtonTooltips(row);
   };
@@ -3172,6 +3373,7 @@ function renderVariants(section) {
             <button class="secondary" type="submit" id="variantSaveNew" data-action="create" hidden>Gem som ny</button>
             <button class="secondary" type="button" id="variantClear">Ny</button>
             <button class="danger" type="button" id="variantDelete">Slet</button>
+            <button class="secondary" type="button" id="variantFromLibrary">Fra bibliotek</button>
             <button class="secondary" type="button" id="variantToLibrary">Til bibliotek</button>
           </div>
         </form>
@@ -3297,6 +3499,20 @@ function renderVariants(section) {
       await deleteRecord('variants', id);
       renderTab('variants');
     }
+  });
+  section.querySelector('#variantFromLibrary').addEventListener('click', () => {
+    openVariantLibraryPicker(variant => {
+      if (!form) return;
+      if (form.elements.gene) form.elements.gene.value = variant.gene || '';
+      if (form.elements.transcript) form.elements.transcript.value = variant.transcript || '';
+      if (form.elements.hgvs_c) form.elements.hgvs_c.value = variant.hgvs_c || '';
+      if (form.elements.hgvs_p) form.elements.hgvs_p.value = variant.hgvs_p || '';
+      if (form.elements.criteria) form.elements.criteria.value = variant.criteria || '';
+      if (form.elements.interpretation) form.elements.interpretation.value = variant.evidence || variant.interpretation || '';
+      if (form.elements.classification && variant.classification != null && variant.classification !== '') {
+        form.elements.classification.value = String(variant.classification);
+      }
+    });
   });
   section.querySelector('#variantClear').addEventListener('click', () => {
     const orderValue = form.elements.order_id.value;
