@@ -3985,7 +3985,7 @@ function createZip(files) {
   offset += 22;
   return buffer.slice(0, offset);
 }
-async function generateSqlDump() {{
+async function generateSqlDump() {
   const createStatements = `SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS=0;
 CREATE TABLE IF NOT EXISTS \`patients\` (
@@ -4132,22 +4132,34 @@ CREATE TABLE IF NOT EXISTS \`audit_log\` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`;
   const rows = await exportData();
   const inserts = [];
-  const mapTable = {{
-    patients:'patients', users:'users', samples:'samples', panels:'panels', orders:'orders', reports:'reports', qc:'qc_metrics', variants:'variants', variant_library:'variant_library', responses:'responses', audit:'audit_log'
-  }};
-  for (const [store, table] of Object.entries(mapTable)) {{
+  const mapTable = {
+    patients: 'patients',
+    users: 'users',
+    samples: 'samples',
+    panels: 'panels',
+    orders: 'orders',
+    reports: 'reports',
+    qc: 'qc_metrics',
+    variants: 'variants',
+    variant_library: 'variant_library',
+    responses: 'responses',
+    audit: 'audit_log'
+  };
+  for (const [store, table] of Object.entries(mapTable)) {
     const data = rows[store] || [];
     if (!data.length) continue;
     const fields = schemaFields[store];
-    const values = data.map(row => `(${fields.map(field => sqlValue(row[field])).join(',')})`).join('
-');
-    inserts.push(`INSERT INTO \`${{table}}\` (${fields.map(f => `\`${{f}}\``).join(',')}) VALUES
-${{values}};`);
-  }}
-  return createStatements + inserts.join('
-') + '
-';
-}}
+    const fieldList = fields.map(f => `\`${f}\``).join(',');
+    const values = data
+      .map(row => `(${fields.map(field => sqlValue(row[field])).join(',')})`)
+      .join(',\n');
+    inserts.push(
+      `INSERT INTO \`${table}\` (${fieldList}) VALUES\n${values};`
+    );
+  }
+  return createStatements + inserts.join('\n\n') + '\n';
+}
+
 
 function sqlValue(val) {
   if (val === null || val === undefined || val === '') return 'NULL';
