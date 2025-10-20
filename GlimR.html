@@ -376,6 +376,92 @@ input[type="search"] {
 .filterable-select select {
   max-height: 220px;
 }
+.report-variant-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: flex-end;
+  margin-top: 0.4rem;
+}
+.report-variant-selector .filterable-select {
+  flex: 1 1 260px;
+  margin-top: 0;
+}
+.report-variant-list {
+  margin-top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.report-variant-item {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 0.65rem;
+  padding: 0.6rem 0.75rem;
+  box-shadow: inset 0 1px 0 rgba(15, 27, 45, 0.04);
+}
+[data-theme="dark"] .report-variant-item {
+  background: rgba(15, 23, 42, 0.45);
+}
+.report-variant-item header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+.report-variant-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.8rem;
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted-text);
+}
+.report-variant-meta strong {
+  font-weight: 600;
+}
+.report-variant-item p {
+  margin: 0.35rem 0 0;
+}
+.report-variant-remove {
+  background: none;
+  border: none;
+  color: var(--danger);
+  cursor: pointer;
+  padding: 0.15rem 0.35rem;
+  border-radius: 0.4rem;
+  font-size: 0.85rem;
+}
+.report-variant-remove:hover,
+.report-variant-remove:focus {
+  text-decoration: underline;
+}
+.report-variant-empty {
+  color: var(--muted-text);
+  font-style: italic;
+  font-size: 0.9rem;
+}
+.report-variant-detail {
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  border-left: 3px solid var(--accent);
+  border-radius: 0.6rem;
+  background: var(--panel-bg);
+}
+[data-theme="dark"] .report-variant-detail {
+  background: rgba(15, 23, 42, 0.45);
+}
+.report-variant-detail h3 {
+  margin: 0;
+}
+.report-variant-detail ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.2rem;
+}
+.report-variant-detail p {
+  margin: 0.5rem 0 0;
+}
 .family-combo {
   display: flex;
   gap: 0.4rem;
@@ -581,7 +667,7 @@ const schemaFields = {
   orders: ['id','patient_id','sample_id','panel_id','analysis_responsible_id','interpreter_id','approver_id','clinician','status','ordered_at','created_by','created_at','updated_at'],
   variants: ['id','order_id','gene','transcript','hgvs_c','hgvs_p','zygosity','classification','criteria','af','interpretation','created_by','created_at','updated_at'],
   qc: ['id','sample_id','metric','value','unit','notes','created_by','created_at','updated_at'],
-  reports: ['id','order_id','findings','summary','status','issued_at','created_by','created_at','updated_at'],
+  reports: ['id','order_id','findings','variant_ids','variant_details','summary','status','issued_at','created_by','created_at','updated_at'],
   users: ['id','name','email','role','pin','created_at','updated_at'],
   audit: ['id','ts','user','action','entity','entity_id','before','after','created_at','updated_at'],
   variant_library: ['id','gene','transcript','hgvs_c','hgvs_p','classification','criteria','evidence','condition','inheritance','curated_by','last_review','created_at','updated_at'],
@@ -720,8 +806,8 @@ const tooltipCatalog = {
       order_id: 'Ordinationen som rapporten beskriver.',
       status: 'Rapportstatus (udkast, endelig eller ændret).',
       issued_at: 'Dato og tidspunkt for rapportens udsendelse.',
-      findings: 'Detaljerede fund til rapportens bilag.',
-      summary: 'Kort klinisk resumé til modtageren.'
+      variant_ids: 'Tilføj de registrerede varianter, der skal indgå i rapporten.',
+      summary: 'Kort konklusion til modtageren.'
     },
     qcForm: {
       sample_id: 'Vælg den prøve QC-målingen relaterer til.',
@@ -780,6 +866,7 @@ const tooltipCatalog = {
     reportClear: 'Ryd formularen for at skrive en ny rapport.',
     reportDelete: 'Slet den valgte rapport.',
     reportPreview: 'Åbn rapporten i en ny fane til forhåndsvisning.',
+    reportAddVariant: 'Tilføj den valgte variant til rapporten.',
     qcClear: 'Ryd formularen for at registrere en ny QC-måling.',
     qcDelete: 'Slet den valgte QC-måling.',
     userClear: 'Ryd formularen for at oprette en ny bruger.',
@@ -810,6 +897,8 @@ const tooltipCatalog = {
     fhirOrderSelect: 'Vælg hvilken ordination der skal bruges til FHIR-svar.',
     fhirImportLabel: 'Importer en modtaget FHIR JSON-fil.',
     fhirPreview: 'JSON-visning af den genererede FHIR-bundle.',
+    reportVariantSelect: 'Vælg blandt ordinationens registrerede varianter.',
+    reportVariantList: 'Varianter der er føjet til rapportens fund.',
     restoreLabel: 'Gendan databasen fra en tidligere JSON-backup.',
     schemaText: 'Viser MySQL-skema og INSERT-statements til reference.',
     patientsFilterPanel: 'Åbn avancerede filtre for at søge præcist i patientlisten.',
@@ -3270,6 +3359,77 @@ function renderVariantLibrary(section) {
     }
   });
 }
+function snapshotVariant(variant) {
+  if (!variant) {
+    return {id: null, order_id: null, gene: '', transcript: '', hgvs_c: '', hgvs_p: '', zygosity: '', classification: '', criteria: '', af: '', interpretation: ''};
+  }
+  return {
+    id: variant.id ?? null,
+    order_id: variant.order_id ?? null,
+    gene: variant.gene || '',
+    transcript: variant.transcript || '',
+    hgvs_c: variant.hgvs_c || '',
+    hgvs_p: variant.hgvs_p || '',
+    zygosity: variant.zygosity || '',
+    classification: variant.classification || '',
+    criteria: variant.criteria || '',
+    af: variant.af ?? '',
+    interpretation: variant.interpretation || ''
+  };
+}
+function parseReportVariantIds(value) {
+  if (Array.isArray(value)) {
+    return value.map(Number).filter(id => Number.isFinite(id));
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      return parseReportVariantIds(parsed);
+    } catch (err) {
+      return trimmed.split(/[^0-9]+/).map(Number).filter(id => Number.isFinite(id));
+    }
+  }
+  return [];
+}
+function getReportVariantSnapshots(report, orderId) {
+  if (!report) return [];
+  const detailsRaw = report.variant_details;
+  if (Array.isArray(detailsRaw) && detailsRaw.length) {
+    return detailsRaw.map(snapshotVariant);
+  }
+  if (typeof detailsRaw === 'string' && detailsRaw.trim()) {
+    try {
+      const parsed = JSON.parse(detailsRaw);
+      if (Array.isArray(parsed) && parsed.length) {
+        return parsed.map(snapshotVariant);
+      }
+    } catch (err) {
+      console.warn('Kunne ikke parse variant_details', err);
+    }
+  }
+  const ids = parseReportVariantIds(report.variant_ids);
+  if (!ids.length) return [];
+  const orderVariants = getCached('variants').filter(v => !orderId || v.order_id === orderId);
+  return ids.map(id => {
+    const found = orderVariants.find(v => v.id === id) || getCached('variants').find(v => v.id === id);
+    if (!found) return null;
+    return snapshotVariant(found);
+  }).filter(Boolean);
+}
+function describeVariantNarrative(variant) {
+  if (!variant) return '';
+  const nameParts = [variant.gene, variant.hgvs_c, variant.hgvs_p].filter(Boolean);
+  const summaryParts = [];
+  if (variant.classification) summaryParts.push(`Klasse ${variant.classification}`);
+  if (variant.criteria) summaryParts.push(`ACMG: ${variant.criteria}`);
+  if (variant.af !== undefined && variant.af !== null && variant.af !== '') summaryParts.push(`AF: ${variant.af}`);
+  if (variant.zygosity) summaryParts.push(`Zygositet: ${variant.zygosity}`);
+  if (variant.interpretation) summaryParts.push(variant.interpretation);
+  const title = nameParts.join(' · ');
+  return [title, summaryParts.join(' – ')].filter(Boolean).join(' – ');
+}
 function renderReports(section) {
   const list = getCached('reports');
   const orders = getCached('orders');
@@ -3309,13 +3469,28 @@ function renderReports(section) {
           </label>
           <label>Status<select name="status"><option value="draft">Udkast</option><option value="final">Endelig</option><option value="amended">Ændret</option></select></label>
           <label>Udstedt<input type="datetime-local" name="issued_at"></label>
-          <label>Fund<textarea name="findings"></textarea></label>
-          <label>Resumé<textarea name="summary"></textarea></label>
+          <label>Fund
+            <div class="report-variant-selector">
+              <div class="filterable-select">
+                <input type="search" placeholder="Filtrer varianter" data-report-variant-filter>
+                <select id="reportVariantSelect" disabled>
+                  <option value="" selected>Vælg variant</option>
+                </select>
+              </div>
+              <button class="secondary" type="button" id="reportAddVariant" disabled>Tilføj</button>
+            </div>
+          </label>
+          <div class="report-variant-list" id="reportVariantList">
+            <p class="report-variant-empty">Ingen varianter valgt.</p>
+          </div>
+          <input type="hidden" name="variant_ids" value="[]">
+          <label>Konklusion<textarea name="summary"></textarea></label>
           <div class="btn-row">
             <button class="primary" type="submit">Gem</button>
             <button class="secondary" type="button" id="reportClear">Ny</button>
             <button class="danger" type="button" id="reportDelete">Slet</button>
             <button class="secondary" type="button" id="reportPreview">Udskriv/forhåndsvis</button>
+            <button class="secondary" type="button" id="reportDownloadPdf">Hent PDF</button>
           </div>
         </form>
       </div>
@@ -3324,6 +3499,109 @@ function renderReports(section) {
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#reportSearch');
   const form = section.querySelector('#reportForm');
+  const orderSelect = form?.elements.order_id;
+  const variantSelect = form?.querySelector('#reportVariantSelect');
+  const variantFilterInput = form?.querySelector('[data-report-variant-filter]');
+  const variantAddButton = form?.querySelector('#reportAddVariant');
+  const variantList = form?.querySelector('#reportVariantList');
+  const variantIdsInput = form?.elements.variant_ids;
+  let selectedReportVariants = [];
+  let currentReportOrderId = null;
+  let variantOptionState = [];
+  const updateAddButtonState = () => {
+    if (!variantAddButton || !variantSelect) return;
+    const id = Number(variantSelect.value);
+    const exists = selectedReportVariants.some(v => v.id === id);
+    variantAddButton.disabled = variantSelect.disabled || !variantSelect.value || exists;
+  };
+  const syncVariantIdsInput = () => {
+    if (!variantIdsInput) return;
+    const ids = selectedReportVariants.map(v => v.id).filter(id => id != null);
+    variantIdsInput.value = JSON.stringify(ids);
+  };
+  const renderSelectedReportVariants = () => {
+    if (!variantList) return;
+    if (!selectedReportVariants.length) {
+      variantList.innerHTML = '<p class="report-variant-empty">Ingen varianter valgt.</p>';
+      return;
+    }
+    const items = selectedReportVariants.map(variant => {
+      const titleParts = [variant.gene, variant.hgvs_c, variant.hgvs_p].filter(Boolean);
+      const title = titleParts.length ? titleParts.join(' · ') : `Variant ${variant.id ?? ''}`.trim();
+      const metaParts = [];
+      if (variant.id != null) metaParts.push(`<span><strong>ID:</strong> ${esc(variant.id)}</span>`);
+      if (variant.transcript) metaParts.push(`<span><strong>Transkript:</strong> ${esc(variant.transcript)}</span>`);
+      if (variant.classification) metaParts.push(`<span><strong>Klasse:</strong> ${esc(variant.classification)}</span>`);
+      if (variant.criteria) metaParts.push(`<span><strong>ACMG:</strong> ${esc(variant.criteria)}</span>`);
+      if (variant.af !== undefined && variant.af !== null && variant.af !== '') metaParts.push(`<span><strong>AF:</strong> ${esc(variant.af)}</span>`);
+      if (variant.zygosity) metaParts.push(`<span><strong>Zygositet:</strong> ${esc(variant.zygosity)}</span>`);
+      const metaHtml = metaParts.length ? `<div class="report-variant-meta">${metaParts.join('')}</div>` : '';
+      const interpretationHtml = variant.interpretation ? `<p>${esc(variant.interpretation)}</p>` : '';
+      return `<div class="report-variant-item" data-variant-id="${variant.id}"><header><span>${esc(title)}</span><button type="button" class="report-variant-remove" data-action="remove" data-variant-id="${variant.id}">Fjern</button></header>${metaHtml}${interpretationHtml}</div>`;
+    }).join('');
+    variantList.innerHTML = items;
+  };
+  const setSelectedReportVariants = variants => {
+    selectedReportVariants = (variants || []).map(v => ({...v}));
+    syncVariantIdsInput();
+    renderSelectedReportVariants();
+    updateAddButtonState();
+  };
+  const buildVariantOptionLabel = variant => {
+    const parts = [variant.gene, variant.hgvs_c, variant.hgvs_p].filter(Boolean);
+    if (parts.length) return parts.join(' · ');
+    return `Variant ${variant.id}`;
+  };
+  const applyVariantFilter = () => {
+    if (!variantFilterInput) return;
+    const term = variantFilterInput.value.trim().toLowerCase();
+    variantOptionState.forEach(({option, text}) => {
+      const matches = !term || text.includes(term) || option.selected;
+      option.hidden = !matches;
+    });
+    if (term && variantSelect) {
+      const firstVisible = variantOptionState.find(({option}) => !option.hidden);
+      if (firstVisible && !firstVisible.option.selected) {
+        variantSelect.value = firstVisible.option.value;
+      }
+    }
+    updateAddButtonState();
+  };
+  const refreshVariantOptions = () => {
+    if (!variantSelect) return;
+    const orderId = Number(orderSelect?.value || '');
+    currentReportOrderId = Number.isFinite(orderId) && orderId ? orderId : null;
+    variantOptionState = [];
+    variantSelect.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Vælg variant';
+    variantSelect.appendChild(placeholder);
+    if (!currentReportOrderId) {
+      variantSelect.disabled = true;
+      if (variantFilterInput) {
+        variantFilterInput.value = '';
+        variantFilterInput.disabled = true;
+      }
+      updateAddButtonState();
+      return;
+    }
+    const variantsForOrder = getCached('variants').filter(v => v.order_id === currentReportOrderId);
+    variantsForOrder.forEach(variant => {
+      const option = document.createElement('option');
+      option.value = variant.id;
+      option.textContent = buildVariantOptionLabel(variant);
+      variantSelect.appendChild(option);
+      variantOptionState.push({option, text: option.textContent.toLowerCase()});
+    });
+    variantSelect.disabled = variantsForOrder.length === 0;
+    if (variantFilterInput) {
+      variantFilterInput.value = '';
+      variantFilterInput.disabled = variantsForOrder.length === 0;
+    }
+    variantSelect.value = '';
+    applyVariantFilter();
+  };
   const filterInputs = {
     id: section.querySelector('[data-filter-reports="id"]'),
     order: section.querySelector('[data-filter-reports="order"]'),
@@ -3337,6 +3615,64 @@ function renderReports(section) {
   applyControlTooltips(section);
   applyFormTooltips(form);
   applySelectFilters(section);
+  setSelectedReportVariants([]);
+  refreshVariantOptions();
+  if (variantFilterInput) {
+    variantFilterInput.addEventListener('input', applyVariantFilter);
+    variantFilterInput.addEventListener('keydown', evt => {
+      if (evt.key === 'Escape') {
+        variantFilterInput.value = '';
+        applyVariantFilter();
+      }
+    });
+  }
+  if (variantSelect) {
+    variantSelect.addEventListener('change', updateAddButtonState);
+  }
+  if (variantAddButton) {
+    variantAddButton.addEventListener('click', () => {
+      if (!variantSelect) return;
+      const id = Number(variantSelect.value);
+      if (!id || selectedReportVariants.some(v => v.id === id)) {
+        updateAddButtonState();
+        return;
+      }
+      const storeVariant = getCached('variants').find(v => v.id === id);
+      const snapshot = snapshotVariant(storeVariant || {id, order_id: currentReportOrderId || Number(orderSelect?.value) || null});
+      if (!snapshot.order_id) snapshot.order_id = currentReportOrderId || Number(orderSelect?.value) || null;
+      setSelectedReportVariants(selectedReportVariants.concat(snapshot));
+      variantSelect.value = '';
+      applyVariantFilter();
+    });
+  }
+  if (variantList) {
+    variantList.addEventListener('click', evt => {
+      const btn = evt.target.closest('[data-action="remove"]');
+      if (!btn) return;
+      const id = Number(btn.dataset.variantId);
+      if (!id) return;
+      setSelectedReportVariants(selectedReportVariants.filter(v => v.id !== id));
+      updateAddButtonState();
+    });
+  }
+  if (orderSelect) {
+    orderSelect.addEventListener('change', () => {
+      refreshVariantOptions();
+      const orderId = Number(orderSelect.value);
+      if (!orderId) {
+        setSelectedReportVariants([]);
+        return;
+      }
+      const filtered = selectedReportVariants.filter(v => Number(v.order_id) === orderId);
+      if (filtered.length !== selectedReportVariants.length) {
+        setSelectedReportVariants(filtered);
+      } else {
+        syncVariantIdsInput();
+        renderSelectedReportVariants();
+        updateAddButtonState();
+      }
+    });
+  }
   const statusMap = {draft:'Udkast', final:'Endelig', amended:'Ændret'};
   let filteredReports = list.slice();
   let activeFilters = {};
@@ -3399,12 +3735,25 @@ function renderReports(section) {
     const report = list.find(r => r.id === Number(tr.dataset.id));
     if (!report) return;
     fillForm(form, report);
+    refreshVariantOptions();
+    const variants = getReportVariantSnapshots(report, Number(report.order_id));
+    setSelectedReportVariants(variants);
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
     if (!ensureWrite('reports')) return;
     const data = Object.fromEntries(new FormData(form).entries());
     data.order_id = Number(data.order_id);
+    const orderId = data.order_id;
+    const variantStore = getCached('variants');
+    const variantSnapshots = selectedReportVariants.map(item => {
+      const source = variantStore.find(v => v.id === item.id) || item;
+      const snapshot = snapshotVariant(source);
+      if (!snapshot.order_id) snapshot.order_id = orderId || item.order_id || currentReportOrderId || null;
+      return snapshot;
+    });
+    data.variant_ids = JSON.stringify(variantSnapshots.map(v => v.id).filter(id => id != null));
+    data.variant_details = variantSnapshots;
     if (data.id) {
       const id = Number(data.id);
       const before = {...findById('reports', id)};
@@ -3426,28 +3775,91 @@ function renderReports(section) {
       renderTab('reports');
     }
   });
-  section.querySelector('#reportClear').addEventListener('click', () => form.reset());
+  section.querySelector('#reportClear').addEventListener('click', () => {
+    form.reset();
+    setSelectedReportVariants([]);
+    refreshVariantOptions();
+  });
   section.querySelector('#reportPreview').addEventListener('click', () => {
     const data = Object.fromEntries(new FormData(form).entries());
     if (!data.order_id) return alert('Vælg ordre');
-    const html = buildReportHtml(Number(data.order_id), data);
+    const orderId = Number(data.order_id);
+    data.order_id = orderId;
+    const variantStore = getCached('variants');
+    const variantSnapshots = selectedReportVariants.map(item => {
+      const source = variantStore.find(v => v.id === item.id) || item;
+      const snapshot = snapshotVariant(source);
+      if (!snapshot.order_id) snapshot.order_id = orderId || item.order_id || currentReportOrderId || null;
+      return snapshot;
+    });
+    data.variant_details = variantSnapshots;
+    data.variant_ids = JSON.stringify(variantSnapshots.map(v => v.id).filter(id => id != null));
+    const html = buildReportHtml(orderId, data);
     const win = window.open('', '_blank');
     if (win) {
       win.document.write('<!DOCTYPE html><html><head><title>Rapport</title><style>body{font-family:Segoe UI,Arial;margin:2rem;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ccc;padding:0.4rem;}th{background:#f0f0f0;}</style></head><body>' + html + '</body></html>');
       win.document.close();
     }
   });
+  const downloadPdfButton = section.querySelector('#reportDownloadPdf');
+  if (downloadPdfButton) {
+    downloadPdfButton.addEventListener('click', async () => {
+      const data = Object.fromEntries(new FormData(form).entries());
+      if (!data.order_id) {
+        alert('Vælg ordre');
+        return;
+      }
+      const orderId = Number(data.order_id);
+      data.order_id = orderId;
+      const variantStore = getCached('variants');
+      const variantSnapshots = selectedReportVariants.map(item => {
+        const source = variantStore.find(v => v.id === item.id) || item;
+        const snapshot = snapshotVariant(source);
+        if (!snapshot.order_id) snapshot.order_id = orderId || item.order_id || currentReportOrderId || null;
+        return snapshot;
+      });
+      data.variant_details = variantSnapshots;
+      data.variant_ids = JSON.stringify(variantSnapshots.map(v => v.id).filter(id => id != null));
+      const exportedAt = new Date();
+      const blob = await createReportPdfBlob(orderId, data, exportedAt);
+      if (!blob) {
+        alert('Kunne ikke generere PDF for rapporten.');
+        return;
+      }
+      const filename = buildReportPdfFilename(orderId, data, exportedAt);
+      const url = URL.createObjectURL(blob);
+      triggerDownload(url, filename);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setStatus(`Rapport PDF hentet som ${filename}.`);
+    });
+  }
 }
 function buildReportHtml(orderId, reportData) {
   const order = findById('orders', orderId);
   const patient = order ? findById('patients', Number(order.patient_id)) : null;
   const sample = order ? findById('samples', Number(order.sample_id)) : null;
-  const variants = getCached('variants').filter(v => v.order_id === orderId);
+  let variants = getReportVariantSnapshots(reportData, orderId);
+  if (!variants.length) {
+    variants = getCached('variants').filter(v => v.order_id === orderId).map(snapshotVariant);
+  }
   const sampleIdentifierParts = [];
   if (sample?.pmb_number) sampleIdentifierParts.push(sample.pmb_number);
   if (sample?.id != null) sampleIdentifierParts.push(`ID ${sample.id}`);
   const sampleIdentifier = sampleIdentifierParts.join(' / ');
   const rows = variants.map(v => `<tr><td>${esc(v.gene)}</td><td>${esc(v.hgvs_c||'')}</td><td>${esc(v.hgvs_p||'')}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(v.af??'')}</td><td>${esc(v.interpretation||'')}</td></tr>`).join('') || '<tr><td colspan="7">Ingen fund</td></tr>';
+  const detailSections = variants.length ? variants.map(variant => {
+    const headingParts = [variant.gene, variant.hgvs_c, variant.hgvs_p].filter(Boolean);
+    const heading = headingParts.length ? headingParts.join(' · ') : `Variant ${variant.id ?? ''}`.trim();
+    const meta = [];
+    if (variant.transcript) meta.push(`<li><strong>Transkript:</strong> ${esc(variant.transcript)}</li>`);
+    if (variant.zygosity) meta.push(`<li><strong>Zygositet:</strong> ${esc(variant.zygosity)}</li>`);
+    if (variant.classification) meta.push(`<li><strong>Klasse:</strong> ${esc(variant.classification)}</li>`);
+    if (variant.criteria) meta.push(`<li><strong>ACMG:</strong> ${esc(variant.criteria)}</li>`);
+    if (variant.af !== undefined && variant.af !== null && variant.af !== '') meta.push(`<li><strong>AF:</strong> ${esc(variant.af)}</li>`);
+    const interpretation = variant.interpretation ? `<p>${esc(variant.interpretation)}</p>` : '';
+    const metaList = meta.length ? `<ul>${meta.join('')}</ul>` : '';
+    return `<div class="report-variant-detail"><h3>${esc(heading)}</h3>${metaList}${interpretation}</div>`;
+  }).join('') : '<p>Ingen variantdetaljer registreret.</p>';
   return `
   <h1>Diagnostisk rapport</h1>
   <p><strong>Ordination:</strong> ${orderId}</p>
@@ -3455,12 +3867,629 @@ function buildReportHtml(orderId, reportData) {
   <p><strong>Prøve:</strong> ${esc(sample?.sample_type||'')}${sampleIdentifier ? ` (${esc(sampleIdentifier)})` : ''}</p>
   <p><strong>Status:</strong> ${esc(reportData.status||'')}</p>
   <p><strong>Udstedt:</strong> ${esc(reportData.issued_at||'')}</p>
-  <h2>Resumé</h2>
+  <h2>Konklusion</h2>
   <p>${esc(reportData.summary||'')}</p>
   <h2>Fund</h2>
   <table><thead><tr><th>Gen</th><th>HGVS c.</th><th>HGVS p.</th><th>Klasse</th><th>ACMG</th><th>AF</th><th>Tolkning</th></tr></thead><tbody>${rows}</tbody></table>
   <h2>Detaljer</h2>
-  <pre>${esc(reportData.findings||'')}</pre>`;
+  ${detailSections}`;
+}
+function escapePdfText(text) {
+  return String(text || '').replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)').replace(/\r/g, '').replace(/\n/g, '\\n');
+}
+function stringToPdfBytes(str) {
+  const bytes = new Uint8Array(str.length);
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    bytes[i] = code <= 0xFF ? code : 0x3F;
+  }
+  return bytes;
+}
+const PDF_PAGE_WIDTH = 595;
+const PDF_PAGE_HEIGHT = 842;
+const PDF_MARGIN = 48;
+const PDF_GUTTER = 28;
+const PDF_BODY_FONT_SIZE = 11;
+const PDF_HEADING_FONT_SIZE = 13;
+const PDF_TITLE_FONT_SIZE = 20;
+const PDF_BODY_LEADING = 16;
+const PDF_HEADING_LEADING = 20;
+const PDF_HEADING_GAP = 6;
+const PDF_SECTION_SPACING = 16;
+const PDF_ROW_SPACING = 6;
+const PDF_SIGNATURE_BLOCK_HEIGHT = 110;
+const PDF_TITLE_LEADING = 28;
+const PDF_SECTION_CARD_PADDING_X = 14;
+const PDF_SECTION_CARD_PADDING_TOP = 12;
+const PDF_SECTION_CARD_PADDING_BOTTOM = 14;
+const PDF_SECTION_CARD_INSET = 6;
+const PDF_CARD_HEADING_BAR_HEIGHT = 24;
+const PDF_HEADER_BAND_HEIGHT = 96;
+const PDF_TEXT_COLOR = '#1b2c45';
+const PDF_MUTED_TEXT_COLOR = '#4a6080';
+const PDF_HEADING_TEXT_COLOR = '#124c87';
+const PDF_ACCENT_COLOR = '#124c87';
+const PDF_HEADER_BAND_COLOR = '#e5effb';
+const PDF_CARD_BACKGROUND_COLOR = '#f9fbff';
+const PDF_CARD_BORDER_COLOR = '#c5d7ed';
+const PDF_CARD_HEADING_COLOR = '#cfe0f6';
+const PDF_SIGNATURE_BAND_COLOR = '#ecf2fb';
+const PDF_SIGNATURE_LINE_COLOR = '#8ea8c7';
+const PT_TO_PX = 96 / 72;
+
+function pdfColorToRgb(color) {
+  if (!color) return null;
+  if (Array.isArray(color) && color.length >= 3) {
+    return color.slice(0, 3).map(component => Math.max(0, Math.min(1, Number(component) || 0))).join(' ');
+  }
+  if (typeof color === 'string') {
+    let hex = color.trim();
+    if (hex.startsWith('#')) hex = hex.slice(1);
+    if (hex.length === 3) {
+      hex = hex.split('').map(ch => ch + ch).join('');
+    }
+    if (hex.length === 6) {
+      const r = parseInt(hex.slice(0, 2), 16) / 255;
+      const g = parseInt(hex.slice(2, 4), 16) / 255;
+      const b = parseInt(hex.slice(4, 6), 16) / 255;
+      return [r, g, b].map(v => v.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')).join(' ');
+    }
+  }
+  return null;
+}
+
+let pdfMeasureCtx = null;
+
+function getPdfMeasureContext(fontSize) {
+  if (!pdfMeasureCtx) {
+    const canvas = document.createElement('canvas');
+    pdfMeasureCtx = canvas.getContext('2d');
+  }
+  if (pdfMeasureCtx) {
+    pdfMeasureCtx.font = `${(fontSize * PT_TO_PX).toFixed(2)}px "Arial", "Helvetica", sans-serif`;
+  }
+  return pdfMeasureCtx;
+}
+
+function wrapPdfText(text, maxWidth, fontSize) {
+  const ctx = getPdfMeasureContext(fontSize);
+  if (!ctx) return [String(text ?? '')];
+  const maxWidthPx = maxWidth * PT_TO_PX;
+  const paragraphs = String(text ?? '').replace(/\r/g, '').split('\n');
+  const lines = [];
+  for (let p = 0; p < paragraphs.length; p++) {
+    const paragraph = paragraphs[p];
+    const words = paragraph.trim() ? paragraph.split(/\s+/) : [];
+    if (!words.length) {
+      if (p < paragraphs.length - 1) lines.push('');
+      continue;
+    }
+    let current = '';
+    const flush = () => {
+      if (current) {
+        lines.push(current);
+        current = '';
+      }
+    };
+    for (const word of words) {
+      const candidate = current ? `${current} ${word}` : word;
+      if (ctx.measureText(candidate).width <= maxWidthPx) {
+        current = candidate;
+        continue;
+      }
+      flush();
+      if (ctx.measureText(word).width <= maxWidthPx) {
+        current = word;
+        continue;
+      }
+      let segment = '';
+      for (const char of word) {
+        const attempt = segment + char;
+        if (ctx.measureText(attempt).width > maxWidthPx && segment) {
+          lines.push(segment);
+          segment = char;
+        } else {
+          segment = attempt;
+        }
+      }
+      current = segment;
+    }
+    flush();
+    if (p < paragraphs.length - 1) lines.push('');
+  }
+  if (!lines.length) lines.push('');
+  return lines;
+}
+
+function indentWrappedLines(lines, indentText) {
+  if (!indentText) return lines;
+  return lines.map((line, index) => (index === 0 ? `${indentText}${line}` : `${indentText}${line}`));
+}
+
+class SimplePdfBuilder {
+  constructor() {
+    this.width = PDF_PAGE_WIDTH;
+    this.height = PDF_PAGE_HEIGHT;
+    this.margin = PDF_MARGIN;
+    this.pages = [];
+    this.images = [];
+    this.currentPage = null;
+  }
+  startPage() {
+    const page = {ops: [], imageNames: new Set()};
+    this.pages.push(page);
+    this.currentPage = page;
+    return page;
+  }
+  ensurePage() {
+    if (!this.currentPage) this.startPage();
+  }
+  addText(text, x, y, fontSize = PDF_BODY_FONT_SIZE, color = null) {
+    this.ensurePage();
+    const fill = pdfColorToRgb(color || PDF_TEXT_COLOR);
+    const colorPart = fill ? `${fill} rg\n` : '';
+    this.currentPage.ops.push(`BT\n${colorPart}/F1 ${fontSize.toFixed(2)} Tf\n1 0 0 1 ${x.toFixed(2)} ${y.toFixed(2)} Tm (${escapePdfText(text)}) Tj\nET`);
+  }
+  addLine(x1, y1, x2, y2, width = 1, color = null) {
+    this.ensurePage();
+    const stroke = pdfColorToRgb(color || PDF_ACCENT_COLOR);
+    const colorPart = stroke ? `${stroke} RG ` : '';
+    this.currentPage.ops.push(`q ${colorPart}${width.toFixed(2)} w ${x1.toFixed(2)} ${y1.toFixed(2)} m ${x2.toFixed(2)} ${y2.toFixed(2)} l S Q`);
+  }
+  fillRect(x, y, width, height, color = null) {
+    this.ensurePage();
+    const fill = pdfColorToRgb(color);
+    const colorPart = fill ? `${fill} rg ` : '';
+    this.currentPage.ops.push(`q ${colorPart}${x.toFixed(2)} ${y.toFixed(2)} ${width.toFixed(2)} ${height.toFixed(2)} re f Q`);
+  }
+  strokeRect(x, y, width, height, lineWidth = 1, color = null) {
+    this.ensurePage();
+    const stroke = pdfColorToRgb(color || PDF_CARD_BORDER_COLOR);
+    const colorPart = stroke ? `${stroke} RG ` : '';
+    this.currentPage.ops.push(`q ${colorPart}${lineWidth.toFixed(2)} w ${x.toFixed(2)} ${y.toFixed(2)} ${width.toFixed(2)} ${height.toFixed(2)} re S Q`);
+  }
+  registerImage(image) {
+    const name = `Im${this.images.length + 1}`;
+    this.images.push({...image, name});
+    return name;
+  }
+  drawImage(name, x, y, width, height) {
+    this.ensurePage();
+    this.currentPage.imageNames.add(name);
+    this.currentPage.ops.push(`q ${width.toFixed(2)} 0 0 ${height.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)} cm /${name} Do Q`);
+  }
+  build() {
+    if (!this.pages.length) this.startPage();
+    const pageCount = this.pages.length;
+    let pdf = '%PDF-1.4\n';
+    const offsets = [0];
+    const addObject = str => {
+      offsets.push(pdf.length);
+      pdf += str;
+    };
+    const kids = this.pages.map((_, idx) => `${3 + idx} 0 R`).join(' ');
+    addObject('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+    addObject(`2 0 obj\n<< /Type /Pages /Count ${pageCount} /Kids [${kids}] >>\nendobj\n`);
+    const fontObjNumber = 3 + pageCount * 2;
+    const imageStart = fontObjNumber + 1;
+    this.images.forEach((image, index) => {
+      image.objectNumber = imageStart + index;
+    });
+    const contentObjects = [];
+    this.pages.forEach((page, idx) => {
+      const pageObjNumber = 3 + idx;
+      const contentObjNumber = 3 + pageCount + idx;
+      const resourceParts = [`/Font << /F1 ${fontObjNumber} 0 R >>`];
+      if (page.imageNames.size) {
+        const entries = [];
+        page.imageNames.forEach(name => {
+          const image = this.images.find(img => img.name === name);
+          if (image) entries.push(`/${name} ${image.objectNumber} 0 R`);
+        });
+        if (entries.length) resourceParts.push(`/XObject << ${entries.join(' ')} >>`);
+      }
+      addObject(`${pageObjNumber} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${this.width} ${this.height}] /Contents ${contentObjNumber} 0 R /Resources << ${resourceParts.join(' ')} >> >>\nendobj\n`);
+      const content = page.ops.join('\n');
+      contentObjects.push({number: contentObjNumber, content});
+    });
+    contentObjects.forEach(obj => {
+      addObject(`${obj.number} 0 obj\n<< /Length ${obj.content.length} >>\nstream\n${obj.content}\nendstream\nendobj\n`);
+    });
+    addObject(`${fontObjNumber} 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n`);
+    this.images.forEach(image => {
+      const filter = image.filter || '/DCTDecode';
+      const colorSpace = image.colorSpace || '/DeviceRGB';
+      addObject(`${image.objectNumber} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} /ColorSpace ${colorSpace} /BitsPerComponent ${image.bitsPerComponent || 8} /Filter ${filter} /Length ${image.dataString.length} >>\nstream\n${image.dataString}\nendstream\nendobj\n`);
+    });
+    const totalObjects = fontObjNumber + this.images.length;
+    const xrefOffset = pdf.length;
+    pdf += `xref\n0 ${totalObjects + 1}\n0000000000 65535 f \n`;
+    for (let i = 1; i <= totalObjects; i++) {
+      const offset = offsets[i] || 0;
+      pdf += `${String(offset).padStart(10, '0')} 00000 n \n`;
+    }
+    pdf += `trailer\n<< /Size ${totalObjects + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+    return stringToPdfBytes(pdf);
+  }
+}
+
+function bytesToBinaryString(bytes) {
+  let result = '';
+  for (let i = 0; i < bytes.length; i++) {
+    result += String.fromCharCode(bytes[i]);
+  }
+  return result;
+}
+
+function base64ToUint8Array(base64) {
+  const binary = atob(base64);
+  const length = binary.length;
+  const bytes = new Uint8Array(length);
+  for (let i = 0; i < length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+async function loadReportLogoImage() {
+  if (loadReportLogoImage.cache !== undefined) {
+    return loadReportLogoImage.cache;
+  }
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const element = new Image();
+      element.onload = () => resolve(element);
+      element.onerror = reject;
+      element.src = `logo.png?ts=${Date.now()}`;
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    const base64 = dataUrl.split(',')[1];
+    const bytes = base64ToUint8Array(base64);
+    loadReportLogoImage.cache = {
+      width: img.naturalWidth,
+      height: img.naturalHeight,
+      data: bytes,
+      dataString: bytesToBinaryString(bytes),
+      bitsPerComponent: 8,
+      filter: '/DCTDecode',
+      colorSpace: '/DeviceRGB'
+    };
+  } catch (err) {
+    console.warn('Kunne ikke indlæse logo til PDF', err);
+    loadReportLogoImage.cache = null;
+  }
+  return loadReportLogoImage.cache;
+}
+
+function drawReportHeader(builder, logo, exportedAt) {
+  const margin = builder.margin;
+  const pageHeight = builder.height;
+  const titleBaseline = pageHeight - margin - 12;
+  const headerBottom = pageHeight - margin - PDF_HEADER_BAND_HEIGHT;
+  builder.fillRect(0, headerBottom, builder.width, PDF_HEADER_BAND_HEIGHT, PDF_HEADER_BAND_COLOR);
+  let imageWidth = 0;
+  let imageHeight = 0;
+  if (logo) {
+    if (!logo.objectName) {
+      logo.objectName = builder.registerImage({
+        width: logo.width,
+        height: logo.height,
+        dataString: logo.dataString,
+        bitsPerComponent: logo.bitsPerComponent,
+        filter: logo.filter,
+        colorSpace: logo.colorSpace
+      });
+    }
+    const targetHeight = 52;
+    const aspect = logo.width && logo.height ? logo.width / logo.height : 1;
+    imageHeight = Math.min(targetHeight, pageHeight - margin - 120);
+    imageWidth = imageHeight * aspect;
+    const imageY = pageHeight - margin - imageHeight;
+    builder.drawImage(logo.objectName, margin, imageY, imageWidth, imageHeight);
+  }
+  const titleX = imageWidth ? margin + imageWidth + 24 : margin + PDF_SECTION_CARD_PADDING_X;
+  builder.addText('Diagnostisk Rapport', titleX, titleBaseline, PDF_TITLE_FONT_SIZE, PDF_ACCENT_COLOR);
+  const dateFormatter = drawReportHeader.dateFormatter || new Intl.DateTimeFormat('da-DK');
+  drawReportHeader.dateFormatter = dateFormatter;
+  const dateLabel = dateFormatter.format(exportedAt || new Date());
+  const dateWidth = measurePdfTextWidth(dateLabel, 12);
+  const dateX = builder.width - margin - dateWidth;
+  builder.addText(dateLabel, dateX, titleBaseline, 12, PDF_MUTED_TEXT_COLOR);
+  builder.addLine(margin, headerBottom + 6, builder.width - margin, headerBottom + 6, 1.1, PDF_ACCENT_COLOR);
+  const contentStart = Math.min(titleBaseline - PDF_TITLE_LEADING, pageHeight - margin - imageHeight - 38);
+  return {contentTop: contentStart};
+}
+
+function measurePdfTextWidth(text, fontSize) {
+  const ctx = getPdfMeasureContext(fontSize);
+  if (!ctx) return String(text || '').length * fontSize * 0.5;
+  return ctx.measureText(String(text || '')).width * (72 / 96);
+}
+
+function buildSectionLayout(heading, rows, width) {
+  const contentWidth = Math.max(10, width - PDF_SECTION_CARD_PADDING_X * 2);
+  const layout = {
+    heading,
+    width,
+    contentWidth,
+    blocks: [],
+    height: PDF_SECTION_CARD_PADDING_TOP + PDF_HEADING_LEADING + PDF_HEADING_GAP + PDF_SECTION_CARD_PADDING_BOTTOM + PDF_SECTION_SPACING
+  };
+  rows.forEach((row, index) => {
+    switch (row.type) {
+      case 'kv': {
+        const value = row.value !== undefined && row.value !== null && row.value !== '' ? String(row.value) : row.fallback || '-';
+        const text = `${row.label}: ${value}`;
+        const lines = wrapPdfText(text, contentWidth, PDF_BODY_FONT_SIZE);
+        layout.blocks.push({lines});
+        layout.height += lines.length * PDF_BODY_LEADING;
+        if (index < rows.length - 1) layout.height += PDF_ROW_SPACING;
+        break;
+      }
+      case 'paragraph': {
+        const label = row.label ? `${row.label}:` : '';
+        if (label) {
+          const labelLines = wrapPdfText(label, contentWidth, PDF_BODY_FONT_SIZE);
+          layout.blocks.push({lines: labelLines});
+          layout.height += labelLines.length * PDF_BODY_LEADING;
+        }
+        const bodyText = row.value ? String(row.value) : (row.emptyText || 'Ingen oplysninger.');
+        const bodyLines = wrapPdfText(bodyText, contentWidth, PDF_BODY_FONT_SIZE);
+        const indented = row.indent ? indentWrappedLines(bodyLines, row.indent) : bodyLines;
+        layout.blocks.push({lines: indented});
+        layout.height += indented.length * PDF_BODY_LEADING;
+        if (index < rows.length - 1) layout.height += PDF_ROW_SPACING;
+        break;
+      }
+      case 'text': {
+        const lines = wrapPdfText(row.text || '', contentWidth, PDF_BODY_FONT_SIZE);
+        layout.blocks.push({lines});
+        layout.height += lines.length * PDF_BODY_LEADING;
+        if (index < rows.length - 1) layout.height += PDF_ROW_SPACING;
+        break;
+      }
+      case 'list': {
+        const items = Array.isArray(row.items) ? row.items : [];
+        if (!items.length) {
+          const emptyLines = wrapPdfText(row.emptyText || 'Ingen poster.', contentWidth, PDF_BODY_FONT_SIZE);
+          layout.blocks.push({lines: emptyLines});
+          layout.height += emptyLines.length * PDF_BODY_LEADING;
+          if (index < rows.length - 1) layout.height += PDF_ROW_SPACING;
+          break;
+        }
+        items.forEach((item, idx) => {
+          const lines = wrapPdfText(item, contentWidth, PDF_BODY_FONT_SIZE);
+          layout.blocks.push({lines});
+          layout.height += lines.length * PDF_BODY_LEADING;
+          if (idx < items.length - 1) layout.height += PDF_ROW_SPACING / 2;
+        });
+        if (index < rows.length - 1) layout.height += PDF_ROW_SPACING;
+        break;
+      }
+      default:
+        break;
+    }
+  });
+  return layout;
+}
+
+function renderSection(builder, column, section) {
+  const startCursor = column.cursor;
+  const bodyHeight = section.height - PDF_SECTION_SPACING;
+  const cardBottom = startCursor - bodyHeight;
+  const cardX = column.x - PDF_SECTION_CARD_INSET;
+  const cardWidth = column.width + PDF_SECTION_CARD_INSET * 2;
+  builder.fillRect(cardX, cardBottom, cardWidth, bodyHeight, PDF_CARD_BACKGROUND_COLOR);
+  builder.strokeRect(cardX, cardBottom, cardWidth, bodyHeight, 0.8, PDF_CARD_BORDER_COLOR);
+  const headingBarBottom = startCursor - PDF_SECTION_CARD_PADDING_TOP - PDF_HEADING_FONT_SIZE - 6;
+  const headingBarHeight = PDF_CARD_HEADING_BAR_HEIGHT;
+  const headingBarY = Math.max(cardBottom, headingBarBottom);
+  const headingFillHeight = Math.min(headingBarHeight, Math.max(0, startCursor - headingBarY));
+  if (headingFillHeight > 0.1) {
+    builder.fillRect(cardX, headingBarY, cardWidth, headingFillHeight, PDF_CARD_HEADING_COLOR);
+  }
+  let cursor = startCursor - PDF_SECTION_CARD_PADDING_TOP;
+  const textX = column.x + PDF_SECTION_CARD_PADDING_X;
+  builder.addText(section.heading, textX, cursor, PDF_HEADING_FONT_SIZE, PDF_HEADING_TEXT_COLOR);
+  cursor -= (PDF_HEADING_LEADING + PDF_HEADING_GAP);
+  section.blocks.forEach((block, idx) => {
+    const lines = block.lines || [];
+    lines.forEach(line => {
+      builder.addText(line, textX, cursor, PDF_BODY_FONT_SIZE, PDF_TEXT_COLOR);
+      cursor -= PDF_BODY_LEADING;
+    });
+    if (idx < section.blocks.length - 1) cursor -= PDF_ROW_SPACING;
+  });
+  cursor -= PDF_SECTION_CARD_PADDING_BOTTOM;
+  cursor -= PDF_SECTION_SPACING;
+  column.cursor = cursor;
+}
+
+function ensureSingleColumnSpace(builder, column, neededHeight, reserveBottom) {
+  const bottomLimit = builder.margin + (reserveBottom || 0);
+  if (column.cursor - neededHeight < bottomLimit) {
+    const {logo, exportedAt} = ensureSingleColumnSpace;
+    const header = startNewReportPage(builder, logo, exportedAt);
+    column.cursor = header.contentTop;
+  }
+}
+
+function startNewReportPage(builder, logo, exportedAt) {
+  builder.startPage();
+  return drawReportHeader(builder, logo, exportedAt);
+}
+
+async function createReportPdfBlob(orderId, reportData, exportedAt = new Date()) {
+  try {
+    const order = findById('orders', orderId);
+    if (!order) return null;
+    const patient = findById('patients', Number(order.patient_id));
+    const sample = findById('samples', Number(order.sample_id));
+    const panel = order?.panel_id ? findById('panels', Number(order.panel_id)) : null;
+    const interpreterName = order?.interpreter_id ? getName('users', order.interpreter_id) : '';
+    const approverName = order?.approver_id ? getName('users', order.approver_id) : '';
+    const analysisResponsible = order?.analysis_responsible_id ? getName('users', order.analysis_responsible_id) : '';
+    const clinician = order?.clinician || '';
+    const qcEntries = sample ? getCached('qc').filter(q => Number(q.sample_id) === Number(sample.id)) : [];
+    let variants = getReportVariantSnapshots(reportData, orderId);
+    if (!variants.length) {
+      variants = getCached('variants').filter(v => Number(v.order_id) === Number(order.id)).map(snapshotVariant);
+    }
+    const builder = new SimplePdfBuilder();
+    const logo = await loadReportLogoImage();
+    const initialHeader = startNewReportPage(builder, logo, exportedAt);
+    ensureSingleColumnSpace.logo = logo;
+    ensureSingleColumnSpace.exportedAt = exportedAt;
+    const columnWidth = (builder.width - builder.margin * 2 - PDF_GUTTER) / 2;
+    const leftColumn = {x: builder.margin, width: columnWidth, cursor: initialHeader.contentTop};
+    const rightColumn = {x: builder.margin + columnWidth + PDF_GUTTER, width: columnWidth, cursor: initialHeader.contentTop};
+    const patientRows = [
+      {type: 'kv', label: 'Navn', value: patient?.name},
+      {type: 'kv', label: 'MRN', value: patient?.mrn},
+      {type: 'kv', label: 'Familienummer', value: patient?.family_number},
+      {type: 'kv', label: 'Køn', value: patient?.gender},
+      {type: 'kv', label: 'Fødselsdato', value: patient?.birth_date},
+      {type: 'paragraph', label: 'Noter', value: patient?.notes, emptyText: 'Ingen noter.', indent: '  '}
+    ];
+    const sampleRows = [
+      {type: 'kv', label: 'PMB-nummer', value: sample?.pmb_number},
+      {type: 'kv', label: 'Prøvetype', value: sample?.sample_type},
+      {type: 'kv', label: 'Status', value: sample?.status},
+      {type: 'kv', label: 'Opsamlet', value: sample?.collected_at},
+      {type: 'paragraph', label: 'Noter', value: sample?.notes, emptyText: 'Ingen noter.', indent: '  '}
+    ];
+    const analysisRows = [
+      {type: 'kv', label: 'Panel', value: panel?.name},
+      {type: 'paragraph', label: 'Panelbeskrivelse', value: panel?.description, emptyText: 'Ingen beskrivelse.', indent: '  '},
+      {type: 'kv', label: 'Analyseansvarlig', value: analysisResponsible},
+      {type: 'kv', label: 'Tolker', value: interpreterName},
+      {type: 'kv', label: 'Godkender', value: approverName},
+      {type: 'kv', label: 'Rekvirent', value: clinician},
+      {type: 'kv', label: 'Ordinationsstatus', value: order?.status},
+      {type: 'kv', label: 'Bestilt', value: order?.ordered_at}
+    ];
+    const qcRows = [];
+    if (qcEntries.length) {
+      qcEntries.forEach((qc, index) => {
+        const label = `${index + 1}. ${qc.metric}`;
+        const unit = qc.unit ? ` ${qc.unit}` : '';
+        const value = `${qc.value}${unit}`;
+        const parts = [value];
+        if (qc.notes) parts.push(`Noter: ${qc.notes}`);
+        qcRows.push({type: 'paragraph', label, value: parts.join('\n'), indent: '  '});
+      });
+    } else {
+      qcRows.push({type: 'text', text: 'Ingen registrerede kvalitetsmålinger.'});
+    }
+    const patientSection = buildSectionLayout('Patientoplysninger', patientRows, columnWidth);
+    const analysisSection = buildSectionLayout('Analyse', analysisRows, columnWidth);
+    const sampleSection = buildSectionLayout('Prøvedata', sampleRows, columnWidth);
+    const qcSection = buildSectionLayout('Kvalitetsmålinger', qcRows, columnWidth);
+    renderSection(builder, leftColumn, patientSection);
+    renderSection(builder, rightColumn, sampleSection);
+    renderSection(builder, leftColumn, analysisSection);
+    renderSection(builder, rightColumn, qcSection);
+    const singleColumn = {
+      x: builder.margin,
+      width: builder.width - builder.margin * 2,
+      cursor: Math.min(leftColumn.cursor, rightColumn.cursor) - PDF_SECTION_SPACING
+    };
+    if (singleColumn.cursor < builder.margin + PDF_SIGNATURE_BLOCK_HEIGHT + 40) {
+      const header = startNewReportPage(builder, logo, exportedAt);
+      singleColumn.cursor = header.contentTop;
+    }
+    const fundRows = [];
+    if (variants.length) {
+      variants.forEach((variant, index) => {
+        const headingParts = [variant.gene, variant.hgvs_c, variant.hgvs_p].filter(Boolean);
+        const heading = headingParts.length ? headingParts.join(' · ') : `Variant ${variant.id ?? index + 1}`;
+        const meta = [];
+        if (variant.transcript) meta.push(`Transkript: ${variant.transcript}`);
+        if (variant.zygosity) meta.push(`Zygositet: ${variant.zygosity}`);
+        if (variant.classification) meta.push(`Klasse: ${variant.classification}`);
+        if (variant.criteria) meta.push(`ACMG: ${variant.criteria}`);
+        if (variant.af !== undefined && variant.af !== null && variant.af !== '') meta.push(`AF: ${variant.af}`);
+        const bodyParts = [];
+        if (meta.length) bodyParts.push(meta.join(' · '));
+        if (variant.interpretation) bodyParts.push(variant.interpretation);
+        fundRows.push({
+          type: 'paragraph',
+          label: `${index + 1}. ${heading}`,
+          value: bodyParts.join('\n\n'),
+          emptyText: 'Ingen detaljer angivet.',
+          indent: '  '
+        });
+      });
+    } else {
+      fundRows.push({type: 'text', text: 'Ingen registrerede varianter.'});
+    }
+    const fundSection = buildSectionLayout('Fund', fundRows, singleColumn.width);
+    const conclusionText = reportData.summary || '';
+    const conclusionRows = [
+      conclusionText ? {type: 'text', text: conclusionText} : {type: 'text', text: 'Ingen konklusion angivet.'}
+    ];
+    const conclusionSection = buildSectionLayout('Konklusion', conclusionRows, singleColumn.width);
+    const singleSections = [fundSection, conclusionSection];
+    singleSections.forEach((section, index) => {
+      const remaining = singleSections.slice(index + 1).reduce((sum, item) => sum + item.height, 0);
+      const reserve = remaining + PDF_SIGNATURE_BLOCK_HEIGHT + 20;
+      ensureSingleColumnSpace(builder, singleColumn, section.height, reserve);
+      renderSection(builder, singleColumn, section);
+    });
+    ensureSingleColumnSpace(builder, singleColumn, PDF_SIGNATURE_BLOCK_HEIGHT, 0);
+    const signatureBottom = builder.margin;
+    const signatureHeight = PDF_SIGNATURE_BLOCK_HEIGHT;
+    const signatureX = builder.margin - PDF_SECTION_CARD_INSET;
+    const signatureWidth = builder.width - 2 * builder.margin + PDF_SECTION_CARD_INSET * 2;
+    builder.fillRect(signatureX, signatureBottom, signatureWidth, signatureHeight, PDF_SIGNATURE_BAND_COLOR);
+    builder.strokeRect(signatureX, signatureBottom, signatureWidth, signatureHeight, 0.8, PDF_CARD_BORDER_COLOR);
+    const signatureHeadingY = signatureBottom + signatureHeight - 18;
+    const signatureTextX = singleColumn.x + PDF_SECTION_CARD_PADDING_X;
+    builder.addText('Signering', signatureTextX, signatureHeadingY, PDF_HEADING_FONT_SIZE, PDF_HEADING_TEXT_COLOR);
+    const signatureInnerWidth = singleColumn.width - PDF_SECTION_CARD_PADDING_X * 2;
+    const signatureLineY = signatureBottom + 40;
+    const firstLineStart = signatureTextX;
+    const midPoint = signatureTextX + signatureInnerWidth / 2;
+    const gap = 24;
+    let firstLineEnd = midPoint - gap;
+    if (firstLineEnd - firstLineStart < 80) firstLineEnd = firstLineStart + 80;
+    firstLineEnd = Math.min(firstLineEnd, midPoint - 6);
+    let secondLineStart = midPoint + gap;
+    if (secondLineStart < firstLineEnd + 24) {
+      secondLineStart = firstLineEnd + 24;
+    }
+    let secondLineEnd = signatureTextX + signatureInnerWidth;
+    if (secondLineEnd - secondLineStart < 80) {
+      secondLineStart = Math.max(secondLineEnd - 80, secondLineStart);
+    }
+    builder.addLine(firstLineStart, signatureLineY, firstLineEnd, signatureLineY, 1, PDF_SIGNATURE_LINE_COLOR);
+    builder.addText(`Tolker: ${interpreterName || 'Ikke angivet'}`, firstLineStart, signatureLineY + 14, PDF_BODY_FONT_SIZE, PDF_TEXT_COLOR);
+    builder.addLine(secondLineStart, signatureLineY, secondLineEnd, signatureLineY, 1, PDF_SIGNATURE_LINE_COLOR);
+    builder.addText(`Godkender: ${approverName || 'Ikke angivet'}`, secondLineStart, signatureLineY + 14, PDF_BODY_FONT_SIZE, PDF_TEXT_COLOR);
+    const bytes = builder.build();
+    return new Blob([bytes], {type: 'application/pdf'});
+  } catch (err) {
+    console.error('Kunne ikke generere PDF for rapporten', err);
+    return null;
+  }
+}
+
+function sanitizeFilenameComponent(value) {
+  if (!value) return 'ukendt';
+  return String(value).trim().replace(/[^0-9A-Za-zÆØÅæøå_-]+/g, '_') || 'ukendt';
+}
+
+function buildReportPdfFilename(orderId, reportData, exportedAt = new Date()) {
+  const order = findById('orders', Number(orderId));
+  const patient = order ? findById('patients', Number(order?.patient_id)) : null;
+  const mrnPart = sanitizeFilenameComponent(patient?.mrn || patient?.cpr || 'ukendt');
+  const dateStamp = exportedAt.toISOString().slice(0, 10).replace(/-/g, '');
+  return `${mrnPart}_Diagnostisk_Rapport_${dateStamp}.pdf`;
 }
 function renderQC(section) {
   const list = getCached('qc');
@@ -3629,8 +4658,11 @@ function buildFhirBundle(orderId) {
   const patient = findById('patients', Number(order.patient_id));
   const sample = findById('samples', Number(order.sample_id));
   const panel = order.panel_id ? findById('panels', Number(order.panel_id)) : null;
-  const report = getCached('reports').find(r => r.order_id === orderId) || {status:'final', summary:'', findings:''};
-  const variants = getCached('variants').filter(v => v.order_id === orderId);
+  const report = getCached('reports').find(r => r.order_id === orderId) || {status:'final', summary:'', variant_ids:'[]', variant_details:[]};
+  let variants = getReportVariantSnapshots(report, orderId);
+  if (!variants.length) {
+    variants = getCached('variants').filter(v => v.order_id === orderId).map(snapshotVariant);
+  }
   const timestamp = new Date().toISOString();
   const patientResource = {
     resourceType:'Patient',
@@ -3670,9 +4702,12 @@ function buildFhirBundle(orderId) {
     issued: report.issued_at || new Date().toISOString(),
     performer:[{reference:'Organization/org-producer'}],
     resultsInterpreter: requesterOrg.name ? [{reference:'Organization/org-requester'}] : undefined,
-    conclusion: report.summary || undefined,
-    presentedForm: report.findings ? [{contentType:'text/plain', data:btoa(report.findings)}] : undefined
+    conclusion: report.summary || undefined
   };
+  const narrative = variants.map(describeVariantNarrative).filter(Boolean).join('\n');
+  if (narrative) {
+    diagnosticReport.presentedForm = [{contentType:'text/plain', data:btoa(narrative)}];
+  }
   const entries = [];
   const addEntry = resource => entries.push({fullUrl:`urn:uuid:${crypto.randomUUID?.() || Math.random().toString(36).slice(2)}`, resource});
   const messageHeader = {
@@ -4012,7 +5047,8 @@ async function runTests() {
     const variantCount = getCached('variants').filter(v => v.order_id === orderId).length;
     results.push(['Tilføj testvariant', variantCount > 0, `Varianter: ${variantCount}`]);
     results.push(['Oprettelse ordination med FK', !!findById('orders', orderId), `Ordination ${orderId}`]);
-    const reportHtml = buildReportHtml(orderId, {status:'draft', issued_at:new Date().toISOString(), summary:'Test', findings:'Ingen'});
+    const variantDetails = getCached('variants').filter(v => v.order_id === orderId).map(snapshotVariant);
+    const reportHtml = buildReportHtml(orderId, {status:'draft', issued_at:new Date().toISOString(), summary:'Test', variant_details: variantDetails});
     results.push(['Generering af rapport HTML', reportHtml.includes('Diagnostisk rapport'), 'HTML længde ' + reportHtml.length]);
     const bundle = buildFhirBundle(orderId);
     const hasResources = ['MessageHeader','Patient','DiagnosticReport','Observation'].every(type => (bundle.entry||[]).some(e => e.resource.resourceType === type));
@@ -4207,6 +5243,8 @@ CREATE TABLE IF NOT EXISTS \`reports\` (
   \`id\` INT AUTO_INCREMENT PRIMARY KEY,
   \`order_id\` INT,
   \`findings\` TEXT,
+  \`variant_ids\` TEXT,
+  \`variant_details\` LONGTEXT,
   \`summary\` TEXT,
   \`status\` VARCHAR(32),
   \`issued_at\` DATETIME,
@@ -4334,7 +5372,7 @@ async function loadDemoData() {
     const o2 = await addRecord('orders', {patient_id:p2, sample_id:s2, panel_id:panel, analysis_responsible_id:null, interpreter_id:null, approver_id:null, clinician:'Dr. Holm', status:'Rapport', ordered_at:new Date().toISOString()});
     await addRecord('variants', {order_id:o1, gene:'BRCA1', transcript:'NM_007294.3', hgvs_c:'c.5266dupC', hgvs_p:'p.Gln1756Profs', zygosity:'heterozygot', classification:'5', criteria:'PVS1,PS3,PM2,PP3', af:0.0001, interpretation:'Patogen variant med høj risiko'});
     await addRecord('qc', {sample_id:s1, metric:'Dækning', value:98.5, unit:'%', notes:''});
-    await addRecord('reports', {order_id:o2, findings:'Ingen klinisk signifikante varianter', summary:'Negativ rapport', status:'final', issued_at:new Date().toISOString()});
+    await addRecord('reports', {order_id:o2, variant_ids:'[]', variant_details:[], summary:'Negativ rapport', status:'final', issued_at:new Date().toISOString()});
     await addRecord('users', {name:'Admin', email:'admin@example.com', role:'Administrator', pin:'admin'});
   } else {
     alert('Demo-data allerede til stede.');
