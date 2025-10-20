@@ -759,6 +759,7 @@ const tooltipCatalog = {
     orderClear: 'Ryd formularen for at oprette en ny ordination.',
     orderDelete: 'Slet den valgte ordination.',
     variantClear: 'Ryd formularen for at registrere en ny variant.',
+    variantSaveNew: 'Gem varianten som en ny registrering uden at overskrive den valgte.',
     variantDelete: 'Slet den valgte variant.',
     variantToLibrary: 'Tilføj varianten til det kuraterede bibliotek.',
     reportClear: 'Ryd formularen for at skrive en ny rapport.',
@@ -2970,7 +2971,8 @@ function renderVariants(section) {
           <label>Allelfrekvens<input name="af" type="number" step="0.0001"></label>
           <label>Tolkning<textarea name="interpretation"></textarea></label>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
+            <button class="primary" type="submit" id="variantSave" data-action="save">Gem</button>
+            <button class="secondary" type="submit" id="variantSaveNew" data-action="create" hidden>Gem som ny</button>
             <button class="secondary" type="button" id="variantClear">Ny</button>
             <button class="danger" type="button" id="variantDelete">Slet</button>
             <button class="secondary" type="button" id="variantToLibrary">Til bibliotek</button>
@@ -2982,6 +2984,25 @@ function renderVariants(section) {
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#variantSearch');
   const form = section.querySelector('#variantForm');
+  const saveButton = form.querySelector('#variantSave');
+  const saveNewButton = form.querySelector('#variantSaveNew');
+  const defaultSaveLabel = saveButton?.textContent || 'Gem';
+  const enterEditMode = id => {
+    if (!form) return;
+    form.dataset.mode = 'edit';
+    form.dataset.editingId = id != null ? String(id) : '';
+    if (saveButton) saveButton.textContent = 'Opdater variant';
+    if (saveNewButton) saveNewButton.hidden = false;
+  };
+  const exitEditMode = () => {
+    if (!form) return;
+    form.dataset.mode = 'create';
+    form.dataset.editingId = '';
+    if (form.elements.id) form.elements.id.value = '';
+    if (saveButton) saveButton.textContent = defaultSaveLabel;
+    if (saveNewButton) saveNewButton.hidden = true;
+  };
+  exitEditMode();
   const filterInputs = {
     id: section.querySelector('[data-filter-variants="id"]'),
     order: section.querySelector('[data-filter-variants="order"]'),
@@ -3047,16 +3068,20 @@ function renderVariants(section) {
     const variant = list.find(v => v.id === Number(tr.dataset.id));
     if (!variant) return;
     fillForm(form, variant);
+    enterEditMode(variant.id);
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
     if (!ensureWrite('variants')) return;
+    const action = e.submitter?.dataset.action || 'save';
     const data = Object.fromEntries(new FormData(form).entries());
     data.order_id = Number(data.order_id);
     data.classification = String(data.classification);
     if (data.af) data.af = Number(data.af);
-    if (data.id) {
-      const id = Number(data.id);
+    const editingId = Number(form.dataset.editingId || data.id || 0);
+    const creatingNew = action === 'create' || !editingId;
+    if (!creatingNew) {
+      const id = editingId;
       const before = {...findById('variants', id)};
       const updated = {...before, ...data, id};
       await updateRecord('variants', updated, before);
@@ -3076,7 +3101,14 @@ function renderVariants(section) {
       renderTab('variants');
     }
   });
-  section.querySelector('#variantClear').addEventListener('click', () => form.reset());
+  section.querySelector('#variantClear').addEventListener('click', () => {
+    const orderValue = form.elements.order_id.value;
+    const classificationValue = form.elements.classification.value;
+    form.reset();
+    if (orderValue) form.elements.order_id.value = orderValue;
+    if (classificationValue) form.elements.classification.value = classificationValue;
+    exitEditMode();
+  });
   section.querySelector('#variantToLibrary').addEventListener('click', async () => {
     if (!ensureWrite('variant_library')) return;
     const data = Object.fromEntries(new FormData(form).entries());
