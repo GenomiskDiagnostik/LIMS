@@ -5538,7 +5538,7 @@ function buildFhirBundle(orderId) {
   };
   const narrative = variants.map(describeVariantNarrative).filter(Boolean).join('\n');
   if (narrative) {
-    diagnosticReport.presentedForm = [{contentType:'text/plain', data:btoa(narrative)}];
+    diagnosticReport.presentedForm = [{contentType:'text/plain', data:base64EncodeUtf8(narrative)}];
   }
   const entries = [];
   const addEntry = resource => entries.push({fullUrl:`urn:uuid:${crypto.randomUUID?.() || Math.random().toString(36).slice(2)}`, resource});
@@ -5914,6 +5914,16 @@ async function buildZipFiles() {
     {name:'glimr-backup.json', data:utf8Encode(backup)},
     {name:'README.txt', data:utf8Encode(readme)}
   ];
+}
+function base64EncodeUtf8(str) {
+  const bytes = utf8Encode(str);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
 }
 function utf8Encode(str) {
   return new TextEncoder().encode(str);
