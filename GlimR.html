@@ -189,6 +189,150 @@ section[data-tab].active {
   margin-bottom: 1.2rem;
   border: 1px solid var(--panel-border);
 }
+.tool-panel {
+  padding: 0;
+  overflow: hidden;
+}
+.tool-panel summary {
+  margin: 0;
+  padding: 1rem 1.2rem;
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: transparent;
+  color: inherit;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.tool-panel summary:hover {
+  background: rgba(24, 111, 175, 0.08);
+}
+.tool-panel[open] summary {
+  color: var(--accent-strong);
+  background: rgba(24, 111, 175, 0.08);
+}
+[data-theme="dark"] .tool-panel summary:hover {
+  background: rgba(56, 189, 248, 0.12);
+}
+[data-theme="dark"] .tool-panel[open] summary {
+  background: rgba(56, 189, 248, 0.12);
+  color: var(--accent);
+}
+.tool-panel summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.tool-panel summary::-webkit-details-marker {
+  display: none;
+}
+.tool-panel summary::marker {
+  display: none;
+}
+.tool-panel summary::after {
+  content: '\25B6';
+  font-size: 0.95rem;
+  color: var(--muted-text);
+  transition: transform 0.2s ease;
+}
+.tool-panel[open] summary::after {
+  transform: rotate(90deg);
+  color: var(--accent-strong);
+}
+.tool-summary-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.tool-summary-text .tool-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.tool-summary-text .tool-subtitle {
+  font-size: 0.9rem;
+  color: var(--muted-text);
+}
+.tool-panel .tool-body {
+  padding: 0 1.2rem 1.2rem;
+  border-top: 1px solid var(--panel-border);
+}
+.tool-panel .tool-body > h3 {
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  font-size: 1.2rem;
+}
+.tool-panel .tool-body > p:first-of-type {
+  margin-top: 0;
+}
+[data-theme="dark"] .tool-panel summary::after {
+  color: var(--muted-text);
+}
+[data-theme="dark"] .tool-panel[open] summary::after {
+  color: var(--accent);
+}
+.tool-panel[open] {
+  padding-bottom: 0;
+}
+.tool-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+.tool-criteria-list {
+  display: grid;
+  gap: 0.4rem;
+  justify-items: stretch;
+}
+.tool-criteria {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 0.55rem;
+  background: rgba(24, 111, 175, 0.08);
+  text-align: left;
+}
+[data-theme="dark"] .tool-criteria {
+  background: rgba(14, 165, 233, 0.12);
+}
+.tool-criteria input[type="checkbox"] {
+  margin-top: 0.25rem;
+}
+.tool-criteria span {
+  display: block;
+  line-height: 1.35;
+}
+.tool-result {
+  margin-top: 0.9rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 0.55rem;
+  background: rgba(24, 111, 175, 0.08);
+  border: 1px solid var(--panel-border);
+}
+[data-theme="dark"] .tool-result {
+  background: rgba(14, 165, 233, 0.15);
+}
+.tool-inline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  align-items: end;
+  margin-top: 0.75rem;
+}
+.tool-inline label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.tool-note {
+  color: var(--muted-text);
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
 .variant-picker-overlay {
   position: fixed;
   inset: 0;
@@ -732,6 +876,7 @@ const tabs = [
   {id:'reports', label:'Rapporter'},
   {id:'qc', label:'Kvalitetskontrol'},
   {id:'responses', label:'Svar (MedCom)'},
+  {id:'tools', label:'Værktøjskasse'},
   {id:'users', label:'Brugere'},
   {id:'audit', label:'Revision'},
   {id:'db', label:'Database & Backup'},
@@ -766,6 +911,7 @@ const tooltipCatalog = {
     reports: 'Opret og redigér laboratoriesvar og rapporter.',
     qc: 'Registrer kvalitetskontrolmålinger for prøver.',
     responses: 'Importer og gennemse MedCom/FHIR-svar.',
+    tools: 'Åbn værktøjskassen med beregnere og hjælpeværktøjer til variantfortolkning.',
     users: 'Administrer GlimR-brugere og roller.',
     audit: 'Gennemgå revisionsloggen for alle ændringer.',
     db: 'Håndter lokal databasefil, backup og autogem.',
@@ -979,6 +1125,10 @@ const tooltipCatalog = {
     qcDelete: 'Slet den valgte QC-måling.',
     userClear: 'Ryd formularen for at oprette en ny bruger.',
     userDelete: 'Slet den valgte bruger.',
+    acmgReset: 'Ryd alle valgte ACMG-kriterier.',
+    distanceSwap: 'Byt start- og slutposition for beregningen.',
+    gcUpper: 'Fjern mellemrum og konverter sekvensen til store bogstaver.',
+    gcReverse: 'Beregn og indsæt den omvendt komplementære sekvens.',
     patientsExport: 'Eksportér den aktuelt filtrerede patientliste til en JSON-fil.',
     samplesExport: 'Eksportér de filtrerede prøver til JSON til deling eller videre analyse.',
     ordersExport: 'Eksportér ordinationerne der matcher filtrene.',
@@ -1029,7 +1179,15 @@ const tooltipCatalog = {
     caseImportVarSeqInput: 'Vælg en VarSeq CSV-fil med fund, som skal tilføjes til sagen.',
     variantBatchOrder: 'Vælg den ordination som de importerede varianter skal knyttes til.',
     variantBatchMessage: 'Status og advarsler for masseoprettelse af varianter.',
-    variantBatchFile: 'Vælg en VarSeq CSV-fil til masseimport.'
+    variantBatchFile: 'Vælg en VarSeq CSV-fil til masseimport.',
+    acmgTool: 'Vælg de kriterier der er opfyldt, for at få et ACMG-forslag.',
+    distanceTool: 'Indtast to koordinater for at udregne den genomiske afstand.',
+    distanceStart: 'Genomisk startposition, fx 123456 eller chr7:123456.',
+    distanceEnd: 'Genomisk slutposition. Bogstaver ignoreres automatisk.',
+    distanceResult: 'Viser antal baser mellem positionerne (inkl./ekskl.).',
+    gcSequence: 'Indsæt DNA/RNA-sekvens for at beregne længde og GC%.',
+    acmgResult: 'Opsummering af den foreslåede klassifikation baseret på kriterierne.',
+    gcResult: 'Opsummerer længde, GC% og basefordeling for sekvensen.'
   }
 };
 function setTooltip(el, text) {
@@ -2176,6 +2334,7 @@ function renderTab(id) {
     case 'reports': return renderReports(section);
     case 'qc': return renderQC(section);
     case 'responses': return renderResponses(section);
+    case 'tools': return renderTools(section);
     case 'users': return renderUsers(section);
     case 'audit': return renderAudit(section);
     case 'db': return renderDbTab(section);
@@ -6067,6 +6226,440 @@ function renderQC(section) {
   });
   section.querySelector('#qcClear').addEventListener('click', () => form.reset());
 }
+
+function renderTools(section) {
+  const pathogenicCriteria = [
+    {code: 'PVS1', label: 'Loss-of-function variant i gen hvor loss-of-function er kendt sygdomsmekanisme.', weight: 8},
+    {code: 'PS1', label: 'Samme aminosyreændring som kendt patogen variant uden ændret nukleotid.', weight: 4},
+    {code: 'PS2', label: 'De novo (bekræftet) hos patient med sund(e) forælder(e).', weight: 4},
+    {code: 'PS3', label: 'Funktionelle studier viser skadelig effekt.', weight: 4},
+    {code: 'PS4', label: 'Signifikant øget forekomst i syge kontra kontroller.', weight: 4},
+    {code: 'PM1', label: 'Hotspot/domæne uden godartede variationer.', weight: 2},
+    {code: 'PM2', label: 'Fraværende eller ekstremt lav frekvens i kontroller.', weight: 2},
+    {code: 'PM3', label: 'Påvist i trans med patogen variant i recessiv sygdom.', weight: 2},
+    {code: 'PM4', label: 'Proteinaltering der påvirker læseramme eller stopper protein.', weight: 2},
+    {code: 'PM5', label: 'Ny missense på samme aminosyre som anden patogen variant.', weight: 2},
+    {code: 'PM6', label: 'De novo (uformelt) uden bekræftede forældre.', weight: 2},
+    {code: 'PP1', label: 'Segregerer med sygdommen i familien.', weight: 1},
+    {code: 'PP2', label: 'Missense i gen hvor missense er hyppig sygdomsmekanisme.', weight: 1},
+    {code: 'PP3', label: 'In silico-støtte for skadelig effekt.', weight: 1},
+    {code: 'PP4', label: 'Fænotype/specifik sygdom i tråd med genet.', weight: 1},
+    {code: 'PP5', label: 'Anført som patogen af velrenommeret kilde.', weight: 1}
+  ];
+  const benignCriteria = [
+    {code: 'BA1', label: 'Allelfrekvens >5 % i kontroller (stand-alone).', weight: 8, effect: 'benign'},
+    {code: 'BS1', label: 'Allelfrekvens større end forventet for lidelsen.', weight: 4, effect: 'benign'},
+    {code: 'BS2', label: 'Observeret hos sund homozygot/hemizygot.', weight: 4, effect: 'benign'},
+    {code: 'BS3', label: 'Funktionelle studier viser ingen skadelig effekt.', weight: 4, effect: 'benign'},
+    {code: 'BS4', label: 'Mangel på segregering med sygdommen.', weight: 4, effect: 'benign'},
+    {code: 'BP1', label: 'Missense i gen hvor loss-of-function er dominerende mekanisme.', weight: 1, effect: 'benign'},
+    {code: 'BP2', label: 'Observeret sammen med patogen variant for dominant sygdom.', weight: 1, effect: 'benign'},
+    {code: 'BP3', label: 'In-frame indel i repetitiv region uden kendt funktion.', weight: 1, effect: 'benign'},
+    {code: 'BP4', label: 'In silico understøtter benign effekt.', weight: 1, effect: 'benign'},
+    {code: 'BP5', label: 'Variant forklarer alternativ diagnose.', weight: 1, effect: 'benign'},
+    {code: 'BP6', label: 'Anført som godartet af velrenommeret kilde.', weight: 1, effect: 'benign'},
+    {code: 'BP7', label: 'Synonym variant uden splice-påvirkning.', weight: 1, effect: 'benign'}
+  ];
+  const makeCriteriaList = list => list.map(item => {
+    const code = esc(item.code);
+    const label = esc(item.label);
+    const effect = esc(item.effect || 'pathogenic');
+    return `
+    <label class="tool-criteria" title="${code} – ${label}">
+      <input type="checkbox" value="${code}" data-weight="${item.weight}" data-effect="${effect}">
+      <span><strong>${code}</strong> ${label}</span>
+    </label>
+  `;
+  }).join('');
+  section.innerHTML = `
+  <details class="panel tool-panel">
+    <summary>
+      <div class="tool-summary-text">
+        <span class="tool-title">ACMG klassifikationshjælper</span>
+        <span class="tool-subtitle">Forenklet vægtning af ACMG/AMP 2015 med opdaterede pointværdier.</span>
+      </div>
+    </summary>
+    <div class="tool-body">
+      <h3>ACMG klassifikationshjælper</h3>
+      <p>Vælg de kriterier der er opfyldt for varianten. Resultatet bruger en forenklet vægtning af ACMG/AMP 2015 med opdaterede pointværdier.</p>
+      <form id="acmgTool">
+        <div class="tool-columns">
+          <fieldset>
+            <legend>Patogene kriterier</legend>
+            <div class="tool-criteria-list">
+              ${makeCriteriaList(pathogenicCriteria)}
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Benigne kriterier</legend>
+            <div class="tool-criteria-list">
+              ${makeCriteriaList(benignCriteria)}
+            </div>
+          </fieldset>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="secondary" id="acmgReset">Nulstil kriterier</button>
+        </div>
+      </form>
+      <div class="tool-result" id="acmgResult">Vælg kriterier for at se forslag til klassifikation.</div>
+      <p class="tool-note">Vurderingen er vejledende og kræver altid manuel gennemgang og dokumentation.</p>
+    </div>
+  </details>
+  <details class="panel tool-panel">
+    <summary>
+      <div class="tool-summary-text">
+        <span class="tool-title">HGVS c. nomenklaturhjælper</span>
+        <span class="tool-subtitle">Byg hurtigt cDNA-notation for substitutioner, deletioner m.m.</span>
+      </div>
+    </summary>
+    <div class="tool-body">
+      <h3>HGVS c. nomenklaturhjælper</h3>
+      <p>Udfyld felterne for at få foreslået et gyldigt HGVS c.-udtryk til simple varianter. Vælg varianttype og angiv de relevante positioner og sekvenser.</p>
+      <form id="hgvsForm">
+        <div class="tool-inline">
+          <label for="hgvsTranscript" title="Angiv referencetranskript (RefSeq, LRG eller tilsvarende).">
+            Referencetranskript
+            <input id="hgvsTranscript" name="transcript" placeholder="fx NM_000546.5">
+          </label>
+          <label for="hgvsType" title="Vælg varianttypen for at vise de relevante felter.">
+            Varianttype
+            <select id="hgvsType" name="type">
+              <option value="substitution">Basiskift (substitution)</option>
+              <option value="deletion">Deletion</option>
+              <option value="insertion">Insertion</option>
+              <option value="duplication">Duplikation</option>
+              <option value="delins">Delins (deletion+insertion)</option>
+            </select>
+          </label>
+        </div>
+        <div class="tool-inline">
+          <label for="hgvsStart" data-hgvs-field="start" title="Startpositionen for ændringen. Brug intronnotation ved behov (fx 123+1).">
+            Position (start)
+            <input id="hgvsStart" name="start" placeholder="fx 215">
+          </label>
+          <label for="hgvsEnd" data-hgvs-field="end" title="Slutpositionen for ændringen. Udelades for enkeltbase-varianter.">
+            Position (slut)
+            <input id="hgvsEnd" name="end" placeholder="fx 217">
+          </label>
+        </div>
+        <div class="tool-inline">
+          <label for="hgvsRef" data-hgvs-field="ref" title="Referencebase(r) eller slettet sekvens, hvis kendt.">
+            Reference/sekvens
+            <input id="hgvsRef" name="ref" placeholder="fx C eller AGT">
+          </label>
+          <label for="hgvsAlt" data-hgvs-field="alt" title="Ændringen, indsatte baser eller erstatningssekvens.">
+            Ændring/indsættelse
+            <input id="hgvsAlt" name="alt" placeholder="fx G eller TTA">
+          </label>
+        </div>
+        <p class="tool-note">Felter skjules automatisk for varianttyper, hvor de ikke anvendes. Positioner kan skrives med intronnotation (fx 123+1).</p>
+        <div class="btn-row">
+          <button type="button" class="secondary" id="hgvsCopy">Kopiér notation</button>
+        </div>
+      </form>
+      <div class="tool-result" id="hgvsResult">Udfyld felterne for at få et HGVS-forslag.</div>
+      <p class="tool-note">Kontroller altid notationen mod HGVS-retningslinjerne og kliniske SOP&apos;er før rapportering.</p>
+    </div>
+  </details>
+  <details class="panel tool-panel">
+    <summary>
+      <div class="tool-summary-text">
+        <span class="tool-title">Genomisk afstandsberegner</span>
+        <span class="tool-subtitle">Beregn antal baser mellem to lokationer.</span>
+      </div>
+    </summary>
+    <div class="tool-body">
+      <h3>Genomisk afstandsberegner</h3>
+      <p>Beregn antal baser mellem to lokationer. Indtast fx <code>chr7:55191822</code> og <code>chr7:55277778</code>.</p>
+      <form id="distanceTool">
+        <div class="tool-inline">
+          <label for="distanceStart">Startposition<input id="distanceStart" name="start" placeholder="fx chr7:55191822"></label>
+          <label for="distanceEnd">Slutposition<input id="distanceEnd" name="end" placeholder="fx 55277778"></label>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="secondary" id="distanceSwap">Byt positioner</button>
+        </div>
+      </form>
+      <div class="tool-result" id="distanceResult">Indtast positioner for at se resultatet.</div>
+      <p class="tool-note">Resultatet viser både eksklusiv (end-start) og inklusiv (end-start+1) afstand.</p>
+    </div>
+  </details>
+  <details class="panel tool-panel">
+    <summary>
+      <div class="tool-summary-text">
+        <span class="tool-title">GC- og sekvensværktøj</span>
+        <span class="tool-subtitle">Analyser sekvensen for GC-indhold og reverse komplement.</span>
+      </div>
+    </summary>
+    <div class="tool-body">
+      <h3>GC- og sekvensværktøj</h3>
+      <p>Analyser en DNA/RNA-sekvens for længde, GC-indhold og generér reverse komplement.</p>
+      <form id="gcTool">
+        <label for="gcSequence">Sekvens
+          <textarea id="gcSequence" name="sequence" rows="4" placeholder="Indsæt sekvens her"></textarea>
+        </label>
+        <div class="btn-row">
+          <button type="button" class="secondary" id="gcUpper">Rens og formater</button>
+          <button type="button" class="secondary" id="gcReverse">Reverse komplement</button>
+        </div>
+      </form>
+      <div class="tool-result" id="gcResult">Indsæt en sekvens for at beregne GC%.</div>
+      <p class="tool-note">Beregningen ignorerer mellemrum og tal. Ambigue baser (fx N, R, Y) medtages i længden.</p>
+    </div>
+  </details>`;
+
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+
+  const acmgForm = section.querySelector('#acmgTool');
+  const acmgResult = section.querySelector('#acmgResult');
+  const acmgCheckboxes = Array.from(acmgForm.querySelectorAll('input[type="checkbox"]'));
+  const acmgReset = section.querySelector('#acmgReset');
+  const formatList = list => list.length ? list.join(', ') : 'Ingen';
+  const updateAcmgResult = () => {
+    let score = 0;
+    const selectedPath = [];
+    const selectedBenign = [];
+    acmgCheckboxes.forEach(cb => {
+      if (!cb.checked) return;
+      const weight = Number(cb.dataset.weight || '0');
+      const effect = cb.dataset.effect === 'benign' ? 'benign' : 'pathogenic';
+      if (effect === 'benign') {
+        score -= weight;
+        selectedBenign.push(cb.value);
+      } else {
+        score += weight;
+        selectedPath.push(cb.value);
+      }
+    });
+    if (!selectedPath.length && !selectedBenign.length) {
+      acmgResult.textContent = 'Vælg kriterier for at se forslag til klassifikation.';
+      return;
+    }
+    let classification;
+    if (score >= 10) classification = 'Patogen';
+    else if (score >= 6) classification = 'Sandsynligvis patogen';
+    else if (score <= -6) classification = 'Godartet';
+    else if (score <= -2) classification = 'Sandsynligvis godartet';
+    else classification = 'Variant af ukendt betydning (VUS)';
+    acmgResult.innerHTML = `<strong>${classification}</strong><br>` +
+      `Vægtet score: ${score}.<br>` +
+      `Patogene kriterier: ${formatList(selectedPath)}.<br>` +
+      `Benigne kriterier: ${formatList(selectedBenign)}.`;
+  };
+  acmgForm.addEventListener('change', updateAcmgResult);
+  acmgReset?.addEventListener('click', () => {
+    acmgCheckboxes.forEach(cb => { cb.checked = false; });
+    updateAcmgResult();
+  });
+  updateAcmgResult();
+
+  const hgvsForm = section.querySelector('#hgvsForm');
+  const hgvsResult = section.querySelector('#hgvsResult');
+  if (hgvsForm && hgvsResult) {
+    const hgvsType = hgvsForm.querySelector('#hgvsType');
+    if (hgvsType) {
+      const hgvsCopy = section.querySelector('#hgvsCopy');
+      const hgvsFields = {
+        transcript: hgvsForm.querySelector('#hgvsTranscript'),
+        start: hgvsForm.querySelector('#hgvsStart'),
+        end: hgvsForm.querySelector('#hgvsEnd'),
+        ref: hgvsForm.querySelector('#hgvsRef'),
+        alt: hgvsForm.querySelector('#hgvsAlt')
+      };
+      const hgvsFieldVisibility = {
+        substitution: {start: true, end: false, ref: true, alt: true},
+        deletion: {start: true, end: true, ref: true, alt: false},
+        insertion: {start: true, end: true, ref: false, alt: true},
+        duplication: {start: true, end: true, ref: false, alt: false},
+        delins: {start: true, end: true, ref: true, alt: true}
+      };
+      const hgvsRequiredFields = {
+        substitution: ['start', 'ref', 'alt'],
+        deletion: ['start'],
+        insertion: ['start', 'end', 'alt'],
+        duplication: ['start'],
+        delins: ['start', 'alt']
+      };
+      const hgvsFieldLabels = {
+        start: 'Position (start)',
+        end: 'Position (slut)',
+        ref: 'Reference/sekvens',
+        alt: 'Ændring/indsættelse'
+      };
+      const hgvsFieldControls = Array.from(hgvsForm.querySelectorAll('[data-hgvs-field]'));
+      const setHgvsVisibility = type => {
+        const config = hgvsFieldVisibility[type] || hgvsFieldVisibility.substitution;
+        hgvsFieldControls.forEach(label => {
+          const field = label.getAttribute('data-hgvs-field');
+          label.hidden = config[field] === false;
+        });
+      };
+      const normaliseTranscript = value => value.trim();
+      const normaliseSequenceField = value => value.replace(/\s+/g, '').toUpperCase();
+      const buildCoordinate = (start, end) => {
+        if (!end || end === start) return start;
+        return `${start}_${end}`;
+      };
+      const updateHgvsResult = () => {
+        const type = hgvsType.value;
+        setHgvsVisibility(type);
+        const config = hgvsFieldVisibility[type] || hgvsFieldVisibility.substitution;
+        const transcript = normaliseTranscript(hgvsFields.transcript?.value || '');
+        const start = (hgvsFields.start?.value || '').trim();
+        const rawEnd = (hgvsFields.end?.value || '').trim();
+        const end = config.end === false ? '' : rawEnd;
+        const rawRef = hgvsFields.ref?.value || '';
+        const rawAlt = hgvsFields.alt?.value || '';
+        const ref = config.ref === false ? '' : normaliseSequenceField(rawRef);
+        const alt = config.alt === false ? '' : normaliseSequenceField(rawAlt);
+        const required = hgvsRequiredFields[type] || hgvsRequiredFields.substitution;
+        const values = {start, end, ref, alt};
+        const missing = required.filter(key => !values[key]);
+        if (missing.length) {
+          const names = missing.map(key => hgvsFieldLabels[key] || key).join(', ');
+          hgvsResult.textContent = `Udfyld følgende felter: ${names}.`;
+          hgvsResult.dataset.hgvsString = '';
+          return;
+        }
+        let coordinate = start;
+        if (end) {
+          coordinate = buildCoordinate(start, end);
+        }
+        let variantPart = '';
+        switch (type) {
+          case 'deletion':
+            variantPart = `${coordinate}del${ref}`;
+            break;
+          case 'insertion':
+            variantPart = `${coordinate}ins${alt}`;
+            break;
+          case 'duplication':
+            variantPart = `${coordinate}dup${ref || ''}`;
+            break;
+          case 'delins':
+            variantPart = `${coordinate}delins${alt}`;
+            break;
+          default:
+            variantPart = `${coordinate}${ref}>${alt}`;
+        }
+        let transcriptPart = '';
+        if (transcript) {
+          let cleaned = transcript.replace(/\s+/g, '');
+          if (/^c\./i.test(cleaned)) {
+            cleaned = cleaned.replace(/^c\./i, '');
+            transcriptPart = '';
+          } else {
+            const lower = cleaned.toLowerCase();
+            const colonIndex = lower.indexOf(':c.');
+            if (colonIndex !== -1) {
+              cleaned = cleaned.slice(0, colonIndex);
+            } else {
+              cleaned = cleaned.replace(/:$/,'').replace(/:c$/i, '');
+            }
+            if (cleaned) {
+              transcriptPart = `${cleaned}:`;
+            }
+          }
+        }
+        const notation = `${transcriptPart}c.${variantPart}`;
+        hgvsResult.innerHTML = `<strong>Forslag:</strong> <code>${esc(notation)}</code>`;
+        hgvsResult.dataset.hgvsString = notation;
+      };
+      hgvsForm.addEventListener('input', updateHgvsResult);
+      hgvsType.addEventListener('change', updateHgvsResult);
+      updateHgvsResult();
+      hgvsCopy?.addEventListener('click', async () => {
+        const notation = hgvsResult.dataset.hgvsString;
+        if (!notation) {
+          alert('Der er ingen notation at kopiere endnu.');
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(notation);
+          setStatus(`HGVS-notation kopieret: ${notation}`);
+        } catch (err) {
+          console.error(err);
+          alert('Kunne ikke kopiere til udklipsholderen.');
+        }
+      });
+    }
+  }
+
+  const distanceForm = section.querySelector('#distanceTool');
+  const distanceResult = section.querySelector('#distanceResult');
+  const distanceStart = distanceForm.querySelector('#distanceStart');
+  const distanceEnd = distanceForm.querySelector('#distanceEnd');
+  const parsePosition = value => {
+    if (!value) return NaN;
+    const cleaned = value.replace(/,/g, '');
+    const matches = cleaned.match(/-?\d+/g);
+    if (!matches) return NaN;
+    return Number(matches[matches.length - 1]);
+  };
+  const updateDistance = () => {
+    const startVal = parsePosition(distanceStart.value);
+    const endVal = parsePosition(distanceEnd.value);
+    if (!Number.isFinite(startVal) || !Number.isFinite(endVal)) {
+      distanceResult.textContent = 'Indtast gyldige numeriske positioner for begge felter.';
+      return;
+    }
+    const diff = Math.abs(endVal - startVal);
+    const inclusive = diff + 1;
+    const orientation = endVal === startVal ? 'samme position' : endVal > startVal ? 'stigende koordinater' : 'faldende koordinater';
+    distanceResult.innerHTML = `<strong>Eksklusiv afstand:</strong> ${diff.toLocaleString('da-DK')} baser` +
+      `<br><strong>Inklusiv afstand:</strong> ${inclusive.toLocaleString('da-DK')} baser` +
+      `<br><span class="tool-note">Fortolkning: ${orientation}.</span>`;
+  };
+  distanceForm.addEventListener('input', updateDistance);
+  section.querySelector('#distanceSwap')?.addEventListener('click', () => {
+    const tmp = distanceStart.value;
+    distanceStart.value = distanceEnd.value;
+    distanceEnd.value = tmp;
+    updateDistance();
+  });
+  updateDistance();
+
+  const gcTextarea = section.querySelector('#gcSequence');
+  const gcResult = section.querySelector('#gcResult');
+  const gcUpper = section.querySelector('#gcUpper');
+  const gcReverse = section.querySelector('#gcReverse');
+  const normaliseSequence = value => value.replace(/[^A-Za-z]/g, '').toUpperCase();
+  const updateGc = () => {
+    const seq = normaliseSequence(gcTextarea.value);
+    if (!seq.length) {
+      gcResult.textContent = 'Indsæt en sekvens for at beregne GC%.';
+      return;
+    }
+    const gcCount = (seq.match(/[GC]/g) || []).length;
+    const atCount = (seq.match(/[ATU]/g) || []).length;
+    const nCount = (seq.match(/[N]/g) || []).length;
+    const otherCount = seq.length - (gcCount + atCount + nCount);
+    const gcPct = (gcCount / seq.length) * 100;
+    gcResult.innerHTML = `<strong>Længde:</strong> ${seq.length.toLocaleString('da-DK')} baser` +
+      `<br><strong>GC-indhold:</strong> ${gcPct.toFixed(1)} % (${gcCount} G/C)` +
+      `<br><strong>A/T/U:</strong> ${atCount}` +
+      `<br><strong>N/andre:</strong> ${nCount + otherCount}`;
+  };
+  gcTextarea.addEventListener('input', updateGc);
+  gcUpper?.addEventListener('click', () => {
+    gcTextarea.value = normaliseSequence(gcTextarea.value);
+    updateGc();
+  });
+  gcReverse?.addEventListener('click', () => {
+    const seq = normaliseSequence(gcTextarea.value);
+    if (!seq.length) {
+      gcResult.textContent = 'Indsæt en sekvens for at beregne GC%.';
+      return;
+    }
+    const complementMap = {A: 'T', T: 'A', U: 'A', G: 'C', C: 'G', Y: 'R', R: 'Y', S: 'S', W: 'W', K: 'M', M: 'K', B: 'V', V: 'B', D: 'H', H: 'D', N: 'N'};
+    const reversed = seq.split('').reverse().map(base => complementMap[base] || base).join('');
+    gcTextarea.value = reversed;
+    updateGc();
+  });
+  updateGc();
+}
+
 function renderResponses(section) {
   const list = getCached('responses').slice().reverse();
   section.innerHTML = `
