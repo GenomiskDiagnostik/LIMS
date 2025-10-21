@@ -80,6 +80,17 @@ header {
   flex-wrap: wrap;
   gap: 1rem;
 }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 .brand {
   display: flex;
   align-items: center;
@@ -149,6 +160,24 @@ header h1 {
   align-items: center;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+.language-select {
+  display: flex;
+  align-items: center;
+}
+.language-select select {
+  border-radius: 0.5rem;
+  border: 1px solid var(--panel-border);
+  background: var(--input-bg);
+  color: inherit;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.95rem;
+  min-width: 160px;
+}
+[data-theme="dark"] .language-select select {
+  background: var(--nav-button-bg);
+  border-color: var(--nav-border);
+  color: var(--text);
 }
 nav {
   background: var(--nav-bg);
@@ -883,6 +912,10 @@ pre {
       </div>
     </div>
     <div class="quick-actions">
+      <label class="language-select" for="languageSelect">
+        <span class="sr-only">Systemsprog</span>
+        <select id="languageSelect" aria-label="Vælg systemsprog"></select>
+      </label>
       <button class="secondary" id="themeToggle">Skift til mørkt tema</button>
     </div>
   </div>
@@ -895,6 +928,239 @@ pre {
 const DB_NAME = 'glims';
 const DB_VER = 6;
 const STORES = ['patients','samples','orders','panels','variants','qc','reports','users','audit','variant_library','responses','conclusion_library'];
+const LANGUAGE_DEFINITIONS = {
+  da: {
+    label: 'Dansk',
+    locale: 'da-DK',
+    htmlLang: 'da',
+    pdf: {
+      reportTitle: 'Diagnostisk Rapport',
+      signature: 'Signering',
+      interpreter: 'Tolker',
+      approver: 'Godkender',
+      notProvided: 'Ikke angivet',
+      noRecords: 'Ingen poster.'
+    }
+  },
+  sv: {
+    label: 'Svenska',
+    locale: 'sv-SE',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'Diagnostisk rapport',
+      signature: 'Signering',
+      interpreter: 'Tolk',
+      approver: 'Godkännare',
+      notProvided: 'Ej angivet',
+      noRecords: 'Inga poster.'
+    }
+  },
+  nb: {
+    label: 'Norsk',
+    locale: 'nb-NO',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'Diagnostisk rapport',
+      signature: 'Signering',
+      interpreter: 'Tolk',
+      approver: 'Godkjenner',
+      notProvided: 'Ikke oppgitt',
+      noRecords: 'Ingen poster.'
+    }
+  },
+  is: {
+    label: 'Íslenska',
+    locale: 'is-IS',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'Greiningarskýrsla',
+      signature: 'Undirritun',
+      interpreter: 'Túlkur',
+      approver: 'Samþykkir',
+      notProvided: 'Ekki tilgreint',
+      noRecords: 'Engar færslur.'
+    }
+  },
+  kl: {
+    label: 'Kalaallisut',
+    locale: 'kl-GL',
+    inherits: 'da'
+  },
+  fo: {
+    label: 'Føroyskt',
+    locale: 'fo-FO',
+    inherits: 'da',
+    pdf: {
+      reportTitle: 'Diagnostisk frágreiðing',
+      signature: 'Undirskrift',
+      interpreter: 'Tulkur',
+      approver: 'Góðkennar',
+      notProvided: 'Ikki upplýst',
+      noRecords: 'Ongar postar.'
+    }
+  },
+  en: {
+    label: 'English',
+    locale: 'en-GB',
+    htmlLang: 'en',
+    pdf: {
+      reportTitle: 'Diagnostic Report',
+      signature: 'Signature',
+      interpreter: 'Interpreter',
+      approver: 'Approver',
+      notProvided: 'Not provided',
+      noRecords: 'No records.'
+    }
+  },
+  de: {
+    label: 'Deutsch',
+    locale: 'de-DE',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'Diagnostischer Bericht',
+      signature: 'Unterschrift',
+      interpreter: 'Interpret',
+      approver: 'Genehmigender',
+      notProvided: 'Nicht angegeben',
+      noRecords: 'Keine Einträge.'
+    }
+  },
+  fr: {
+    label: 'Français',
+    locale: 'fr-FR',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'Rapport diagnostique',
+      signature: 'Signature',
+      interpreter: 'Interprète',
+      approver: 'Approbateur',
+      notProvided: 'Non renseigné',
+      noRecords: 'Aucun enregistrement.'
+    }
+  },
+  nl: {
+    label: 'Nederlands',
+    locale: 'nl-NL',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'Diagnostisch rapport',
+      signature: 'Ondertekening',
+      interpreter: 'Interpreter',
+      approver: 'Goedkeurder',
+      notProvided: 'Niet opgegeven',
+      noRecords: 'Geen records.'
+    }
+  },
+  es: {
+    label: 'Español',
+    locale: 'es-ES',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'Informe diagnóstico',
+      signature: 'Firma',
+      interpreter: 'Intérprete',
+      approver: 'Aprobador',
+      notProvided: 'No indicado',
+      noRecords: 'Sin registros.'
+    }
+  },
+  eo: {
+    label: 'Esperanto',
+    locale: 'eo',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'Diagnoza raporto',
+      signature: 'Subskribo',
+      interpreter: 'Interpretanto',
+      approver: 'Aprobanto',
+      notProvided: 'Ne indikite',
+      noRecords: 'Neniuj registroj.'
+    }
+  },
+  ru: {
+    label: 'Русский',
+    locale: 'ru-RU',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'Диагностический отчёт',
+      signature: 'Подпись',
+      interpreter: 'Интерпретатор',
+      approver: 'Утверждающий',
+      notProvided: 'Не указано',
+      noRecords: 'Нет записей.'
+    }
+  },
+  tr: {
+    label: 'Türkçe',
+    locale: 'tr-TR',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'Tanısal Rapor',
+      signature: 'İmza',
+      interpreter: 'Yorumlayan',
+      approver: 'Onaylayan',
+      notProvided: 'Belirtilmedi',
+      noRecords: 'Kayıt yok.'
+    }
+  },
+  fa: {
+    label: 'فارسی',
+    locale: 'fa-IR',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'گزارش تشخیصی',
+      signature: 'امضا',
+      interpreter: 'تفسیرکننده',
+      approver: 'تأییدکننده',
+      notProvided: 'ذکر نشده',
+      noRecords: 'هیچ رکوردی نیست.'
+    }
+  },
+  zh: {
+    label: '中文',
+    locale: 'zh-CN',
+    inherits: 'en',
+    pdf: {
+      reportTitle: '诊断报告',
+      signature: '签署',
+      interpreter: '解读者',
+      approver: '批准者',
+      notProvided: '未提供',
+      noRecords: '无记录。'
+    }
+  },
+  ja: {
+    label: '日本語',
+    locale: 'ja-JP',
+    inherits: 'en',
+    pdf: {
+      reportTitle: '診断報告書',
+      signature: '署名',
+      interpreter: '解釈者',
+      approver: '承認者',
+      notProvided: '未入力',
+      noRecords: '記録はありません。'
+    }
+  },
+  th: {
+    label: 'ไทย',
+    locale: 'th-TH',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'รายงานการวินิจฉัย',
+      signature: 'การลงนาม',
+      interpreter: 'ผู้แปลผล',
+      approver: 'ผู้อนุมัติ',
+      notProvided: 'ไม่ได้ระบุ',
+      noRecords: 'ไม่มีรายการ.'
+    }
+  }
+};
+const LANGUAGE_ORDER = ['da', 'sv', 'nb', 'is', 'kl', 'fo', 'en', 'de', 'fr', 'nl', 'es', 'eo', 'ru', 'tr', 'fa', 'zh', 'ja', 'th'];
+const DEFAULT_LANGUAGE = 'da';
+function normaliseLanguage(lang) {
+  return LANGUAGE_DEFINITIONS[lang] ? lang : DEFAULT_LANGUAGE;
+}
 const state = {
   db: null,
   cache: new Map(),
@@ -905,9 +1171,90 @@ const state = {
   currentTab: 'dashboard',
   currentUser: null,
   theme: localStorage.getItem('glimr-theme') || 'light',
+  language: normaliseLanguage(localStorage.getItem('glimr-language') || DEFAULT_LANGUAGE),
   testResults: [],
   lastStatus: ''
 };
+
+function currentLanguage() {
+  return state.language;
+}
+function resolveLanguageValue(path, lang = currentLanguage(), seen = new Set()) {
+  if (seen.has(lang)) return null;
+  seen.add(lang);
+  const def = LANGUAGE_DEFINITIONS[lang];
+  if (!def) return null;
+  const segments = Array.isArray(path) ? path : String(path).split('.');
+  let node = def;
+  for (const segment of segments) {
+    if (node == null) break;
+    node = node[segment];
+  }
+  if (node != null) return node;
+  const fallback = def.inherits ? resolveLanguageValue(path, def.inherits, seen) : null;
+  if (fallback != null) return fallback;
+  if (lang !== DEFAULT_LANGUAGE) {
+    return resolveLanguageValue(path, DEFAULT_LANGUAGE, seen);
+  }
+  return null;
+}
+function getLanguageSetting(path, fallback) {
+  const value = resolveLanguageValue(path);
+  return value == null ? fallback : value;
+}
+function getCurrentLocale() {
+  return getLanguageSetting('locale', 'da-DK');
+}
+function getCurrentCollationLocale() {
+  return getLanguageSetting('collation', getCurrentLocale());
+}
+function translate(path, fallback) {
+  const value = resolveLanguageValue(path);
+  return value == null ? fallback : value;
+}
+function pdfText(key, fallback) {
+  return translate(`pdf.${key}`, fallback);
+}
+function populateLanguageSelect(select) {
+  if (!select || select.dataset.languageInit) return;
+  select.innerHTML = LANGUAGE_ORDER.map(code => {
+    const def = LANGUAGE_DEFINITIONS[code];
+    if (!def) return '';
+    const label = esc(def.label || code);
+    const value = esc(code);
+    return `<option value="${value}">${label}</option>`;
+  }).join('');
+  select.dataset.languageInit = 'true';
+}
+function applyLanguageSettings() {
+  const lang = currentLanguage();
+  const locale = getCurrentLocale();
+  const htmlLang = getLanguageSetting('htmlLang', locale?.split?.('-')?.[0] || lang);
+  document.documentElement.lang = htmlLang || lang;
+  const dir = getLanguageSetting('dir', 'ltr');
+  document.documentElement.dir = dir;
+  const select = document.getElementById('languageSelect');
+  if (select) {
+    populateLanguageSelect(select);
+    select.value = lang;
+  }
+  if (typeof drawReportHeader === 'function') {
+    drawReportHeader.dateFormatter = null;
+  }
+}
+function setLanguage(lang) {
+  const normalised = normaliseLanguage(lang);
+  if (normalised === state.language) {
+    applyLanguageSettings();
+    return;
+  }
+  state.language = normalised;
+  localStorage.setItem('glimr-language', normalised);
+  applyLanguageSettings();
+  renderAll();
+  activateTab(state.currentTab);
+  applyControlTooltips(document.body);
+}
 const CREATED_BY_STORES = new Set(['patients','samples','orders','variants','qc','reports','conclusion_library']);
 const ROLE_OPTIONS = [
   {value: 'Observatør', description: 'Kun læseadgang til data', canWrite: false},
@@ -1246,6 +1593,7 @@ const tooltipCatalog = {
   },
   controls: {
     autosaveToggle: 'Aktiver eller deaktiver automatisk gemning til fil.',
+    languageSelect: 'Vælg systemsproget til formatering, rapporter og eksport.',
     fhirOrderSelect: 'Vælg hvilken ordination der skal bruges til FHIR-svar.',
     fhirImportLabel: 'Importer en modtaget FHIR JSON-fil.',
     fhirPreview: 'JSON-visning af den genererede FHIR-bundle.',
@@ -1401,9 +1749,9 @@ function openVariantLibraryPicker(onSelect) {
   const existing = document.querySelector('.variant-picker-overlay');
   if (existing) existing.remove();
   const sorted = library.sort((a, b) => {
-    const geneCompare = (a.gene || '').localeCompare(b.gene || '');
+    const geneCompare = (a.gene || '').localeCompare(b.gene || '', getCurrentCollationLocale());
     if (geneCompare) return geneCompare;
-    const hgvsCompare = (a.hgvs_c || '').localeCompare(b.hgvs_c || '');
+    const hgvsCompare = (a.hgvs_c || '').localeCompare(b.hgvs_c || '', getCurrentCollationLocale());
     if (hgvsCompare) return hgvsCompare;
     return (a.id || 0) - (b.id || 0);
   });
@@ -1585,7 +1933,7 @@ function updateWriteBanner() {
 function refreshLoginOptions() {
   const select = document.getElementById('loginUser');
   if (!select) return;
-  const users = getCached('users').slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const users = getCached('users').slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', getCurrentCollationLocale()));
   const currentId = state.currentUser?.id ? String(state.currentUser.id) : '';
   select.innerHTML = '';
   const placeholder = document.createElement('option');
@@ -1878,7 +2226,7 @@ async function saveBoundFile() {
   const data = await exportData();
   await writable.write(JSON.stringify(data, null, 2));
   await writable.close();
-  setStatus('Autogemt kl. ' + new Date().toLocaleTimeString());
+  setStatus('Autogemt kl. ' + new Date().toLocaleTimeString(getCurrentLocale()));
 }
 async function manualSave() {
   try {
@@ -2501,9 +2849,9 @@ function renderDashboard(section) {
 }
 
 function renderCreateCase(section) {
-  const panels = getCached('panels').slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  const users = getCached('users').slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  const families = Array.from(new Set(getCached('patients').map(p => (p.family_number || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'da'));
+  const panels = getCached('panels').slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', getCurrentCollationLocale()));
+  const users = getCached('users').slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', getCurrentCollationLocale()));
+  const families = Array.from(new Set(getCached('patients').map(p => (p.family_number || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, getCurrentCollationLocale()));
   const familySelectOptions = ['<option value="">Vælg familienummer</option>']
     .concat(families.map(num => `<option value="${esc(num)}">${esc(num)}</option>`))
     .concat('<option value="__custom__">Tilføj nyt familienummer…</option>')
@@ -3264,7 +3612,7 @@ function clearFormIdentifier(form, fieldName = 'id') {
 }
 function renderPatients(section) {
   const list = getCached('patients');
-  const existingFamilyNumbers = Array.from(new Set(list.map(p => (p.family_number || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'da'));
+  const existingFamilyNumbers = Array.from(new Set(list.map(p => (p.family_number || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, getCurrentCollationLocale()));
   const familySelectOptions = ['<option value="">Vælg familienummer</option>']
     .concat(existingFamilyNumbers.map(num => `<option value="${esc(num)}">${esc(num)}</option>`))
     .concat('<option value="__custom__">Tilføj nyt familienummer…</option>')
@@ -3775,7 +4123,7 @@ function renderOrders(section) {
   const patients = getCached('patients');
   const samples = getCached('samples');
   const panels = getCached('panels');
-  const users = getCached('users').slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const users = getCached('users').slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', getCurrentCollationLocale()));
   const patientMap = new Map(patients.map(p => [p.id, p]));
   const sampleMap = new Map(samples.map(s => [s.id, s]));
   const panelMap = new Map(panels.map(p => [p.id, p]));
@@ -4641,9 +4989,9 @@ function renderVariants(section) {
 }
 function renderVariantLibrary(section) {
   const list = getCached('variant_library').slice().sort((a, b) => {
-    const geneCompare = (a.gene || '').localeCompare(b.gene || '', 'da');
+    const geneCompare = (a.gene || '').localeCompare(b.gene || '', getCurrentCollationLocale());
     if (geneCompare) return geneCompare;
-    const hgvsCompare = (a.hgvs_c || '').localeCompare(b.hgvs_c || '', 'da');
+    const hgvsCompare = (a.hgvs_c || '').localeCompare(b.hgvs_c || '', getCurrentCollationLocale());
     if (hgvsCompare) return hgvsCompare;
     return (a.id || 0) - (b.id || 0);
   });
@@ -5173,7 +5521,7 @@ function buildConclusionPlaceholderGuide(context = 'report') {
 
 function renderConclusionLibrary(section) {
   const list = getCached('conclusion_library').slice().sort((a, b) => {
-    const titleCompare = (a.title || '').localeCompare(b.title || '', 'da');
+    const titleCompare = (a.title || '').localeCompare(b.title || '', getCurrentCollationLocale());
     if (titleCompare) return titleCompare;
     return (a.id || 0) - (b.id || 0);
   });
@@ -5313,7 +5661,7 @@ function renderConclusionLibrary(section) {
 function renderReports(section) {
   const list = getCached('reports');
   const orders = getCached('orders');
-  const conclusionLibrary = getCached('conclusion_library').slice().sort((a, b) => (a.title || '').localeCompare(b.title || '', 'da'));
+  const conclusionLibrary = getCached('conclusion_library').slice().sort((a, b) => (a.title || '').localeCompare(b.title || '', getCurrentCollationLocale()));
   const conclusionOptions = conclusionLibrary.map(entry => `<option value="${entry.id}">${esc(entry.title || `Tekst #${entry.id}`)}</option>`).join('');
   section.innerHTML = `
   <div class="panel">
@@ -6360,8 +6708,8 @@ function drawReportHeader(builder, logo, exportedAt) {
     builder.drawImage(logo.objectName, margin, imageY, imageWidth, imageHeight);
   }
   const titleX = imageWidth ? margin + imageWidth + 28 : margin + PDF_SECTION_CARD_PADDING_X;
-  builder.addText('Diagnostisk Rapport', titleX, titleBaseline, PDF_TITLE_FONT_SIZE, PDF_ACCENT_COLOR);
-  const dateFormatter = drawReportHeader.dateFormatter || new Intl.DateTimeFormat('da-DK');
+  builder.addText(pdfText('reportTitle', 'Diagnostisk Rapport'), titleX, titleBaseline, PDF_TITLE_FONT_SIZE, PDF_ACCENT_COLOR);
+  const dateFormatter = drawReportHeader.dateFormatter || new Intl.DateTimeFormat(getCurrentLocale());
   drawReportHeader.dateFormatter = dateFormatter;
   const dateLabel = dateFormatter.format(exportedAt || new Date());
   const dateWidth = measurePdfTextWidth(dateLabel, 12);
@@ -6423,7 +6771,7 @@ function buildSectionLayout(heading, rows, width) {
       case 'list': {
         const items = Array.isArray(row.items) ? row.items : [];
         if (!items.length) {
-          const emptyLines = wrapPdfText(row.emptyText || 'Ingen poster.', contentWidth, PDF_BODY_FONT_SIZE);
+          const emptyLines = wrapPdfText(row.emptyText || pdfText('noRecords', 'Ingen poster.'), contentWidth, PDF_BODY_FONT_SIZE);
           layout.blocks.push({lines: emptyLines});
           layout.height += emptyLines.length * PDF_BODY_LEADING;
           if (index < rows.length - 1) layout.height += PDF_ROW_SPACING;
@@ -6616,7 +6964,7 @@ async function createReportPdfBlob(orderId, reportData, exportedAt = new Date())
     builder.strokeRect(signatureX, signatureBottom, signatureWidth, signatureHeight, 0.8, PDF_CARD_BORDER_COLOR);
     const signatureHeadingY = signatureBottom + signatureHeight - 18;
     const signatureTextX = singleColumn.x + PDF_SECTION_CARD_PADDING_X;
-    builder.addText('Signering', signatureTextX, signatureHeadingY, PDF_HEADING_FONT_SIZE, PDF_HEADING_TEXT_COLOR);
+    builder.addText(pdfText('signature', 'Signering'), signatureTextX, signatureHeadingY, PDF_HEADING_FONT_SIZE, PDF_HEADING_TEXT_COLOR);
     const signatureInnerWidth = singleColumn.width - PDF_SECTION_CARD_PADDING_X * 2;
     const signatureLineY = signatureBottom + 40;
     const firstLineStart = signatureTextX;
@@ -6634,9 +6982,12 @@ async function createReportPdfBlob(orderId, reportData, exportedAt = new Date())
       secondLineStart = Math.max(secondLineEnd - 80, secondLineStart);
     }
     builder.addLine(firstLineStart, signatureLineY, firstLineEnd, signatureLineY, 1, PDF_SIGNATURE_LINE_COLOR);
-    builder.addText(`Tolker: ${interpreterName || 'Ikke angivet'}`, firstLineStart, signatureLineY + 24, PDF_BODY_FONT_SIZE, PDF_TEXT_COLOR);
+    const interpreterLabel = pdfText('interpreter', 'Tolker');
+    const approverLabel = pdfText('approver', 'Godkender');
+    const notProvided = pdfText('notProvided', 'Ikke angivet');
+    builder.addText(`${interpreterLabel}: ${interpreterName || notProvided}`, firstLineStart, signatureLineY + 24, PDF_BODY_FONT_SIZE, PDF_TEXT_COLOR);
     builder.addLine(secondLineStart, signatureLineY, secondLineEnd, signatureLineY, 1, PDF_SIGNATURE_LINE_COLOR);
-    builder.addText(`Godkender: ${approverName || 'Ikke angivet'}`, secondLineStart, signatureLineY + 24, PDF_BODY_FONT_SIZE, PDF_TEXT_COLOR);
+    builder.addText(`${approverLabel}: ${approverName || notProvided}`, secondLineStart, signatureLineY + 24, PDF_BODY_FONT_SIZE, PDF_TEXT_COLOR);
     const bytes = builder.build();
     return new Blob([bytes], {type: 'application/pdf'});
   } catch (err) {
@@ -7225,10 +7576,10 @@ function renderTools(section) {
       return Number.isFinite(number) ? number : NaN;
     };
     const formatRatio = value => Number.isFinite(value)
-      ? Number(value).toLocaleString('da-DK', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+      ? Number(value).toLocaleString(getCurrentLocale(), {minimumFractionDigits: 2, maximumFractionDigits: 2})
       : '–';
     const formatPercent = value => Number.isFinite(value)
-      ? Number(value).toLocaleString('da-DK', {style: 'percent', maximumFractionDigits: 1})
+      ? Number(value).toLocaleString(getCurrentLocale(), {style: 'percent', maximumFractionDigits: 1})
       : '–';
     const updateConsang = () => {
       const selectedValue = ethnicitySelect?.value;
@@ -7309,8 +7660,8 @@ function renderTools(section) {
     const diff = Math.abs(endVal - startVal);
     const inclusive = diff + 1;
     const orientation = endVal === startVal ? 'samme position' : endVal > startVal ? 'stigende koordinater' : 'faldende koordinater';
-    distanceResult.innerHTML = `<strong>Eksklusiv afstand:</strong> ${diff.toLocaleString('da-DK')} baser` +
-      `<br><strong>Inklusiv afstand:</strong> ${inclusive.toLocaleString('da-DK')} baser` +
+    distanceResult.innerHTML = `<strong>Eksklusiv afstand:</strong> ${diff.toLocaleString(getCurrentLocale())} baser` +
+      `<br><strong>Inklusiv afstand:</strong> ${inclusive.toLocaleString(getCurrentLocale())} baser` +
       `<br><span class="tool-note">Fortolkning: ${orientation}.</span>`;
   };
   distanceForm.addEventListener('input', updateDistance);
@@ -7338,7 +7689,7 @@ function renderTools(section) {
     const nCount = (seq.match(/[N]/g) || []).length;
     const otherCount = seq.length - (gcCount + atCount + nCount);
     const gcPct = (gcCount / seq.length) * 100;
-    gcResult.innerHTML = `<strong>Længde:</strong> ${seq.length.toLocaleString('da-DK')} baser` +
+    gcResult.innerHTML = `<strong>Længde:</strong> ${seq.length.toLocaleString(getCurrentLocale())} baser` +
       `<br><strong>GC-indhold:</strong> ${gcPct.toFixed(1)} % (${gcCount} G/C)` +
       `<br><strong>A/T/U:</strong> ${atCount}` +
       `<br><strong>N/andre:</strong> ${nCount + otherCount}`;
@@ -8205,6 +8556,12 @@ function hookUi() {
     themeBtn.addEventListener('click', toggleTheme);
     setTooltip(themeBtn, tooltipCatalog.buttons.themeToggle);
   }
+  const languageSelect = document.getElementById('languageSelect');
+  if (languageSelect) {
+    populateLanguageSelect(languageSelect);
+    languageSelect.value = currentLanguage();
+    languageSelect.addEventListener('change', evt => setLanguage(evt.target.value));
+  }
   const logoImg = document.getElementById('glimrLogo');
   if (logoImg) {
     const brand = logoImg.closest('.brand');
@@ -8227,6 +8584,7 @@ function hookUi() {
   applyControlTooltips(document.body);
 }
 async function init() {
+  applyLanguageSettings();
   initTabs();
   try {
     state.db = await openDb();
