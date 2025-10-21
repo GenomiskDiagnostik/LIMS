@@ -16,6 +16,8 @@ Active — under active development. See the repository for current branches and
 - Audit trails and reporting
 - Import/export (CSV, JSON) of sample and run data
 
+<img width="1567" height="797" alt="Skærmbillede 2025-10-21 101535" src="https://github.com/user-attachments/assets/6bfa5412-1502-49f5-b699-3fc3bca23bf7" />
+
 ## Technologies
 
 List of primary technologies used in this repository (actual components may vary by module):
