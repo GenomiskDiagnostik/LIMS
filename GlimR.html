@@ -745,7 +745,7 @@ const schemaFields = {
   samples: ['id','pmb_number','patient_id','sample_type','collected_at','status','notes','created_by','created_at','updated_at'],
   panels: ['id','name','description','created_at','updated_at'],
   orders: ['id','patient_id','sample_id','panel_id','analysis_responsible_id','interpreter_id','approver_id','clinician','status','ordered_at','created_by','created_at','updated_at'],
-  variants: ['id','order_id','gene','transcript','hgvs_c','hgvs_p','zygosity','classification','criteria','af','interpretation','created_by','created_at','updated_at'],
+  variants: ['id','order_id','gene','transcript','hgvs_c','hgvs_p','zygosity','classification','criteria','af','annotations','interpretation','created_by','created_at','updated_at'],
   qc: ['id','sample_id','metric','value','unit','notes','created_by','created_at','updated_at'],
   reports: ['id','order_id','findings','variant_ids','variant_details','summary','status','issued_at','created_by','created_at','updated_at'],
   users: ['id','name','email','role','pin','created_at','updated_at'],
@@ -886,6 +886,7 @@ const tooltipCatalog = {
       classification: 'ACMG-klassifikation 1 (godartet) – 5 (patogen).',
       criteria: 'Anfør anvendte ACMG-kriterier, adskilt af komma.',
       af: 'Allelfrekvens eller observationsfrekvens.',
+      annotations: 'Supplerende annoteringer fra eksterne værktøjer såsom VarSeq.',
       interpretation: 'Klinisk tolkning og evidens for varianten.'
     },
     variantLibraryForm: {
@@ -995,6 +996,11 @@ const tooltipCatalog = {
     submit: 'Gemmer formularens indhold i databasen.',
     addQcRow: 'Tilføj en ekstra QC-måling til prøven.',
     addVariantRow: 'Tilføj endnu en variant til ordinationen.',
+    caseImportVarSeq: 'Importer varianter fra en VarSeq-CSV direkte i oprettelsesflowet.',
+    variantBatchAdd: 'Tilføj en tom række til masseoprettelse af varianter.',
+    variantBatchImport: 'Importer en VarSeq-CSV og udfyld rækkerne automatisk.',
+    variantBatchSave: 'Gem alle udfyldte rækker på den valgte ordination.',
+    variantBatchClear: 'Ryd alle midlertidige rækker uden at gemme dem.',
     createCaseSubmit: 'Opretter patient, prøve, ordination, QC og varianter i ét trin.',
     createCaseReset: 'Ryd alle felter i oprettelsesformularen.',
     'Vælg fra bibliotek': 'Hent variantoplysninger fra biblioteket.'
@@ -1016,9 +1022,13 @@ const tooltipCatalog = {
     loginUser: 'Vælg hvilken GlimR-bruger der skal logges ind.',
     loginPass: 'Indtast brugerens adgangskode hvis der er opsat en PIN.',
     includeControlSample: 'Aktiver for at registrere en ekstra kontrolprøve på samme patient.',
-    caseVariantHint: 'Information om tilknyttede varianter i den nye sag.',
     orderStatusPreview: 'Viser hvilken status den nye ordination får. Status følger prøvens valg.',
-    variantLibraryImportInput: 'Vælg en CSV-fil der indeholder biblioteksposter til import.'
+    caseVariantHint: 'Information om tilknyttede varianter i den nye sag.',
+    variantLibraryImportInput: 'Vælg en CSV-fil der indeholder biblioteksposter til import.',
+    caseImportVarSeqInput: 'Vælg en VarSeq CSV-fil med fund, som skal tilføjes til sagen.',
+    variantBatchOrder: 'Vælg den ordination som de importerede varianter skal knyttes til.',
+    variantBatchMessage: 'Status og advarsler for masseoprettelse af varianter.',
+    variantBatchFile: 'Vælg en VarSeq CSV-fil til masseimport.'
   }
 };
 function setTooltip(el, text) {
@@ -1952,6 +1962,185 @@ function parseCsv(text) {
   const headers = rows.shift() || [];
   return {headers: headers.map(h => h.trim()), rows, delimiter};
 }
+function normaliseHeader(header) {
+  if (header == null) return '';
+  let value = String(header).trim().toLowerCase();
+  if (typeof value.normalize === 'function') {
+    value = value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+  return value.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+function mapVarSeqClassification(value) {
+  if (value == null) return '';
+  const raw = String(value).trim();
+  if (!raw) return '';
+  if (/^[1-5]$/.test(raw)) return raw;
+  const digit = raw.match(/[1-5]/);
+  if (digit) return digit[0];
+  const lower = raw.toLowerCase();
+  if (lower.includes('pathogenic')) {
+    return lower.includes('likely') ? '4' : '5';
+  }
+  if (lower.includes('benign')) {
+    return lower.includes('likely') ? '2' : '1';
+  }
+  if (lower.includes('vus') || lower.includes('uncertain') || lower.includes('ukendt')) {
+    return '3';
+  }
+  if (lower.includes('risk')) return '3';
+  return '';
+}
+function parseVarSeqVariants(text) {
+  const {headers, rows} = parseCsv(text);
+  if (!headers.length) throw new Error('CSV-filen mangler kolonneoverskrifter.');
+  const headerMap = {
+    gene: 'gene',
+    gen: 'gene',
+    gene_name: 'gene',
+    gene_symbol: 'gene',
+    transcript: 'transcript',
+    transcript_id: 'transcript',
+    transcript_accession: 'transcript',
+    refseq_transcript: 'transcript',
+    refseq: 'transcript',
+    ensembl_transcript: 'transcript',
+    cdna_change: 'hgvs_c',
+    cdna_change_hgvs: 'hgvs_c',
+    cdna: 'hgvs_c',
+    c_hgvs: 'hgvs_c',
+    hgvs_c: 'hgvs_c',
+    coding_hgvs: 'hgvs_c',
+    coding_dna_change: 'hgvs_c',
+    protein_change: 'hgvs_p',
+    protein_change_hgvs: 'hgvs_p',
+    protein: 'hgvs_p',
+    hgvs_p: 'hgvs_p',
+    amino_acid_change: 'hgvs_p',
+    effect: 'hgvs_p',
+    protein_effect: 'hgvs_p',
+    zygosity: 'zygosity',
+    genotype: 'zygosity',
+    sample_zygosity: 'zygosity',
+    classification: 'classification',
+    classification_short: 'classification',
+    acmg_classification: 'classification',
+    acmg_class: 'classification',
+    acmg_score: 'classification',
+    acmg: 'criteria',
+    acmg_evidence: 'criteria',
+    acmg_criteria: 'criteria',
+    acmg_codes: 'criteria',
+    acmg_rule: 'criteria',
+    allele_fraction: 'af',
+    allele_frequency: 'af',
+    allele_balance: 'af',
+    allele_ratio: 'af',
+    af: 'af',
+    af_percent: 'af',
+    variant_af: 'af',
+    allel_frekvens: 'af',
+    allelfrekvens: 'af'
+  };
+  const columnKeys = headers.map(header => headerMap[normaliseHeader(header)] || null);
+  if (!columnKeys.some(key => key === 'gene' || key === 'hgvs_c' || key === 'hgvs_p')) {
+    throw new Error('CSV-filen skal indeholde mindst én kolonne for gen eller HGVS.');
+  }
+  const variants = [];
+  let skipped = 0;
+  const warnings = [];
+  const seenAnnotations = new Set();
+  const toNumber = value => {
+    if (value == null) return null;
+    const trimmed = String(value).trim();
+    if (!trimmed) return null;
+    const hasPercent = /%/.test(trimmed);
+    const normalised = trimmed.replace(/%/g, '').replace(/\s+/g, '').replace(',', '.');
+    const parsed = Number(normalised);
+    if (!Number.isFinite(parsed)) return null;
+    const result = hasPercent ? parsed / 100 : parsed;
+    return result;
+  };
+  rows.forEach((rowValues, index) => {
+    if (!rowValues || rowValues.every(cell => !cell || !cell.trim())) {
+      skipped++;
+      return;
+    }
+    const entry = {};
+    const annotations = [];
+    columnKeys.forEach((key, idx) => {
+      const rawValue = rowValues[idx];
+      if (rawValue == null) return;
+      const value = String(rawValue).trim();
+      if (!value) return;
+      if (!key) {
+        const header = headers[idx] ?? `Kolonne ${idx + 1}`;
+        const label = String(header).trim() || `Kolonne ${idx + 1}`;
+        annotations.push(`${label}: ${value}`);
+        seenAnnotations.add(label);
+        return;
+      }
+      switch (key) {
+        case 'gene':
+          entry.gene = value;
+          break;
+        case 'transcript':
+          entry.transcript = value;
+          break;
+        case 'hgvs_c':
+          entry.hgvs_c = value;
+          break;
+        case 'hgvs_p':
+          entry.hgvs_p = value;
+          break;
+        case 'zygosity':
+          entry.zygosity = value;
+          break;
+        case 'classification':
+          entry.classification = mapVarSeqClassification(value);
+          if (!entry.classification && value) {
+            warnings.push(`Række ${index + 2}: Ukendt klassifikation "${value}".`);
+          }
+          break;
+        case 'criteria':
+          entry.criteria = entry.criteria ? `${entry.criteria}; ${value}` : value;
+          break;
+        case 'af':
+          const afValue = toNumber(value);
+          if (afValue != null) {
+            entry.af = afValue;
+          } else {
+            warnings.push(`Række ${index + 2}: Kunne ikke tolke allelfrekvens "${value}".`);
+          }
+          break;
+        default:
+          break;
+      }
+    });
+    if (!entry.gene && !entry.hgvs_c && !entry.hgvs_p) {
+      skipped++;
+      return;
+    }
+    if (annotations.length) {
+      entry.annotations = annotations.join(' | ');
+    }
+    variants.push(entry);
+  });
+  return {
+    variants,
+    warnings,
+    summary: {
+      total: rows.length,
+      imported: variants.length,
+      skipped,
+      annotationColumns: Array.from(seenAnnotations)
+    }
+  };
+}
+async function parseVarSeqFile(file) {
+  if (!file) throw new Error('Ingen fil valgt.');
+  const text = await file.text();
+  return parseVarSeqVariants(text);
+}
 async function restoreFromFile(file) {
   const text = await file.text();
   const data = JSON.parse(text);
@@ -2173,7 +2362,11 @@ function renderCreateCase(section) {
         <legend>Varianter</legend>
         <p class="form-hint" id="caseVariantHint">Registrer varianter fundet ved analysen. Tomme rækker ignoreres.</p>
         <div id="variantList" class="repeater"></div>
-        <button type="button" class="secondary" id="addVariantRow">Tilføj variant</button>
+        <div class="btn-row">
+          <button type="button" class="secondary" id="addVariantRow">Tilføj variant</button>
+          <button type="button" class="secondary" id="caseImportVarSeq">Importér VarSeq CSV</button>
+          <input type="file" id="caseImportVarSeqInput" accept=".csv,text/csv" hidden>
+        </div>
       </fieldset>
       <div class="btn-row">
         <button type="submit" class="primary" id="createCaseSubmit">Opret sag</button>
@@ -2194,6 +2387,8 @@ function renderCreateCase(section) {
   const addQcBtn = section.querySelector('#addQcRow');
   const qcList = section.querySelector('#qcList');
   const addVariantBtn = section.querySelector('#addVariantRow');
+  const importVariantBtn = section.querySelector('#caseImportVarSeq');
+  const importVariantInput = section.querySelector('#caseImportVarSeqInput');
   const variantList = section.querySelector('#variantList');
   const submitBtn = section.querySelector('#createCaseSubmit');
   const resetBtn = section.querySelector('#createCaseReset');
@@ -2277,6 +2472,7 @@ function renderCreateCase(section) {
       <label class="inline">ACMG<select data-field="classification">${classificationOptions}</select></label>
       <label class="inline">Kriterier<input type="text" data-field="criteria" placeholder="PM1,PP3"></label>
       <label class="inline">Allelfrekvens<input type="number" step="0.0001" data-field="af" placeholder="0.125"></label>
+      <label class="inline wide">Annoteringer<textarea class="small" data-field="annotations" placeholder="VarSeq-annoteringer og noter"></textarea></label>
       <label class="inline wide">Tolkning<textarea class="small" data-field="interpretation" placeholder="Kort tolkning"></textarea></label>
       <button type="button" class="secondary case-choose-library">Vælg fra bibliotek</button>
       <button type="button" class="secondary case-remove-row">Fjern</button>`;
@@ -2300,6 +2496,8 @@ function renderCreateCase(section) {
     }
     const interpretationField = row.querySelector('[data-field="interpretation"]');
     if (interpretationField) interpretationField.value = values.interpretation || '';
+    const annotationsField = row.querySelector('[data-field="annotations"]');
+    if (annotationsField) annotationsField.value = values.annotations || '';
     const removeBtn = row.querySelector('.case-remove-row');
     removeBtn?.addEventListener('click', () => row.remove());
     if (removeBtn) setTooltip(removeBtn, 'Fjern varianten fra oprettelsen.');
@@ -2317,14 +2515,74 @@ function renderCreateCase(section) {
         }
         const interpretationField = row.querySelector('[data-field="interpretation"]');
         if (interpretationField) interpretationField.value = variant.evidence || variant.interpretation || '';
+        const annotationsField = row.querySelector('[data-field="annotations"]');
+        if (annotationsField) annotationsField.value = variant.annotations || variant.annotation_summary || '';
       });
     });
     if (libraryBtn) setTooltip(libraryBtn, 'Vælg en variant fra biblioteket.');
     variantList.appendChild(row);
     applyButtonTooltips(row);
   };
+  const isVariantRowEmpty = row => {
+    if (!row) return true;
+    const get = field => {
+      const el = row.querySelector(`[data-field="${field}"]`);
+      if (!el) return '';
+      if (el.type === 'number') return el.value.trim();
+      return (el.value || '').trim();
+    };
+    const gene = get('gene');
+    const transcript = get('transcript');
+    const hgvsC = get('hgvs_c');
+    const hgvsP = get('hgvs_p');
+    const zygosity = get('zygosity');
+    const criteria = get('criteria');
+    const af = get('af');
+    const interpretation = get('interpretation');
+    const annotations = get('annotations');
+    return !gene && !transcript && !hgvsC && !hgvsP && !zygosity && !criteria && !af && !interpretation && !annotations;
+  };
+  const removeEmptyVariantRows = () => {
+    if (!variantList) return;
+    const rows = Array.from(variantList.querySelectorAll('.variant-row'));
+    if (!rows.length) return;
+    const filled = rows.filter(row => !isVariantRowEmpty(row));
+    if (!filled.length) {
+      variantList.innerHTML = '';
+      return;
+    }
+    rows.forEach(row => {
+      if (isVariantRowEmpty(row)) row.remove();
+    });
+  };
   addQcBtn?.addEventListener('click', () => addQcRow());
   addVariantBtn?.addEventListener('click', () => addVariantRow());
+  importVariantBtn?.addEventListener('click', () => importVariantInput?.click());
+  importVariantInput?.addEventListener('change', async () => {
+    const file = importVariantInput?.files?.[0];
+    if (!file) return;
+    try {
+      const {variants: importedVariants, warnings, summary} = await parseVarSeqFile(file);
+      if (!importedVariants.length) {
+        setMessage('Ingen varianter blev fundet i filen.', 'error');
+        return;
+      }
+      removeEmptyVariantRows();
+      importedVariants.forEach(variant => addVariantRow(variant));
+      const parts = [`Tilføjede ${importedVariants.length} varianter fra ${file.name}.`];
+      if (summary.skipped) parts.push(`${summary.skipped} rækker blev ignoreret.`);
+      if (warnings.length) parts.push(`${warnings.length} advarsler blev logget i konsollen.`);
+      const messageText = parts.join(' ');
+      setMessage(messageText, 'success');
+      setStatus(`VarSeq import til oprettelse: ${importedVariants.length} varianter klar.`);
+      if (warnings.length) console.warn('VarSeq import advarsler', warnings);
+    } catch (err) {
+      console.error(err);
+      setMessage('Kunne ikke importere VarSeq CSV: ' + (err?.message || err), 'error');
+    } finally {
+      if (importVariantInput) importVariantInput.value = '';
+    }
+  });
   addQcRow();
   addVariantRow();
   applyButtonTooltips(section);
@@ -2484,7 +2742,8 @@ function renderCreateCase(section) {
         const criteria = row.querySelector('[data-field="criteria"]')?.value.trim() || '';
         const afRaw = row.querySelector('[data-field="af"]')?.value.trim() || '';
         const interpretation = row.querySelector('[data-field="interpretation"]')?.value.trim() || '';
-        const isEmpty = !gene && !transcript && !hgvsC && !hgvsP && !zygosity && !criteria && !afRaw && !interpretation;
+        const annotations = row.querySelector('[data-field="annotations"]')?.value.trim() || '';
+        const isEmpty = !gene && !transcript && !hgvsC && !hgvsP && !zygosity && !criteria && !afRaw && !interpretation && !annotations;
         if (isEmpty) continue;
         if (!gene) {
           setMessage('Angiv gen for hver registreret variant.', 'error');
@@ -2513,6 +2772,9 @@ function renderCreateCase(section) {
             return;
           }
           variant.af = afNumber;
+        }
+        if (annotations) {
+          variant.annotations = annotations;
         }
         variantEntries.push(variant);
       }
@@ -3564,7 +3826,7 @@ function renderOrders(section) {
   section.querySelector('#orderClear').addEventListener('click', () => form.reset());
 }
 function renderVariants(section) {
-  const list = getCached('variants');
+  let list = getCached('variants');
   const orders = getCached('orders');
   section.innerHTML = `
   <div class="panel">
@@ -3609,6 +3871,7 @@ function renderVariants(section) {
           <label>ACMG-klasse<select name="classification" required><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></label>
           <label>Kriterier<input name="criteria" placeholder="PM1,PP3..."></label>
           <label>Allelfrekvens<input name="af" type="number" step="0.0001"></label>
+          <label>Annoteringer<textarea name="annotations" placeholder="Importerede annoteringer fra VarSeq og andre værktøjer."></textarea></label>
           <label>Tolkning<textarea name="interpretation"></textarea></label>
           <div class="btn-row">
             <button class="primary" type="submit" id="variantSave" data-action="save">Gem</button>
@@ -3621,6 +3884,28 @@ function renderVariants(section) {
         </form>
       </div>
     </div>
+  </div>
+  <div class="panel">
+    <h2>Massetilføj varianter</h2>
+    <p class="panel-hint">Tilføj flere varianter til en eksisterende ordination via import eller manuel indtastning.</p>
+    <label>Ordination
+      <div class="filterable-select">
+        <input type="search" data-select-filter placeholder="Filtrer ordinationer">
+        <select id="variantBatchOrder">
+          <option value="" selected>Vælg ordination</option>
+          ${orders.map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}
+        </select>
+      </div>
+    </label>
+    <div id="variantBatchList" class="repeater"></div>
+    <div class="btn-row">
+      <button type="button" class="secondary" id="variantBatchAdd">Tilføj variant</button>
+      <button type="button" class="secondary" id="variantBatchImport">Importér VarSeq CSV</button>
+      <input type="file" id="variantBatchFile" accept=".csv,text/csv" hidden>
+      <button type="button" class="primary" id="variantBatchSave">Gem varianter</button>
+      <button type="button" class="secondary" id="variantBatchClear">Ryd rækker</button>
+    </div>
+    <div class="form-hint" id="variantBatchMessage" role="status" aria-live="polite"></div>
   </div>`;
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#variantSearch');
@@ -3628,6 +3913,165 @@ function renderVariants(section) {
   const saveButton = form.querySelector('#variantSave');
   const saveNewButton = form.querySelector('#variantSaveNew');
   const defaultSaveLabel = saveButton?.textContent || 'Gem';
+  const batchList = section.querySelector('#variantBatchList');
+  const batchAddBtn = section.querySelector('#variantBatchAdd');
+  const batchImportBtn = section.querySelector('#variantBatchImport');
+  const batchFileInput = section.querySelector('#variantBatchFile');
+  const batchSaveBtn = section.querySelector('#variantBatchSave');
+  const batchClearBtn = section.querySelector('#variantBatchClear');
+  const batchMessage = section.querySelector('#variantBatchMessage');
+  const batchOrderSelect = section.querySelector('#variantBatchOrder');
+  const setBatchMessage = (text, tone = 'info') => {
+    if (!batchMessage) return;
+    batchMessage.textContent = text ?? '';
+    const color = tone === 'success' ? 'var(--accent-strong)' : tone === 'error' ? 'var(--danger)' : 'var(--muted-text)';
+    batchMessage.style.color = color;
+  };
+  const addBatchVariantRow = (values = {}) => {
+    if (!batchList) return;
+    const defaultClass = values.classification != null ? String(values.classification) : '3';
+    const classificationOptions = ['1','2','3','4','5'].map(v => `<option value="${v}"${defaultClass === String(v) ? ' selected' : ''}>${v}</option>`).join('');
+    const row = document.createElement('div');
+    row.className = 'case-row variant-row';
+    row.innerHTML = `
+      <label class="inline">Gen<input type="text" data-field="gene" placeholder="BRCA1"></label>
+      <label class="inline">Transkript<input type="text" data-field="transcript" placeholder="NM_007294.3"></label>
+      <label class="inline">HGVS c.<input type="text" data-field="hgvs_c" placeholder="c.5266dupC"></label>
+      <label class="inline">HGVS p.<input type="text" data-field="hgvs_p" placeholder="p.(Gln1756Profs*74)"></label>
+      <label class="inline">Zygositet<input type="text" data-field="zygosity" placeholder="Heterozygot"></label>
+      <label class="inline">ACMG<select data-field="classification">${classificationOptions}</select></label>
+      <label class="inline">Kriterier<input type="text" data-field="criteria" placeholder="PM1,PP3"></label>
+      <label class="inline">Allelfrekvens<input type="number" step="0.0001" data-field="af" placeholder="0.125"></label>
+      <label class="inline wide">Annoteringer<textarea class="small" data-field="annotations" placeholder="VarSeq-annoteringer og noter"></textarea></label>
+      <label class="inline wide">Tolkning<textarea class="small" data-field="interpretation" placeholder="Valgfrit"></textarea></label>
+      <button type="button" class="secondary case-choose-library">Vælg fra bibliotek</button>
+      <button type="button" class="secondary case-remove-row">Fjern</button>`;
+    const setValue = (selector, value) => {
+      const el = row.querySelector(selector);
+      if (el) el.value = value || '';
+    };
+    setValue('[data-field="gene"]', values.gene);
+    setValue('[data-field="transcript"]', values.transcript);
+    setValue('[data-field="hgvs_c"]', values.hgvs_c);
+    setValue('[data-field="hgvs_p"]', values.hgvs_p);
+    setValue('[data-field="zygosity"]', values.zygosity);
+    setValue('[data-field="criteria"]', values.criteria);
+    const afField = row.querySelector('[data-field="af"]');
+    if (afField) {
+      if (values.af !== undefined && values.af !== null && values.af !== '') {
+        afField.value = values.af;
+      } else {
+        afField.value = '';
+      }
+    }
+    const interpretationField = row.querySelector('[data-field="interpretation"]');
+    if (interpretationField) interpretationField.value = values.interpretation || '';
+    const annotationsField = row.querySelector('[data-field="annotations"]');
+    if (annotationsField) annotationsField.value = values.annotations || '';
+    const removeBtn = row.querySelector('.case-remove-row');
+    removeBtn?.addEventListener('click', () => row.remove());
+    if (removeBtn) setTooltip(removeBtn, 'Fjern varianten fra batch-listen.');
+    const libraryBtn = row.querySelector('.case-choose-library');
+    libraryBtn?.addEventListener('click', () => {
+      openVariantLibraryPicker(variant => {
+        setValue('[data-field="gene"]', variant.gene);
+        setValue('[data-field="transcript"]', variant.transcript);
+        setValue('[data-field="hgvs_c"]', variant.hgvs_c);
+        setValue('[data-field="hgvs_p"]', variant.hgvs_p);
+        setValue('[data-field="criteria"]', variant.criteria);
+        const classField = row.querySelector('[data-field="classification"]');
+        if (classField && variant.classification != null && variant.classification !== '') {
+          classField.value = String(variant.classification);
+        }
+        const interpretationField = row.querySelector('[data-field="interpretation"]');
+        if (interpretationField) interpretationField.value = variant.evidence || variant.interpretation || '';
+        const annotationsField = row.querySelector('[data-field="annotations"]');
+        if (annotationsField) annotationsField.value = variant.annotations || variant.annotation_summary || '';
+      });
+    });
+    if (libraryBtn) setTooltip(libraryBtn, 'Vælg en variant fra biblioteket.');
+    batchList.appendChild(row);
+    applyButtonTooltips(row);
+  };
+  const getBatchValue = (row, field) => {
+    const el = row?.querySelector(`[data-field="${field}"]`);
+    if (!el) return '';
+    return (el.value || '').trim();
+  };
+  const isBatchVariantRowEmpty = row => {
+    if (!row) return true;
+    const gene = getBatchValue(row, 'gene');
+    const transcript = getBatchValue(row, 'transcript');
+    const hgvsC = getBatchValue(row, 'hgvs_c');
+    const hgvsP = getBatchValue(row, 'hgvs_p');
+    const zygosity = getBatchValue(row, 'zygosity');
+    const criteria = getBatchValue(row, 'criteria');
+    const af = getBatchValue(row, 'af');
+    const interpretation = getBatchValue(row, 'interpretation');
+    const annotations = getBatchValue(row, 'annotations');
+    return !gene && !transcript && !hgvsC && !hgvsP && !zygosity && !criteria && !af && !interpretation && !annotations;
+  };
+  const collectBatchVariants = () => {
+    if (!batchList) return [];
+    const rows = Array.from(batchList.querySelectorAll('.variant-row'));
+    const variants = [];
+    rows.forEach((row, idx) => {
+      const gene = getBatchValue(row, 'gene');
+      const transcript = getBatchValue(row, 'transcript');
+      const hgvsC = getBatchValue(row, 'hgvs_c');
+      const hgvsP = getBatchValue(row, 'hgvs_p');
+      const zygosity = getBatchValue(row, 'zygosity');
+      const criteria = getBatchValue(row, 'criteria');
+      const afRaw = getBatchValue(row, 'af');
+      const interpretation = getBatchValue(row, 'interpretation');
+      const annotations = getBatchValue(row, 'annotations');
+      const classification = row.querySelector('[data-field="classification"]')?.value || '3';
+      const isEmpty = !gene && !transcript && !hgvsC && !hgvsP && !zygosity && !criteria && !afRaw && !interpretation && !annotations;
+      if (isEmpty) return;
+      if (!gene) {
+        const err = new Error(`Angiv gen for række ${idx + 1}.`);
+        err.focus = row.querySelector('[data-field="gene"]');
+        throw err;
+      }
+      const variant = {
+        gene,
+        transcript,
+        hgvs_c: hgvsC,
+        hgvs_p: hgvsP,
+        zygosity,
+        classification: String(classification || '3'),
+        criteria,
+        interpretation
+      };
+      if (afRaw) {
+        const afNumber = Number(afRaw);
+        if (!Number.isFinite(afNumber)) {
+          const err = new Error(`Allelfrekvens skal være et tal i række ${idx + 1}.`);
+          err.focus = row.querySelector('[data-field="af"]');
+          throw err;
+        }
+        variant.af = afNumber;
+      }
+      if (annotations) {
+        variant.annotations = annotations;
+      }
+      variants.push(variant);
+    });
+    return variants;
+  };
+  const removeEmptyBatchRows = () => {
+    if (!batchList) return;
+    const rows = Array.from(batchList.querySelectorAll('.variant-row'));
+    if (!rows.length) return;
+    const filled = rows.filter(row => !isBatchVariantRowEmpty(row));
+    if (!filled.length) {
+      batchList.innerHTML = '';
+      return;
+    }
+    rows.forEach(row => {
+      if (isBatchVariantRowEmpty(row)) row.remove();
+    });
+  };
   const enterEditMode = id => {
     if (!form) return;
     form.dataset.mode = 'edit';
@@ -3716,7 +4160,96 @@ function renderVariants(section) {
     selectedVariantId = variant.id;
     fillForm(form, variant);
     enterEditMode(variant.id);
+    if (batchOrderSelect && variant.order_id) {
+      batchOrderSelect.value = String(variant.order_id);
+    }
     renderRows();
+  });
+  batchAddBtn?.addEventListener('click', () => addBatchVariantRow());
+  batchClearBtn?.addEventListener('click', () => {
+    if (batchList) {
+      batchList.innerHTML = '';
+      addBatchVariantRow();
+    }
+    setBatchMessage('Batch-liste ryddet.', 'info');
+  });
+  batchImportBtn?.addEventListener('click', () => batchFileInput?.click());
+  batchFileInput?.addEventListener('change', async () => {
+    const file = batchFileInput?.files?.[0];
+    if (!file) return;
+    try {
+      const {variants: importedVariants, warnings, summary} = await parseVarSeqFile(file);
+      if (!importedVariants.length) {
+        setBatchMessage('Ingen varianter blev fundet i filen.', 'error');
+        return;
+      }
+      removeEmptyBatchRows();
+      importedVariants.forEach(variant => addBatchVariantRow(variant));
+      const parts = [`Tilføjede ${importedVariants.length} varianter fra ${file.name}.`];
+      if (summary.skipped) parts.push(`${summary.skipped} rækker ignoreret.`);
+      if (warnings.length) parts.push(`${warnings.length} advarsler logget i konsollen.`);
+      setBatchMessage(parts.join(' '), 'success');
+      setStatus(`VarSeq import til masseoprettelse: ${importedVariants.length} varianter klar.`);
+      if (warnings.length) console.warn('VarSeq import advarsler', warnings);
+    } catch (err) {
+      console.error(err);
+      setBatchMessage('Kunne ikke importere VarSeq CSV: ' + (err?.message || err), 'error');
+    } finally {
+      if (batchFileInput) batchFileInput.value = '';
+    }
+  });
+  batchSaveBtn?.addEventListener('click', async () => {
+    if (!ensureWrite('variants')) {
+      setBatchMessage('Handling kræver skriveadgang. Log ind med en bruger der kan redigere varianter.', 'error');
+      return;
+    }
+    const orderId = Number(batchOrderSelect?.value || 0);
+    if (!orderId) {
+      setBatchMessage('Vælg en ordination for at gemme varianterne.', 'error');
+      batchOrderSelect?.focus();
+      return;
+    }
+    let variants;
+    try {
+      variants = collectBatchVariants();
+    } catch (err) {
+      setBatchMessage(err.message || 'Kunne ikke fortolke batch-rækkerne.', 'error');
+      if (err.focus) err.focus.focus();
+      return;
+    }
+    if (!variants.length) {
+      setBatchMessage('Udfyld mindst én variant før du gemmer.', 'error');
+      return;
+    }
+    batchSaveBtn.disabled = true;
+    if (batchAddBtn) batchAddBtn.disabled = true;
+    if (batchImportBtn) batchImportBtn.disabled = true;
+    if (batchClearBtn) batchClearBtn.disabled = true;
+    try {
+      setBatchMessage('Gemmer varianter...', 'info');
+      const createdIds = [];
+      for (const variant of variants) {
+        const id = await addRecord('variants', {...variant, order_id: orderId});
+        createdIds.push(id);
+      }
+      list = getCached('variants');
+      filteredVariants = list.slice();
+      renderRows();
+      if (batchList) {
+        batchList.innerHTML = '';
+        addBatchVariantRow();
+      }
+      setBatchMessage(`Tilføjede ${createdIds.length} varianter til ordination ${orderId}.`, 'success');
+      setStatus(`Tilføjede ${createdIds.length} varianter til ordination ${orderId}.`);
+    } catch (err) {
+      console.error(err);
+      setBatchMessage('Kunne ikke gemme varianter: ' + (err?.message || err), 'error');
+    } finally {
+      batchSaveBtn.disabled = false;
+      if (batchAddBtn) batchAddBtn.disabled = false;
+      if (batchImportBtn) batchImportBtn.disabled = false;
+      if (batchClearBtn) batchClearBtn.disabled = false;
+    }
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -3757,12 +4290,17 @@ function renderVariants(section) {
       if (form.elements.hgvs_c) form.elements.hgvs_c.value = variant.hgvs_c || '';
       if (form.elements.hgvs_p) form.elements.hgvs_p.value = variant.hgvs_p || '';
       if (form.elements.criteria) form.elements.criteria.value = variant.criteria || '';
+      if (form.elements.annotations) form.elements.annotations.value = variant.annotations || variant.annotation_summary || '';
       if (form.elements.interpretation) form.elements.interpretation.value = variant.evidence || variant.interpretation || '';
       if (form.elements.classification && variant.classification != null && variant.classification !== '') {
         form.elements.classification.value = String(variant.classification);
       }
     });
   });
+  if (batchList && !batchList.children.length) {
+    addBatchVariantRow();
+    setBatchMessage('Importer eller udfyld varianter for at gemme dem på den valgte ordination.', 'info');
+  }
   form.addEventListener('reset', () => {
     selectedVariantId = null;
     exitEditMode();
@@ -3780,6 +4318,9 @@ function renderVariants(section) {
     if (!ensureWrite('variant_library')) return;
     const data = Object.fromEntries(new FormData(form).entries());
     if (!data.gene) return alert('Vælg variant først');
+    const evidenceParts = [];
+    if (data.interpretation) evidenceParts.push(data.interpretation);
+    if (data.annotations) evidenceParts.push(data.annotations);
     const libraryEntry = {
       gene: data.gene,
       transcript: data.transcript,
@@ -3787,7 +4328,7 @@ function renderVariants(section) {
       hgvs_p: data.hgvs_p,
       classification: String(data.classification || ''),
       criteria: data.criteria,
-      evidence: data.interpretation,
+      evidence: evidenceParts.join('\n').trim(),
       condition: '',
       inheritance: '',
       curated_by: currentUserName(),
@@ -4097,11 +4638,6 @@ function renderVariantLibrary(section) {
       const text = await file.text();
       const {headers, rows} = parseCsv(text);
       if (!headers.length) throw new Error('CSV-filen mangler kolonneoverskrifter.');
-      const normaliseHeader = header => {
-        const lower = String(header || '').toLowerCase();
-        const normalized = typeof lower.normalize === 'function' ? lower.normalize('NFD') : lower;
-        return normalized.replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-      };
       const headerMap = {
         id: 'id',
         gene: 'gene',
