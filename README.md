@@ -1,5 +1,5 @@
 
-#<img width="90" height="90" alt="logo" src="https://github.com/user-attachments/assets/cfdd5b73-d477-477d-9ba6-acba4826ea60" /> GlimR - Genetic LIMS Reporter
+# <img width="90" height="90" alt="logo" src="https://github.com/user-attachments/assets/cfdd5b73-d477-477d-9ba6-acba4826ea60" /> GlimR - Genetic LIMS Reporter
 
 A Laboratory Information Management System (LIMS) for genomic diagnostics developed by Thomas Lindestrand-Hansen. This repository contains the backend, frontend, configuration, and deployment scripts used to manage samples, track workflows, and integrate with sequencing and analysis pipelines.
 If you need a the logo.png file - right click the logo and save as logo.png. Place the file next to GlimR.html.
