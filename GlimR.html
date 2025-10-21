@@ -2798,6 +2798,7 @@ function renderPatients(section) {
   };
   let filteredPatients = list.slice();
   let activeFilters = {};
+  let selectedPatientId = null;
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
@@ -2832,10 +2833,14 @@ function renderPatients(section) {
       if (filters.birth && !(p.birth_date||'').toLowerCase().startsWith(filters.birth)) return false;
       return true;
     });
+    if (selectedPatientId != null && !filteredPatients.some(p => p.id === selectedPatientId)) {
+      selectedPatientId = null;
+    }
     tbody.innerHTML = filteredPatients.map(p => {
       const gender = genderMap[p.gender] || p.gender || '';
       const createdBy = determineCreatedBy('patients', p);
-      return `<tr data-id="${p.id}"><td>${p.id}</td><td>${esc(p.mrn)}</td><td>${esc(p.family_number||'')}</td><td>${esc(p.name)}</td><td>${esc(gender)}</td><td>${esc(p.birth_date||'')}</td><td>${esc(createdBy)}</td></tr>`;
+      const selectedAttr = p.id === selectedPatientId ? ' data-selected="true"' : '';
+      return `<tr data-id="${p.id}"${selectedAttr}><td>${p.id}</td><td>${esc(p.mrn)}</td><td>${esc(p.family_number||'')}</td><td>${esc(p.name)}</td><td>${esc(gender)}</td><td>${esc(p.birth_date||'')}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -2856,7 +2861,9 @@ function renderPatients(section) {
     const id = Number(tr.dataset.id);
     const patient = list.find(p => p.id === id);
     if (!patient) return;
+    selectedPatientId = id;
     fillForm(form, patient);
+    renderRows();
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -2885,6 +2892,10 @@ function renderPatients(section) {
       renderTab('patients');
       renderDashboard(document.querySelector('section[data-tab="dashboard"]'));
     }
+  });
+  form.addEventListener('reset', () => {
+    selectedPatientId = null;
+    renderRows();
   });
   clearBtn.addEventListener('click', () => form.reset());
 }
@@ -2975,6 +2986,7 @@ function renderSamples(section) {
   applySelectFilters(section);
   let filteredSamples = list.slice();
   let activeFilters = {};
+  let selectedSampleId = null;
   const renderRows = () => {
     const term = search.value.toLowerCase();
     const filters = {
@@ -3015,9 +3027,13 @@ function renderSamples(section) {
       }
       return true;
     });
+    if (selectedSampleId != null && !filteredSamples.some(s => s.id === selectedSampleId)) {
+      selectedSampleId = null;
+    }
     tbody.innerHTML = filteredSamples.map(s => {
       const createdBy = determineCreatedBy('samples', s);
-      return `<tr data-id="${s.id}"><td>${s.id}</td><td>${esc(s.pmb_number||'')}</td><td>${esc(getName('patients', Number(s.patient_id)))}</td><td>${esc(s.sample_type)}</td><td>${esc(s.status||'')}</td><td>${esc(s.collected_at||'')}</td><td>${esc(createdBy)}</td></tr>`;
+      const selectedAttr = s.id === selectedSampleId ? ' data-selected="true"' : '';
+      return `<tr data-id="${s.id}"${selectedAttr}><td>${s.id}</td><td>${esc(s.pmb_number||'')}</td><td>${esc(getName('patients', Number(s.patient_id)))}</td><td>${esc(s.sample_type)}</td><td>${esc(s.status||'')}</td><td>${esc(s.collected_at||'')}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -3037,7 +3053,9 @@ function renderSamples(section) {
     if (!tr) return;
     const sample = list.find(s => s.id === Number(tr.dataset.id));
     if (!sample) return;
+    selectedSampleId = sample.id;
     fillForm(form, sample);
+    renderRows();
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -3099,6 +3117,10 @@ function renderSamples(section) {
       renderTab('samples');
     }
   });
+  form.addEventListener('reset', () => {
+    selectedSampleId = null;
+    renderRows();
+  });
   section.querySelector('#sampleClear').addEventListener('click', () => form.reset());
 }
 function renderPanels(section) {
@@ -3135,9 +3157,17 @@ function renderPanels(section) {
   applyControlTooltips(section);
   applyFormTooltips(form);
   applySelectFilters(section);
+  let selectedPanelId = null;
   const renderRows = () => {
     const term = search.value.toLowerCase();
-    tbody.innerHTML = list.filter(p => !term || (p.name||'').toLowerCase().includes(term)).map(p => `<tr data-id="${p.id}"><td>${p.id}</td><td>${esc(p.name)}</td><td>${esc(p.description||'')}</td></tr>`).join('');
+    const filteredPanels = list.filter(p => !term || (p.name||'').toLowerCase().includes(term));
+    if (selectedPanelId != null && !filteredPanels.some(p => p.id === selectedPanelId)) {
+      selectedPanelId = null;
+    }
+    tbody.innerHTML = filteredPanels.map(p => {
+      const selectedAttr = p.id === selectedPanelId ? ' data-selected="true"' : '';
+      return `<tr data-id="${p.id}"${selectedAttr}><td>${p.id}</td><td>${esc(p.name)}</td><td>${esc(p.description||'')}</td></tr>`;
+    }).join('');
     annotateTableCells(section);
   };
   renderRows();
@@ -3147,7 +3177,9 @@ function renderPanels(section) {
     if (!tr) return;
     const panel = list.find(p => p.id === Number(tr.dataset.id));
     if (!panel) return;
+    selectedPanelId = panel.id;
     fillForm(form, panel);
+    renderRows();
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -3173,6 +3205,10 @@ function renderPanels(section) {
       await deleteRecord('panels', id);
       renderTab('panels');
     }
+  });
+  form.addEventListener('reset', () => {
+    selectedPanelId = null;
+    renderRows();
   });
   section.querySelector('#panelClear').addEventListener('click', () => form.reset());
 }
@@ -3366,6 +3402,7 @@ function renderOrders(section) {
   });
   let filteredOrders = list.slice();
   let activeFilters = {};
+  let selectedOrderId = null;
   const renderRows = () => {
     const term = search.value.toLowerCase();
     const filters = {
@@ -3437,11 +3474,15 @@ function renderOrders(section) {
       return true;
     });
     const userName = id => userMap.get(Number(id))?.name || '';
+    if (selectedOrderId != null && !filteredOrders.some(o => o.id === selectedOrderId)) {
+      selectedOrderId = null;
+    }
     tbody.innerHTML = filteredOrders.map(o => {
       const sample = sampleMap.get(Number(o.sample_id));
       const statusDisplay = sample?.status || o.status || '';
       const createdBy = determineCreatedBy('orders', o);
-      return `<tr data-id="${o.id}"><td>${o.id}</td><td>${esc(getName('patients', Number(o.patient_id)))}</td><td>${esc(getName('samples', Number(o.sample_id)))}</td><td>${esc(getName('panels', Number(o.panel_id)))}</td><td>${esc(userName(o.analysis_responsible_id))}</td><td>${esc(userName(o.interpreter_id))}</td><td>${esc(userName(o.approver_id))}</td><td>${esc(statusDisplay)}</td><td>${esc(createdBy)}</td><td>${esc(o.ordered_at||'')}</td></tr>`;
+      const selectedAttr = o.id === selectedOrderId ? ' data-selected="true"' : '';
+      return `<tr data-id="${o.id}"${selectedAttr}><td>${o.id}</td><td>${esc(getName('patients', Number(o.patient_id)))}</td><td>${esc(getName('samples', Number(o.sample_id)))}</td><td>${esc(getName('panels', Number(o.panel_id)))}</td><td>${esc(userName(o.analysis_responsible_id))}</td><td>${esc(userName(o.interpreter_id))}</td><td>${esc(userName(o.approver_id))}</td><td>${esc(statusDisplay)}</td><td>${esc(createdBy)}</td><td>${esc(o.ordered_at||'')}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -3468,8 +3509,10 @@ function renderOrders(section) {
     if (!tr) return;
     const order = list.find(o => o.id === Number(tr.dataset.id));
     if (!order) return;
+    selectedOrderId = order.id;
     fillForm(form, order);
     syncStatusFromSample(order.sample_id);
+    renderRows();
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -3513,6 +3556,10 @@ function renderOrders(section) {
       renderTab('orders');
       renderDashboard(document.querySelector('section[data-tab="dashboard"]'));
     }
+  });
+  form.addEventListener('reset', () => {
+    selectedOrderId = null;
+    renderRows();
   });
   section.querySelector('#orderClear').addEventListener('click', () => form.reset());
 }
@@ -3613,6 +3660,7 @@ function renderVariants(section) {
   applySelectFilters(section);
   let filteredVariants = list.slice();
   let activeFilters = {};
+  let selectedVariantId = null;
   const renderRows = () => {
     const term = search.value.toLowerCase();
     const filters = {
@@ -3639,9 +3687,13 @@ function renderVariants(section) {
       if (filters.criteria && !(v.criteria || '').toLowerCase().includes(filters.criteria)) return false;
       return true;
     });
+    if (selectedVariantId != null && !filteredVariants.some(v => v.id === selectedVariantId)) {
+      selectedVariantId = null;
+    }
     tbody.innerHTML = filteredVariants.map(v => {
       const createdBy = determineCreatedBy('variants', v);
-      return `<tr data-id="${v.id}"><td>${v.id}</td><td>${v.order_id}</td><td>${esc(v.gene)}</td><td>${esc(v.hgvs_c||'')}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(createdBy)}</td></tr>`;
+      const selectedAttr = v.id === selectedVariantId ? ' data-selected="true"' : '';
+      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td>${v.order_id}</td><td>${esc(v.gene)}</td><td>${esc(v.hgvs_c||'')}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -3661,8 +3713,10 @@ function renderVariants(section) {
     if (!tr) return;
     const variant = list.find(v => v.id === Number(tr.dataset.id));
     if (!variant) return;
+    selectedVariantId = variant.id;
     fillForm(form, variant);
     enterEditMode(variant.id);
+    renderRows();
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -3708,6 +3762,11 @@ function renderVariants(section) {
         form.elements.classification.value = String(variant.classification);
       }
     });
+  });
+  form.addEventListener('reset', () => {
+    selectedVariantId = null;
+    exitEditMode();
+    renderRows();
   });
   section.querySelector('#variantClear').addEventListener('click', () => {
     const orderValue = form.elements.order_id.value;
@@ -4464,6 +4523,7 @@ function renderReports(section) {
   const statusMap = {draft:'Udkast', final:'Endelig', amended:'Ændret'};
   let filteredReports = list.slice();
   let activeFilters = {};
+  let selectedReportId = null;
   const renderRows = () => {
     const term = search.value.toLowerCase();
     const filters = {
@@ -4499,10 +4559,14 @@ function renderReports(section) {
       }
       return true;
     });
+    if (selectedReportId != null && !filteredReports.some(r => r.id === selectedReportId)) {
+      selectedReportId = null;
+    }
     tbody.innerHTML = filteredReports.map(r => {
       const displayStatus = statusMap[r.status] || r.status || '';
       const createdBy = determineCreatedBy('reports', r);
-      return `<tr data-id="${r.id}"><td>${r.id}</td><td>${r.order_id}</td><td>${esc(displayStatus)}</td><td>${esc(createdBy)}</td><td>${esc(r.issued_at||'')}</td></tr>`;
+      const selectedAttr = r.id === selectedReportId ? ' data-selected="true"' : '';
+      return `<tr data-id="${r.id}"${selectedAttr}><td>${r.id}</td><td>${r.order_id}</td><td>${esc(displayStatus)}</td><td>${esc(createdBy)}</td><td>${esc(r.issued_at||'')}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -4522,10 +4586,12 @@ function renderReports(section) {
     if (!tr) return;
     const report = list.find(r => r.id === Number(tr.dataset.id));
     if (!report) return;
+    selectedReportId = report.id;
     fillForm(form, report);
     refreshVariantOptions();
     const variants = getReportVariantSnapshots(report, Number(report.order_id));
     setSelectedReportVariants(variants);
+    renderRows();
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -4562,6 +4628,10 @@ function renderReports(section) {
       await deleteRecord('reports', id);
       renderTab('reports');
     }
+  });
+  form.addEventListener('reset', () => {
+    selectedReportId = null;
+    renderRows();
   });
   section.querySelector('#reportClear').addEventListener('click', () => {
     form.reset();
@@ -5369,15 +5439,21 @@ function renderQC(section) {
   applyControlTooltips(section);
   applyFormTooltips(form);
   applySelectFilters(section);
+  let selectedQcId = null;
   const renderRows = () => {
     const term = search.value.toLowerCase();
-    tbody.innerHTML = list.filter(q => {
+    const filteredQc = list.filter(q => {
       if (!term) return true;
       const creator = determineCreatedBy('qc', q);
       return [q.metric, q.unit, creator].some(v => (v || '').toString().toLowerCase().includes(term));
-    }).map(q => {
+    });
+    if (selectedQcId != null && !filteredQc.some(q => q.id === selectedQcId)) {
+      selectedQcId = null;
+    }
+    tbody.innerHTML = filteredQc.map(q => {
       const createdBy = determineCreatedBy('qc', q);
-      return `<tr data-id="${q.id}"><td>${q.id}</td><td>${esc(q.sample_id)}</td><td>${esc(q.metric)}</td><td>${esc(q.value)}</td><td>${esc(q.unit||'')}</td><td>${esc(createdBy)}</td></tr>`;
+      const selectedAttr = q.id === selectedQcId ? ' data-selected="true"' : '';
+      return `<tr data-id="${q.id}"${selectedAttr}><td>${q.id}</td><td>${esc(q.sample_id)}</td><td>${esc(q.metric)}</td><td>${esc(q.value)}</td><td>${esc(q.unit||'')}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -5388,7 +5464,9 @@ function renderQC(section) {
     if (!tr) return;
     const qc = list.find(q => q.id === Number(tr.dataset.id));
     if (!qc) return;
+    selectedQcId = qc.id;
     fillForm(form, qc);
+    renderRows();
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -5415,6 +5493,10 @@ function renderQC(section) {
       await deleteRecord('qc', id);
       renderTab('qc');
     }
+  });
+  form.addEventListener('reset', () => {
+    selectedQcId = null;
+    renderRows();
   });
   section.querySelector('#qcClear').addEventListener('click', () => form.reset());
 }
@@ -5658,9 +5740,17 @@ function renderUsers(section) {
   applyButtonTooltips(section);
   applyControlTooltips(section);
   applyFormTooltips(form);
+  let selectedUserId = null;
   const renderRows = () => {
     const term = search.value.toLowerCase();
-    tbody.innerHTML = list.filter(u => !term || [u.name,u.email,u.role].some(v => (v||'').toLowerCase().includes(term))).map(u => `<tr data-id="${u.id}"><td>${u.id}</td><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${esc(roleLabel(u.role))}</td></tr>`).join('');
+    const filteredUsers = list.filter(u => !term || [u.name,u.email,u.role].some(v => (v||'').toLowerCase().includes(term)));
+    if (selectedUserId != null && !filteredUsers.some(u => u.id === selectedUserId)) {
+      selectedUserId = null;
+    }
+    tbody.innerHTML = filteredUsers.map(u => {
+      const selectedAttr = u.id === selectedUserId ? ' data-selected="true"' : '';
+      return `<tr data-id="${u.id}"${selectedAttr}><td>${u.id}</td><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${esc(roleLabel(u.role))}</td></tr>`;
+    }).join('');
     annotateTableCells(section);
   };
   renderRows();
@@ -5670,7 +5760,9 @@ function renderUsers(section) {
     if (!tr) return;
     const user = list.find(u => u.id === Number(tr.dataset.id));
     if (!user) return;
+    selectedUserId = user.id;
     fillForm(form, user);
+    renderRows();
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -5705,6 +5797,10 @@ function renderUsers(section) {
       }
       renderTab('users');
     }
+  });
+  form.addEventListener('reset', () => {
+    selectedUserId = null;
+    renderRows();
   });
   section.querySelector('#userClear').addEventListener('click', () => form.reset());
 }
