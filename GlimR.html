@@ -876,7 +876,7 @@ const tabs = [
   {id:'reports', label:'Rapporter'},
   {id:'qc', label:'Kvalitetskontrol'},
   {id:'responses', label:'Svar (MedCom)'},
-  {id:'tools', label:'Værktøj (tools)'},
+  {id:'tools', label:'Værktøjskasse'},
   {id:'users', label:'Brugere'},
   {id:'audit', label:'Revision'},
   {id:'db', label:'Database & Backup'},
@@ -911,7 +911,7 @@ const tooltipCatalog = {
     reports: 'Opret og redigér laboratoriesvar og rapporter.',
     qc: 'Registrer kvalitetskontrolmålinger for prøver.',
     responses: 'Importer og gennemse MedCom/FHIR-svar.',
-    tools: 'Tilgå beregnere og hjælpeværktøjer til variantfortolkning.',
+    tools: 'Åbn værktøjskassen med beregnere og hjælpeværktøjer til variantfortolkning.',
     users: 'Administrer GlimR-brugere og roller.',
     audit: 'Gennemgå revisionsloggen for alle ændringer.',
     db: 'Håndter lokal databasefil, backup og autogem.',
@@ -6308,6 +6308,62 @@ function renderTools(section) {
   <details class="panel tool-panel">
     <summary>
       <div class="tool-summary-text">
+        <span class="tool-title">HGVS c. nomenklaturhjælper</span>
+        <span class="tool-subtitle">Byg hurtigt cDNA-notation for substitutioner, deletioner m.m.</span>
+      </div>
+    </summary>
+    <div class="tool-body">
+      <h3>HGVS c. nomenklaturhjælper</h3>
+      <p>Udfyld felterne for at få foreslået et gyldigt HGVS c.-udtryk til simple varianter. Vælg varianttype og angiv de relevante positioner og sekvenser.</p>
+      <form id="hgvsForm">
+        <div class="tool-inline">
+          <label for="hgvsTranscript" title="Angiv referencetranskript (RefSeq, LRG eller tilsvarende).">
+            Referencetranskript
+            <input id="hgvsTranscript" name="transcript" placeholder="fx NM_000546.5">
+          </label>
+          <label for="hgvsType" title="Vælg varianttypen for at vise de relevante felter.">
+            Varianttype
+            <select id="hgvsType" name="type">
+              <option value="substitution">Basiskift (substitution)</option>
+              <option value="deletion">Deletion</option>
+              <option value="insertion">Insertion</option>
+              <option value="duplication">Duplikation</option>
+              <option value="delins">Delins (deletion+insertion)</option>
+            </select>
+          </label>
+        </div>
+        <div class="tool-inline">
+          <label for="hgvsStart" data-hgvs-field="start" title="Startpositionen for ændringen. Brug intronnotation ved behov (fx 123+1).">
+            Position (start)
+            <input id="hgvsStart" name="start" placeholder="fx 215">
+          </label>
+          <label for="hgvsEnd" data-hgvs-field="end" title="Slutpositionen for ændringen. Udelades for enkeltbase-varianter.">
+            Position (slut)
+            <input id="hgvsEnd" name="end" placeholder="fx 217">
+          </label>
+        </div>
+        <div class="tool-inline">
+          <label for="hgvsRef" data-hgvs-field="ref" title="Referencebase(r) eller slettet sekvens, hvis kendt.">
+            Reference/sekvens
+            <input id="hgvsRef" name="ref" placeholder="fx C eller AGT">
+          </label>
+          <label for="hgvsAlt" data-hgvs-field="alt" title="Ændringen, indsatte baser eller erstatningssekvens.">
+            Ændring/indsættelse
+            <input id="hgvsAlt" name="alt" placeholder="fx G eller TTA">
+          </label>
+        </div>
+        <p class="tool-note">Felter skjules automatisk for varianttyper, hvor de ikke anvendes. Positioner kan skrives med intronnotation (fx 123+1).</p>
+        <div class="btn-row">
+          <button type="button" class="secondary" id="hgvsCopy">Kopiér notation</button>
+        </div>
+      </form>
+      <div class="tool-result" id="hgvsResult">Udfyld felterne for at få et HGVS-forslag.</div>
+      <p class="tool-note">Kontroller altid notationen mod HGVS-retningslinjerne og kliniske SOP&apos;er før rapportering.</p>
+    </div>
+  </details>
+  <details class="panel tool-panel">
+    <summary>
+      <div class="tool-summary-text">
         <span class="tool-title">Genomisk afstandsberegner</span>
         <span class="tool-subtitle">Beregn antal baser mellem to lokationer.</span>
       </div>
@@ -6397,6 +6453,138 @@ function renderTools(section) {
     updateAcmgResult();
   });
   updateAcmgResult();
+
+  const hgvsForm = section.querySelector('#hgvsForm');
+  const hgvsResult = section.querySelector('#hgvsResult');
+  if (hgvsForm && hgvsResult) {
+    const hgvsType = hgvsForm.querySelector('#hgvsType');
+    if (hgvsType) {
+      const hgvsCopy = section.querySelector('#hgvsCopy');
+      const hgvsFields = {
+        transcript: hgvsForm.querySelector('#hgvsTranscript'),
+        start: hgvsForm.querySelector('#hgvsStart'),
+        end: hgvsForm.querySelector('#hgvsEnd'),
+        ref: hgvsForm.querySelector('#hgvsRef'),
+        alt: hgvsForm.querySelector('#hgvsAlt')
+      };
+      const hgvsFieldVisibility = {
+        substitution: {start: true, end: false, ref: true, alt: true},
+        deletion: {start: true, end: true, ref: true, alt: false},
+        insertion: {start: true, end: true, ref: false, alt: true},
+        duplication: {start: true, end: true, ref: false, alt: false},
+        delins: {start: true, end: true, ref: true, alt: true}
+      };
+      const hgvsRequiredFields = {
+        substitution: ['start', 'ref', 'alt'],
+        deletion: ['start'],
+        insertion: ['start', 'end', 'alt'],
+        duplication: ['start'],
+        delins: ['start', 'alt']
+      };
+      const hgvsFieldLabels = {
+        start: 'Position (start)',
+        end: 'Position (slut)',
+        ref: 'Reference/sekvens',
+        alt: 'Ændring/indsættelse'
+      };
+      const hgvsFieldControls = Array.from(hgvsForm.querySelectorAll('[data-hgvs-field]'));
+      const setHgvsVisibility = type => {
+        const config = hgvsFieldVisibility[type] || hgvsFieldVisibility.substitution;
+        hgvsFieldControls.forEach(label => {
+          const field = label.getAttribute('data-hgvs-field');
+          label.hidden = config[field] === false;
+        });
+      };
+      const normaliseTranscript = value => value.trim();
+      const normaliseSequenceField = value => value.replace(/\s+/g, '').toUpperCase();
+      const buildCoordinate = (start, end) => {
+        if (!end || end === start) return start;
+        return `${start}_${end}`;
+      };
+      const updateHgvsResult = () => {
+        const type = hgvsType.value;
+        setHgvsVisibility(type);
+        const config = hgvsFieldVisibility[type] || hgvsFieldVisibility.substitution;
+        const transcript = normaliseTranscript(hgvsFields.transcript?.value || '');
+        const start = (hgvsFields.start?.value || '').trim();
+        const rawEnd = (hgvsFields.end?.value || '').trim();
+        const end = config.end === false ? '' : rawEnd;
+        const rawRef = hgvsFields.ref?.value || '';
+        const rawAlt = hgvsFields.alt?.value || '';
+        const ref = config.ref === false ? '' : normaliseSequenceField(rawRef);
+        const alt = config.alt === false ? '' : normaliseSequenceField(rawAlt);
+        const required = hgvsRequiredFields[type] || hgvsRequiredFields.substitution;
+        const values = {start, end, ref, alt};
+        const missing = required.filter(key => !values[key]);
+        if (missing.length) {
+          const names = missing.map(key => hgvsFieldLabels[key] || key).join(', ');
+          hgvsResult.textContent = `Udfyld følgende felter: ${names}.`;
+          hgvsResult.dataset.hgvsString = '';
+          return;
+        }
+        let coordinate = start;
+        if (end) {
+          coordinate = buildCoordinate(start, end);
+        }
+        let variantPart = '';
+        switch (type) {
+          case 'deletion':
+            variantPart = `${coordinate}del${ref}`;
+            break;
+          case 'insertion':
+            variantPart = `${coordinate}ins${alt}`;
+            break;
+          case 'duplication':
+            variantPart = `${coordinate}dup${ref || ''}`;
+            break;
+          case 'delins':
+            variantPart = `${coordinate}delins${alt}`;
+            break;
+          default:
+            variantPart = `${coordinate}${ref}>${alt}`;
+        }
+        let transcriptPart = '';
+        if (transcript) {
+          let cleaned = transcript.replace(/\s+/g, '');
+          if (/^c\./i.test(cleaned)) {
+            cleaned = cleaned.replace(/^c\./i, '');
+            transcriptPart = '';
+          } else {
+            const lower = cleaned.toLowerCase();
+            const colonIndex = lower.indexOf(':c.');
+            if (colonIndex !== -1) {
+              cleaned = cleaned.slice(0, colonIndex);
+            } else {
+              cleaned = cleaned.replace(/:$/,'').replace(/:c$/i, '');
+            }
+            if (cleaned) {
+              transcriptPart = `${cleaned}:`;
+            }
+          }
+        }
+        const notation = `${transcriptPart}c.${variantPart}`;
+        hgvsResult.innerHTML = `<strong>Forslag:</strong> <code>${esc(notation)}</code>`;
+        hgvsResult.dataset.hgvsString = notation;
+      };
+      hgvsForm.addEventListener('input', updateHgvsResult);
+      hgvsType.addEventListener('change', updateHgvsResult);
+      updateHgvsResult();
+      hgvsCopy?.addEventListener('click', async () => {
+        const notation = hgvsResult.dataset.hgvsString;
+        if (!notation) {
+          alert('Der er ingen notation at kopiere endnu.');
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(notation);
+          setStatus(`HGVS-notation kopieret: ${notation}`);
+        } catch (err) {
+          console.error(err);
+          alert('Kunne ikke kopiere til udklipsholderen.');
+        }
+      });
+    }
+  }
 
   const distanceForm = section.querySelector('#distanceTool');
   const distanceResult = section.querySelector('#distanceResult');
