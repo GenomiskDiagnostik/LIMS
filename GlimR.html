@@ -189,6 +189,80 @@ section[data-tab].active {
   margin-bottom: 1.2rem;
   border: 1px solid var(--panel-border);
 }
+.variant-picker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1.5rem;
+}
+[data-theme="dark"] .variant-picker-overlay {
+  background: rgba(8, 13, 23, 0.75);
+}
+.variant-picker {
+  background: var(--panel-bg);
+  color: var(--text);
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--panel-border);
+  max-width: 960px;
+  width: 100%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+.variant-picker header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--panel-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.variant-picker header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.variant-picker .picker-body {
+  padding: 1rem 1.25rem 1.25rem;
+  overflow: auto;
+}
+.variant-picker .picker-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 1.25rem 1rem;
+}
+.variant-picker table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.75rem;
+}
+.variant-picker table th,
+.variant-picker table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--table-row-border);
+  text-align: left;
+}
+.variant-picker table tbody tr {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.variant-picker table tbody tr:hover,
+.variant-picker table tbody tr:focus-within {
+  background: var(--table-header-bg);
+}
+.variant-picker table tbody tr:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.variant-picker-empty {
+  text-align: center;
+  padding: 1.5rem 0.5rem;
+  color: var(--muted-text);
+}
 .panel h2 {
   margin-top: 0;
 }
@@ -214,6 +288,12 @@ th, td {
 }
 th {
   background: var(--table-header-bg);
+}
+tbody tr[data-selected="true"] {
+  background: rgba(24, 111, 175, 0.12);
+}
+[data-theme="dark"] tbody tr[data-selected="true"] {
+  background: rgba(56, 189, 248, 0.18);
 }
 form label {
   display: block;
@@ -724,6 +804,7 @@ const tooltipCatalog = {
     'Opsamlet': 'Dato og tidspunkt for prøveindsamling.',
     'Ordination': 'Reference til ordinationen.',
     'Gen': 'Genet hvor varianten er fundet.',
+    'Transkript': 'Reference-transkript for varianten.',
     'HGVS c.': 'HGVS-beskrivelse på cDNA-niveau.',
     'HGVS p.': 'HGVS-beskrivelse på protein-niveau.',
     'Klasse': 'ACMG-klassifikation 1–5.',
@@ -731,6 +812,11 @@ const tooltipCatalog = {
     'HGVS': 'HGVS-beskrivelse for varianten.',
     'Evidens': 'Kurateret evidens for varianten.',
     'Kurateret af': 'Navn på ansvarlig kurator.',
+    'Sidst gennemgået': 'Dato for seneste kuratoriske gennemgang.',
+    'Tilstand': 'Associeret sygdom eller klinisk tilstand.',
+    'Nedarvning': 'Beskriver variantens nedarvningsmønster.',
+    'Oprettet': 'Tidspunkt for hvornår posten blev oprettet.',
+    'Opdateret': 'Tidspunkt for den seneste ændring.',
     'Beskrivelse': 'Uddybende beskrivelse.',
     'Måling': 'Navn på kvalitetskontrolmålingen.',
     'Værdi': 'Målt værdi.',
@@ -802,6 +888,19 @@ const tooltipCatalog = {
       af: 'Allelfrekvens eller observationsfrekvens.',
       interpretation: 'Klinisk tolkning og evidens for varianten.'
     },
+    variantLibraryForm: {
+      gene: 'Gen-symbol for varianten i biblioteket.',
+      transcript: 'Reference-transkript brugt til kurateringen.',
+      hgvs_c: 'HGVS cDNA-beskrivelse som varianten er registreret med.',
+      hgvs_p: 'HGVS protein-beskrivelse for varianten.',
+      classification: 'Kurateret ACMG-klassifikation eller tilsvarende vurdering.',
+      criteria: 'De kriterier der understøtter klassifikationen.',
+      evidence: 'Sammendrag af litteratur, observationer eller noter.',
+      condition: 'Associeret sygdom eller klinisk tilstand.',
+      inheritance: 'Beskriv nedarvningsmønstret, fx autosomal dominant.',
+      curated_by: 'Navn på kurator eller team der har ansvaret.',
+      last_review: 'Dato for seneste gennemgang (ÅÅÅÅ-MM-DD).'
+    },
     reportForm: {
       order_id: 'Ordinationen som rapporten beskriver.',
       status: 'Rapportstatus (udkast, endelig eller ændret).',
@@ -863,6 +962,13 @@ const tooltipCatalog = {
     variantSaveNew: 'Gem varianten som en ny registrering uden at overskrive den valgte.',
     variantDelete: 'Slet den valgte variant.',
     variantToLibrary: 'Tilføj varianten til det kuraterede bibliotek.',
+    variantFromLibrary: 'Hent variantoplysninger fra biblioteket.',
+    variantLibraryClear: 'Ryd formularen for at oprette en ny bibliotekspost.',
+    variantLibraryDelete: 'Slet den valgte bibliotekspost.',
+    variantLibrarySaveNew: 'Gem biblioteksposten som en ny registrering.',
+    variantLibrarySave: 'Gem ændringerne til den valgte bibliotekspost.',
+    libraryExportCsv: 'Eksportér de viste biblioteksposter til en CSV-fil.',
+    libraryImportCsv: 'Importer biblioteksposter fra en CSV-fil.',
     reportClear: 'Ryd formularen for at skrive en ny rapport.',
     reportDelete: 'Slet den valgte rapport.',
     reportPreview: 'Åbn rapporten i en ny fane til forhåndsvisning.',
@@ -890,7 +996,8 @@ const tooltipCatalog = {
     addQcRow: 'Tilføj en ekstra QC-måling til prøven.',
     addVariantRow: 'Tilføj endnu en variant til ordinationen.',
     createCaseSubmit: 'Opretter patient, prøve, ordination, QC og varianter i ét trin.',
-    createCaseReset: 'Ryd alle felter i oprettelsesformularen.'
+    createCaseReset: 'Ryd alle felter i oprettelsesformularen.',
+    'Vælg fra bibliotek': 'Hent variantoplysninger fra biblioteket.'
   },
   controls: {
     autosaveToggle: 'Aktiver eller deaktiver automatisk gemning til fil.',
@@ -910,7 +1017,8 @@ const tooltipCatalog = {
     loginPass: 'Indtast brugerens adgangskode hvis der er opsat en PIN.',
     includeControlSample: 'Aktiver for at registrere en ekstra kontrolprøve på samme patient.',
     caseVariantHint: 'Information om tilknyttede varianter i den nye sag.',
-    orderStatusPreview: 'Viser hvilken status den nye ordination får. Status følger prøvens valg.'
+    orderStatusPreview: 'Viser hvilken status den nye ordination får. Status følger prøvens valg.',
+    variantLibraryImportInput: 'Vælg en CSV-fil der indeholder biblioteksposter til import.'
   }
 };
 function setTooltip(el, text) {
@@ -1025,6 +1133,113 @@ function applySelectFilters(root) {
     });
     wrapper.dataset.filterInit = 'true';
   });
+}
+
+function openVariantLibraryPicker(onSelect) {
+  const library = (getCached('variant_library') || []).slice();
+  if (!library.length) {
+    alert('Variantbiblioteket er tomt.');
+    return;
+  }
+  const existing = document.querySelector('.variant-picker-overlay');
+  if (existing) existing.remove();
+  const sorted = library.sort((a, b) => {
+    const geneCompare = (a.gene || '').localeCompare(b.gene || '');
+    if (geneCompare) return geneCompare;
+    const hgvsCompare = (a.hgvs_c || '').localeCompare(b.hgvs_c || '');
+    if (hgvsCompare) return hgvsCompare;
+    return (a.id || 0) - (b.id || 0);
+  });
+  const overlay = document.createElement('div');
+  overlay.className = 'variant-picker-overlay';
+  overlay.innerHTML = `
+    <div class="variant-picker" role="dialog" aria-modal="true" aria-label="Vælg variant fra bibliotek">
+      <header>
+        <h3>Vælg variant fra bibliotek</h3>
+        <button type="button" class="secondary" data-action="close">Luk</button>
+      </header>
+      <div class="picker-body">
+        <label class="inline">Søg
+          <input type="search" placeholder="Filtrer på gen, HGVS eller kriterier">
+        </label>
+        <p class="form-hint">Klik på en variant for at kopiere oplysningerne til formularen.</p>
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Gen</th><th>Transkript</th><th>HGVS c.</th><th>HGVS p.</th><th>Klasse</th><th>Kriterier</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>`;
+  const previousOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+  document.body.appendChild(overlay);
+  const dialog = overlay.querySelector('.variant-picker');
+  const searchInput = overlay.querySelector('input[type="search"]');
+  const tbody = overlay.querySelector('tbody');
+  const closeBtn = overlay.querySelector('[data-action="close"]');
+  const cleanup = () => {
+    document.body.style.overflow = previousOverflow;
+    overlay.remove();
+    document.removeEventListener('keydown', onKeyDown, true);
+  };
+  const onKeyDown = evt => {
+    if (evt.key === 'Escape') {
+      evt.preventDefault();
+      cleanup();
+    }
+  };
+  document.addEventListener('keydown', onKeyDown, true);
+  const handleSelect = id => {
+    const variant = sorted.find(item => item.id === id);
+    if (!variant) return;
+    if (onSelect) onSelect({...variant});
+    cleanup();
+  };
+  const renderRows = () => {
+    const term = (searchInput?.value || '').trim().toLowerCase();
+    const filtered = sorted.filter(item => {
+      if (!term) return true;
+      return [item.gene, item.transcript, item.hgvs_c, item.hgvs_p, item.criteria, item.evidence]
+        .some(value => (value || '').toLowerCase().includes(term));
+    });
+    if (!filtered.length) {
+      tbody.innerHTML = '<tr><td colspan="7"><div class="variant-picker-empty">Ingen varianter matcher søgningen.</div></td></tr>';
+      return;
+    }
+    tbody.innerHTML = filtered.map(item => `
+      <tr tabindex="0" data-id="${item.id}">
+        <td>${esc(item.id)}</td>
+        <td>${esc(item.gene)}</td>
+        <td>${esc(item.transcript || '')}</td>
+        <td>${esc(item.hgvs_c || '')}</td>
+        <td>${esc(item.hgvs_p || '')}</td>
+        <td>${esc(item.classification || '')}</td>
+        <td>${esc(item.criteria || '')}</td>
+      </tr>`).join('');
+    annotateTableCells(dialog);
+  };
+  renderRows();
+  annotateHeaders(dialog);
+  applyButtonTooltips(dialog);
+  overlay.addEventListener('click', evt => {
+    if (evt.target === overlay) cleanup();
+  });
+  closeBtn?.addEventListener('click', cleanup);
+  searchInput?.addEventListener('input', renderRows);
+  tbody.addEventListener('click', evt => {
+    const tr = evt.target.closest('tr[data-id]');
+    if (!tr) return;
+    handleSelect(Number(tr.dataset.id));
+  });
+  tbody.addEventListener('keydown', evt => {
+    if (evt.key === 'Enter' || evt.key === ' ') {
+      evt.preventDefault();
+      const tr = evt.target.closest('tr[data-id]');
+      if (tr) handleSelect(Number(tr.dataset.id));
+    }
+  });
+  setTimeout(() => searchInput?.focus(), 50);
 }
 function initFamilyCombos(root) {
   if (!root) return;
@@ -1568,11 +1783,174 @@ function downloadJsonFile(data, baseName) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   return filename;
 }
+const WINDOWS_1252_EXTENDED = {
+  0x20ac: 0x80,
+  0x201a: 0x82,
+  0x0192: 0x83,
+  0x201e: 0x84,
+  0x2026: 0x85,
+  0x2020: 0x86,
+  0x2021: 0x87,
+  0x02c6: 0x88,
+  0x2030: 0x89,
+  0x0160: 0x8a,
+  0x2039: 0x8b,
+  0x0152: 0x8c,
+  0x017d: 0x8e,
+  0x2018: 0x91,
+  0x2019: 0x92,
+  0x201c: 0x93,
+  0x201d: 0x94,
+  0x2022: 0x95,
+  0x2013: 0x96,
+  0x2014: 0x97,
+  0x02dc: 0x98,
+  0x2122: 0x99,
+  0x0161: 0x9a,
+  0x203a: 0x9b,
+  0x0153: 0x9c,
+  0x017e: 0x9e,
+  0x0178: 0x9f
+};
+function encodeWindows1252(str) {
+  const bytes = [];
+  for (let i = 0; i < str.length; i++) {
+    let codePoint = str.codePointAt(i);
+    if (codePoint > 0xffff) {
+      i++;
+    }
+    if (codePoint <= 0xff) {
+      bytes.push(codePoint);
+      continue;
+    }
+    const mapped = WINDOWS_1252_EXTENDED[codePoint];
+    if (mapped != null) {
+      bytes.push(mapped);
+    } else {
+      bytes.push(0x3f);
+    }
+  }
+  return new Uint8Array(bytes);
+}
+function downloadCsvFile(rows, columns, baseName, delimiter = ';') {
+  if (!Array.isArray(rows)) rows = [];
+  const cols = columns.map(col => typeof col === 'string' ? {key: col, label: col} : col);
+  const header = cols.map(col => escapeCsvValue(col.label ?? col.key, delimiter)).join(delimiter);
+  const lines = rows.map(row => cols.map(col => {
+    const raw = typeof col.value === 'function' ? col.value(row) : row?.[col.key];
+    return escapeCsvValue(raw, delimiter);
+  }).join(delimiter));
+  const csv = [header, ...lines].join('\r\n');
+  const encoded = encodeWindows1252(csv);
+  const blob = new Blob([encoded], {type: 'text/csv;charset=windows-1252;'});
+  const url = URL.createObjectURL(blob);
+  const filename = withDateStamp(baseName);
+  triggerDownload(url, filename);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return filename;
+}
+function escapeCsvValue(value, delimiter) {
+  if (value == null) value = '';
+  if (value instanceof Date) value = value.toISOString();
+  let str = String(value);
+  if (!str) return '';
+  str = str.replace(/\r?\n|\r/g, ' ');
+  const needsQuotes = str.includes(delimiter) || str.includes('"') || /[\t]/.test(str) || /^\s|\s$/.test(str);
+  let escaped = str.replace(/"/g, '""');
+  if (needsQuotes) {
+    escaped = `"${escaped}"`;
+  }
+  return escaped;
+}
 function withDateStamp(filename) {
   const stamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0].replace('T', '-');
   const dot = filename.lastIndexOf('.');
   if (dot === -1) return `${filename}-${stamp}`;
   return `${filename.slice(0, dot)}-${stamp}${filename.slice(dot)}`;
+}
+function detectCsvDelimiter(text) {
+  const sample = (text || '').slice(0, 1024);
+  const counts = {',': 0, ';': 0, '\t': 0};
+  let inQuotes = false;
+  for (let i = 0; i < sample.length; i++) {
+    const char = sample[i];
+    if (char === '"') {
+      if (inQuotes && sample[i + 1] === '"') {
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+    if (!inQuotes && (char === ',' || char === ';' || char === '\t')) {
+      counts[char]++;
+    }
+    if (char === '\n' && !inQuotes) {
+      break;
+    }
+  }
+  if (counts[';'] >= counts[','] && counts[';'] >= counts['\t'] && counts[';'] > 0) return ';';
+  if (counts[','] >= counts['\t'] && counts[','] > 0) return ',';
+  if (counts['\t'] > 0) return '\t';
+  return ';';
+}
+function parseCsv(text) {
+  if (!text) return {headers: [], rows: [], delimiter: ';'};
+  const cleaned = text.replace(/^\ufeff/, '');
+  const delimiter = detectCsvDelimiter(cleaned);
+  const rows = [];
+  let field = '';
+  let row = [];
+  let inQuotes = false;
+  for (let i = 0; i < cleaned.length; i++) {
+    const char = cleaned[i];
+    if (inQuotes) {
+      if (char === '"') {
+        if (cleaned[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field += char;
+      }
+      continue;
+    }
+    if (char === '"') {
+      inQuotes = true;
+      continue;
+    }
+    if (char === '\r') {
+      continue;
+    }
+    if (char === '\n') {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = '';
+      continue;
+    }
+    if (char === delimiter) {
+      row.push(field);
+      field = '';
+      continue;
+    }
+    field += char;
+  }
+  if (inQuotes) {
+    row.push(field);
+  } else if (field !== '' || row.length) {
+    row.push(field);
+  }
+  if (row.length) {
+    rows.push(row);
+  }
+  while (rows.length && rows[rows.length - 1].every(cell => cell.trim() === '')) {
+    rows.pop();
+  }
+  const headers = rows.shift() || [];
+  return {headers: headers.map(h => h.trim()), rows, delimiter};
 }
 async function restoreFromFile(file) {
   const text = await file.text();
@@ -1900,6 +2278,7 @@ function renderCreateCase(section) {
       <label class="inline">Kriterier<input type="text" data-field="criteria" placeholder="PM1,PP3"></label>
       <label class="inline">Allelfrekvens<input type="number" step="0.0001" data-field="af" placeholder="0.125"></label>
       <label class="inline wide">Tolkning<textarea class="small" data-field="interpretation" placeholder="Kort tolkning"></textarea></label>
+      <button type="button" class="secondary case-choose-library">Vælg fra bibliotek</button>
       <button type="button" class="secondary case-remove-row">Fjern</button>`;
     const setValue = (selector, value) => {
       const el = row.querySelector(selector);
@@ -1924,6 +2303,23 @@ function renderCreateCase(section) {
     const removeBtn = row.querySelector('.case-remove-row');
     removeBtn?.addEventListener('click', () => row.remove());
     if (removeBtn) setTooltip(removeBtn, 'Fjern varianten fra oprettelsen.');
+    const libraryBtn = row.querySelector('.case-choose-library');
+    libraryBtn?.addEventListener('click', () => {
+      openVariantLibraryPicker(variant => {
+        setValue('[data-field="gene"]', variant.gene);
+        setValue('[data-field="transcript"]', variant.transcript);
+        setValue('[data-field="hgvs_c"]', variant.hgvs_c);
+        setValue('[data-field="hgvs_p"]', variant.hgvs_p);
+        setValue('[data-field="criteria"]', variant.criteria);
+        const classField = row.querySelector('[data-field="classification"]');
+        if (classField && variant.classification != null && variant.classification !== '') {
+          classField.value = String(variant.classification);
+        }
+        const interpretationField = row.querySelector('[data-field="interpretation"]');
+        if (interpretationField) interpretationField.value = variant.evidence || variant.interpretation || '';
+      });
+    });
+    if (libraryBtn) setTooltip(libraryBtn, 'Vælg en variant fra biblioteket.');
     variantList.appendChild(row);
     applyButtonTooltips(row);
   };
@@ -2402,6 +2798,7 @@ function renderPatients(section) {
   };
   let filteredPatients = list.slice();
   let activeFilters = {};
+  let selectedPatientId = null;
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
@@ -2436,10 +2833,14 @@ function renderPatients(section) {
       if (filters.birth && !(p.birth_date||'').toLowerCase().startsWith(filters.birth)) return false;
       return true;
     });
+    if (selectedPatientId != null && !filteredPatients.some(p => p.id === selectedPatientId)) {
+      selectedPatientId = null;
+    }
     tbody.innerHTML = filteredPatients.map(p => {
       const gender = genderMap[p.gender] || p.gender || '';
       const createdBy = determineCreatedBy('patients', p);
-      return `<tr data-id="${p.id}"><td>${p.id}</td><td>${esc(p.mrn)}</td><td>${esc(p.family_number||'')}</td><td>${esc(p.name)}</td><td>${esc(gender)}</td><td>${esc(p.birth_date||'')}</td><td>${esc(createdBy)}</td></tr>`;
+      const selectedAttr = p.id === selectedPatientId ? ' data-selected="true"' : '';
+      return `<tr data-id="${p.id}"${selectedAttr}><td>${p.id}</td><td>${esc(p.mrn)}</td><td>${esc(p.family_number||'')}</td><td>${esc(p.name)}</td><td>${esc(gender)}</td><td>${esc(p.birth_date||'')}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -2460,7 +2861,9 @@ function renderPatients(section) {
     const id = Number(tr.dataset.id);
     const patient = list.find(p => p.id === id);
     if (!patient) return;
+    selectedPatientId = id;
     fillForm(form, patient);
+    renderRows();
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -2489,6 +2892,10 @@ function renderPatients(section) {
       renderTab('patients');
       renderDashboard(document.querySelector('section[data-tab="dashboard"]'));
     }
+  });
+  form.addEventListener('reset', () => {
+    selectedPatientId = null;
+    renderRows();
   });
   clearBtn.addEventListener('click', () => form.reset());
 }
@@ -2579,6 +2986,7 @@ function renderSamples(section) {
   applySelectFilters(section);
   let filteredSamples = list.slice();
   let activeFilters = {};
+  let selectedSampleId = null;
   const renderRows = () => {
     const term = search.value.toLowerCase();
     const filters = {
@@ -2619,9 +3027,13 @@ function renderSamples(section) {
       }
       return true;
     });
+    if (selectedSampleId != null && !filteredSamples.some(s => s.id === selectedSampleId)) {
+      selectedSampleId = null;
+    }
     tbody.innerHTML = filteredSamples.map(s => {
       const createdBy = determineCreatedBy('samples', s);
-      return `<tr data-id="${s.id}"><td>${s.id}</td><td>${esc(s.pmb_number||'')}</td><td>${esc(getName('patients', Number(s.patient_id)))}</td><td>${esc(s.sample_type)}</td><td>${esc(s.status||'')}</td><td>${esc(s.collected_at||'')}</td><td>${esc(createdBy)}</td></tr>`;
+      const selectedAttr = s.id === selectedSampleId ? ' data-selected="true"' : '';
+      return `<tr data-id="${s.id}"${selectedAttr}><td>${s.id}</td><td>${esc(s.pmb_number||'')}</td><td>${esc(getName('patients', Number(s.patient_id)))}</td><td>${esc(s.sample_type)}</td><td>${esc(s.status||'')}</td><td>${esc(s.collected_at||'')}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -2641,7 +3053,9 @@ function renderSamples(section) {
     if (!tr) return;
     const sample = list.find(s => s.id === Number(tr.dataset.id));
     if (!sample) return;
+    selectedSampleId = sample.id;
     fillForm(form, sample);
+    renderRows();
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -2703,6 +3117,10 @@ function renderSamples(section) {
       renderTab('samples');
     }
   });
+  form.addEventListener('reset', () => {
+    selectedSampleId = null;
+    renderRows();
+  });
   section.querySelector('#sampleClear').addEventListener('click', () => form.reset());
 }
 function renderPanels(section) {
@@ -2739,9 +3157,17 @@ function renderPanels(section) {
   applyControlTooltips(section);
   applyFormTooltips(form);
   applySelectFilters(section);
+  let selectedPanelId = null;
   const renderRows = () => {
     const term = search.value.toLowerCase();
-    tbody.innerHTML = list.filter(p => !term || (p.name||'').toLowerCase().includes(term)).map(p => `<tr data-id="${p.id}"><td>${p.id}</td><td>${esc(p.name)}</td><td>${esc(p.description||'')}</td></tr>`).join('');
+    const filteredPanels = list.filter(p => !term || (p.name||'').toLowerCase().includes(term));
+    if (selectedPanelId != null && !filteredPanels.some(p => p.id === selectedPanelId)) {
+      selectedPanelId = null;
+    }
+    tbody.innerHTML = filteredPanels.map(p => {
+      const selectedAttr = p.id === selectedPanelId ? ' data-selected="true"' : '';
+      return `<tr data-id="${p.id}"${selectedAttr}><td>${p.id}</td><td>${esc(p.name)}</td><td>${esc(p.description||'')}</td></tr>`;
+    }).join('');
     annotateTableCells(section);
   };
   renderRows();
@@ -2751,7 +3177,9 @@ function renderPanels(section) {
     if (!tr) return;
     const panel = list.find(p => p.id === Number(tr.dataset.id));
     if (!panel) return;
+    selectedPanelId = panel.id;
     fillForm(form, panel);
+    renderRows();
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -2777,6 +3205,10 @@ function renderPanels(section) {
       await deleteRecord('panels', id);
       renderTab('panels');
     }
+  });
+  form.addEventListener('reset', () => {
+    selectedPanelId = null;
+    renderRows();
   });
   section.querySelector('#panelClear').addEventListener('click', () => form.reset());
 }
@@ -2970,6 +3402,7 @@ function renderOrders(section) {
   });
   let filteredOrders = list.slice();
   let activeFilters = {};
+  let selectedOrderId = null;
   const renderRows = () => {
     const term = search.value.toLowerCase();
     const filters = {
@@ -3041,11 +3474,15 @@ function renderOrders(section) {
       return true;
     });
     const userName = id => userMap.get(Number(id))?.name || '';
+    if (selectedOrderId != null && !filteredOrders.some(o => o.id === selectedOrderId)) {
+      selectedOrderId = null;
+    }
     tbody.innerHTML = filteredOrders.map(o => {
       const sample = sampleMap.get(Number(o.sample_id));
       const statusDisplay = sample?.status || o.status || '';
       const createdBy = determineCreatedBy('orders', o);
-      return `<tr data-id="${o.id}"><td>${o.id}</td><td>${esc(getName('patients', Number(o.patient_id)))}</td><td>${esc(getName('samples', Number(o.sample_id)))}</td><td>${esc(getName('panels', Number(o.panel_id)))}</td><td>${esc(userName(o.analysis_responsible_id))}</td><td>${esc(userName(o.interpreter_id))}</td><td>${esc(userName(o.approver_id))}</td><td>${esc(statusDisplay)}</td><td>${esc(createdBy)}</td><td>${esc(o.ordered_at||'')}</td></tr>`;
+      const selectedAttr = o.id === selectedOrderId ? ' data-selected="true"' : '';
+      return `<tr data-id="${o.id}"${selectedAttr}><td>${o.id}</td><td>${esc(getName('patients', Number(o.patient_id)))}</td><td>${esc(getName('samples', Number(o.sample_id)))}</td><td>${esc(getName('panels', Number(o.panel_id)))}</td><td>${esc(userName(o.analysis_responsible_id))}</td><td>${esc(userName(o.interpreter_id))}</td><td>${esc(userName(o.approver_id))}</td><td>${esc(statusDisplay)}</td><td>${esc(createdBy)}</td><td>${esc(o.ordered_at||'')}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -3072,8 +3509,10 @@ function renderOrders(section) {
     if (!tr) return;
     const order = list.find(o => o.id === Number(tr.dataset.id));
     if (!order) return;
+    selectedOrderId = order.id;
     fillForm(form, order);
     syncStatusFromSample(order.sample_id);
+    renderRows();
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -3117,6 +3556,10 @@ function renderOrders(section) {
       renderTab('orders');
       renderDashboard(document.querySelector('section[data-tab="dashboard"]'));
     }
+  });
+  form.addEventListener('reset', () => {
+    selectedOrderId = null;
+    renderRows();
   });
   section.querySelector('#orderClear').addEventListener('click', () => form.reset());
 }
@@ -3172,6 +3615,7 @@ function renderVariants(section) {
             <button class="secondary" type="submit" id="variantSaveNew" data-action="create" hidden>Gem som ny</button>
             <button class="secondary" type="button" id="variantClear">Ny</button>
             <button class="danger" type="button" id="variantDelete">Slet</button>
+            <button class="secondary" type="button" id="variantFromLibrary">Fra bibliotek</button>
             <button class="secondary" type="button" id="variantToLibrary">Til bibliotek</button>
           </div>
         </form>
@@ -3216,6 +3660,7 @@ function renderVariants(section) {
   applySelectFilters(section);
   let filteredVariants = list.slice();
   let activeFilters = {};
+  let selectedVariantId = null;
   const renderRows = () => {
     const term = search.value.toLowerCase();
     const filters = {
@@ -3242,9 +3687,13 @@ function renderVariants(section) {
       if (filters.criteria && !(v.criteria || '').toLowerCase().includes(filters.criteria)) return false;
       return true;
     });
+    if (selectedVariantId != null && !filteredVariants.some(v => v.id === selectedVariantId)) {
+      selectedVariantId = null;
+    }
     tbody.innerHTML = filteredVariants.map(v => {
       const createdBy = determineCreatedBy('variants', v);
-      return `<tr data-id="${v.id}"><td>${v.id}</td><td>${v.order_id}</td><td>${esc(v.gene)}</td><td>${esc(v.hgvs_c||'')}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(createdBy)}</td></tr>`;
+      const selectedAttr = v.id === selectedVariantId ? ' data-selected="true"' : '';
+      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td>${v.order_id}</td><td>${esc(v.gene)}</td><td>${esc(v.hgvs_c||'')}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -3264,8 +3713,10 @@ function renderVariants(section) {
     if (!tr) return;
     const variant = list.find(v => v.id === Number(tr.dataset.id));
     if (!variant) return;
+    selectedVariantId = variant.id;
     fillForm(form, variant);
     enterEditMode(variant.id);
+    renderRows();
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -3297,6 +3748,25 @@ function renderVariants(section) {
       await deleteRecord('variants', id);
       renderTab('variants');
     }
+  });
+  section.querySelector('#variantFromLibrary').addEventListener('click', () => {
+    openVariantLibraryPicker(variant => {
+      if (!form) return;
+      if (form.elements.gene) form.elements.gene.value = variant.gene || '';
+      if (form.elements.transcript) form.elements.transcript.value = variant.transcript || '';
+      if (form.elements.hgvs_c) form.elements.hgvs_c.value = variant.hgvs_c || '';
+      if (form.elements.hgvs_p) form.elements.hgvs_p.value = variant.hgvs_p || '';
+      if (form.elements.criteria) form.elements.criteria.value = variant.criteria || '';
+      if (form.elements.interpretation) form.elements.interpretation.value = variant.evidence || variant.interpretation || '';
+      if (form.elements.classification && variant.classification != null && variant.classification !== '') {
+        form.elements.classification.value = String(variant.classification);
+      }
+    });
+  });
+  form.addEventListener('reset', () => {
+    selectedVariantId = null;
+    exitEditMode();
+    renderRows();
   });
   section.querySelector('#variantClear').addEventListener('click', () => {
     const orderValue = form.elements.order_id.value;
@@ -3330,32 +3800,409 @@ function renderVariants(section) {
   });
 }
 function renderVariantLibrary(section) {
-  const list = getCached('variant_library');
+  const list = getCached('variant_library').slice().sort((a, b) => {
+    const geneCompare = (a.gene || '').localeCompare(b.gene || '', 'da');
+    if (geneCompare) return geneCompare;
+    const hgvsCompare = (a.hgvs_c || '').localeCompare(b.hgvs_c || '', 'da');
+    if (hgvsCompare) return hgvsCompare;
+    return (a.id || 0) - (b.id || 0);
+  });
   section.innerHTML = `
   <div class="panel">
-    <label for="libSearch">Søg</label>
-    <input id="libSearch" type="search" placeholder="Gen/HGVS...">
-    <table><thead><tr><th>ID</th><th>Gen</th><th>HGVS</th><th>Klasse</th><th>Kriterier</th><th>Evidens</th><th>Kurateret af</th></tr></thead><tbody></tbody></table>
+    <div class="flex">
+      <div>
+        <label for="libSearch">Søg</label>
+        <input id="libSearch" type="search" placeholder="Gen/HGVS...">
+        <details class="advanced-filter" id="variantLibraryFilterPanel">
+          <summary>Avanceret filter</summary>
+          <div class="filter-grid">
+            <label>Gen<input type="search" data-filter-library="gene" placeholder="Gen"></label>
+            <label>Transkript<input type="search" data-filter-library="transcript" placeholder="RefSeq/ENST"></label>
+            <label>HGVS c.<input type="search" data-filter-library="hgvs_c" placeholder="c."></label>
+            <label>HGVS p.<input type="search" data-filter-library="hgvs_p" placeholder="p."></label>
+            <label>Klasse<input type="search" data-filter-library="classification" placeholder="1-5/VUS"></label>
+            <label>Kriterier<input type="search" data-filter-library="criteria" placeholder="PM1,PP3..."></label>
+            <label>Tilstand<input type="search" data-filter-library="condition" placeholder="Tilstand"></label>
+            <label>Nedarvning<input type="search" data-filter-library="inheritance" placeholder="Arvegang"></label>
+            <label>Kurateret af<input type="search" data-filter-library="curated_by" placeholder="Kurator"></label>
+            <label>Sidst gennemgået fra<input type="date" data-filter-library="last_review_from"></label>
+            <label>Sidst gennemgået til<input type="date" data-filter-library="last_review_to"></label>
+          </div>
+        </details>
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Gen</th><th>Transkript</th><th>HGVS c.</th><th>HGVS p.</th><th>Klasse</th><th>Kriterier</th><th>Tilstand</th><th>Nedarvning</th><th>Kurateret af</th><th>Sidst gennemgået</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <div class="table-actions">
+          <button type="button" class="secondary" id="libraryExportCsv">Eksportér CSV</button>
+          <button type="button" class="secondary" id="libraryImportCsv">Importér CSV</button>
+          <input type="file" id="variantLibraryImportInput" accept=".csv,text/csv" hidden>
+        </div>
+      </div>
+      <div>
+        <h2>Bibliotekspost</h2>
+        <form id="variantLibraryForm">
+          <input type="hidden" name="id">
+          <label>Gen<input name="gene" required></label>
+          <label>Transkript<input name="transcript"></label>
+          <label>HGVS c.<input name="hgvs_c"></label>
+          <label>HGVS p.<input name="hgvs_p"></label>
+          <label>Klasse<input name="classification" placeholder="1-5/VUS"></label>
+          <label>Kriterier<input name="criteria"></label>
+          <label>Tilstand<input name="condition"></label>
+          <label>Nedarvning<input name="inheritance"></label>
+          <label>Evidens<textarea name="evidence" rows="4"></textarea></label>
+          <label>Kurateret af<input name="curated_by"></label>
+          <label>Sidst gennemgået<input type="date" name="last_review"></label>
+          <div class="btn-row">
+            <button class="primary" type="submit" data-action="save" id="variantLibrarySave">Gem</button>
+            <button class="secondary" type="submit" data-action="create" id="variantLibrarySaveNew" hidden>Gem som ny</button>
+            <button class="secondary" type="button" id="variantLibraryClear">Ny</button>
+            <button class="danger" type="button" id="variantLibraryDelete">Slet</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>`;
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#libSearch');
+  const form = section.querySelector('#variantLibraryForm');
+  const saveButton = section.querySelector('#variantLibrarySave');
+  const saveNewButton = section.querySelector('#variantLibrarySaveNew');
+  const clearButton = section.querySelector('#variantLibraryClear');
+  const deleteButton = section.querySelector('#variantLibraryDelete');
+  const exportButton = section.querySelector('#libraryExportCsv');
+  const importButton = section.querySelector('#libraryImportCsv');
+  const importInput = section.querySelector('#variantLibraryImportInput');
+  const defaultSaveLabel = saveButton?.textContent || 'Gem';
+  const csvColumns = [
+    {key: 'id', label: 'ID'},
+    {key: 'gene', label: 'Gen'},
+    {key: 'transcript', label: 'Transkript'},
+    {key: 'hgvs_c', label: 'HGVS c.'},
+    {key: 'hgvs_p', label: 'HGVS p.'},
+    {key: 'classification', label: 'Klasse'},
+    {key: 'criteria', label: 'Kriterier'},
+    {key: 'condition', label: 'Tilstand'},
+    {key: 'inheritance', label: 'Nedarvning'},
+    {key: 'evidence', label: 'Evidens'},
+    {key: 'curated_by', label: 'Kurateret af'},
+    {key: 'last_review', label: 'Sidst gennemgået'},
+    {key: 'created_at', label: 'Oprettet'},
+    {key: 'updated_at', label: 'Opdateret'}
+  ];
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
   applyControlTooltips(section);
+  applyFormTooltips(form);
+  let filteredLibrary = list.slice();
+  let selectedId = null;
+  const filterInputs = {
+    gene: section.querySelector('[data-filter-library="gene"]'),
+    transcript: section.querySelector('[data-filter-library="transcript"]'),
+    hgvs_c: section.querySelector('[data-filter-library="hgvs_c"]'),
+    hgvs_p: section.querySelector('[data-filter-library="hgvs_p"]'),
+    classification: section.querySelector('[data-filter-library="classification"]'),
+    criteria: section.querySelector('[data-filter-library="criteria"]'),
+    condition: section.querySelector('[data-filter-library="condition"]'),
+    inheritance: section.querySelector('[data-filter-library="inheritance"]'),
+    curated_by: section.querySelector('[data-filter-library="curated_by"]'),
+    last_review_from: section.querySelector('[data-filter-library="last_review_from"]'),
+    last_review_to: section.querySelector('[data-filter-library="last_review_to"]')
+  };
+  const enterEditMode = id => {
+    if (!form) return;
+    form.dataset.mode = 'edit';
+    form.dataset.editingId = id != null ? String(id) : '';
+    if (saveButton) saveButton.textContent = 'Opdater bibliotekspost';
+    if (saveNewButton) saveNewButton.hidden = false;
+  };
+  const exitEditMode = () => {
+    if (!form) return;
+    form.dataset.mode = 'create';
+    form.dataset.editingId = '';
+    if (form.elements.id) form.elements.id.value = '';
+    if (saveButton) saveButton.textContent = defaultSaveLabel;
+    if (saveNewButton) saveNewButton.hidden = true;
+  };
+  exitEditMode();
   const renderRows = () => {
-    const term = search.value.toLowerCase();
-    tbody.innerHTML = list.filter(v => !term || [v.gene,v.hgvs_c,v.hgvs_p].some(val => (val||'').toLowerCase().includes(term))).map(v => `<tr data-id="${v.id}"><td>${v.id}</td><td>${esc(v.gene)}</td><td>${esc(v.hgvs_c||v.hgvs_p||'')}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(v.evidence||'')}</td><td>${esc(v.curated_by||'')}</td></tr>`).join('');
+    const term = (search?.value || '').trim().toLowerCase();
+    const filters = {
+      gene: filterInputs.gene?.value.trim().toLowerCase() || '',
+      transcript: filterInputs.transcript?.value.trim().toLowerCase() || '',
+      hgvs_c: filterInputs.hgvs_c?.value.trim().toLowerCase() || '',
+      hgvs_p: filterInputs.hgvs_p?.value.trim().toLowerCase() || '',
+      classification: filterInputs.classification?.value.trim().toLowerCase() || '',
+      criteria: filterInputs.criteria?.value.trim().toLowerCase() || '',
+      condition: filterInputs.condition?.value.trim().toLowerCase() || '',
+      inheritance: filterInputs.inheritance?.value.trim().toLowerCase() || '',
+      curated_by: filterInputs.curated_by?.value.trim().toLowerCase() || '',
+      last_review_from: filterInputs.last_review_from?.value || '',
+      last_review_to: filterInputs.last_review_to?.value || ''
+    };
+    const fromDate = filters.last_review_from ? new Date(filters.last_review_from) : null;
+    const toDate = filters.last_review_to ? new Date(filters.last_review_to) : null;
+    const validFrom = fromDate && !Number.isNaN(fromDate.getTime()) ? fromDate : null;
+    const validTo = toDate && !Number.isNaN(toDate.getTime()) ? toDate : null;
+    filteredLibrary = list.filter(v => {
+      if (!term) return true;
+      return [v.gene, v.transcript, v.hgvs_c, v.hgvs_p, v.classification, v.criteria, v.condition, v.inheritance, v.evidence, v.curated_by]
+        .some(val => (val || '').toLowerCase().includes(term));
+    }).filter(v => {
+      if (filters.gene && !(v.gene || '').toLowerCase().includes(filters.gene)) return false;
+      if (filters.transcript && !(v.transcript || '').toLowerCase().includes(filters.transcript)) return false;
+      if (filters.hgvs_c && !(v.hgvs_c || '').toLowerCase().includes(filters.hgvs_c)) return false;
+      if (filters.hgvs_p && !(v.hgvs_p || '').toLowerCase().includes(filters.hgvs_p)) return false;
+      if (filters.classification && !(String(v.classification || '')).toLowerCase().includes(filters.classification)) return false;
+      if (filters.criteria && !(v.criteria || '').toLowerCase().includes(filters.criteria)) return false;
+      if (filters.condition && !(v.condition || '').toLowerCase().includes(filters.condition)) return false;
+      if (filters.inheritance && !(v.inheritance || '').toLowerCase().includes(filters.inheritance)) return false;
+      if (filters.curated_by && !(v.curated_by || '').toLowerCase().includes(filters.curated_by)) return false;
+      if ((validFrom || validTo) && v.last_review) {
+        const reviewDate = new Date(v.last_review);
+        if (!Number.isNaN(reviewDate.getTime())) {
+          if (validFrom && reviewDate < validFrom) return false;
+          if (validTo && reviewDate > validTo) return false;
+        } else if (validFrom || validTo) {
+          return false;
+        }
+      } else if ((validFrom || validTo) && !v.last_review) {
+        return false;
+      }
+      return true;
+    });
+    if (selectedId && !filteredLibrary.some(v => v.id === selectedId)) {
+      selectedId = null;
+    }
+    if (!filteredLibrary.length) {
+      tbody.innerHTML = `<tr><td colspan="11">Ingen poster matcher filtreringen.</td></tr>`;
+      annotateTableCells(section);
+      return;
+    }
+    tbody.innerHTML = filteredLibrary.map(v => {
+      const selectedAttr = v.id === selectedId ? ' data-selected="true"' : '';
+      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td>${esc(v.gene)}</td><td>${esc(v.transcript || '')}</td><td>${esc(v.hgvs_c || '')}</td><td>${esc(v.hgvs_p || '')}</td><td>${esc(v.classification || '')}</td><td>${esc(v.criteria || '')}</td><td>${esc(v.condition || '')}</td><td>${esc(v.inheritance || '')}</td><td>${esc(v.curated_by || '')}</td><td>${esc(v.last_review || '')}</td></tr>`;
+    }).join('');
     annotateTableCells(section);
   };
   renderRows();
-  search.addEventListener('input', renderRows);
-  tbody.addEventListener('dblclick', async e => {
-    const tr = e.target.closest('tr');
+  search?.addEventListener('input', renderRows);
+  Object.entries(filterInputs).forEach(([, input]) => {
+    if (!input) return;
+    const eventName = input.type === 'date' ? 'change' : 'input';
+    input.addEventListener(eventName, renderRows);
+    if (eventName === 'change') {
+      input.addEventListener('input', renderRows);
+    }
+  });
+  tbody?.addEventListener('click', e => {
+    const tr = e.target.closest('tr[data-id]');
     if (!tr) return;
-    if (confirm('Slet bibliotekspost?')) {
-      await deleteRecord('variant_library', Number(tr.dataset.id));
+    const id = Number(tr.dataset.id);
+    const entry = list.find(v => v.id === id);
+    if (!entry) return;
+    selectedId = id;
+    fillForm(form, entry);
+    enterEditMode(id);
+    renderRows();
+  });
+  const clearForm = () => {
+    if (!form) return;
+    form.reset();
+    exitEditMode();
+    selectedId = null;
+    renderRows();
+  };
+  clearButton?.addEventListener('click', clearForm);
+  form?.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!ensureWrite('variant_library')) return;
+    const submitterAction = e.submitter?.dataset.action || 'save';
+    const data = Object.fromEntries(new FormData(form).entries());
+    Object.keys(data).forEach(key => {
+      if (typeof data[key] === 'string') {
+        data[key] = data[key].trim();
+      }
+    });
+    const editingId = Number(form.dataset.editingId || data.id || 0);
+    const creatingNew = submitterAction === 'create' || !editingId;
+    const payload = {
+      gene: data.gene || '',
+      transcript: data.transcript || '',
+      hgvs_c: data.hgvs_c || '',
+      hgvs_p: data.hgvs_p || '',
+      classification: data.classification || '',
+      criteria: data.criteria || '',
+      condition: data.condition || '',
+      inheritance: data.inheritance || '',
+      evidence: data.evidence || '',
+      curated_by: data.curated_by || '',
+      last_review: data.last_review || ''
+    };
+    if (payload.last_review && !/^\d{4}-\d{2}-\d{2}$/.test(payload.last_review)) {
+      const date = new Date(payload.last_review);
+      if (!Number.isNaN(date.getTime())) {
+        payload.last_review = date.toISOString().split('T')[0];
+      }
+    }
+    if (!creatingNew) {
+      const id = editingId;
+      const beforeRecord = findById('variant_library', id);
+      if (!beforeRecord) {
+        alert('Kunne ikke finde biblioteksposten.');
+        return;
+      }
+      const before = {...beforeRecord};
+      const updated = {...before, ...payload, id};
+      await updateRecord('variant_library', updated, before);
+      setStatus(`Bibliotekspost ${id} opdateret.`);
+    } else {
+      if (!payload.curated_by) payload.curated_by = currentUserName() || '';
+      if (!payload.last_review) payload.last_review = new Date().toISOString().split('T')[0];
+      const record = {...payload};
+      await addRecord('variant_library', record);
+      setStatus('Bibliotekspost oprettet.');
+    }
+    renderTab('variant_library');
+  });
+  deleteButton?.addEventListener('click', async () => {
+    const id = Number(form?.elements?.id?.value || 0);
+    if (!id) {
+      alert('Vælg en bibliotekspost der skal slettes.');
+      return;
+    }
+    if (!ensureWrite('variant_library')) return;
+    if (!confirm('Slet bibliotekspost?')) return;
+    await deleteRecord('variant_library', id);
+    setStatus(`Bibliotekspost ${id} slettet.`);
+    renderTab('variant_library');
+  });
+  exportButton?.addEventListener('click', () => {
+    const filename = downloadCsvFile(filteredLibrary, csvColumns, 'glimr-variantbibliotek.csv');
+    setStatus(`Eksporterede ${filteredLibrary.length} biblioteksposter til ${filename}.`);
+  });
+  importButton?.addEventListener('click', () => importInput?.click());
+  importInput?.addEventListener('change', async () => {
+    const file = importInput.files?.[0];
+    if (!file) return;
+    if (!ensureWrite('variant_library')) {
+      importInput.value = '';
+      return;
+    }
+    try {
+      const text = await file.text();
+      const {headers, rows} = parseCsv(text);
+      if (!headers.length) throw new Error('CSV-filen mangler kolonneoverskrifter.');
+      const normaliseHeader = header => {
+        const lower = String(header || '').toLowerCase();
+        const normalized = typeof lower.normalize === 'function' ? lower.normalize('NFD') : lower;
+        return normalized.replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      };
+      const headerMap = {
+        id: 'id',
+        gene: 'gene',
+        gen: 'gene',
+        transcript: 'transcript',
+        transkript: 'transcript',
+        hgvs_c: 'hgvs_c',
+        hgvs_c_: 'hgvs_c',
+        hgvs: 'hgvs_c',
+        hgvs_p: 'hgvs_p',
+        klassifikation: 'classification',
+        classification: 'classification',
+        class: 'classification',
+        klasse: 'classification',
+        criteria: 'criteria',
+        kriterier: 'criteria',
+        acmg: 'criteria',
+        evidence: 'evidence',
+        evidens: 'evidence',
+        notes: 'evidence',
+        condition: 'condition',
+        tilstand: 'condition',
+        phenotype: 'condition',
+        inheritance: 'inheritance',
+        nedarvning: 'inheritance',
+        curated_by: 'curated_by',
+        kurator: 'curated_by',
+        kurateret_af: 'curated_by',
+        last_review: 'last_review',
+        sidst_gennemgaaet: 'last_review',
+        lastreview: 'last_review'
+      };
+      const columnKeys = headers.map(header => headerMap[normaliseHeader(header)] || null);
+      if (!columnKeys.some(key => key === 'gene' || key === 'hgvs_c' || key === 'hgvs_p')) {
+        throw new Error('CSV-filen skal mindst indeholde kolonnen "Gene/Gen" eller HGVS.');
+      }
+      const summary = {created: 0, updated: 0, skipped: 0};
+      const existingCache = new Map(getCached('variant_library').map(entry => [entry.id, {...entry}]));
+      for (const rowValues of rows) {
+        if (!rowValues || rowValues.every(cell => !cell || !cell.trim())) {
+          summary.skipped++;
+          continue;
+        }
+        const entry = {};
+        columnKeys.forEach((key, idx) => {
+          if (!key) return;
+          entry[key] = (rowValues[idx] || '').trim();
+        });
+        let id = null;
+        if (entry.id) {
+          const parsedId = Number(entry.id);
+          if (Number.isFinite(parsedId) && parsedId > 0) {
+            id = parsedId;
+            entry.id = parsedId;
+          } else {
+            delete entry.id;
+          }
+        }
+        const ensureIsoDate = value => {
+          if (!value) return '';
+          if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+          const parsed = new Date(value);
+          if (!Number.isNaN(parsed.getTime())) {
+            return parsed.toISOString().split('T')[0];
+          }
+          return value;
+        };
+        entry.last_review = ensureIsoDate(entry.last_review || '');
+        if (!entry.gene && !entry.hgvs_c && !entry.hgvs_p) {
+          summary.skipped++;
+          continue;
+        }
+        if (id && existingCache.has(id)) {
+          const before = existingCache.get(id);
+          const updated = {...before, ...entry, id};
+          await updateRecord('variant_library', updated, before);
+          existingCache.set(id, updated);
+          summary.updated++;
+        } else {
+          const record = {...entry};
+          delete record.id;
+          if (!record.curated_by) record.curated_by = currentUserName() || '';
+          if (!record.last_review) record.last_review = new Date().toISOString().split('T')[0];
+          await addRecord('variant_library', record);
+          summary.created++;
+        }
+      }
+      const summaryParts = [];
+      if (summary.updated) summaryParts.push(`${summary.updated} opdateret`);
+      if (summary.created) summaryParts.push(`${summary.created} tilføjet`);
+      if (summary.skipped) summaryParts.push(`${summary.skipped} uændret`);
+      const message = summaryParts.length ? summaryParts.join(', ') : 'Ingen poster ændret';
+      setStatus(`Import fuldført: ${message}.`);
+      alert(`Import fuldført: ${message}.`);
       renderTab('variant_library');
+    } catch (err) {
+      console.error(err);
+      alert('Kunne ikke importere CSV: ' + err.message);
+      setStatus('Fejl under import: ' + err.message);
+    } finally {
+      importInput.value = '';
     }
   });
 }
@@ -3676,6 +4523,7 @@ function renderReports(section) {
   const statusMap = {draft:'Udkast', final:'Endelig', amended:'Ændret'};
   let filteredReports = list.slice();
   let activeFilters = {};
+  let selectedReportId = null;
   const renderRows = () => {
     const term = search.value.toLowerCase();
     const filters = {
@@ -3711,10 +4559,14 @@ function renderReports(section) {
       }
       return true;
     });
+    if (selectedReportId != null && !filteredReports.some(r => r.id === selectedReportId)) {
+      selectedReportId = null;
+    }
     tbody.innerHTML = filteredReports.map(r => {
       const displayStatus = statusMap[r.status] || r.status || '';
       const createdBy = determineCreatedBy('reports', r);
-      return `<tr data-id="${r.id}"><td>${r.id}</td><td>${r.order_id}</td><td>${esc(displayStatus)}</td><td>${esc(createdBy)}</td><td>${esc(r.issued_at||'')}</td></tr>`;
+      const selectedAttr = r.id === selectedReportId ? ' data-selected="true"' : '';
+      return `<tr data-id="${r.id}"${selectedAttr}><td>${r.id}</td><td>${r.order_id}</td><td>${esc(displayStatus)}</td><td>${esc(createdBy)}</td><td>${esc(r.issued_at||'')}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -3734,10 +4586,12 @@ function renderReports(section) {
     if (!tr) return;
     const report = list.find(r => r.id === Number(tr.dataset.id));
     if (!report) return;
+    selectedReportId = report.id;
     fillForm(form, report);
     refreshVariantOptions();
     const variants = getReportVariantSnapshots(report, Number(report.order_id));
     setSelectedReportVariants(variants);
+    renderRows();
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -3774,6 +4628,10 @@ function renderReports(section) {
       await deleteRecord('reports', id);
       renderTab('reports');
     }
+  });
+  form.addEventListener('reset', () => {
+    selectedReportId = null;
+    renderRows();
   });
   section.querySelector('#reportClear').addEventListener('click', () => {
     form.reset();
@@ -4581,15 +5439,21 @@ function renderQC(section) {
   applyControlTooltips(section);
   applyFormTooltips(form);
   applySelectFilters(section);
+  let selectedQcId = null;
   const renderRows = () => {
     const term = search.value.toLowerCase();
-    tbody.innerHTML = list.filter(q => {
+    const filteredQc = list.filter(q => {
       if (!term) return true;
       const creator = determineCreatedBy('qc', q);
       return [q.metric, q.unit, creator].some(v => (v || '').toString().toLowerCase().includes(term));
-    }).map(q => {
+    });
+    if (selectedQcId != null && !filteredQc.some(q => q.id === selectedQcId)) {
+      selectedQcId = null;
+    }
+    tbody.innerHTML = filteredQc.map(q => {
       const createdBy = determineCreatedBy('qc', q);
-      return `<tr data-id="${q.id}"><td>${q.id}</td><td>${esc(q.sample_id)}</td><td>${esc(q.metric)}</td><td>${esc(q.value)}</td><td>${esc(q.unit||'')}</td><td>${esc(createdBy)}</td></tr>`;
+      const selectedAttr = q.id === selectedQcId ? ' data-selected="true"' : '';
+      return `<tr data-id="${q.id}"${selectedAttr}><td>${q.id}</td><td>${esc(q.sample_id)}</td><td>${esc(q.metric)}</td><td>${esc(q.value)}</td><td>${esc(q.unit||'')}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -4600,7 +5464,9 @@ function renderQC(section) {
     if (!tr) return;
     const qc = list.find(q => q.id === Number(tr.dataset.id));
     if (!qc) return;
+    selectedQcId = qc.id;
     fillForm(form, qc);
+    renderRows();
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -4627,6 +5493,10 @@ function renderQC(section) {
       await deleteRecord('qc', id);
       renderTab('qc');
     }
+  });
+  form.addEventListener('reset', () => {
+    selectedQcId = null;
+    renderRows();
   });
   section.querySelector('#qcClear').addEventListener('click', () => form.reset());
 }
@@ -4750,7 +5620,7 @@ function buildFhirBundle(orderId) {
   };
   const narrative = variants.map(describeVariantNarrative).filter(Boolean).join('\n');
   if (narrative) {
-    diagnosticReport.presentedForm = [{contentType:'text/plain', data:btoa(narrative)}];
+    diagnosticReport.presentedForm = [{contentType:'text/plain', data:base64EncodeUtf8(narrative)}];
   }
   const entries = [];
   const addEntry = resource => entries.push({fullUrl:`urn:uuid:${crypto.randomUUID?.() || Math.random().toString(36).slice(2)}`, resource});
@@ -4870,9 +5740,17 @@ function renderUsers(section) {
   applyButtonTooltips(section);
   applyControlTooltips(section);
   applyFormTooltips(form);
+  let selectedUserId = null;
   const renderRows = () => {
     const term = search.value.toLowerCase();
-    tbody.innerHTML = list.filter(u => !term || [u.name,u.email,u.role].some(v => (v||'').toLowerCase().includes(term))).map(u => `<tr data-id="${u.id}"><td>${u.id}</td><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${esc(roleLabel(u.role))}</td></tr>`).join('');
+    const filteredUsers = list.filter(u => !term || [u.name,u.email,u.role].some(v => (v||'').toLowerCase().includes(term)));
+    if (selectedUserId != null && !filteredUsers.some(u => u.id === selectedUserId)) {
+      selectedUserId = null;
+    }
+    tbody.innerHTML = filteredUsers.map(u => {
+      const selectedAttr = u.id === selectedUserId ? ' data-selected="true"' : '';
+      return `<tr data-id="${u.id}"${selectedAttr}><td>${u.id}</td><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${esc(roleLabel(u.role))}</td></tr>`;
+    }).join('');
     annotateTableCells(section);
   };
   renderRows();
@@ -4882,7 +5760,9 @@ function renderUsers(section) {
     if (!tr) return;
     const user = list.find(u => u.id === Number(tr.dataset.id));
     if (!user) return;
+    selectedUserId = user.id;
     fillForm(form, user);
+    renderRows();
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -4917,6 +5797,10 @@ function renderUsers(section) {
       }
       renderTab('users');
     }
+  });
+  form.addEventListener('reset', () => {
+    selectedUserId = null;
+    renderRows();
   });
   section.querySelector('#userClear').addEventListener('click', () => form.reset());
 }
@@ -5126,6 +6010,16 @@ async function buildZipFiles() {
     {name:'glimr-backup.json', data:utf8Encode(backup)},
     {name:'README.txt', data:utf8Encode(readme)}
   ];
+}
+function base64EncodeUtf8(str) {
+  const bytes = utf8Encode(str);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
 }
 function utf8Encode(str) {
   return new TextEncoder().encode(str);
