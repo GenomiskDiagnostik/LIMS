@@ -957,6 +957,7 @@ const tooltipCatalog = {
     sampleDelete: 'Slet den valgte prøve.',
     panelClear: 'Ryd formularen for at oprette et nyt panel.',
     panelDelete: 'Slet det valgte panel.',
+    panelsExport: 'Eksportér den filtrerede panelliste som tekstfil.',
     orderClear: 'Ryd formularen for at oprette en ny ordination.',
     orderDelete: 'Slet den valgte ordination.',
     variantClear: 'Ryd formularen for at registrere en ny variant.',
@@ -1853,6 +1854,17 @@ function downloadCsvFile(rows, columns, baseName, delimiter = ';') {
   const csv = [header, ...lines].join('\r\n');
   const encoded = encodeWindows1252(csv);
   const blob = new Blob([encoded], {type: 'text/csv;charset=windows-1252;'});
+  const url = URL.createObjectURL(blob);
+  const filename = withDateStamp(baseName);
+  triggerDownload(url, filename);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return filename;
+}
+function downloadTextFile(text, baseName) {
+  if (typeof text !== 'string') text = '';
+  const normalised = text.replace(/\r?\n|\r/g, '\r\n');
+  const encoded = encodeWindows1252(normalised);
+  const blob = new Blob([encoded], {type: 'text/plain;charset=windows-1252;'});
   const url = URL.createObjectURL(blob);
   const filename = withDateStamp(baseName);
   triggerDownload(url, filename);
@@ -3394,6 +3406,9 @@ function renderPanels(section) {
         <label for="panelSearch">Søg</label>
         <input id="panelSearch" type="search" placeholder="Navn...">
         <table><thead><tr><th>ID</th><th>Navn</th><th>Beskrivelse</th></tr></thead><tbody></tbody></table>
+        <div class="table-actions">
+          <button type="button" class="secondary" id="panelsExport">Eksportér filtrerede paneler</button>
+        </div>
       </div>
       <div>
         <h2>Panel</h2>
@@ -3413,6 +3428,7 @@ function renderPanels(section) {
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#panelSearch');
   const form = section.querySelector('#panelForm');
+  const exportButton = section.querySelector('#panelsExport');
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
@@ -3420,9 +3436,10 @@ function renderPanels(section) {
   applyFormTooltips(form);
   applySelectFilters(section);
   let selectedPanelId = null;
+  let filteredPanels = list.slice();
   const renderRows = () => {
-    const term = search.value.toLowerCase();
-    const filteredPanels = list.filter(p => !term || (p.name||'').toLowerCase().includes(term));
+    const term = search.value.trim().toLowerCase();
+    filteredPanels = list.filter(p => !term || (p.name || '').toLowerCase().includes(term));
     if (selectedPanelId != null && !filteredPanels.some(p => p.id === selectedPanelId)) {
       selectedPanelId = null;
     }
@@ -3434,6 +3451,20 @@ function renderPanels(section) {
   };
   renderRows();
   search.addEventListener('input', renderRows);
+  exportButton?.addEventListener('click', () => {
+    if (!filteredPanels.length) {
+      alert('Ingen paneler matcher filtreringen.');
+      return;
+    }
+    const lines = filteredPanels.map(p => {
+      const name = (p.name ?? '').toString().trim() || '(uden navn)';
+      const desc = (p.description ?? '').toString().replace(/\r?\n|\r/g, ' ').trim();
+      return `${name}: ${desc}`;
+    });
+    const text = lines.join('\r\n');
+    const filename = downloadTextFile(text, 'glimr-paneler.txt');
+    setStatus(`Eksporterede ${filteredPanels.length} paneler til ${filename}.`);
+  });
   tbody.addEventListener('click', e => {
     const tr = e.target.closest('tr');
     if (!tr) return;
