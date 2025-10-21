@@ -1,6 +1,8 @@
-# LIMS
 
-A Laboratory Information Management System (LIMS) for genomic diagnostics developed by GenomiskDiagnostik. This repository contains the backend, frontend, configuration, and deployment scripts used to manage samples, track workflows, and integrate with sequencing and analysis pipelines.
+# <img width="90" height="90" alt="logo" src="https://github.com/user-attachments/assets/cfdd5b73-d477-477d-9ba6-acba4826ea60" /> GlimR - Genetic LIMS Reporter
+
+A Laboratory Information Management System (LIMS) for genomic diagnostics developed by Thomas Lindestrand-Hansen. This repository contains the backend, frontend, configuration, and deployment scripts used to manage samples, track workflows, and integrate with sequencing and analysis pipelines.
+If you need a the logo.png file - right click the logo and save as logo.png. Place the file next to GlimR.html.
 
 ## Status
 
@@ -14,6 +16,8 @@ Active — under active development. See the repository for current branches and
 - User and role-based access control
 - Audit trails and reporting
 - Import/export (CSV, JSON) of sample and run data
+
+<img width="1567" height="797" alt="Skærmbillede 2025-10-21 101535" src="https://github.com/user-attachments/assets/6bfa5412-1502-49f5-b699-3fc3bca23bf7" />
 
 ## Technologies
 
