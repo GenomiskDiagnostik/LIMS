@@ -333,6 +333,58 @@ section[data-tab].active {
   font-size: 0.85rem;
   margin-top: 0.5rem;
 }
+.placeholder-guide {
+  margin-top: 1rem;
+  padding: 1rem 1.25rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--panel-border);
+  background: rgba(24, 111, 175, 0.08);
+}
+[data-theme="dark"] .placeholder-guide {
+  background: rgba(14, 165, 233, 0.12);
+}
+.placeholder-guide h3 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+}
+.placeholder-guide h4 {
+  margin: 0.75rem 0 0.35rem;
+  font-size: 0.95rem;
+}
+.placeholder-guide p {
+  margin: 0 0 0.5rem;
+}
+.placeholder-guide-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+.placeholder-guide ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.92rem;
+  color: var(--muted-text);
+}
+.placeholder-guide li + li {
+  margin-top: 0.35rem;
+}
+.placeholder-guide code {
+  font-family: 'Fira Code', 'Fira Mono', 'Consolas', monospace;
+  background: rgba(24, 111, 175, 0.15);
+  color: var(--accent-strong);
+  border-radius: 0.45rem;
+  padding: 0.05rem 0.35rem;
+  font-size: 0.85rem;
+}
+[data-theme="dark"] .placeholder-guide code {
+  background: rgba(14, 165, 233, 0.2);
+  color: var(--code-text);
+}
+.placeholder-guide-footnote {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--muted-text);
+}
 .variant-picker-overlay {
   position: fixed;
   inset: 0;
@@ -898,7 +950,7 @@ const tabs = [
   {id:'panels', label:'Analyser/Panels'},
   {id:'variants', label:'Varianter'},
   {id:'variant_library', label:'Variantbibliotek'},
-  {id:'conclusion_library', label:'Svartekster'},
+  {id:'conclusion_library', label:'Standardtekster'},
   {id:'reports', label:'Rapporter'},
   {id:'qc', label:'Kvalitetskontrol'},
   {id:'responses', label:'Svar (MedCom)'},
@@ -5042,6 +5094,60 @@ function describeVariantNarrative(variant) {
   const title = nameParts.join(' · ');
   return [title, summaryParts.join(' – ')].filter(Boolean).join(' – ');
 }
+function buildConclusionPlaceholderGuide(context = 'report') {
+  const intro = context === 'library'
+    ? 'Indsæt pladsholdere i standardteksten for at få felter udfyldt automatisk, når teksten bruges i en rapport.'
+    : 'Når du indsætter en standardtekst i rapporten, erstattes pladsholdere automatisk med data fra den valgte ordination.';
+  return `
+    <div class="placeholder-guide">
+      <h3>Pladsholdere til konklusioner</h3>
+      <p>${intro} Skriv pladsholderen i firkantede parenteser, fx <code>[Patient]</code>.</p>
+      <div class="placeholder-guide-columns">
+        <div>
+          <h4>Patient &amp; ordination</h4>
+          <ul>
+            <li><code>[Patient]</code> – patientens navn</li>
+            <li><code>[PatientMRN]</code> – patientens MRN/CPR</li>
+            <li><code>[PatientFamilienummer]</code> – familienummer</li>
+            <li><code>[PatientFødselsdato]</code> – fødselsdato (dd-mm-åååå)</li>
+            <li><code>[OrdinationID]</code> – ordinationens ID</li>
+            <li><code>[OrdinationStatus]</code> – ordinationens status</li>
+            <li><code>[OrdinationDato]</code> – bestillingsdato</li>
+            <li><code>[OrdinationRekvirent]</code> – rekvirerende afdeling/læge</li>
+            <li><code>[OrdinationPanel]</code> – valgt panel</li>
+            <li><code>[OrdinationAnalyseansvarlig]</code> – analyseansvarlig</li>
+            <li><code>[OrdinationTolker]</code> – tolk/fortolker</li>
+            <li><code>[OrdinationGodkender]</code> – godkender</li>
+          </ul>
+        </div>
+        <div>
+          <h4>Prøve</h4>
+          <ul>
+            <li><code>[SampleID]</code> – prøve-ID</li>
+            <li><code>[SamplePMB]</code> – PMB-nummer</li>
+            <li><code>[SampleType]</code> – prøvetype</li>
+            <li><code>[SampleStatus]</code> – prøvens status</li>
+            <li><code>[SampleDato]</code> – prøvetagningsdato</li>
+          </ul>
+        </div>
+        <div>
+          <h4>Varianter</h4>
+          <ul>
+            <li><code>[VariantAntal]</code> – antal valgte varianter</li>
+            <li><code>[Gen]</code>, <code>[Transkript]</code>, <code>[HGVS_c]</code>, <code>[HGVS_p]</code> – lister over værdier på tværs af varianter</li>
+            <li><code>[Zygositet]</code>, <code>[ACMG-klasse]</code>, <code>[Kriterier]</code> – kombinerede klassifikationer</li>
+            <li><code>[Annoteringer]</code> – samlede annoteringer (inkl. VarSeq-noter)</li>
+            <li><code>[Tolkning]</code> – samlede tolkninger</li>
+            <li><code>[VariantListe]</code> – nummereret oversigt med detaljer for hver variant</li>
+            <li><code>[Variant]</code> / <code>[Variant1]</code> – detaljer for den første variant</li>
+          </ul>
+        </div>
+      </div>
+      <p class="placeholder-guide-footnote">Tilgå enkelte varianter med nummererede pladsholdere, fx <code>[Variant1Gene]</code>, <code>[Variant2Tolkning]</code> eller <code>[Variant3.HGVS_c]</code>. Manglende oplysninger giver tom tekst, og pladsholdere er uafhængige af store/små bogstaver. Punktum kan bruges som adskillelse, fx <code>[Patient.MRN]</code>.</p>
+    </div>
+  `;
+}
+
 function renderConclusionLibrary(section) {
   const list = getCached('conclusion_library').slice().sort((a, b) => {
     const titleCompare = (a.title || '').localeCompare(b.title || '', 'da');
@@ -5073,6 +5179,7 @@ function renderConclusionLibrary(section) {
             <button class="danger" type="button" id="conclusionLibraryDelete">Slet</button>
           </div>
         </form>
+        <div data-placeholder-guide="library"></div>
       </div>
     </div>
   </div>`;
@@ -5081,11 +5188,15 @@ function renderConclusionLibrary(section) {
   const form = section.querySelector('#conclusionLibraryForm');
   const clearBtn = section.querySelector('#conclusionLibraryClear');
   const deleteBtn = section.querySelector('#conclusionLibraryDelete');
+  const placeholderGuideHost = section.querySelector('[data-placeholder-guide="library"]');
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
   applyControlTooltips(section);
   applyFormTooltips(form);
+  if (placeholderGuideHost) {
+    placeholderGuideHost.innerHTML = buildConclusionPlaceholderGuide('library');
+  }
   let selectedId = null;
   let filtered = list.slice();
   const renderRows = () => {
@@ -5246,6 +5357,7 @@ function renderReports(section) {
               <button class="secondary" type="button" id="conclusionLibraryAppend">Tilføj til konklusion</button>
             </div>
           </div>
+          <div data-placeholder-guide="report"></div>
           <div class="btn-row">
             <button class="primary" type="submit">Gem</button>
             <button class="secondary" type="button" id="reportClear">Ny</button>
@@ -5271,9 +5383,13 @@ function renderReports(section) {
   const conclusionAppendBtn = form?.querySelector('#conclusionLibraryAppend');
   const summaryField = form?.elements.summary;
   const conclusionMap = new Map(conclusionLibrary.map(entry => [String(entry.id), entry]));
+  const placeholderGuideHost = section.querySelector('[data-placeholder-guide="report"]');
   let selectedReportVariants = [];
   let currentReportOrderId = null;
   let variantOptionState = [];
+  if (placeholderGuideHost) {
+    placeholderGuideHost.innerHTML = buildConclusionPlaceholderGuide('report');
+  }
   const updateAddButtonState = () => {
     if (!variantAddButton || !variantSelect) return;
     const id = Number(variantSelect.value);
