@@ -189,6 +189,91 @@ section[data-tab].active {
   margin-bottom: 1.2rem;
   border: 1px solid var(--panel-border);
 }
+.tool-panel {
+  padding: 0;
+  overflow: hidden;
+}
+.tool-panel summary {
+  margin: 0;
+  padding: 1rem 1.2rem;
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: transparent;
+  color: inherit;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.tool-panel summary:hover {
+  background: rgba(24, 111, 175, 0.08);
+}
+.tool-panel[open] summary {
+  color: var(--accent-strong);
+  background: rgba(24, 111, 175, 0.08);
+}
+[data-theme="dark"] .tool-panel summary:hover {
+  background: rgba(56, 189, 248, 0.12);
+}
+[data-theme="dark"] .tool-panel[open] summary {
+  background: rgba(56, 189, 248, 0.12);
+  color: var(--accent);
+}
+.tool-panel summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.tool-panel summary::-webkit-details-marker {
+  display: none;
+}
+.tool-panel summary::marker {
+  display: none;
+}
+.tool-panel summary::after {
+  content: '\25B6';
+  font-size: 0.95rem;
+  color: var(--muted-text);
+  transition: transform 0.2s ease;
+}
+.tool-panel[open] summary::after {
+  transform: rotate(90deg);
+  color: var(--accent-strong);
+}
+.tool-summary-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.tool-summary-text .tool-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.tool-summary-text .tool-subtitle {
+  font-size: 0.9rem;
+  color: var(--muted-text);
+}
+.tool-panel .tool-body {
+  padding: 0 1.2rem 1.2rem;
+  border-top: 1px solid var(--panel-border);
+}
+.tool-panel .tool-body > h3 {
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  font-size: 1.2rem;
+}
+.tool-panel .tool-body > p:first-of-type {
+  margin-top: 0;
+}
+[data-theme="dark"] .tool-panel summary::after {
+  color: var(--muted-text);
+}
+[data-theme="dark"] .tool-panel[open] summary::after {
+  color: var(--accent);
+}
+.tool-panel[open] {
+  padding-bottom: 0;
+}
 .tool-columns {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -6175,61 +6260,85 @@ function renderTools(section) {
     </label>
   `).join('');
   section.innerHTML = `
-  <div class="panel tool-panel">
-    <h2>ACMG klassifikationshjælper</h2>
-    <p>Vælg de kriterier der er opfyldt for varianten. Resultatet bruger en forenklet vægtning af ACMG/AMP 2015 med opdaterede pointværdier.</p>
-    <form id="acmgTool">
-      <div class="tool-columns">
-        <fieldset>
-          <legend>Patogene kriterier</legend>
-          <div class="tool-criteria-list">
-            ${makeCriteriaList(pathogenicCriteria)}
-          </div>
-        </fieldset>
-        <fieldset>
-          <legend>Benigne kriterier</legend>
-          <div class="tool-criteria-list">
-            ${makeCriteriaList(benignCriteria)}
-          </div>
-        </fieldset>
+  <details class="panel tool-panel">
+    <summary>
+      <div class="tool-summary-text">
+        <span class="tool-title">ACMG klassifikationshjælper</span>
+        <span class="tool-subtitle">Forenklet vægtning af ACMG/AMP 2015 med opdaterede pointværdier.</span>
       </div>
-      <div class="btn-row">
-        <button type="button" class="secondary" id="acmgReset">Nulstil kriterier</button>
+    </summary>
+    <div class="tool-body">
+      <h3>ACMG klassifikationshjælper</h3>
+      <p>Vælg de kriterier der er opfyldt for varianten. Resultatet bruger en forenklet vægtning af ACMG/AMP 2015 med opdaterede pointværdier.</p>
+      <form id="acmgTool">
+        <div class="tool-columns">
+          <fieldset>
+            <legend>Patogene kriterier</legend>
+            <div class="tool-criteria-list">
+              ${makeCriteriaList(pathogenicCriteria)}
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Benigne kriterier</legend>
+            <div class="tool-criteria-list">
+              ${makeCriteriaList(benignCriteria)}
+            </div>
+          </fieldset>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="secondary" id="acmgReset">Nulstil kriterier</button>
+        </div>
+      </form>
+      <div class="tool-result" id="acmgResult">Vælg kriterier for at se forslag til klassifikation.</div>
+      <p class="tool-note">Vurderingen er vejledende og kræver altid manuel gennemgang og dokumentation.</p>
+    </div>
+  </details>
+  <details class="panel tool-panel">
+    <summary>
+      <div class="tool-summary-text">
+        <span class="tool-title">Genomisk afstandsberegner</span>
+        <span class="tool-subtitle">Beregn antal baser mellem to lokationer.</span>
       </div>
-    </form>
-    <div class="tool-result" id="acmgResult">Vælg kriterier for at se forslag til klassifikation.</div>
-    <p class="tool-note">Vurderingen er vejledende og kræver altid manuel gennemgang og dokumentation.</p>
-  </div>
-  <div class="panel tool-panel">
-    <h2>Genomisk afstandsberegner</h2>
-    <p>Beregn antal baser mellem to lokationer. Indtast fx <code>chr7:55191822</code> og <code>chr7:55277778</code>.</p>
-    <form id="distanceTool">
-      <div class="tool-inline">
-        <label for="distanceStart">Startposition<input id="distanceStart" name="start" placeholder="fx chr7:55191822"></label>
-        <label for="distanceEnd">Slutposition<input id="distanceEnd" name="end" placeholder="fx 55277778"></label>
+    </summary>
+    <div class="tool-body">
+      <h3>Genomisk afstandsberegner</h3>
+      <p>Beregn antal baser mellem to lokationer. Indtast fx <code>chr7:55191822</code> og <code>chr7:55277778</code>.</p>
+      <form id="distanceTool">
+        <div class="tool-inline">
+          <label for="distanceStart">Startposition<input id="distanceStart" name="start" placeholder="fx chr7:55191822"></label>
+          <label for="distanceEnd">Slutposition<input id="distanceEnd" name="end" placeholder="fx 55277778"></label>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="secondary" id="distanceSwap">Byt positioner</button>
+        </div>
+      </form>
+      <div class="tool-result" id="distanceResult">Indtast positioner for at se resultatet.</div>
+      <p class="tool-note">Resultatet viser både eksklusiv (end-start) og inklusiv (end-start+1) afstand.</p>
+    </div>
+  </details>
+  <details class="panel tool-panel">
+    <summary>
+      <div class="tool-summary-text">
+        <span class="tool-title">GC- og sekvensværktøj</span>
+        <span class="tool-subtitle">Analyser sekvensen for GC-indhold og reverse komplement.</span>
       </div>
-      <div class="btn-row">
-        <button type="button" class="secondary" id="distanceSwap">Byt positioner</button>
-      </div>
-    </form>
-    <div class="tool-result" id="distanceResult">Indtast positioner for at se resultatet.</div>
-    <p class="tool-note">Resultatet viser både eksklusiv (end-start) og inklusiv (end-start+1) afstand.</p>
-  </div>
-  <div class="panel tool-panel">
-    <h2>GC- og sekvensværktøj</h2>
-    <p>Analyser en DNA/RNA-sekvens for længde, GC-indhold og generér reverse komplement.</p>
-    <form id="gcTool">
-      <label for="gcSequence">Sekvens
-        <textarea id="gcSequence" name="sequence" rows="4" placeholder="Indsæt sekvens her"></textarea>
-      </label>
-      <div class="btn-row">
-        <button type="button" class="secondary" id="gcUpper">Rens og formater</button>
-        <button type="button" class="secondary" id="gcReverse">Reverse komplement</button>
-      </div>
-    </form>
-    <div class="tool-result" id="gcResult">Indsæt en sekvens for at beregne GC%.</div>
-    <p class="tool-note">Beregningen ignorerer mellemrum og tal. Ambigue baser (fx N, R, Y) medtages i længden.</p>
-  </div>`;
+    </summary>
+    <div class="tool-body">
+      <h3>GC- og sekvensværktøj</h3>
+      <p>Analyser en DNA/RNA-sekvens for længde, GC-indhold og generér reverse komplement.</p>
+      <form id="gcTool">
+        <label for="gcSequence">Sekvens
+          <textarea id="gcSequence" name="sequence" rows="4" placeholder="Indsæt sekvens her"></textarea>
+        </label>
+        <div class="btn-row">
+          <button type="button" class="secondary" id="gcUpper">Rens og formater</button>
+          <button type="button" class="secondary" id="gcReverse">Reverse komplement</button>
+        </div>
+      </form>
+      <div class="tool-result" id="gcResult">Indsæt en sekvens for at beregne GC%.</div>
+      <p class="tool-note">Beregningen ignorerer mellemrum og tal. Ambigue baser (fx N, R, Y) medtages i længden.</p>
+    </div>
+  </details>`;
 
   applyButtonTooltips(section);
   applyControlTooltips(section);
