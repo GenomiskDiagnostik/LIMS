@@ -283,21 +283,28 @@ section[data-tab].active {
 .tool-criteria-list {
   display: grid;
   gap: 0.4rem;
+  justify-items: stretch;
 }
-.tool-criteria-list label {
-  display: flex;
-  gap: 0.6rem;
+.tool-criteria {
+  display: grid;
+  grid-template-columns: auto 1fr;
   align-items: flex-start;
+  gap: 0.55rem;
   padding: 0.45rem 0.6rem;
   border: 1px solid var(--panel-border);
   border-radius: 0.55rem;
   background: rgba(24, 111, 175, 0.08);
+  text-align: left;
 }
-[data-theme="dark"] .tool-criteria-list label {
+[data-theme="dark"] .tool-criteria {
   background: rgba(14, 165, 233, 0.12);
 }
-.tool-criteria-list input[type="checkbox"] {
+.tool-criteria input[type="checkbox"] {
   margin-top: 0.25rem;
+}
+.tool-criteria span {
+  display: block;
+  line-height: 1.35;
 }
 .tool-result {
   margin-top: 0.9rem;
@@ -6253,12 +6260,17 @@ function renderTools(section) {
     {code: 'BP6', label: 'Anført som godartet af velrenommeret kilde.', weight: 1, effect: 'benign'},
     {code: 'BP7', label: 'Synonym variant uden splice-påvirkning.', weight: 1, effect: 'benign'}
   ];
-  const makeCriteriaList = list => list.map(item => `
-    <label class="tool-criteria">
-      <input type="checkbox" value="${item.code}" data-weight="${item.weight}" data-effect="${item.effect || 'pathogenic'}">
-      <span><strong>${item.code}</strong> ${item.label}</span>
+  const makeCriteriaList = list => list.map(item => {
+    const code = esc(item.code);
+    const label = esc(item.label);
+    const effect = esc(item.effect || 'pathogenic');
+    return `
+    <label class="tool-criteria" title="${code} – ${label}">
+      <input type="checkbox" value="${code}" data-weight="${item.weight}" data-effect="${effect}">
+      <span><strong>${code}</strong> ${label}</span>
     </label>
-  `).join('');
+  `;
+  }).join('');
   section.innerHTML = `
   <details class="panel tool-panel">
     <summary>
