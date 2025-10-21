@@ -5238,6 +5238,13 @@ function renderConclusionLibrary(section) {
   const clearForm = () => {
     if (!form) return;
     form.reset();
+    const idField = form.elements.id;
+    if (idField) {
+      idField.value = '';
+      if ('defaultValue' in idField) {
+        idField.defaultValue = '';
+      }
+    }
     selectedId = null;
     renderRows();
   };
@@ -5283,6 +5290,13 @@ function renderConclusionLibrary(section) {
     renderTab('conclusion_library');
   });
   form?.addEventListener('reset', () => {
+    const idField = form.elements.id;
+    if (idField) {
+      idField.value = '';
+      if ('defaultValue' in idField) {
+        idField.defaultValue = '';
+      }
+    }
     selectedId = null;
     renderRows();
   });
