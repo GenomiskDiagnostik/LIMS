@@ -928,6 +928,239 @@ pre {
 const DB_NAME = 'glims';
 const DB_VER = 6;
 const STORES = ['patients','samples','orders','panels','variants','qc','reports','users','audit','variant_library','responses','conclusion_library'];
+const LANGUAGE_DEFINITIONS = {
+  da: {
+    label: 'Dansk',
+    locale: 'da-DK',
+    htmlLang: 'da',
+    pdf: {
+      reportTitle: 'Diagnostisk Rapport',
+      signature: 'Signering',
+      interpreter: 'Tolker',
+      approver: 'Godkender',
+      notProvided: 'Ikke angivet',
+      noRecords: 'Ingen poster.'
+    }
+  },
+  sv: {
+    label: 'Svenska',
+    locale: 'sv-SE',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'Diagnostisk rapport',
+      signature: 'Signering',
+      interpreter: 'Tolk',
+      approver: 'Godkännare',
+      notProvided: 'Ej angivet',
+      noRecords: 'Inga poster.'
+    }
+  },
+  nb: {
+    label: 'Norsk',
+    locale: 'nb-NO',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'Diagnostisk rapport',
+      signature: 'Signering',
+      interpreter: 'Tolk',
+      approver: 'Godkjenner',
+      notProvided: 'Ikke oppgitt',
+      noRecords: 'Ingen poster.'
+    }
+  },
+  is: {
+    label: 'Íslenska',
+    locale: 'is-IS',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'Greiningarskýrsla',
+      signature: 'Undirritun',
+      interpreter: 'Túlkur',
+      approver: 'Samþykkir',
+      notProvided: 'Ekki tilgreint',
+      noRecords: 'Engar færslur.'
+    }
+  },
+  kl: {
+    label: 'Kalaallisut',
+    locale: 'kl-GL',
+    inherits: 'da'
+  },
+  fo: {
+    label: 'Føroyskt',
+    locale: 'fo-FO',
+    inherits: 'da',
+    pdf: {
+      reportTitle: 'Diagnostisk frágreiðing',
+      signature: 'Undirskrift',
+      interpreter: 'Tulkur',
+      approver: 'Góðkennar',
+      notProvided: 'Ikki upplýst',
+      noRecords: 'Ongar postar.'
+    }
+  },
+  en: {
+    label: 'English',
+    locale: 'en-GB',
+    htmlLang: 'en',
+    pdf: {
+      reportTitle: 'Diagnostic Report',
+      signature: 'Signature',
+      interpreter: 'Interpreter',
+      approver: 'Approver',
+      notProvided: 'Not provided',
+      noRecords: 'No records.'
+    }
+  },
+  de: {
+    label: 'Deutsch',
+    locale: 'de-DE',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'Diagnostischer Bericht',
+      signature: 'Unterschrift',
+      interpreter: 'Interpret',
+      approver: 'Genehmigender',
+      notProvided: 'Nicht angegeben',
+      noRecords: 'Keine Einträge.'
+    }
+  },
+  fr: {
+    label: 'Français',
+    locale: 'fr-FR',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'Rapport diagnostique',
+      signature: 'Signature',
+      interpreter: 'Interprète',
+      approver: 'Approbateur',
+      notProvided: 'Non renseigné',
+      noRecords: 'Aucun enregistrement.'
+    }
+  },
+  nl: {
+    label: 'Nederlands',
+    locale: 'nl-NL',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'Diagnostisch rapport',
+      signature: 'Ondertekening',
+      interpreter: 'Interpreter',
+      approver: 'Goedkeurder',
+      notProvided: 'Niet opgegeven',
+      noRecords: 'Geen records.'
+    }
+  },
+  es: {
+    label: 'Español',
+    locale: 'es-ES',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'Informe diagnóstico',
+      signature: 'Firma',
+      interpreter: 'Intérprete',
+      approver: 'Aprobador',
+      notProvided: 'No indicado',
+      noRecords: 'Sin registros.'
+    }
+  },
+  eo: {
+    label: 'Esperanto',
+    locale: 'eo',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'Diagnoza raporto',
+      signature: 'Subskribo',
+      interpreter: 'Interpretanto',
+      approver: 'Aprobanto',
+      notProvided: 'Ne indikite',
+      noRecords: 'Neniuj registroj.'
+    }
+  },
+  ru: {
+    label: 'Русский',
+    locale: 'ru-RU',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'Диагностический отчёт',
+      signature: 'Подпись',
+      interpreter: 'Интерпретатор',
+      approver: 'Утверждающий',
+      notProvided: 'Не указано',
+      noRecords: 'Нет записей.'
+    }
+  },
+  tr: {
+    label: 'Türkçe',
+    locale: 'tr-TR',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'Tanısal Rapor',
+      signature: 'İmza',
+      interpreter: 'Yorumlayan',
+      approver: 'Onaylayan',
+      notProvided: 'Belirtilmedi',
+      noRecords: 'Kayıt yok.'
+    }
+  },
+  fa: {
+    label: 'فارسی',
+    locale: 'fa-IR',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'گزارش تشخیصی',
+      signature: 'امضا',
+      interpreter: 'تفسیرکننده',
+      approver: 'تأییدکننده',
+      notProvided: 'ذکر نشده',
+      noRecords: 'هیچ رکوردی نیست.'
+    }
+  },
+  zh: {
+    label: '中文',
+    locale: 'zh-CN',
+    inherits: 'en',
+    pdf: {
+      reportTitle: '诊断报告',
+      signature: '签署',
+      interpreter: '解读者',
+      approver: '批准者',
+      notProvided: '未提供',
+      noRecords: '无记录。'
+    }
+  },
+  ja: {
+    label: '日本語',
+    locale: 'ja-JP',
+    inherits: 'en',
+    pdf: {
+      reportTitle: '診断報告書',
+      signature: '署名',
+      interpreter: '解釈者',
+      approver: '承認者',
+      notProvided: '未入力',
+      noRecords: '記録はありません。'
+    }
+  },
+  th: {
+    label: 'ไทย',
+    locale: 'th-TH',
+    inherits: 'en',
+    pdf: {
+      reportTitle: 'รายงานการวินิจฉัย',
+      signature: 'การลงนาม',
+      interpreter: 'ผู้แปลผล',
+      approver: 'ผู้อนุมัติ',
+      notProvided: 'ไม่ได้ระบุ',
+      noRecords: 'ไม่มีรายการ.'
+    }
+  }
+};
+const LANGUAGE_ORDER = ['da', 'sv', 'nb', 'is', 'kl', 'fo', 'en', 'de', 'fr', 'nl', 'es', 'eo', 'ru', 'tr', 'fa', 'zh', 'ja', 'th'];
+const DEFAULT_LANGUAGE = 'da';
+function normaliseLanguage(lang) {
+  return LANGUAGE_DEFINITIONS[lang] ? lang : DEFAULT_LANGUAGE;
+}
 const state = {
   db: null,
   cache: new Map(),
@@ -942,6 +1175,7 @@ const state = {
   testResults: [],
   lastStatus: ''
 };
+
 function currentLanguage() {
   return state.language;
 }
