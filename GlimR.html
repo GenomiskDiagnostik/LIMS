@@ -6799,49 +6799,51 @@ function renderTools(section) {
     {code: 'BP6', label: 'Anført som godartet af velrenommeret kilde.', weight: 1, effect: 'benign'},
     {code: 'BP7', label: 'Synonym variant uden splice-påvirkning.', weight: 1, effect: 'benign'}
   ];
+  const WGS_BASELINE_FACTOR = 1.6 / 2.05; // SNP-array baselines (~2,05 i Nordeuropa) -> WGS-observeret ~1,6
+  const scaleWgsBaseline = baseline => Number((baseline * WGS_BASELINE_FACTOR).toFixed(3));
   const consanguinityProfiles = [
     {
       value: 'generic',
       label: 'Ukendt/blandet (global baseline)',
-      baseline: 2.0,
-      note: 'Generisk baseline baseret på blandede kohorter fra store SNP-arrays.',
+      baseline: scaleWgsBaseline(2.0),
+      note: 'Generisk baseline justeret til helgenomsekventeringsdata (WGS) baseret på blandede kohorter.',
       defaultSelected: true
     },
     {
       value: 'northern_europe',
       label: 'Nordeuropæisk/Skandinavisk',
-      baseline: 2.05,
-      note: 'Store outbred kohorter fra Nordeuropa viser typisk heterozygositet ~67 %.'
+      baseline: scaleWgsBaseline(2.05),
+      note: 'Kalibreret til helgenomsekventering; skandinaviske patienter viser het/hom ≈ 1,6 (≈62 % heterozygote).'
     },
     {
       value: 'southern_europe_middle_east',
       label: 'Sydeuropæisk/Mellemøstlig',
-      baseline: 1.85,
-      note: 'Historisk øget beslægtethed sænker forventet het/hom-forhold til ~1,85.'
+      baseline: scaleWgsBaseline(1.85),
+      note: 'Historisk øget beslægtethed med WGS-justeret forventet het/hom omkring 1,4.'
     },
     {
       value: 'south_asia',
       label: 'Sydasiatisk',
-      baseline: 1.7,
-      note: 'Populationsstudier rapporterer lavere heterozygositet pga. hyppigere ægteskaber i familien.'
+      baseline: scaleWgsBaseline(1.7),
+      note: 'Populationsstudier rapporterer lavere heterozygositet; WGS-justeret baseline ~1,3.'
     },
     {
       value: 'east_asia',
       label: 'Østasiatisk',
-      baseline: 1.95,
-      note: 'Store urbaniserede populationer med moderat heterozygositet (~66 %).' 
+      baseline: scaleWgsBaseline(1.95),
+      note: 'Store urbaniserede populationer med moderat heterozygositet; WGS-justeret baseline ~1,5.'
     },
     {
       value: 'sub_saharan_africa',
       label: 'Subsaharisk Afrika',
-      baseline: 2.3,
-      note: 'Høj genetisk diversitet med heterozygositet ofte >69 %.'
+      baseline: scaleWgsBaseline(2.3),
+      note: 'Høj genetisk diversitet; WGS viser het/hom omkring 1,8 for outbred kohorter.'
     },
     {
       value: 'americas',
       label: 'Latinamerikansk/admixed',
-      baseline: 2.0,
-      note: 'Stor variation – baseline sat til global gennemsnitsværdi.'
+      baseline: scaleWgsBaseline(2.0),
+      note: 'Stor variation – baseline sat til WGS-justeret global gennemsnitsværdi (~1,6).'
     }
   ];
   const consanguinityCategories = [
