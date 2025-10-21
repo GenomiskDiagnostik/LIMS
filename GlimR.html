@@ -611,6 +611,31 @@ input[type="search"] {
   flex: 1 1 260px;
   margin-top: 0;
 }
+.conclusion-library-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: flex-end;
+  margin-top: 0.4rem;
+}
+.conclusion-library-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted-text);
+}
+.conclusion-library-controls select {
+  min-width: 220px;
+}
+.conclusion-library-buttons {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+.conclusion-library-buttons button {
+  margin-top: 0.35rem;
+}
 .report-variant-list {
   margin-top: 0.6rem;
   display: flex;
@@ -816,8 +841,8 @@ pre {
 (() => {
 'use strict';
 const DB_NAME = 'glims';
-const DB_VER = 5;
-const STORES = ['patients','samples','orders','panels','variants','qc','reports','users','audit','variant_library','responses'];
+const DB_VER = 6;
+const STORES = ['patients','samples','orders','panels','variants','qc','reports','users','audit','variant_library','responses','conclusion_library'];
 const state = {
   db: null,
   cache: new Map(),
@@ -831,7 +856,7 @@ const state = {
   testResults: [],
   lastStatus: ''
 };
-const CREATED_BY_STORES = new Set(['patients','samples','orders','variants','qc','reports']);
+const CREATED_BY_STORES = new Set(['patients','samples','orders','variants','qc','reports','conclusion_library']);
 const ROLE_OPTIONS = [
   {value: 'Observatør', description: 'Kun læseadgang til data', canWrite: false},
   {value: 'Bioinformatiker', description: 'Kan registrere analyser og varianter', canWrite: true},
@@ -873,6 +898,7 @@ const tabs = [
   {id:'panels', label:'Analyser/Panels'},
   {id:'variants', label:'Varianter'},
   {id:'variant_library', label:'Variantbibliotek'},
+  {id:'conclusion_library', label:'Svartekster'},
   {id:'reports', label:'Rapporter'},
   {id:'qc', label:'Kvalitetskontrol'},
   {id:'responses', label:'Svar (MedCom)'},
@@ -896,7 +922,8 @@ const schemaFields = {
   users: ['id','name','email','role','pin','created_at','updated_at'],
   audit: ['id','ts','user','action','entity','entity_id','before','after','created_at','updated_at'],
   variant_library: ['id','gene','transcript','hgvs_c','hgvs_p','classification','criteria','evidence','condition','inheritance','curated_by','last_review','created_at','updated_at'],
-  responses: ['id','ts','sender','patient','diagnostic_report_id','variant_count','variants','raw','created_at','updated_at']
+  responses: ['id','ts','sender','patient','diagnostic_report_id','variant_count','variants','raw','created_at','updated_at'],
+  conclusion_library: ['id','title','body','created_by','created_at','updated_at']
 };
 const tooltipCatalog = {
   tabs: {
@@ -908,6 +935,7 @@ const tooltipCatalog = {
     panels: 'Vedligehold assays og analysepaneler.',
     variants: 'Registrer genetiske varianter for ordinationer.',
     variant_library: 'Se og vedligehold det kuraterede variantbibliotek.',
+    conclusion_library: 'Administrer standardtekster til rapportkonklusioner.',
     reports: 'Opret og redigér laboratoriesvar og rapporter.',
     qc: 'Registrer kvalitetskontrolmålinger for prøver.',
     responses: 'Importer og gennemse MedCom/FHIR-svar.',
@@ -1048,6 +1076,10 @@ const tooltipCatalog = {
       curated_by: 'Navn på kurator eller team der har ansvaret.',
       last_review: 'Dato for seneste gennemgang (ÅÅÅÅ-MM-DD).'
     },
+    conclusionLibraryForm: {
+      title: 'Sigende titel, fx formål eller patientgruppe.',
+      body: 'Standardtekst der kan indsættes som rapportkonklusion.'
+    },
     reportForm: {
       order_id: 'Ordinationen som rapporten beskriver.',
       status: 'Rapportstatus (udkast, endelig eller ændret).',
@@ -1117,6 +1149,10 @@ const tooltipCatalog = {
     variantLibrarySave: 'Gem ændringerne til den valgte bibliotekspost.',
     libraryExportCsv: 'Eksportér de viste biblioteksposter til en CSV-fil.',
     libraryImportCsv: 'Importer biblioteksposter fra en CSV-fil.',
+    conclusionLibraryClear: 'Ryd formularen for at oprette en ny standardtekst.',
+    conclusionLibraryDelete: 'Slet den valgte standardtekst.',
+    conclusionLibraryInsert: 'Erstat konklusionsfeltet med den valgte standardtekst.',
+    conclusionLibraryAppend: 'Tilføj den valgte tekst til eksisterende konklusion.',
     reportClear: 'Ryd formularen for at skrive en ny rapport.',
     reportDelete: 'Slet den valgte rapport.',
     reportPreview: 'Åbn rapporten i en ny fane til forhåndsvisning.',
@@ -1682,6 +1718,7 @@ function openDb() {
       withTimestamps(ensureStore('audit',{keyPath:'id',autoIncrement:true}));
       withTimestamps(ensureStore('variant_library',{keyPath:'id',autoIncrement:true}));
       withTimestamps(ensureStore('responses',{keyPath:'id',autoIncrement:true}));
+      withTimestamps(ensureStore('conclusion_library',{keyPath:'id',autoIncrement:true}));
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -2331,6 +2368,7 @@ function renderTab(id) {
     case 'panels': return renderPanels(section);
     case 'variants': return renderVariants(section);
     case 'variant_library': return renderVariantLibrary(section);
+    case 'conclusion_library': return renderConclusionLibrary(section);
     case 'reports': return renderReports(section);
     case 'qc': return renderQC(section);
     case 'responses': return renderResponses(section);
@@ -4934,7 +4972,7 @@ function renderVariantLibrary(section) {
 }
 function snapshotVariant(variant) {
   if (!variant) {
-    return {id: null, order_id: null, gene: '', transcript: '', hgvs_c: '', hgvs_p: '', zygosity: '', classification: '', criteria: '', af: '', interpretation: ''};
+    return {id: null, order_id: null, gene: '', transcript: '', hgvs_c: '', hgvs_p: '', zygosity: '', classification: '', criteria: '', af: '', annotations: '', interpretation: ''};
   }
   return {
     id: variant.id ?? null,
@@ -4947,6 +4985,7 @@ function snapshotVariant(variant) {
     classification: variant.classification || '',
     criteria: variant.criteria || '',
     af: variant.af ?? '',
+    annotations: variant.annotations || variant.annotation_summary || '',
     interpretation: variant.interpretation || ''
   };
 }
@@ -5003,9 +5042,146 @@ function describeVariantNarrative(variant) {
   const title = nameParts.join(' · ');
   return [title, summaryParts.join(' – ')].filter(Boolean).join(' – ');
 }
+function renderConclusionLibrary(section) {
+  const list = getCached('conclusion_library').slice().sort((a, b) => {
+    const titleCompare = (a.title || '').localeCompare(b.title || '', 'da');
+    if (titleCompare) return titleCompare;
+    return (a.id || 0) - (b.id || 0);
+  });
+  section.innerHTML = `
+  <div class="panel">
+    <div class="flex">
+      <div>
+        <label for="conclusionLibrarySearch">Søg</label>
+        <input id="conclusionLibrarySearch" type="search" placeholder="Titel eller tekst...">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Titel</th><th>Uddrag</th><th>Opdateret</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div>
+        <h2>Standardtekst</h2>
+        <form id="conclusionLibraryForm">
+          <input type="hidden" name="id">
+          <label>Titel<input name="title" required></label>
+          <label>Standardtekst<textarea name="body" rows="8" required></textarea></label>
+          <div class="btn-row">
+            <button class="primary" type="submit">Gem</button>
+            <button class="secondary" type="button" id="conclusionLibraryClear">Ny</button>
+            <button class="danger" type="button" id="conclusionLibraryDelete">Slet</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>`;
+  const tbody = section.querySelector('tbody');
+  const search = section.querySelector('#conclusionLibrarySearch');
+  const form = section.querySelector('#conclusionLibraryForm');
+  const clearBtn = section.querySelector('#conclusionLibraryClear');
+  const deleteBtn = section.querySelector('#conclusionLibraryDelete');
+  annotateHeaders(section);
+  annotateSearchInputs(section);
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+  applyFormTooltips(form);
+  let selectedId = null;
+  let filtered = list.slice();
+  const renderRows = () => {
+    const term = (search?.value || '').toLowerCase().trim();
+    filtered = list.filter(entry => {
+      if (!term) return true;
+      const haystack = `${entry.title || ''} ${(entry.body || '').replace(/\s+/g, ' ')}`.toLowerCase();
+      return haystack.includes(term);
+    });
+    if (selectedId && !filtered.some(entry => entry.id === selectedId)) {
+      selectedId = null;
+    }
+    if (!filtered.length) {
+      tbody.innerHTML = '<tr><td colspan="4">Ingen standardtekster matcher søgningen.</td></tr>';
+      annotateTableCells(section);
+      return;
+    }
+    tbody.innerHTML = filtered.map(entry => {
+      const snippetSource = (entry.body || '').replace(/\s+/g, ' ').trim();
+      const snippet = snippetSource.length > 120 ? `${snippetSource.slice(0, 117)}…` : snippetSource;
+      const updatedAt = entry.updated_at ? new Date(entry.updated_at).toLocaleString('da-DK') : '';
+      const selectedAttr = entry.id === selectedId ? ' data-selected="true"' : '';
+      return `<tr data-id="${entry.id}"${selectedAttr}><td>${entry.id}</td><td>${esc(entry.title || '')}</td><td>${esc(snippet)}</td><td>${esc(updatedAt)}</td></tr>`;
+    }).join('');
+    annotateTableCells(section);
+  };
+  renderRows();
+  search?.addEventListener('input', renderRows);
+  tbody?.addEventListener('click', e => {
+    const tr = e.target.closest('tr[data-id]');
+    if (!tr) return;
+    const id = Number(tr.dataset.id);
+    const entry = list.find(item => item.id === id);
+    if (!entry) return;
+    selectedId = id;
+    fillForm(form, entry);
+    renderRows();
+  });
+  const clearForm = () => {
+    if (!form) return;
+    form.reset();
+    selectedId = null;
+    renderRows();
+  };
+  clearBtn?.addEventListener('click', clearForm);
+  deleteBtn?.addEventListener('click', async () => {
+    if (!ensureWrite('conclusion_library')) return;
+    const id = Number(form?.elements.id.value);
+    if (!id) {
+      alert('Vælg en standardtekst der skal slettes.');
+      return;
+    }
+    if (!confirm('Slet den valgte standardtekst?')) return;
+    await deleteRecord('conclusion_library', id);
+    setStatus(`Standardtekst ${id} slettet.`);
+    renderTab('conclusion_library');
+  });
+  form?.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!ensureWrite('conclusion_library')) return;
+    const data = Object.fromEntries(new FormData(form).entries());
+    const payload = {
+      title: (data.title || '').trim(),
+      body: (data.body || '').trim()
+    };
+    if (!payload.title || !payload.body) {
+      alert('Udfyld både titel og tekst.');
+      return;
+    }
+    const id = Number(data.id || 0);
+    if (id) {
+      const before = findById('conclusion_library', id);
+      if (!before) {
+        alert('Kunne ikke finde standardteksten.');
+        return;
+      }
+      const updated = {...before, ...payload, id};
+      await updateRecord('conclusion_library', updated, before);
+      setStatus(`Standardtekst ${id} opdateret.`);
+    } else {
+      await addRecord('conclusion_library', payload);
+      setStatus('Standardtekst oprettet.');
+    }
+    renderTab('conclusion_library');
+  });
+  form?.addEventListener('reset', () => {
+    selectedId = null;
+    renderRows();
+  });
+}
+
 function renderReports(section) {
   const list = getCached('reports');
   const orders = getCached('orders');
+  const conclusionLibrary = getCached('conclusion_library').slice().sort((a, b) => (a.title || '').localeCompare(b.title || '', 'da'));
+  const conclusionOptions = conclusionLibrary.map(entry => `<option value="${entry.id}">${esc(entry.title || `Tekst #${entry.id}`)}</option>`).join('');
   section.innerHTML = `
   <div class="panel">
     <div class="flex">
@@ -5058,6 +5234,18 @@ function renderReports(section) {
           </div>
           <input type="hidden" name="variant_ids" value="[]">
           <label>Konklusion<textarea name="summary"></textarea></label>
+          <div class="conclusion-library-controls">
+            <label>Standardtekst
+              <select id="conclusionLibrarySelect">
+                <option value="" selected>Vælg standardtekst</option>
+                ${conclusionOptions}
+              </select>
+            </label>
+            <div class="conclusion-library-buttons">
+              <button class="secondary" type="button" id="conclusionLibraryInsert">Erstat konklusion</button>
+              <button class="secondary" type="button" id="conclusionLibraryAppend">Tilføj til konklusion</button>
+            </div>
+          </div>
           <div class="btn-row">
             <button class="primary" type="submit">Gem</button>
             <button class="secondary" type="button" id="reportClear">Ny</button>
@@ -5078,6 +5266,11 @@ function renderReports(section) {
   const variantAddButton = form?.querySelector('#reportAddVariant');
   const variantList = form?.querySelector('#reportVariantList');
   const variantIdsInput = form?.elements.variant_ids;
+  const conclusionSelect = form?.querySelector('#conclusionLibrarySelect');
+  const conclusionInsertBtn = form?.querySelector('#conclusionLibraryInsert');
+  const conclusionAppendBtn = form?.querySelector('#conclusionLibraryAppend');
+  const summaryField = form?.elements.summary;
+  const conclusionMap = new Map(conclusionLibrary.map(entry => [String(entry.id), entry]));
   let selectedReportVariants = [];
   let currentReportOrderId = null;
   let variantOptionState = [];
@@ -5182,12 +5375,183 @@ function renderReports(section) {
     issued_from: section.querySelector('[data-filter-reports="issued_from"]'),
     issued_to: section.querySelector('[data-filter-reports="issued_to"]')
   };
+  const updateConclusionButtons = () => {
+    const hasSelection = !!conclusionSelect?.value;
+    if (conclusionInsertBtn) conclusionInsertBtn.disabled = !hasSelection;
+    if (conclusionAppendBtn) conclusionAppendBtn.disabled = !hasSelection;
+  };
+  const normalizePlaceholderKey = key => {
+    if (!key) return '';
+    return key
+      .toLowerCase()
+      .replace(/\s+/g, '')
+      .replace(/[^a-z0-9_.æøå-]/g, '')
+      .replace(/-+/g, '')
+      .replace(/^[.]+|[.]+$/g, '');
+  };
+  const joinUnique = (values, separator = ', ') => {
+    const seen = new Set();
+    const result = [];
+    for (const value of values || []) {
+      const text = value == null ? '' : String(value).trim();
+      if (!text || seen.has(text)) continue;
+      seen.add(text);
+      result.push(text);
+    }
+    return result.join(separator);
+  };
+  const joinUniqueParagraphs = values => {
+    const seen = new Set();
+    const result = [];
+    for (const value of values || []) {
+      const text = value == null ? '' : String(value).trim();
+      if (!text || seen.has(text)) continue;
+      seen.add(text);
+      result.push(text);
+    }
+    return result.join('\n\n');
+  };
+  const describeVariantBlock = variant => {
+    if (!variant) return '';
+    const lines = [];
+    const header = [variant.gene, variant.hgvs_c, variant.hgvs_p].filter(Boolean).join(' · ');
+    if (header) lines.push(header);
+    const details = [];
+    if (variant.transcript) details.push(`Transkript: ${variant.transcript}`);
+    if (variant.zygosity) details.push(`Zygositet: ${variant.zygosity}`);
+    if (variant.classification) details.push(`ACMG-klasse: ${variant.classification}`);
+    if (variant.criteria) details.push(`Kriterier: ${variant.criteria}`);
+    if (variant.af !== undefined && variant.af !== null && variant.af !== '') details.push(`AF: ${variant.af}`);
+    if (details.length) lines.push(details.join(' – '));
+    if (variant.annotations) lines.push(`Annoteringer: ${variant.annotations}`);
+    if (variant.interpretation) lines.push(`Tolkning: ${variant.interpretation}`);
+    return lines.join('\n');
+  };
+  const buildConclusionPlaceholderMap = () => {
+    const map = new Map();
+    const add = (keys, value) => {
+      if (!Array.isArray(keys)) keys = [keys];
+      const text = value == null ? '' : String(value);
+      for (const key of keys) {
+        const normalized = normalizePlaceholderKey(key);
+        if (!normalized) continue;
+        map.set(normalized, text);
+      }
+    };
+    const orderId = Number(form?.elements.order_id?.value || '') || null;
+    const order = orderId ? findById('orders', orderId) : null;
+    const patient = order?.patient_id ? findById('patients', Number(order.patient_id)) : null;
+    const sample = order?.sample_id ? findById('samples', Number(order.sample_id)) : null;
+    const panel = order?.panel_id ? findById('panels', Number(order.panel_id)) : null;
+    const analysisUser = order?.analysis_responsible_id ? findById('users', Number(order.analysis_responsible_id)) : null;
+    const interpreterUser = order?.interpreter_id ? findById('users', Number(order.interpreter_id)) : null;
+    const approverUser = order?.approver_id ? findById('users', Number(order.approver_id)) : null;
+    const variants = selectedReportVariants.slice();
+    const variantCount = variants.length;
+    const firstVariant = variants[0] || null;
+    add(['Patient', 'PatientNavn', 'Patient.Name'], patient?.name || '');
+    add(['PatientMRN', 'MRN', 'Patient.MRN'], patient?.mrn || '');
+    add(['PatientFamilienummer', 'Familienummer', 'Patient.Familienummer'], patient?.family_number || '');
+    add(['PatientFodselsdato', 'PatientFødselsdato', 'Patient.BirthDate'], patient?.birth_date ? formatDanishDate(patient.birth_date) : '');
+    add(['OrdinationID', 'Ordination.Id', 'OrderID'], orderId ? String(orderId) : '');
+    add(['OrdinationStatus', 'Ordination.Status'], order?.status || '');
+    add(['OrdinationDato', 'OrdinationBestilt', 'Ordination.Ordered'], order?.ordered_at ? formatDanishDate(order.ordered_at) : '');
+    add(['OrdinationRekvirent', 'Ordination.Clinician', 'Clinician'], order?.clinician || '');
+    add(['OrdinationPanel', 'PanelNavn', 'Panel'], panel?.name || '');
+    add(['OrdinationAnalyseansvarlig', 'Analyseansvarlig'], analysisUser?.name || '');
+    add(['OrdinationTolker', 'Tolker'], interpreterUser?.name || '');
+    add(['OrdinationGodkender', 'Godkender'], approverUser?.name || '');
+    add(['SampleID', 'ProeveID', 'PrøveID'], sample?.id ? String(sample.id) : '');
+    add(['SamplePMB', 'PMB'], sample?.pmb_number || '');
+    add(['SampleType', 'ProeveType', 'PrøveType'], sample?.sample_type || '');
+    add(['SampleStatus', 'ProeveStatus', 'PrøveStatus'], sample?.status || '');
+    add(['SampleDato', 'Sample.Collected', 'PrøveDato'], sample?.collected_at ? formatDanishDate(sample.collected_at) : '');
+    add(['VariantAntal', 'AntalVarianter'], variantCount ? String(variantCount) : '');
+    const geneList = joinUnique(variants.map(v => v.gene));
+    const transcriptList = joinUnique(variants.map(v => v.transcript));
+    const hgvscList = joinUnique(variants.map(v => v.hgvs_c));
+    const hgvsPList = joinUnique(variants.map(v => v.hgvs_p));
+    const zygosityList = joinUnique(variants.map(v => v.zygosity));
+    const classificationList = joinUnique(variants.map(v => v.classification));
+    const criteriaList = joinUnique(variants.map(v => v.criteria));
+    const annotationsText = joinUniqueParagraphs(variants.map(v => v.annotations));
+    const interpretationText = joinUniqueParagraphs(variants.map(v => v.interpretation));
+    const variantSummaryBlocks = variants.map((variant, index) => {
+      const block = describeVariantBlock(variant);
+      if (!block) return '';
+      const indented = block.replace(/\n/g, '\n   ');
+      return `${index + 1}. ${indented}`;
+    }).filter(Boolean);
+    const variantSummary = variantSummaryBlocks.join('\n\n');
+    add(['Gen', 'Gene', 'Gener'], geneList);
+    add(['Transkript', 'Transcript'], transcriptList);
+    add(['HGVS_c', 'HGVS c', 'HGVSc'], hgvscList);
+    add(['HGVS_p', 'HGVS p', 'HGVSp'], hgvsPList);
+    add(['Zygositet', 'Zygosity'], zygosityList);
+    add(['ACMG-klasse', 'ACMGklasse', 'ACMG'], classificationList);
+    add(['Kriterier', 'Criteria'], criteriaList);
+    add(['Annoteringer', 'Annotationer', 'Annotations', 'VarSeq'], annotationsText);
+    add(['Tolkning', 'Tolkninger', 'Interpretation', 'Interpretations'], interpretationText);
+    add(['VariantListe', 'VariantList', 'Varianter'], variantSummary);
+    if (firstVariant) {
+      add(['Variant', 'VariantNavn', 'Variant1'], describeVariantBlock(firstVariant));
+      add(['VariantGene', 'VariantGen', 'Variant1Gene', 'Variant1.Gen'], firstVariant.gene || '');
+      add(['VariantTranskript', 'Variant1Transkript'], firstVariant.transcript || '');
+      add(['VariantHGVS_c', 'Variant1HGVS_c', 'Variant1.HGVS_c'], firstVariant.hgvs_c || '');
+      add(['VariantHGVS_p', 'Variant1HGVS_p', 'Variant1.HGVS_p'], firstVariant.hgvs_p || '');
+      add(['VariantZygositet', 'Variant1Zygositet'], firstVariant.zygosity || '');
+      add(['VariantACMG', 'Variant1ACMG'], firstVariant.classification || '');
+      add(['VariantKriterier', 'Variant1Kriterier'], firstVariant.criteria || '');
+      add(['VariantAnnoteringer', 'Variant1Annoteringer'], firstVariant.annotations || '');
+      add(['VariantTolkning', 'Variant1Tolkning'], firstVariant.interpretation || '');
+    }
+    variants.forEach((variant, index) => {
+      const idx = index + 1;
+      const prefix = `Variant${idx}`;
+      add([`${prefix}`, `${prefix}Navn`, `${prefix}.Navn`], describeVariantBlock(variant));
+      add([`${prefix}Gene`, `${prefix}.Gene`, `${prefix}Gen`, `${prefix}.Gen`], variant.gene || '');
+      add([`${prefix}Transkript`, `${prefix}.Transkript`], variant.transcript || '');
+      add([`${prefix}HGVS_c`, `${prefix}.HGVS_c`], variant.hgvs_c || '');
+      add([`${prefix}HGVS_p`, `${prefix}.HGVS_p`], variant.hgvs_p || '');
+      add([`${prefix}Zygositet`, `${prefix}.Zygositet`], variant.zygosity || '');
+      add([`${prefix}ACMG`, `${prefix}.ACMG`], variant.classification || '');
+      add([`${prefix}Kriterier`, `${prefix}.Kriterier`], variant.criteria || '');
+      add([`${prefix}Annoteringer`, `${prefix}.Annoteringer`], variant.annotations || '');
+      add([`${prefix}Tolkning`, `${prefix}.Tolkning`], variant.interpretation || '');
+    });
+    return map;
+  };
+  const resolveConclusionTemplate = template => {
+    if (!template) return '';
+    const replacements = buildConclusionPlaceholderMap();
+    return String(template).replace(/\[([^\]]+)\]/g, (match, rawKey) => {
+      const normalized = normalizePlaceholderKey(rawKey);
+      if (!normalized) return match;
+      return replacements.has(normalized) ? replacements.get(normalized) : match;
+    });
+  };
+  const applyConclusionText = mode => {
+    if (!summaryField || !conclusionSelect) return;
+    const entry = conclusionMap.get(conclusionSelect.value);
+    if (!entry) return;
+    const text = resolveConclusionTemplate(entry.body || '');
+    if (mode === 'replace') {
+      summaryField.value = text;
+    } else if (mode === 'append') {
+      const existing = summaryField.value || '';
+      const trimmed = existing.replace(/\s+$/, '');
+      summaryField.value = trimmed ? `${trimmed}\n\n${text}` : text;
+    }
+    summaryField.dispatchEvent(new Event('input', {bubbles: false}));
+    summaryField.focus();
+  };
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
   applyControlTooltips(section);
   applyFormTooltips(form);
   applySelectFilters(section);
+  updateConclusionButtons();
   setSelectedReportVariants([]);
   refreshVariantOptions();
   if (variantFilterInput) {
@@ -5202,6 +5566,9 @@ function renderReports(section) {
   if (variantSelect) {
     variantSelect.addEventListener('change', updateAddButtonState);
   }
+  conclusionSelect?.addEventListener('change', updateConclusionButtons);
+  conclusionInsertBtn?.addEventListener('click', () => applyConclusionText('replace'));
+  conclusionAppendBtn?.addEventListener('click', () => applyConclusionText('append'));
   if (variantAddButton) {
     variantAddButton.addEventListener('click', () => {
       if (!variantSelect) return;
@@ -5314,6 +5681,10 @@ function renderReports(section) {
     if (!report) return;
     selectedReportId = report.id;
     fillForm(form, report);
+    if (conclusionSelect) {
+      conclusionSelect.value = '';
+      updateConclusionButtons();
+    }
     refreshVariantOptions();
     const variants = getReportVariantSnapshots(report, Number(report.order_id));
     setSelectedReportVariants(variants);
@@ -5357,12 +5728,20 @@ function renderReports(section) {
   });
   form.addEventListener('reset', () => {
     selectedReportId = null;
+    if (conclusionSelect) {
+      conclusionSelect.value = '';
+      updateConclusionButtons();
+    }
     renderRows();
   });
   section.querySelector('#reportClear').addEventListener('click', () => {
     form.reset();
     setSelectedReportVariants([]);
     refreshVariantOptions();
+    if (conclusionSelect) {
+      conclusionSelect.value = '';
+      updateConclusionButtons();
+    }
   });
   section.querySelector('#reportPreview').addEventListener('click', () => {
     const data = Object.fromEntries(new FormData(form).entries());
@@ -7396,6 +7775,14 @@ CREATE TABLE IF NOT EXISTS \`variant_library\` (
   \`created_at\` DATETIME,
   \`updated_at\` DATETIME
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS \`conclusion_library\` (
+  \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+  \`title\` VARCHAR(255),
+  \`body\` TEXT,
+  \`created_by\` VARCHAR(255),
+  \`created_at\` DATETIME,
+  \`updated_at\` DATETIME
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE IF NOT EXISTS \`responses\` (
   \`id\` INT AUTO_INCREMENT PRIMARY KEY,
   \`ts\` DATETIME,
@@ -7432,6 +7819,7 @@ CREATE TABLE IF NOT EXISTS \`audit_log\` (
     qc: 'qc_metrics',
     variants: 'variants',
     variant_library: 'variant_library',
+    conclusion_library: 'conclusion_library',
     responses: 'responses',
     audit: 'audit_log'
   };
