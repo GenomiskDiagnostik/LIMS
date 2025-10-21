@@ -3251,6 +3251,16 @@ function fillForm(form, record) {
     }
   });
 }
+
+function clearFormIdentifier(form, fieldName = 'id') {
+  if (!form) return;
+  const field = form.elements[fieldName];
+  if (!field) return;
+  field.value = '';
+  if ('defaultValue' in field) {
+    field.defaultValue = '';
+  }
+}
 function renderPatients(section) {
   const list = getCached('patients');
   const existingFamilyNumbers = Array.from(new Set(list.map(p => (p.family_number || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'da'));
@@ -3417,6 +3427,7 @@ function renderPatients(section) {
     }
   });
   form.addEventListener('reset', () => {
+    clearFormIdentifier(form);
     selectedPatientId = null;
     renderRows();
   });
@@ -3641,6 +3652,7 @@ function renderSamples(section) {
     }
   });
   form.addEventListener('reset', () => {
+    clearFormIdentifier(form);
     selectedSampleId = null;
     renderRows();
   });
@@ -3749,6 +3761,7 @@ function renderPanels(section) {
     }
   });
   form.addEventListener('reset', () => {
+    clearFormIdentifier(form);
     selectedPanelId = null;
     renderRows();
   });
@@ -4100,6 +4113,7 @@ function renderOrders(section) {
     }
   });
   form.addEventListener('reset', () => {
+    clearFormIdentifier(form);
     selectedOrderId = null;
     renderRows();
   });
@@ -4363,7 +4377,7 @@ function renderVariants(section) {
     if (!form) return;
     form.dataset.mode = 'create';
     form.dataset.editingId = '';
-    if (form.elements.id) form.elements.id.value = '';
+    clearFormIdentifier(form);
     if (saveButton) saveButton.textContent = defaultSaveLabel;
     if (saveNewButton) saveNewButton.hidden = true;
   };
@@ -4582,6 +4596,7 @@ function renderVariants(section) {
     setBatchMessage('Importer eller udfyld varianter for at gemme dem på den valgte ordination.', 'info');
   }
   form.addEventListener('reset', () => {
+    clearFormIdentifier(form);
     selectedVariantId = null;
     exitEditMode();
     renderRows();
@@ -4745,7 +4760,7 @@ function renderVariantLibrary(section) {
     if (!form) return;
     form.dataset.mode = 'create';
     form.dataset.editingId = '';
-    if (form.elements.id) form.elements.id.value = '';
+    clearFormIdentifier(form);
     if (saveButton) saveButton.textContent = defaultSaveLabel;
     if (saveNewButton) saveNewButton.hidden = true;
   };
@@ -4834,11 +4849,14 @@ function renderVariantLibrary(section) {
   const clearForm = () => {
     if (!form) return;
     form.reset();
+  };
+  clearButton?.addEventListener('click', clearForm);
+  form?.addEventListener('reset', () => {
+    clearFormIdentifier(form);
     exitEditMode();
     selectedId = null;
     renderRows();
-  };
-  clearButton?.addEventListener('click', clearForm);
+  });
   form?.addEventListener('submit', async e => {
     e.preventDefault();
     if (!ensureWrite('variant_library')) return;
@@ -5238,15 +5256,6 @@ function renderConclusionLibrary(section) {
   const clearForm = () => {
     if (!form) return;
     form.reset();
-    const idField = form.elements.id;
-    if (idField) {
-      idField.value = '';
-      if ('defaultValue' in idField) {
-        idField.defaultValue = '';
-      }
-    }
-    selectedId = null;
-    renderRows();
   };
   clearBtn?.addEventListener('click', clearForm);
   deleteBtn?.addEventListener('click', async () => {
@@ -5290,13 +5299,7 @@ function renderConclusionLibrary(section) {
     renderTab('conclusion_library');
   });
   form?.addEventListener('reset', () => {
-    const idField = form.elements.id;
-    if (idField) {
-      idField.value = '';
-      if ('defaultValue' in idField) {
-        idField.defaultValue = '';
-      }
-    }
+    clearFormIdentifier(form);
     selectedId = null;
     renderRows();
   });
@@ -5857,6 +5860,7 @@ function renderReports(section) {
     }
   });
   form.addEventListener('reset', () => {
+    clearFormIdentifier(form);
     selectedReportId = null;
     if (conclusionSelect) {
       conclusionSelect.value = '';
@@ -6730,6 +6734,7 @@ function renderQC(section) {
     }
   });
   form.addEventListener('reset', () => {
+    clearFormIdentifier(form);
     selectedQcId = null;
     renderRows();
   });
@@ -7468,6 +7473,7 @@ function renderUsers(section) {
     }
   });
   form.addEventListener('reset', () => {
+    clearFormIdentifier(form);
     selectedUserId = null;
     renderRows();
   });
