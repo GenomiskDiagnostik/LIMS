@@ -2456,7 +2456,8 @@ function renderDashboard(section) {
   const recentOrdersHtml = recentOrders.map(o => {
     const sample = findById('samples', Number(o.sample_id));
     const statusDisplay = sample?.status || o.status || '';
-    return `<tr><td>${o.id}</td><td>${esc(getName('patients', o.patient_id))}</td><td>${esc(o.sample_id || '')}</td><td>${getName('panels', o.panel_id)}</td><td>${esc(statusDisplay)}</td><td>${esc(o.updated_at||'')}</td></tr>`;
+    const updatedAt = formatDanishDate(o.updated_at);
+    return `<tr><td>${o.id}</td><td>${esc(getName('patients', o.patient_id))}</td><td>${esc(o.sample_id || '')}</td><td>${getName('panels', o.panel_id)}</td><td>${esc(statusDisplay)}</td><td>${esc(updatedAt)}</td></tr>`;
   }).join('') || '<tr><td colspan="6">Ingen</td></tr>';
   section.innerHTML = `
   <div class="panel">
@@ -3372,8 +3373,9 @@ function renderPatients(section) {
     tbody.innerHTML = filteredPatients.map(p => {
       const gender = genderMap[p.gender] || p.gender || '';
       const createdBy = determineCreatedBy('patients', p);
+      const birthDate = formatDanishDate(p.birth_date);
       const selectedAttr = p.id === selectedPatientId ? ' data-selected="true"' : '';
-      return `<tr data-id="${p.id}"${selectedAttr}><td>${p.id}</td><td>${esc(p.mrn)}</td><td>${esc(p.family_number||'')}</td><td>${esc(p.name)}</td><td>${esc(gender)}</td><td>${esc(p.birth_date||'')}</td><td>${esc(createdBy)}</td></tr>`;
+      return `<tr data-id="${p.id}"${selectedAttr}><td>${p.id}</td><td>${esc(p.mrn)}</td><td>${esc(p.family_number||'')}</td><td>${esc(p.name)}</td><td>${esc(gender)}</td><td>${esc(birthDate)}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -3566,8 +3568,9 @@ function renderSamples(section) {
     }
     tbody.innerHTML = filteredSamples.map(s => {
       const createdBy = determineCreatedBy('samples', s);
+      const collectedAt = formatDanishDate(s.collected_at);
       const selectedAttr = s.id === selectedSampleId ? ' data-selected="true"' : '';
-      return `<tr data-id="${s.id}"${selectedAttr}><td>${s.id}</td><td>${esc(s.pmb_number||'')}</td><td>${esc(getName('patients', Number(s.patient_id)))}</td><td>${esc(s.sample_type)}</td><td>${esc(s.status||'')}</td><td>${esc(s.collected_at||'')}</td><td>${esc(createdBy)}</td></tr>`;
+      return `<tr data-id="${s.id}"${selectedAttr}><td>${s.id}</td><td>${esc(s.pmb_number||'')}</td><td>${esc(getName('patients', Number(s.patient_id)))}</td><td>${esc(s.sample_type)}</td><td>${esc(s.status||'')}</td><td>${esc(collectedAt)}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -4036,8 +4039,9 @@ function renderOrders(section) {
       const sample = sampleMap.get(Number(o.sample_id));
       const statusDisplay = sample?.status || o.status || '';
       const createdBy = determineCreatedBy('orders', o);
+      const orderedAt = formatDanishDate(o.ordered_at);
       const selectedAttr = o.id === selectedOrderId ? ' data-selected="true"' : '';
-      return `<tr data-id="${o.id}"${selectedAttr}><td>${o.id}</td><td>${esc(getName('patients', Number(o.patient_id)))}</td><td>${esc(getName('samples', Number(o.sample_id)))}</td><td>${esc(getName('panels', Number(o.panel_id)))}</td><td>${esc(userName(o.analysis_responsible_id))}</td><td>${esc(userName(o.interpreter_id))}</td><td>${esc(userName(o.approver_id))}</td><td>${esc(statusDisplay)}</td><td>${esc(createdBy)}</td><td>${esc(o.ordered_at||'')}</td></tr>`;
+      return `<tr data-id="${o.id}"${selectedAttr}><td>${o.id}</td><td>${esc(getName('patients', Number(o.patient_id)))}</td><td>${esc(getName('samples', Number(o.sample_id)))}</td><td>${esc(getName('panels', Number(o.panel_id)))}</td><td>${esc(userName(o.analysis_responsible_id))}</td><td>${esc(userName(o.interpreter_id))}</td><td>${esc(userName(o.approver_id))}</td><td>${esc(statusDisplay)}</td><td>${esc(createdBy)}</td><td>${esc(orderedAt)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -4821,7 +4825,8 @@ function renderVariantLibrary(section) {
     }
     tbody.innerHTML = filteredLibrary.map(v => {
       const selectedAttr = v.id === selectedId ? ' data-selected="true"' : '';
-      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td>${esc(v.gene)}</td><td>${esc(v.transcript || '')}</td><td>${esc(v.hgvs_c || '')}</td><td>${esc(v.hgvs_p || '')}</td><td>${esc(v.classification || '')}</td><td>${esc(v.criteria || '')}</td><td>${esc(v.condition || '')}</td><td>${esc(v.inheritance || '')}</td><td>${esc(v.curated_by || '')}</td><td>${esc(v.last_review || '')}</td></tr>`;
+      const lastReview = formatDanishDate(v.last_review);
+      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td>${esc(v.gene)}</td><td>${esc(v.transcript || '')}</td><td>${esc(v.hgvs_c || '')}</td><td>${esc(v.hgvs_p || '')}</td><td>${esc(v.classification || '')}</td><td>${esc(v.criteria || '')}</td><td>${esc(v.condition || '')}</td><td>${esc(v.inheritance || '')}</td><td>${esc(v.curated_by || '')}</td><td>${esc(lastReview)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -5235,7 +5240,7 @@ function renderConclusionLibrary(section) {
     tbody.innerHTML = filtered.map(entry => {
       const snippetSource = (entry.body || '').replace(/\s+/g, ' ').trim();
       const snippet = snippetSource.length > 120 ? `${snippetSource.slice(0, 117)}…` : snippetSource;
-      const updatedAt = entry.updated_at ? new Date(entry.updated_at).toLocaleString('da-DK') : '';
+      const updatedAt = formatDanishDate(entry.updated_at);
       const selectedAttr = entry.id === selectedId ? ' data-selected="true"' : '';
       return `<tr data-id="${entry.id}"${selectedAttr}><td>${entry.id}</td><td>${esc(entry.title || '')}</td><td>${esc(snippet)}</td><td>${esc(updatedAt)}</td></tr>`;
     }).join('');
@@ -5791,8 +5796,9 @@ function renderReports(section) {
     tbody.innerHTML = filteredReports.map(r => {
       const displayStatus = statusMap[r.status] || r.status || '';
       const createdBy = determineCreatedBy('reports', r);
+      const issuedAt = formatDanishDate(r.issued_at);
       const selectedAttr = r.id === selectedReportId ? ' data-selected="true"' : '';
-      return `<tr data-id="${r.id}"${selectedAttr}><td>${r.id}</td><td>${r.order_id}</td><td>${esc(displayStatus)}</td><td>${esc(createdBy)}</td><td>${esc(r.issued_at||'')}</td></tr>`;
+      return `<tr data-id="${r.id}"${selectedAttr}><td>${r.id}</td><td>${r.order_id}</td><td>${esc(displayStatus)}</td><td>${esc(createdBy)}</td><td>${esc(issuedAt)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -5963,7 +5969,7 @@ function buildReportHtml(orderId, reportData) {
   <p><strong>Patient:</strong> ${esc(patient?.name||'')} (${esc(patient?.mrn||'')})</p>
   <p><strong>Prøve:</strong> ${esc(sample?.sample_type||'')}${sampleIdentifier ? ` (${esc(sampleIdentifier)})` : ''}</p>
   <p><strong>Status:</strong> ${esc(reportData.status||'')}</p>
-  <p><strong>Udstedt:</strong> ${esc(reportData.issued_at||'')}</p>
+  <p><strong>Udstedt:</strong> ${esc(formatDanishDate(reportData.issued_at))}</p>
   <h2>Konklusion</h2>
   <p>${esc(reportData.summary||'')}</p>
   <h2>Fund</h2>
@@ -6105,12 +6111,23 @@ function indentWrappedLines(lines, indentText) {
   return lines.map((line, index) => (index === 0 ? `${indentText}${line}` : `${indentText}${line}`));
 }
 
-function formatDanishDate(value) {
+function formatDanishDate(value, includeTimeHint) {
   if (!value) return '';
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    const day = String(value.getDate()).padStart(2, '0');
-    const month = String(value.getMonth() + 1).padStart(2, '0');
-    return `${day}-${month}-${value.getFullYear()}`;
+  const formatFromDate = (date, includeTime) => {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    const base = `${day}.${month}.${year}`;
+    const shouldIncludeTime = includeTime ?? (date.getHours() !== 0 || date.getMinutes() !== 0 || date.getSeconds() !== 0 || date.getMilliseconds() !== 0);
+    if (!shouldIncludeTime) return base;
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    return `${base}, ${hours}.${minutes}.${seconds}`;
+  };
+  if (value instanceof Date) {
+    return formatFromDate(value, includeTimeHint);
   }
   if (typeof value === 'string') {
     const trimmed = value.trim();
@@ -6118,18 +6135,26 @@ function formatDanishDate(value) {
     const isoDateMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (isoDateMatch) {
       const [, year, month, day] = isoDateMatch;
-      return `${day}-${month}-${year}`;
+      return `${day}.${month}.${year}`;
+    }
+    const isoDateTimeMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/);
+    if (isoDateTimeMatch) {
+      const parsed = new Date(trimmed);
+      if (!Number.isNaN(parsed.getTime())) {
+        return formatFromDate(parsed, true);
+      }
     }
     const parsed = new Date(trimmed);
     if (!Number.isNaN(parsed.getTime())) {
-      return formatDanishDate(parsed);
+      const includeTime = trimmed.includes('T') || /\d{2}:\d{2}/.test(trimmed);
+      return formatFromDate(parsed, includeTime);
     }
     return trimmed;
   }
   if (typeof value === 'number') {
     const parsed = new Date(value);
     if (!Number.isNaN(parsed.getTime())) {
-      return formatDanishDate(parsed);
+      return formatFromDate(parsed, true);
     }
   }
   return '';
