@@ -630,6 +630,10 @@ form textarea {
   color: var(--muted-text);
   font-size: 0.85rem;
 }
+.panel-hint.warning {
+  color: var(--danger);
+  font-weight: 600;
+}
 .case-form fieldset {
   border: 1px solid var(--panel-border);
   border-radius: 0.65rem;
@@ -1013,6 +1017,187 @@ const storage = (() => {
   }
 })();
 
+const IDB = (() => {
+  try {
+    return (
+      self.indexedDB ||
+      self.webkitIndexedDB ||
+      self.mozIndexedDB ||
+      self.msIndexedDB ||
+      null
+    );
+  } catch (err) {
+    console.warn('IndexedDB utilgængelig, bruger midlertidig database.', err);
+    return null;
+  }
+})();
+
+const MEMORY_DB_KEY = 'glimr-memory-db';
+
+const enqueueMicrotask = typeof queueMicrotask === 'function'
+  ? queueMicrotask
+  : (fn => Promise.resolve().then(fn));
+
+function deepClone(value) {
+  if (typeof structuredClone === 'function') {
+    try {
+      return structuredClone(value);
+    } catch (err) {
+      console.warn('structuredClone fejlede, falder tilbage til JSON.', err);
+    }
+  }
+  return JSON.parse(JSON.stringify(value));
+}
+
+function readMemoryDbSnapshot() {
+  const raw = storage.getItem(MEMORY_DB_KEY);
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    console.warn('Kunne ikke parse midlertidig database, starter tom.', err);
+    return {};
+  }
+}
+
+function writeMemoryDbSnapshot(snapshot) {
+  try {
+    storage.setItem(MEMORY_DB_KEY, JSON.stringify(snapshot));
+  } catch (err) {
+    console.warn('Kunne ikke gemme midlertidig database.', err);
+  }
+}
+
+function createMemoryRequest(executor) {
+  const request = {onsuccess: null, onerror: null, result: undefined, error: null};
+  enqueueMicrotask(() => {
+    try {
+      const result = executor();
+      request.result = result;
+      if (typeof request.onsuccess === 'function') {
+        request.onsuccess({target: request});
+      }
+    } catch (err) {
+      request.error = err;
+      if (typeof request.onerror === 'function') {
+        request.onerror({target: request});
+      } else {
+        console.error(err);
+      }
+    }
+  });
+  return request;
+}
+
+function createMemoryDb() {
+  const snapshot = readMemoryDbSnapshot();
+  const stores = new Map();
+  const counters = new Map();
+
+  const normaliseKey = value => {
+    if (typeof value === 'number') return value;
+    const num = Number(value);
+    return Number.isFinite(num) ? num : value;
+  };
+
+  const ensureStore = name => {
+    if (!stores.has(name)) {
+      const rows = Array.isArray(snapshot[name]) ? snapshot[name].map(row => deepClone(row)) : [];
+      stores.set(name, rows);
+      const maxId = rows.reduce((max, row) => (typeof row?.id === 'number' ? Math.max(max, row.id) : max), 0);
+      counters.set(name, maxId);
+    }
+  };
+  STORES.forEach(ensureStore);
+
+  const persist = () => {
+    const data = {};
+    stores.forEach((rows, name) => {
+      data[name] = rows.map(row => deepClone(row));
+    });
+    writeMemoryDbSnapshot(data);
+  };
+
+  const buildStore = name => {
+    ensureStore(name);
+    const rows = stores.get(name);
+    return {
+      getAll() {
+        return createMemoryRequest(() => rows.map(row => deepClone(row)));
+      },
+      add(record) {
+        return createMemoryRequest(() => {
+          const clone = deepClone(record);
+          let id = normaliseKey(clone.id);
+          if (id == null) {
+            id = (counters.get(name) || 0) + 1;
+            counters.set(name, id);
+            clone.id = id;
+          } else {
+            if (typeof id === 'number') {
+              counters.set(name, Math.max(counters.get(name) || 0, id));
+            }
+            clone.id = id;
+          }
+          rows.push(clone);
+          persist();
+          return id;
+        });
+      },
+      put(record) {
+        return createMemoryRequest(() => {
+          const clone = deepClone(record);
+          if (clone.id == null) throw new Error('Record mangler id');
+          clone.id = normaliseKey(clone.id);
+          const idx = rows.findIndex(item => item.id === clone.id);
+          if (idx === -1) {
+            rows.push(clone);
+          } else {
+            rows[idx] = clone;
+          }
+          if (typeof clone.id === 'number') {
+            counters.set(name, Math.max(counters.get(name) || 0, clone.id));
+          }
+          persist();
+          return clone.id;
+        });
+      },
+      delete(id) {
+        return createMemoryRequest(() => {
+          const key = normaliseKey(id);
+          const idx = rows.findIndex(item => item.id === key);
+          if (idx !== -1) {
+            rows.splice(idx, 1);
+            persist();
+          }
+        });
+      },
+      clear() {
+        return createMemoryRequest(() => {
+          rows.length = 0;
+          counters.set(name, 0);
+          persist();
+        });
+      }
+    };
+  };
+
+  return {
+    transaction(storeNames) {
+      const names = Array.isArray(storeNames) ? storeNames : [storeNames];
+      names.forEach(ensureStore);
+      return {
+        objectStore(target) {
+          return buildStore(target);
+        },
+        done: Promise.resolve()
+      };
+    },
+    close() {},
+    _persistSnapshot: persist
+  };
+}
+
 const state = {
   db: null,
   cache: new Map(),
@@ -1024,7 +1209,8 @@ const state = {
   currentUser: null,
   theme: storage.getItem('glimr-theme') || 'light',
   testResults: [],
-  lastStatus: ''
+  lastStatus: '',
+  usingMemoryDb: false
 };
 const CREATED_BY_STORES = new Set(['patients','samples','orders','variants','qc','reports','conclusion_library']);
 const ROLE_OPTIONS = [
@@ -1946,21 +2132,6 @@ function setStatus(msg) {
   bar.textContent = msg;
   setTooltip(bar, msg);
 }
-window.addEventListener('error', event => {
-  if (!event) return;
-  const hasDetails = Boolean(event.message) || Boolean(event.error && event.error.message);
-  if (!hasDetails) return;
-  const detail = event.message || (event.error && event.error.message) || 'Ukendt fejl';
-  console.error('Ubehandlet fejl i GlimR:', event.error || detail, event);
-  setStatus('Fejl: ' + detail);
-});
-window.addEventListener('unhandledrejection', event => {
-  if (!event) return;
-  const reason = event.reason;
-  const detail = reason && (reason.message || String(reason)) || 'Ukendt asynkron fejl';
-  console.error('Ubehandlet promise-fejl i GlimR:', reason || event);
-  setStatus('Fejl: ' + detail);
-});
 function currentUserName() {
   return state.currentUser?.name || 'System';
 }
@@ -1993,7 +2164,21 @@ function activateTab(id) {
 }
 function openDb() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VER);
+    if (!IDB) {
+      console.warn('IndexedDB ikke tilgængelig, bruger midlertidig in-memory database.');
+      state.usingMemoryDb = true;
+      resolve(createMemoryDb());
+      return;
+    }
+    let req;
+    try {
+      req = IDB.open(DB_NAME, DB_VER);
+    } catch (err) {
+      console.warn('Kunne ikke åbne IndexedDB, bruger midlertidig database.', err);
+      state.usingMemoryDb = true;
+      resolve(createMemoryDb());
+      return;
+    }
     req.onupgradeneeded = event => {
       const db = event.target.result;
       const ensureStore = (name, options) => {
@@ -2034,8 +2219,18 @@ function openDb() {
       withTimestamps(ensureStore('responses',{keyPath:'id',autoIncrement:true}));
       withTimestamps(ensureStore('conclusion_library',{keyPath:'id',autoIncrement:true}));
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      state.usingMemoryDb = false;
+      resolve(req.result);
+    };
+    req.onerror = () => {
+      console.warn('IndexedDB fejlede, bruger midlertidig database.', req.error);
+      state.usingMemoryDb = true;
+      resolve(createMemoryDb());
+    };
+    req.onblocked = () => {
+      console.warn('Database-opgradering blokeret af en anden fane.');
+    };
   });
 }
 function requestToPromise(req) {
@@ -2220,14 +2415,18 @@ async function backupAndResetData() {
       state.db.close();
       state.db = null;
     }
-    await new Promise((resolve, reject) => {
-      const req = indexedDB.deleteDatabase(DB_NAME);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
-      req.onblocked = () => {
-        alert('Databasen kunne ikke nulstilles, fordi den er åben i en anden fane. Luk andre GlimR-vinduer og prøv igen.');
-      };
-    });
+    if (IDB) {
+      await new Promise((resolve, reject) => {
+        const req = IDB.deleteDatabase(DB_NAME);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+        req.onblocked = () => {
+          alert('Databasen kunne ikke nulstilles, fordi den er åben i en anden fane. Luk andre GlimR-vinduer og prøv igen.');
+        };
+      });
+    } else {
+      writeMemoryDbSnapshot({});
+    }
     state.cache.clear();
     state.db = await openDb();
     await loadAllStores();
@@ -8846,11 +9045,15 @@ function renderAudit(section) {
 function renderDbTab(section) {
   section = section || document.querySelector('section[data-tab="db"]');
   const status = state.boundHandle ? `Tilknyttet fil: ${state.boundHandle.name}` : 'Ingen fil tilknyttet';
+  const memoryWarning = state.usingMemoryDb
+    ? '<p class="panel-hint warning">Browseren blokerer for IndexedDB. Data gemmes kun midlertidigt i denne session.</p>'
+    : '';
   if (!section) return;
   section.innerHTML = `
   <div class="panel">
     <h2>Filbaseret database</h2>
     <p>${esc(status)}</p>
+    ${memoryWarning}
     <div class="btn-row">
       <button class="secondary" id="bindFile">Knyt/åbn DB-fil...</button>
       <button class="secondary" id="saveNow">Gem nu</button>
@@ -9392,7 +9595,7 @@ async function init() {
   initTabs();
   try {
     state.db = await openDb();
-    setStatus('Database åben');
+    setStatus(state.usingMemoryDb ? 'Database åben (midlertidig hukommelse)' : 'Database åben');
     await loadAllStores();
     await ensureCreationMetadata();
     hookUi();
