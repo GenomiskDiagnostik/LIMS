@@ -630,6 +630,10 @@ form textarea {
   color: var(--muted-text);
   font-size: 0.85rem;
 }
+.panel-hint.warning {
+  color: var(--danger);
+  font-weight: 600;
+}
 .case-form fieldset {
   border: 1px solid var(--panel-border);
   border-radius: 0.65rem;
@@ -1024,7 +1028,8 @@ const state = {
   currentUser: null,
   theme: storage.getItem('glimr-theme') || 'light',
   testResults: [],
-  lastStatus: ''
+  lastStatus: '',
+  usingMemoryDb: false
 };
 const CREATED_BY_STORES = new Set(['patients','samples','orders','variants','qc','reports','conclusion_library']);
 const ROLE_OPTIONS = [
@@ -2255,14 +2260,18 @@ async function backupAndResetData() {
       state.db.close();
       state.db = null;
     }
-    await new Promise((resolve, reject) => {
-      const req = indexedDB.deleteDatabase(DB_NAME);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
-      req.onblocked = () => {
-        alert('Databasen kunne ikke nulstilles, fordi den er åben i en anden fane. Luk andre GlimR-vinduer og prøv igen.');
-      };
-    });
+    if (IDB) {
+      await new Promise((resolve, reject) => {
+        const req = IDB.deleteDatabase(DB_NAME);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+        req.onblocked = () => {
+          alert('Databasen kunne ikke nulstilles, fordi den er åben i en anden fane. Luk andre GlimR-vinduer og prøv igen.');
+        };
+      });
+    } else {
+      writeMemoryDbSnapshot({});
+    }
     state.cache.clear();
     state.db = await openDb();
     await loadAllStores();
@@ -4988,6 +4997,20 @@ function renderVariants(section) {
       if (isBatchVariantRowEmpty(row)) row.remove();
     });
   };
+  const variantTypeSelect = form?.elements?.variant_type;
+  const variantGroups = form?.querySelectorAll('.variant-field-group') || [];
+  const updateVariantTypeFields = () => {
+    const type = normalizeVariantType(variantTypeSelect?.value);
+    if (variantTypeSelect && !variantTypeSelect.value) {
+      variantTypeSelect.value = type;
+    }
+    variantGroups.forEach(group => {
+      const types = (group.dataset.variantTypes || '').split(/\s+/).filter(Boolean).map(normalizeVariantType);
+      group.hidden = types.length ? !types.includes(type) : false;
+    });
+  };
+  updateVariantTypeFields();
+  variantTypeSelect?.addEventListener('change', updateVariantTypeFields);
   const enterEditMode = id => {
     if (!form) return;
     form.dataset.mode = 'edit';
@@ -8867,11 +8890,15 @@ function renderAudit(section) {
 function renderDbTab(section) {
   section = section || document.querySelector('section[data-tab="db"]');
   const status = state.boundHandle ? `Tilknyttet fil: ${state.boundHandle.name}` : 'Ingen fil tilknyttet';
+  const memoryWarning = state.usingMemoryDb
+    ? '<p class="panel-hint warning">Browseren blokerer for IndexedDB. Data gemmes kun midlertidigt i denne session.</p>'
+    : '';
   if (!section) return;
   section.innerHTML = `
   <div class="panel">
     <h2>Filbaseret database</h2>
     <p>${esc(status)}</p>
+    ${memoryWarning}
     <div class="btn-row">
       <button class="secondary" id="bindFile">Knyt/åbn DB-fil...</button>
       <button class="secondary" id="saveNow">Gem nu</button>
@@ -9414,7 +9441,7 @@ async function init() {
   try {
     setStatus('Åbner database...');
     state.db = await openDb();
-    setStatus('Database åben');
+    setStatus(state.usingMemoryDb ? 'Database åben (midlertidig hukommelse)' : 'Database åben');
     await loadAllStores();
     await ensureCreationMetadata();
     hookUi();
