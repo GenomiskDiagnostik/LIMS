@@ -5112,10 +5112,6 @@ function renderVariants(section) {
     if (rsidField) setTooltip(rsidField, tooltipCatalog.forms.variantForm.rsid);
     const subtypeSelect = row.querySelector('[data-field="sv_subtype"]');
     if (subtypeSelect) setTooltip(subtypeSelect, tooltipCatalog.forms.variantForm.sv_subtype);
-    const rsidField = row.querySelector('[data-field="rsid"]');
-    if (rsidField) setTooltip(rsidField, tooltipCatalog.forms.variantForm.rsid);
-    const subtypeSelect = row.querySelector('[data-field="sv_subtype"]');
-    if (subtypeSelect) setTooltip(subtypeSelect, tooltipCatalog.forms.variantForm.sv_subtype);
   };
   const getBatchValue = (row, field) => {
     const el = row?.querySelector(`[data-field="${field}"]`);
