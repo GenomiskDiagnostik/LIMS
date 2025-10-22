@@ -990,6 +990,29 @@ pre {
 const DB_NAME = 'glims';
 const DB_VER = 6;
 const STORES = ['patients','samples','orders','panels','variants','qc','reports','users','audit','variant_library','responses','conclusion_library'];
+const storage = (() => {
+  try {
+    const testKey = '__glimr_storage_test__';
+    localStorage.setItem(testKey, '1');
+    localStorage.removeItem(testKey);
+    return localStorage;
+  } catch (err) {
+    console.warn('Local storage utilgængelig, bruger in-memory fallback.', err);
+    const memory = new Map();
+    return {
+      getItem(key) {
+        return memory.has(key) ? memory.get(key) : null;
+      },
+      setItem(key, value) {
+        memory.set(key, String(value));
+      },
+      removeItem(key) {
+        memory.delete(key);
+      }
+    };
+  }
+})();
+
 const state = {
   db: null,
   cache: new Map(),
@@ -999,7 +1022,7 @@ const state = {
   autosaveTimer: null,
   currentTab: 'dashboard',
   currentUser: null,
-  theme: localStorage.getItem('glimr-theme') || 'light',
+  theme: storage.getItem('glimr-theme') || 'light',
   testResults: [],
   lastStatus: ''
 };
@@ -1852,7 +1875,7 @@ function applyTheme() {
     state.theme = 'light';
   }
   document.documentElement.dataset.theme = state.theme;
-  localStorage.setItem('glimr-theme', state.theme);
+  storage.setItem('glimr-theme', state.theme);
   const btn = document.getElementById('themeToggle');
   if (btn) {
     const toDark = state.theme !== 'dark';
@@ -1865,14 +1888,14 @@ function toggleTheme() {
   applyTheme();
 }
 function restoreUserSession() {
-  const storedId = localStorage.getItem('glimr-user-id');
+  const storedId = storage.getItem('glimr-user-id');
   if (storedId) {
     const user = findById('users', Number(storedId));
     if (user) {
       state.currentUser = {...user};
     } else {
       state.currentUser = null;
-      localStorage.removeItem('glimr-user-id');
+      storage.removeItem('glimr-user-id');
     }
   } else if (!state.currentUser || !state.currentUser.internal) {
     state.currentUser = null;
@@ -1882,7 +1905,7 @@ function restoreUserSession() {
 }
 function logoutUser() {
   state.currentUser = null;
-  localStorage.removeItem('glimr-user-id');
+  storage.removeItem('glimr-user-id');
   updateAuthUi();
   setStatus('Logget ud. Systemet er skrivebeskyttet.');
 }
@@ -1908,7 +1931,7 @@ function handleLogin(event) {
     return;
   }
   state.currentUser = {...user};
-  localStorage.setItem('glimr-user-id', String(user.id));
+  storage.setItem('glimr-user-id', String(user.id));
   pass.value = '';
   updateAuthUi();
   setStatus(`Logget ind som ${user.name}.`);
@@ -8775,7 +8798,7 @@ function renderUsers(section) {
     if (confirm('Slet bruger?')) {
       await deleteRecord('users', id);
       refreshLoginOptions();
-      const storedId = localStorage.getItem('glimr-user-id');
+      const storedId = storage.getItem('glimr-user-id');
       if (storedId && Number(storedId) === id) {
         logoutUser();
       }
