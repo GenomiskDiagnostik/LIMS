@@ -1585,12 +1585,19 @@ function formatVariantTitle(variant) {
   const genomic = formatVariantGenomicRange(variant);
   const subtype = variant.sv_subtype || variant.structural_type || variant.variant_subtype || '';
   const affectedGenes = variant.affected_genes || variant.genes || '';
-  const parts = [];
-  if (iscn) parts.push(iscn);
-  if (genomic) parts.push(genomic);
-  if (subtype) parts.push(subtype);
-  if (affectedGenes) parts.push(affectedGenes);
-  if (parts.length) return parts.join(' · ');
+  const gene = variant.gene || variant.region || '';
+  const parts = [gene, iscn, genomic, subtype, affectedGenes];
+  const seen = new Set();
+  const uniqueParts = parts
+    .map(part => (part == null ? '' : String(part).trim()))
+    .filter(part => {
+      if (!part) return false;
+      const key = part.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  if (uniqueParts.length) return uniqueParts.join(' · ');
   if (variant.description) return variant.description;
   return variant.gene || subtype || getVariantTypeLabel(type);
 }
@@ -1600,6 +1607,7 @@ function formatVariantDetailLines(variant) {
   const type = normalizeVariantType(variant.variant_type);
   const details = [];
   if (type !== 'snv') {
+    if (variant.gene) details.push(`Gen/region: ${variant.gene}`);
     const genomeBuild = variant.genome_build || '';
     const range = formatVariantGenomicRange(variant);
     if (genomeBuild || range) {
@@ -1614,6 +1622,8 @@ function formatVariantDetailLines(variant) {
     if (variant.affected_genes) details.push(`Berørte gener: ${variant.affected_genes}`);
     if (variant.iscn) details.push(`ISCN: ${variant.iscn}`);
   }
+  if (variant.hgvs_c) details.push(`HGVS c.: ${variant.hgvs_c}`);
+  if (variant.hgvs_p) details.push(`HGVS p.: ${variant.hgvs_p}`);
   if (variant.transcript) details.push(`Transkript: ${variant.transcript}`);
   if (variant.zygosity) details.push(`Zygositet: ${variant.zygosity}`);
   if (variant.classification) details.push(`ACMG-klasse: ${variant.classification}`);
@@ -5979,7 +5989,10 @@ function describeVariantNarrative(variant) {
   if (variant.criteria) summaryParts.push(`ACMG: ${variant.criteria}`);
   if (variant.af !== undefined && variant.af !== null && variant.af !== '') summaryParts.push(`AF: ${variant.af}`);
   if (variant.zygosity) summaryParts.push(`Zygositet: ${variant.zygosity}`);
+  if (variant.sv_subtype) summaryParts.push(`Type: ${variant.sv_subtype}`);
   if (variant.copy_number) summaryParts.push(`Kopital: ${variant.copy_number}`);
+  if (variant.size_bp) summaryParts.push(`Størrelse: ${variant.size_bp}`);
+  if (variant.affected_genes) summaryParts.push(`Berørte gener: ${variant.affected_genes}`);
   if (variant.iscn) summaryParts.push(`ISCN: ${variant.iscn}`);
   const genomic = formatVariantGenomicRange(variant);
   if (genomic) summaryParts.push(`Position: ${genomic}`);
