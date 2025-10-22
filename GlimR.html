@@ -4997,20 +4997,6 @@ function renderVariants(section) {
       if (isBatchVariantRowEmpty(row)) row.remove();
     });
   };
-  const variantTypeSelect = form?.elements?.variant_type;
-  const variantGroups = form?.querySelectorAll('.variant-field-group') || [];
-  const updateVariantTypeFields = () => {
-    const type = normalizeVariantType(variantTypeSelect?.value);
-    if (variantTypeSelect && !variantTypeSelect.value) {
-      variantTypeSelect.value = type;
-    }
-    variantGroups.forEach(group => {
-      const types = (group.dataset.variantTypes || '').split(/\s+/).filter(Boolean).map(normalizeVariantType);
-      group.hidden = types.length ? !types.includes(type) : false;
-    });
-  };
-  updateVariantTypeFields();
-  variantTypeSelect?.addEventListener('change', updateVariantTypeFields);
   const enterEditMode = id => {
     if (!form) return;
     form.dataset.mode = 'edit';
