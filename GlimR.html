@@ -15,6 +15,7 @@
   --shadow: 0 4px 14px rgba(18, 76, 135, 0.08);
   --accent: #186faf;
   --accent-strong: #124c87;
+  --accent-shadow: rgba(24, 111, 175, 0.2);
   --danger: #c0392b;
   --nav-bg: #ffffff;
   --nav-border: #c7d2e3;
@@ -44,6 +45,7 @@
   --shadow: 0 6px 18px rgba(8, 47, 73, 0.55);
   --accent: #38bdf8;
   --accent-strong: #0ea5e9;
+  --accent-shadow: rgba(56, 189, 248, 0.2);
   --danger: #ef4444;
   --nav-bg: #111c30;
   --nav-border: #1f2a3c;
@@ -736,6 +738,31 @@ button:disabled {
   color: var(--badge-color);
   font-size: 0.75rem;
 }
+.rsid-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: var(--badge-bg);
+  color: var(--accent-strong);
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid currentColor;
+  transition: color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  line-height: 1.2;
+}
+.rsid-badge::after {
+  content: '\2197';
+  font-size: 0.75em;
+  opacity: 0.8;
+}
+.rsid-badge:hover,
+.rsid-badge:focus-visible {
+  background: var(--accent-strong);
+  color: #fff;
+  box-shadow: 0 0 0 3px var(--accent-shadow);
+}
 input[type="search"] {
   border-radius: 1rem;
 }
@@ -1091,12 +1118,12 @@ const schemaFields = {
   samples: ['id','pmb_number','patient_id','sample_type','collected_at','status','notes','created_by','created_at','updated_at'],
   panels: ['id','name','description','created_at','updated_at'],
   orders: ['id','patient_id','sample_id','panel_id','analysis_responsible_id','interpreter_id','approver_id','clinician','status','ordered_at','created_by','created_at','updated_at'],
-  variants: ['id','order_id','variant_type','gene','transcript','hgvs_c','hgvs_p','zygosity','classification','criteria','af','annotations','interpretation','genome_build','chromosome','start','end','copy_number','sv_subtype','size_bp','iscn','description','affected_genes','created_by','created_at','updated_at'],
+  variants: ['id','order_id','variant_type','gene','transcript','hgvs_c','hgvs_p','rsid','zygosity','classification','criteria','af','annotations','interpretation','genome_build','chromosome','start','end','copy_number','sv_subtype','size_bp','iscn','description','affected_genes','created_by','created_at','updated_at'],
   qc: ['id','sample_id','metric','value','unit','notes','created_by','created_at','updated_at'],
   reports: ['id','order_id','findings','variant_ids','variant_details','summary','status','issued_at','created_by','created_at','updated_at'],
   users: ['id','name','email','role','pin','created_at','updated_at'],
   audit: ['id','ts','user','action','entity','entity_id','before','after','created_at','updated_at'],
-  variant_library: ['id','variant_type','gene','transcript','hgvs_c','hgvs_p','classification','criteria','evidence','condition','inheritance','genome_build','chromosome','start','end','copy_number','sv_subtype','size_bp','iscn','description','affected_genes','curated_by','last_review','created_at','updated_at'],
+  variant_library: ['id','variant_type','gene','transcript','hgvs_c','hgvs_p','rsid','classification','criteria','evidence','condition','inheritance','genome_build','chromosome','start','end','copy_number','sv_subtype','size_bp','iscn','description','affected_genes','curated_by','last_review','created_at','updated_at'],
   responses: ['id','ts','sender','patient','diagnostic_report_id','variant_count','variants','raw','created_at','updated_at'],
   conclusion_library: ['id','title','body','created_by','created_at','updated_at']
 };
@@ -1156,6 +1183,7 @@ const tooltipCatalog = {
     'Transkript': 'Reference-transkript for varianten.',
     'HGVS c.': 'HGVS-beskrivelse på cDNA-niveau.',
     'HGVS p.': 'HGVS-beskrivelse på protein-niveau.',
+    'rsID': 'dbSNP-referencenummer (rsID) for SNV/indel.',
     'Klasse': 'ACMG-klassifikation 1–5.',
     'Kriterier': 'Anvendte ACMG-kriterier.',
     'HGVS': 'HGVS-beskrivelse for varianten.',
@@ -1232,6 +1260,7 @@ const tooltipCatalog = {
       transcript: 'Reference-transkript (fx NM_) for SNV/indel.',
       hgvs_c: 'HGVS-beskrivelse på cDNA-niveau (SNV/indel).',
       hgvs_p: 'HGVS-beskrivelse på protein-niveau (SNV/indel).',
+      rsid: 'dbSNP-reference (rsID), fx rs80357713, for SNV/indel.',
       zygosity: 'Zygositetsstatus (fx heterozygot).',
       classification: 'ACMG-klassifikation 1 (godartet) – 5 (patogen).',
       criteria: 'Anfør anvendte ACMG- eller CNV-kriterier, adskilt af komma.',
@@ -1243,7 +1272,7 @@ const tooltipCatalog = {
       start: 'Genomisk startposition.',
       end: 'Genomisk slutposition.',
       copy_number: 'Angiv kopital (fx x1, x3) ved CNV/aneuploidi.',
-      sv_subtype: 'Beskriv type af strukturel variant (deletion, duplikation, translokation...).',
+      sv_subtype: 'Vælg strukturtype for CNV/SV/cytogenetiske fund.',
       size_bp: 'Variantens størrelse i baser eller Mb.',
       iscn: 'ISCN-beskrivelse af cytogenetisk fund.',
       description: 'Valgfri fri tekst til yderligere beskrivelse.',
@@ -1255,6 +1284,7 @@ const tooltipCatalog = {
       transcript: 'Reference-transkript brugt til kurateringen.',
       hgvs_c: 'HGVS cDNA-beskrivelse (SNV/indel).',
       hgvs_p: 'HGVS protein-beskrivelse (SNV/indel).',
+      rsid: 'dbSNP-reference (rsID) knyttet til varianten.',
       classification: 'Kurateret ACMG-klassifikation eller tilsvarende vurdering.',
       criteria: 'De kriterier der understøtter klassifikationen.',
       evidence: 'Sammendrag af litteratur, observationer eller noter.',
@@ -1265,7 +1295,7 @@ const tooltipCatalog = {
       start: 'Genomisk startposition.',
       end: 'Genomisk slutposition.',
       copy_number: 'Kopital for CNV eller aneuploidi.',
-      sv_subtype: 'Variantens under-type (deletion, duplikation, fusion...).',
+      sv_subtype: 'Vælg strukturtype fra listen for CNV/SV/cytogenetik.',
       size_bp: 'Størrelse i baser eller Mb.',
       iscn: 'ISCN-streng for cytogenetiske beskrivelser.',
       description: 'Supplerende fri tekst.',
@@ -1480,6 +1510,12 @@ function applyFormTooltips(form) {
       setTooltip(el, tip);
       const label = el.closest('label');
       if (label) setTooltip(label, tip);
+      const filterable = el.closest('.filterable-select');
+      if (filterable) {
+        setTooltip(filterable, tip);
+        const filterInput = filterable.querySelector('input[data-select-filter]');
+        if (filterInput) setTooltip(filterInput, tip);
+      }
     });
   }
   const submit = form.querySelector('button[type="submit"]');
@@ -1544,6 +1580,150 @@ const VARIANT_TYPE_OPTIONS = [
   {value: 'cyto', label: 'Cytogenetisk forandring'}
 ];
 
+const STRUCTURE_TYPE_OPTION_GROUPS = [
+  {
+    label: 'CNV (kopital)',
+    options: [
+      {value: 'deletion', label: 'Deletion (tab)', synonyms: ['deletion','del','loss','tab','kopitaltab','copy loss']},
+      {value: 'duplication', label: 'Duplikation', synonyms: ['duplication','dup','gain','kopitalgain']},
+      {value: 'amplification', label: 'Amplifikation', synonyms: ['amplification','amp','forstærkning']},
+      {value: 'copy_gain', label: 'Kopitalgain (x3/x4)', synonyms: ['copy gain','kopitalgain','x3','x4','copy-number gain']},
+      {value: 'copy_loss', label: 'Kopitaltab (x1/x0)', synonyms: ['copy loss','kopitaltab','x1','x0']},
+      {value: 'cnloh', label: 'Copy-neutral LOH', synonyms: ['cnloh','copy-neutral loh','copy neutral loh']},
+      {value: 'loh', label: 'LOH', synonyms: ['loh','loss of heterozygosity']},
+      {value: 'mosaic_gain', label: 'Mosaik gain', synonyms: ['mosaic gain','mosaik gain']},
+      {value: 'mosaic_loss', label: 'Mosaik tab', synonyms: ['mosaic loss','mosaik tab']},
+      {value: 'segmental_gain', label: 'Segmental gain', synonyms: ['segmental gain','segment gain','partial duplication','partial gain']},
+      {value: 'segmental_loss', label: 'Segmental tab', synonyms: ['segmental loss','segment loss','partial deletion','partial loss']},
+      {value: 'whole_arm_gain', label: 'Helarm gain', synonyms: ['whole arm gain','arm gain','p-arm gain','q-arm gain']},
+      {value: 'whole_arm_loss', label: 'Helarm tab', synonyms: ['whole arm loss','arm loss','p-arm loss','q-arm loss']}
+    ]
+  },
+  {
+    label: 'Strukturel variant',
+    options: [
+      {value: 'translocation', label: 'Translokation (ikke specificeret)', synonyms: ['translocation','translokation']},
+      {value: 'insertion', label: 'Insertion', synonyms: ['insertion','indsættelse']},
+      {value: 'inversion', label: 'Inversion', synonyms: ['inversion','inversi','omvendt segment']},
+      {value: 'balanced_translocation', label: 'Translokation (balanceret)', synonyms: ['balanced translocation','balanceret translokation']},
+      {value: 'unbalanced_translocation', label: 'Translokation (ubalanceret)', synonyms: ['unbalanced translocation','ubalanceret translokation']},
+      {value: 'fusion', label: 'Fusionsgen', synonyms: ['fusion','fusionsgen','gene fusion']},
+      {value: 'breakend', label: 'Breakend (BND)', synonyms: ['breakend','bnd']},
+      {value: 'tandem_duplication', label: 'Tandem duplikation', synonyms: ['tandem duplication','tandem duplikation']},
+      {value: 'complex_rearrangement', label: 'Kompleks omlejring', synonyms: ['complex rearrangement','kompleks omlejring','complex']},
+      {value: 'chromothripsis', label: 'Kromothripsis', synonyms: ['chromothripsis']},
+      {value: 'transposition', label: 'Transposition', synonyms: ['transposition','transponering']},
+      {value: 'duplication_inverted', label: 'Inverteret duplikation', synonyms: ['inverted duplication','duplication inverted','inv dup']},
+      {value: 'gene_conversion', label: 'Genkonvertering', synonyms: ['gene conversion','genkonvertering']}
+    ]
+  },
+  {
+    label: 'Cytogenetisk forandring',
+    options: [
+      {value: 'monosomy', label: 'Monosomi', synonyms: ['monosomy','monosomi']},
+      {value: 'trisomy', label: 'Trisomi', synonyms: ['trisomy','trisomi']},
+      {value: 'tetrasomy', label: 'Tetrasomi', synonyms: ['tetrasomy','tetrasomi']},
+      {value: 'aneuploidy', label: 'Aneuploidi (andet)', synonyms: ['aneuploidy','aneuploidi']},
+      {value: 'polyploidy', label: 'Polyploidi', synonyms: ['polyploidy','polyploidi']},
+      {value: 'ring_chromosome', label: 'Ringkromosom', synonyms: ['ring chromosome','ringkromosom']},
+      {value: 'isochromosome', label: 'Isochromosom', synonyms: ['isochromosome','isochromosom']},
+      {value: 'dicentric', label: 'Dicentrisk kromosom', synonyms: ['dicentric','dicentrisk']},
+      {value: 'marker_chromosome', label: 'Marker-kromosom', synonyms: ['marker chromosome','marker-kromosom','marker kromosom']},
+      {value: 'robertsonian', label: 'Robertsonsk translokation', synonyms: ['robertsonian','robertsonian translocation','robertsonsk translokation']},
+      {value: 'partial_trisomy', label: 'Partiel trisomi', synonyms: ['partial trisomy','partiel trisomi']},
+      {value: 'partial_monosomy', label: 'Partiel monosomi', synonyms: ['partial monosomy','partiel monosomi']},
+      {value: 'whole_genome_duplication', label: 'Hel genom-duplikation', synonyms: ['whole genome duplication','genom duplikation','tetraploidi']}
+    ]
+  },
+  {
+    label: 'Andre',
+    options: [
+      {value: 'other', label: 'Anden/andet (specificer i beskrivelsen)', synonyms: ['other','andet','anden']}
+    ]
+  }
+];
+
+function renderStructureTypeOptions({includeBlank = true} = {}) {
+  const parts = [];
+  if (includeBlank) {
+    parts.push('<option value="">Vælg strukturtype</option>');
+  }
+  STRUCTURE_TYPE_OPTION_GROUPS.forEach(group => {
+    const options = group.options
+      .map(option => `<option value="${option.value}">${option.label}</option>`)
+      .join('');
+    if (group.label) {
+      parts.push(`<optgroup label="${group.label}">${options}</optgroup>`);
+    } else {
+      parts.push(options);
+    }
+  });
+  return parts.join('');
+}
+
+function normalizeRsId(value) {
+  if (value == null) return '';
+  const trimmed = String(value).trim();
+  if (!trimmed) return '';
+  const match = trimmed.match(/^rs?(\d+)$/i);
+  if (match) {
+    return `rs${match[1]}`;
+  }
+  return trimmed;
+}
+
+function formatRsIdCell(rsid) {
+  const normalized = normalizeRsId(rsid);
+  if (!normalized) return '';
+  if (/^rs\d+$/i.test(normalized)) {
+    const canonical = normalized.replace(/^rs/i, 'rs');
+    const url = `https://www.ncbi.nlm.nih.gov/snp/${encodeURIComponent(canonical)}`;
+    const label = esc(canonical);
+    return `<a class="rsid-badge" href="${url}" target="_blank" rel="noopener noreferrer" title="Åbn dbSNP-opslag for ${label}" aria-label="Åbn dbSNP-opslag for ${label}">${label}</a>`;
+  }
+  return esc(normalized);
+}
+
+function normalizeStructureTypeValue(value) {
+  if (value == null) return '';
+  const trimmed = String(value).trim();
+  if (!trimmed) return '';
+  const lower = trimmed.toLowerCase();
+  for (const group of STRUCTURE_TYPE_OPTION_GROUPS) {
+    for (const option of group.options) {
+      const optionValue = option.value.toLowerCase();
+      if (optionValue === lower) return option.value;
+      const labelLower = option.label.toLowerCase();
+      const labelBase = labelLower.split('(')[0].trim();
+      if (labelLower === lower || (labelBase && labelBase === lower)) {
+        return option.value;
+      }
+      if (labelBase && (labelBase.startsWith(lower) || lower.startsWith(labelBase))) {
+        return option.value;
+      }
+      const synonyms = Array.isArray(option.synonyms) ? option.synonyms : option.synonyms ? [option.synonyms] : [];
+      if (synonyms.some(syn => syn && syn.toLowerCase() === lower)) {
+        return option.value;
+      }
+    }
+  }
+  return trimmed;
+}
+
+function getStructureTypeLabel(value) {
+  if (value == null) return '';
+  const normalized = normalizeStructureTypeValue(value);
+  const lower = normalized.toLowerCase();
+  for (const group of STRUCTURE_TYPE_OPTION_GROUPS) {
+    for (const option of group.options) {
+      if (option.value.toLowerCase() === lower) {
+        return option.label;
+      }
+    }
+  }
+  return String(value).trim();
+}
+
 function normalizeVariantType(value) {
   if (!value) return 'snv';
   const normalized = String(value).trim().toLowerCase();
@@ -1554,6 +1734,54 @@ function getVariantTypeLabel(value) {
   const normalized = normalizeVariantType(value);
   const option = VARIANT_TYPE_OPTIONS.find(opt => opt.value === normalized);
   return option ? option.label : normalized;
+}
+
+function setupVariantTypeForm(form, {defaultType = 'snv'} = {}) {
+  if (!form) {
+    return {
+      updateVariantTypeFields: () => {},
+      variantTypeSelect: null
+    };
+  }
+  const select = form.elements?.variant_type || null;
+  const groups = Array.from(form.querySelectorAll('[data-variant-types]'));
+  const typeRequiredFields = Array.from(form.querySelectorAll('[data-type-required]'));
+  const initialRequired = new Map(typeRequiredFields.map(field => [field, field.required]));
+  const normalizedDefault = normalizeVariantType(defaultType);
+  const update = () => {
+    const type = normalizeVariantType(select?.value || normalizedDefault);
+    if (select && select.value !== type) {
+      select.value = type;
+    }
+    groups.forEach(group => {
+      const types = (group.dataset.variantTypes || '')
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(normalizeVariantType);
+      group.hidden = types.length ? !types.includes(type) : false;
+    });
+    typeRequiredFields.forEach(field => {
+      const requiredFor = (field.dataset.typeRequired || '')
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(normalizeVariantType);
+      const defaultRequired = initialRequired.get(field) ?? field.required;
+      const shouldRequire = requiredFor.length ? requiredFor.includes(type) : defaultRequired;
+      field.required = shouldRequire;
+      const label = field.closest('label');
+      if (label) {
+        label.classList.toggle('required', shouldRequire);
+      }
+    });
+  };
+  if (select) {
+    select.addEventListener('change', update);
+  }
+  update();
+  return {
+    updateVariantTypeFields: update,
+    variantTypeSelect: select
+  };
 }
 
 function formatVariantGenomicRange(variant) {
@@ -1578,19 +1806,26 @@ function formatVariantTitle(variant) {
   if (!variant) return '';
   const type = normalizeVariantType(variant.variant_type);
   if (type === 'snv') {
-    const parts = [variant.gene, variant.hgvs_c, variant.hgvs_p].filter(Boolean);
+    const parts = [variant.gene, variant.hgvs_c, variant.hgvs_p, variant.rsid].filter(Boolean);
     if (parts.length) return parts.join(' · ');
   }
   const iscn = variant.iscn || variant.cytogenetic || '';
   const genomic = formatVariantGenomicRange(variant);
-  const subtype = variant.sv_subtype || variant.structural_type || variant.variant_subtype || '';
+  const subtype = getStructureTypeLabel(variant.sv_subtype || variant.structural_type || variant.variant_subtype || '');
   const affectedGenes = variant.affected_genes || variant.genes || '';
-  const parts = [];
-  if (iscn) parts.push(iscn);
-  if (genomic) parts.push(genomic);
-  if (subtype) parts.push(subtype);
-  if (affectedGenes) parts.push(affectedGenes);
-  if (parts.length) return parts.join(' · ');
+  const gene = variant.gene || variant.region || '';
+  const parts = [gene, iscn, genomic, subtype, affectedGenes, variant.rsid];
+  const seen = new Set();
+  const uniqueParts = parts
+    .map(part => (part == null ? '' : String(part).trim()))
+    .filter(part => {
+      if (!part) return false;
+      const key = part.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  if (uniqueParts.length) return uniqueParts.join(' · ');
   if (variant.description) return variant.description;
   return variant.gene || subtype || getVariantTypeLabel(type);
 }
@@ -1600,13 +1835,14 @@ function formatVariantDetailLines(variant) {
   const type = normalizeVariantType(variant.variant_type);
   const details = [];
   if (type !== 'snv') {
+    if (variant.gene) details.push(`Gen/region: ${variant.gene}`);
     const genomeBuild = variant.genome_build || '';
     const range = formatVariantGenomicRange(variant);
     if (genomeBuild || range) {
       const buildRange = [genomeBuild, range].filter(Boolean).join(' ');
       if (buildRange) details.push(`Genomisk position: ${buildRange}`);
     }
-    const subtype = variant.sv_subtype || variant.structural_type || variant.variant_subtype;
+    const subtype = getStructureTypeLabel(variant.sv_subtype || variant.structural_type || variant.variant_subtype);
     if (subtype) details.push(`Type: ${subtype}`);
     const cn = formatVariantCopyNumber(variant);
     if (cn) details.push(cn);
@@ -1614,6 +1850,9 @@ function formatVariantDetailLines(variant) {
     if (variant.affected_genes) details.push(`Berørte gener: ${variant.affected_genes}`);
     if (variant.iscn) details.push(`ISCN: ${variant.iscn}`);
   }
+  if (variant.hgvs_c) details.push(`HGVS c.: ${variant.hgvs_c}`);
+  if (variant.hgvs_p) details.push(`HGVS p.: ${variant.hgvs_p}`);
+  if (variant.rsid) details.push(`dbSNP: ${variant.rsid}`);
   if (variant.transcript) details.push(`Transkript: ${variant.transcript}`);
   if (variant.zygosity) details.push(`Zygositet: ${variant.zygosity}`);
   if (variant.classification) details.push(`ACMG-klasse: ${variant.classification}`);
@@ -1655,7 +1894,7 @@ function openVariantLibraryPicker(onSelect) {
         <p class="form-hint">Klik på en variant for at kopiere oplysningerne til formularen.</p>
         <table>
           <thead>
-            <tr><th>ID</th><th>Variant</th><th>Type</th><th>Genomisk position</th><th>Gen</th><th>HGVS c.</th><th>ISCN</th><th>Klasse</th><th>Kriterier</th></tr>
+            <tr><th>ID</th><th>Variant</th><th>Type</th><th>Genomisk position</th><th>Gen</th><th>HGVS c.</th><th>rsID</th><th>ISCN</th><th>Klasse</th><th>Kriterier</th></tr>
           </thead>
           <tbody></tbody>
         </table>
@@ -1695,6 +1934,7 @@ function openVariantLibraryPicker(onSelect) {
         item.transcript,
         item.hgvs_c,
         item.hgvs_p,
+        item.rsid,
         item.iscn,
         item.criteria,
         item.evidence,
@@ -1704,7 +1944,7 @@ function openVariantLibraryPicker(onSelect) {
       ].some(value => (value || '').toLowerCase().includes(term));
     });
     if (!filtered.length) {
-      tbody.innerHTML = '<tr><td colspan="9"><div class="variant-picker-empty">Ingen varianter matcher søgningen.</div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10"><div class="variant-picker-empty">Ingen varianter matcher søgningen.</div></td></tr>';
       return;
     }
     tbody.innerHTML = filtered.map(item => {
@@ -1719,6 +1959,7 @@ function openVariantLibraryPicker(onSelect) {
         <td>${esc(genomic)}</td>
         <td>${esc(item.gene || '')}</td>
         <td>${esc(item.hgvs_c || '')}</td>
+        <td>${formatRsIdCell(item.rsid)}</td>
         <td>${esc(item.iscn || '')}</td>
         <td>${esc(item.classification || '')}</td>
         <td>${esc(item.criteria || '')}</td>
@@ -2580,6 +2821,12 @@ function parseVarSeqVariants(text) {
     protein_change_hgvs: 'hgvs_p',
     protein: 'hgvs_p',
     hgvs_p: 'hgvs_p',
+    rsid: 'rsid',
+    dbsnp: 'rsid',
+    dbsnp_id: 'rsid',
+    dbsnpid: 'rsid',
+    dbsnp_rs: 'rsid',
+    rs_id: 'rsid',
     amino_acid_change: 'hgvs_p',
     effect: 'hgvs_p',
     protein_effect: 'hgvs_p',
@@ -2700,6 +2947,9 @@ function parseVarSeqVariants(text) {
         case 'hgvs_p':
           entry.hgvs_p = value;
           break;
+        case 'rsid':
+          entry.rsid = normalizeRsId(value);
+          break;
         case 'zygosity':
           entry.zygosity = value;
           break;
@@ -2739,7 +2989,7 @@ function parseVarSeqVariants(text) {
           entry.copy_number = value;
           break;
         case 'sv_subtype':
-          entry.sv_subtype = value;
+          entry.sv_subtype = normalizeStructureTypeValue(value);
           break;
         case 'size_bp':
           entry.size_bp = value;
@@ -3118,6 +3368,7 @@ function renderCreateCase(section) {
         <label class="inline">Transkript<input type="text" data-field="transcript" placeholder="NM_007294.3"></label>
         <label class="inline">HGVS c.<input type="text" data-field="hgvs_c" placeholder="c.5266dupC"></label>
         <label class="inline">HGVS p.<input type="text" data-field="hgvs_p" placeholder="p.(Gln1756Profs*74)"></label>
+        <label class="inline">dbSNP rsID<input type="text" data-field="rsid" placeholder="rs123456"></label>
         <label class="inline">Zygositet<input type="text" data-field="zygosity" placeholder="Heterozygot"></label>
       </div>
       <div class="variant-batch-group" data-variant-types="cnv sv cyto">
@@ -3126,7 +3377,7 @@ function renderCreateCase(section) {
         <label class="inline">Start<input type="text" data-field="start" placeholder="16287000"></label>
         <label class="inline">Slut<input type="text" data-field="end" placeholder="21100000"></label>
         <label class="inline">Kopital<input type="text" data-field="copy_number" placeholder="x1"></label>
-        <label class="inline">Varianttype<input type="text" data-field="sv_subtype" placeholder="Deletion"></label>
+        <label class="inline">Strukturtype<select data-field="sv_subtype" data-allow-legacy-option>${renderStructureTypeOptions({includeBlank: true})}</select></label>
         <label class="inline">Størrelse<input type="text" data-field="size_bp" placeholder="4.8 Mb"></label>
         <label class="inline wide">ISCN<textarea class="small" data-field="iscn" placeholder="arr[GRCh38] 17p11.2p12(16287000_21100000)x1"></textarea></label>
         <label class="inline wide">Berørte gener<textarea class="small" data-field="affected_genes" placeholder="RAI1; PMP22"></textarea></label>
@@ -3141,13 +3392,32 @@ function renderCreateCase(section) {
       <button type="button" class="secondary case-remove-row">Fjern</button>`;
     const setValue = (selector, value) => {
       const el = row.querySelector(selector);
-      if (el) el.value = value || '';
+      if (!el) return;
+      if (selector.includes('sv_subtype') && el.tagName === 'SELECT') {
+        const normalized = normalizeStructureTypeValue(value);
+        const asString = normalized ? String(normalized) : '';
+        if (el.dataset.allowLegacyOption !== undefined && asString && !Array.from(el.options).some(opt => opt.value === asString)) {
+          const opt = document.createElement('option');
+          opt.value = asString;
+          opt.textContent = getStructureTypeLabel(asString);
+          opt.dataset.legacy = 'true';
+          el.appendChild(opt);
+        }
+        el.value = asString;
+        return;
+      }
+      if (selector.includes('rsid')) {
+        el.value = normalizeRsId(value);
+        return;
+      }
+      el.value = value || '';
     };
     setValue('[data-field="variant_type"]', normalizeVariantType(values.variant_type));
     setValue('[data-field="gene"]', values.gene);
     setValue('[data-field="transcript"]', values.transcript);
     setValue('[data-field="hgvs_c"]', values.hgvs_c);
     setValue('[data-field="hgvs_p"]', values.hgvs_p);
+    setValue('[data-field="rsid"]', values.rsid);
     setValue('[data-field="zygosity"]', values.zygosity);
     setValue('[data-field="criteria"]', values.criteria);
     setValue('[data-field="genome_build"]', values.genome_build);
@@ -3195,6 +3465,7 @@ function renderCreateCase(section) {
         setValue('[data-field="transcript"]', variant.transcript);
         setValue('[data-field="hgvs_c"]', variant.hgvs_c);
         setValue('[data-field="hgvs_p"]', variant.hgvs_p);
+        setValue('[data-field="rsid"]', variant.rsid);
         setValue('[data-field="criteria"]', variant.criteria);
         setValue('[data-field="genome_build"]', variant.genome_build);
         setValue('[data-field="chromosome"]', variant.chromosome);
@@ -3220,6 +3491,10 @@ function renderCreateCase(section) {
     if (libraryBtn) setTooltip(libraryBtn, 'Vælg en variant fra biblioteket.');
     variantList.appendChild(row);
     applyButtonTooltips(row);
+    const rsidField = row.querySelector('[data-field="rsid"]');
+    if (rsidField) setTooltip(rsidField, tooltipCatalog.forms.variantForm.rsid);
+    const subtypeSelect = row.querySelector('[data-field="sv_subtype"]');
+    if (subtypeSelect) setTooltip(subtypeSelect, tooltipCatalog.forms.variantForm.sv_subtype);
   };
   const isVariantRowEmpty = row => {
     if (!row) return true;
@@ -3233,6 +3508,7 @@ function renderCreateCase(section) {
     const transcript = get('transcript');
     const hgvsC = get('hgvs_c');
     const hgvsP = get('hgvs_p');
+    const rsid = get('rsid');
     const zygosity = get('zygosity');
     const criteria = get('criteria');
     const af = get('af');
@@ -3248,7 +3524,7 @@ function renderCreateCase(section) {
     const iscn = get('iscn');
     const description = get('description');
     const affectedGenes = get('affected_genes');
-    return !gene && !transcript && !hgvsC && !hgvsP && !zygosity && !criteria && !af && !interpretation && !annotations && !genomeBuild && !chromosome && !start && !end && !copyNumber && !svSubtype && !sizeBp && !iscn && !description && !affectedGenes;
+    return !gene && !transcript && !hgvsC && !hgvsP && !rsid && !zygosity && !criteria && !af && !interpretation && !annotations && !genomeBuild && !chromosome && !start && !end && !copyNumber && !svSubtype && !sizeBp && !iscn && !description && !affectedGenes;
   };
   const removeEmptyVariantRows = () => {
     if (!variantList) return;
@@ -3446,6 +3722,7 @@ function renderCreateCase(section) {
         const transcript = row.querySelector('[data-field="transcript"]')?.value.trim() || '';
         const hgvsC = row.querySelector('[data-field="hgvs_c"]')?.value.trim() || '';
         const hgvsP = row.querySelector('[data-field="hgvs_p"]')?.value.trim() || '';
+        const rsid = row.querySelector('[data-field="rsid"]')?.value.trim() || '';
         const zygosity = row.querySelector('[data-field="zygosity"]')?.value.trim() || '';
         const classification = row.querySelector('[data-field="classification"]')?.value || '3';
         const criteria = row.querySelector('[data-field="criteria"]')?.value.trim() || '';
@@ -3457,12 +3734,12 @@ function renderCreateCase(section) {
         const start = row.querySelector('[data-field="start"]')?.value.trim() || '';
         const end = row.querySelector('[data-field="end"]')?.value.trim() || '';
         const copyNumber = row.querySelector('[data-field="copy_number"]')?.value.trim() || '';
-        const svSubtype = row.querySelector('[data-field="sv_subtype"]')?.value.trim() || '';
+        const svSubtype = normalizeStructureTypeValue(row.querySelector('[data-field="sv_subtype"]')?.value.trim() || '');
         const sizeBp = row.querySelector('[data-field="size_bp"]')?.value.trim() || '';
         const iscn = row.querySelector('[data-field="iscn"]')?.value.trim() || '';
         const description = row.querySelector('[data-field="description"]')?.value.trim() || '';
         const affectedGenes = row.querySelector('[data-field="affected_genes"]')?.value.trim() || '';
-        const isEmpty = !gene && !transcript && !hgvsC && !hgvsP && !zygosity && !criteria && !afRaw && !interpretation && !annotations && !genomeBuild && !chromosome && !start && !end && !copyNumber && !svSubtype && !sizeBp && !iscn && !description && !affectedGenes;
+        const isEmpty = !gene && !transcript && !hgvsC && !hgvsP && !rsid && !zygosity && !criteria && !afRaw && !interpretation && !annotations && !genomeBuild && !chromosome && !start && !end && !copyNumber && !svSubtype && !sizeBp && !iscn && !description && !affectedGenes;
         if (isEmpty) continue;
         if (variantType === 'snv') {
           if (!gene) {
@@ -3487,6 +3764,7 @@ function renderCreateCase(section) {
           transcript,
           hgvs_c: hgvsC,
           hgvs_p: hgvsP,
+          rsid: normalizeRsId(rsid),
           zygosity,
           classification: String(classification || '3'),
           criteria,
@@ -3696,7 +3974,10 @@ function fillForm(form, record) {
     if (!(el.name in record)) {
       return;
     }
-    const value = record[el.name];
+    let value = record[el.name];
+    if (el.name === 'sv_subtype') {
+      value = normalizeStructureTypeValue(value);
+    }
     if (el.type === 'checkbox') {
       el.checked = Boolean(value);
       return;
@@ -3717,7 +3998,7 @@ function fillForm(form, record) {
       if (el.dataset.allowLegacyOption !== undefined && asString && !Array.from(el.options).some(opt => opt.value === asString)) {
         const opt = document.createElement('option');
         opt.value = asString;
-        opt.textContent = asString;
+        opt.textContent = el.name === 'sv_subtype' ? getStructureTypeLabel(asString) : asString;
         opt.dataset.legacy = 'true';
         el.appendChild(opt);
       }
@@ -4618,6 +4899,7 @@ function renderVariants(section) {
             <label>Ordination<input type="search" data-filter-variants="order" placeholder="Ordinations-ID"></label>
             <label>Gen<input type="search" data-filter-variants="gene" placeholder="Gen"></label>
             <label>Transkript<input type="search" data-filter-variants="transcript" placeholder="RefSeq/ENST"></label>
+            <label>rsID<input type="search" data-filter-variants="rsid" placeholder="rs123456"></label>
             <label>ACMG<input type="search" data-filter-variants="classification" placeholder="1-5"></label>
             <label>Kriterier<input type="search" data-filter-variants="criteria" placeholder="PM1,PP3..."></label>
             <label>Varianttype
@@ -4630,7 +4912,7 @@ function renderVariants(section) {
             <label>Kromosom<input type="search" data-filter-variants="chromosome" placeholder="Chr/arm"></label>
           </div>
         </details>
-        <table><thead><tr><th>ID</th><th>Ordination</th><th>Variant</th><th>Type</th><th>Klasse</th><th>Kriterier</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
+        <table><thead><tr><th>ID</th><th>Ordination</th><th>Variant</th><th>rsID</th><th>Type</th><th>Klasse</th><th>Kriterier</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
           <button type="button" class="secondary" id="variantsExport">Eksportér filtrerede varianter</button>
         </div>
@@ -4658,6 +4940,7 @@ function renderVariants(section) {
             <label>Transkript<input name="transcript" data-type-required="snv"></label>
             <label>HGVS c.<input name="hgvs_c" data-type-required="snv"></label>
             <label>HGVS p.<input name="hgvs_p"></label>
+            <label>dbSNP rsID<input name="rsid" placeholder="rs123456"></label>
             <label>Zygositet<input name="zygosity"></label>
           </div>
           <div class="variant-field-group" data-variant-types="cnv sv cyto">
@@ -4667,7 +4950,7 @@ function renderVariants(section) {
               <label>Start<input name="start"></label>
               <label>Slut<input name="end"></label>
               <label>Kopital<input name="copy_number"></label>
-              <label>Varianttype<input name="sv_subtype"></label>
+              <label>Strukturtype<select name="sv_subtype" data-allow-legacy-option>${renderStructureTypeOptions({includeBlank: true})}</select></label>
               <label>Størrelse<input name="size_bp"></label>
             </div>
             <label>ISCN<input name="iscn"></label>
@@ -4719,35 +5002,7 @@ function renderVariants(section) {
   const saveButton = form.querySelector('#variantSave');
   const saveNewButton = form.querySelector('#variantSaveNew');
   const defaultSaveLabel = saveButton?.textContent || 'Gem';
-  const variantTypeSelect = form.elements.variant_type;
-  const variantGroups = form.querySelectorAll('.variant-field-group');
-  const typeRequiredFields = form.querySelectorAll('[data-type-required]');
-  const updateVariantTypeFields = () => {
-    const type = normalizeVariantType(variantTypeSelect?.value);
-    if (variantTypeSelect && !variantTypeSelect.value) {
-      variantTypeSelect.value = type;
-    }
-    variantGroups.forEach(group => {
-      const types = (group.dataset.variantTypes || '').split(/\s+/).filter(Boolean).map(normalizeVariantType);
-      const show = !types.length || types.includes(type);
-      group.hidden = !show;
-    });
-    typeRequiredFields.forEach(field => {
-      const requiredFor = (field.dataset.typeRequired || '').split(/\s+/).filter(Boolean).map(normalizeVariantType);
-      const shouldRequire = requiredFor.length ? requiredFor.includes(type) : field.required;
-      field.required = shouldRequire;
-      const label = field.closest('label');
-      if (label) {
-        if (shouldRequire) {
-          label.classList.add('required');
-        } else {
-          label.classList.remove('required');
-        }
-      }
-    });
-  };
-  updateVariantTypeFields();
-  variantTypeSelect?.addEventListener('change', updateVariantTypeFields);
+  const {updateVariantTypeFields, variantTypeSelect} = setupVariantTypeForm(form);
   const batchList = section.querySelector('#variantBatchList');
   const batchAddBtn = section.querySelector('#variantBatchAdd');
   const batchImportBtn = section.querySelector('#variantBatchImport');
@@ -4775,6 +5030,7 @@ function renderVariants(section) {
         <label class="inline">Transkript<input type="text" data-field="transcript" placeholder="NM_007294.3"></label>
         <label class="inline">HGVS c.<input type="text" data-field="hgvs_c" placeholder="c.5266dupC"></label>
         <label class="inline">HGVS p.<input type="text" data-field="hgvs_p" placeholder="p.(Gln1756Profs*74)"></label>
+        <label class="inline">dbSNP rsID<input type="text" data-field="rsid" placeholder="rs123456"></label>
         <label class="inline">Zygositet<input type="text" data-field="zygosity" placeholder="Heterozygot"></label>
       </div>
       <div class="variant-batch-group" data-variant-types="cnv sv cyto">
@@ -4783,7 +5039,7 @@ function renderVariants(section) {
         <label class="inline">Start<input type="text" data-field="start" placeholder="16287000"></label>
         <label class="inline">Slut<input type="text" data-field="end" placeholder="21100000"></label>
         <label class="inline">Kopital<input type="text" data-field="copy_number" placeholder="x1"></label>
-        <label class="inline">Varianttype<input type="text" data-field="sv_subtype" placeholder="Deletion"></label>
+        <label class="inline">Strukturtype<select data-field="sv_subtype" data-allow-legacy-option>${renderStructureTypeOptions({includeBlank: true})}</select></label>
         <label class="inline">Størrelse<input type="text" data-field="size_bp" placeholder="4.8 Mb"></label>
         <label class="inline wide">ISCN<textarea class="small" data-field="iscn" placeholder="arr[GRCh38] 17p11.2p12(16287000_21100000)x1"></textarea></label>
         <label class="inline wide">Berørte gener<textarea class="small" data-field="affected_genes" placeholder="RAI1; PMP22"></textarea></label>
@@ -4798,7 +5054,21 @@ function renderVariants(section) {
       <button type="button" class="secondary case-remove-row">Fjern</button>`;
     const setValue = (selector, value) => {
       const el = row.querySelector(selector);
-      if (el) el.value = value || '';
+      if (!el) return;
+      if (selector.includes('sv_subtype') && el.tagName === 'SELECT') {
+        const normalized = normalizeStructureTypeValue(value);
+        const asString = normalized ? String(normalized) : '';
+        if (el.dataset.allowLegacyOption !== undefined && asString && !Array.from(el.options).some(opt => opt.value === asString)) {
+          const opt = document.createElement('option');
+          opt.value = asString;
+          opt.textContent = getStructureTypeLabel(asString);
+          opt.dataset.legacy = 'true';
+          el.appendChild(opt);
+        }
+        el.value = asString;
+        return;
+      }
+      el.value = value || '';
     };
     setValue('[data-field="variant_type"]', normalizeVariantType(values.variant_type));
     setValue('[data-field="gene"]', values.gene);
@@ -4877,6 +5147,10 @@ function renderVariants(section) {
     if (libraryBtn) setTooltip(libraryBtn, 'Vælg en variant fra biblioteket.');
     batchList.appendChild(row);
     applyButtonTooltips(row);
+    const rsidField = row.querySelector('[data-field="rsid"]');
+    if (rsidField) setTooltip(rsidField, tooltipCatalog.forms.variantForm.rsid);
+    const subtypeSelect = row.querySelector('[data-field="sv_subtype"]');
+    if (subtypeSelect) setTooltip(subtypeSelect, tooltipCatalog.forms.variantForm.sv_subtype);
   };
   const getBatchValue = (row, field) => {
     const el = row?.querySelector(`[data-field="${field}"]`);
@@ -4889,6 +5163,7 @@ function renderVariants(section) {
     const transcript = getBatchValue(row, 'transcript');
     const hgvsC = getBatchValue(row, 'hgvs_c');
     const hgvsP = getBatchValue(row, 'hgvs_p');
+    const rsid = getBatchValue(row, 'rsid');
     const zygosity = getBatchValue(row, 'zygosity');
     const criteria = getBatchValue(row, 'criteria');
     const af = getBatchValue(row, 'af');
@@ -4904,7 +5179,7 @@ function renderVariants(section) {
     const iscn = getBatchValue(row, 'iscn');
     const description = getBatchValue(row, 'description');
     const affectedGenes = getBatchValue(row, 'affected_genes');
-    return !gene && !transcript && !hgvsC && !hgvsP && !zygosity && !criteria && !af && !interpretation && !annotations && !genomeBuild && !chromosome && !start && !end && !copyNumber && !svSubtype && !sizeBp && !iscn && !description && !affectedGenes;
+    return !gene && !transcript && !hgvsC && !hgvsP && !rsid && !zygosity && !criteria && !af && !interpretation && !annotations && !genomeBuild && !chromosome && !start && !end && !copyNumber && !svSubtype && !sizeBp && !iscn && !description && !affectedGenes;
   };
   const collectBatchVariants = () => {
     if (!batchList) return [];
@@ -4916,6 +5191,7 @@ function renderVariants(section) {
       const transcript = getBatchValue(row, 'transcript');
       const hgvsC = getBatchValue(row, 'hgvs_c');
       const hgvsP = getBatchValue(row, 'hgvs_p');
+      const rsid = getBatchValue(row, 'rsid');
       const zygosity = getBatchValue(row, 'zygosity');
       const criteria = getBatchValue(row, 'criteria');
       const afRaw = getBatchValue(row, 'af');
@@ -4926,13 +5202,13 @@ function renderVariants(section) {
       const start = getBatchValue(row, 'start');
       const end = getBatchValue(row, 'end');
       const copyNumber = getBatchValue(row, 'copy_number');
-      const svSubtype = getBatchValue(row, 'sv_subtype');
+      const svSubtype = normalizeStructureTypeValue(getBatchValue(row, 'sv_subtype'));
       const sizeBp = getBatchValue(row, 'size_bp');
       const iscn = getBatchValue(row, 'iscn');
       const description = getBatchValue(row, 'description');
       const affectedGenes = getBatchValue(row, 'affected_genes');
       const classification = row.querySelector('[data-field="classification"]')?.value || '3';
-      const isEmpty = !gene && !transcript && !hgvsC && !hgvsP && !zygosity && !criteria && !afRaw && !interpretation && !annotations && !genomeBuild && !chromosome && !start && !end && !copyNumber && !svSubtype && !sizeBp && !iscn && !description && !affectedGenes;
+      const isEmpty = !gene && !transcript && !hgvsC && !hgvsP && !rsid && !zygosity && !criteria && !afRaw && !interpretation && !annotations && !genomeBuild && !chromosome && !start && !end && !copyNumber && !svSubtype && !sizeBp && !iscn && !description && !affectedGenes;
       if (isEmpty) return;
       if (variantType === 'snv') {
         if (!gene) {
@@ -4953,6 +5229,7 @@ function renderVariants(section) {
         transcript,
         hgvs_c: hgvsC,
         hgvs_p: hgvsP,
+        rsid: normalizeRsId(rsid),
         zygosity,
         classification: String(classification || '3'),
         criteria,
@@ -5018,6 +5295,7 @@ function renderVariants(section) {
     order: section.querySelector('[data-filter-variants="order"]'),
     gene: section.querySelector('[data-filter-variants="gene"]'),
     transcript: section.querySelector('[data-filter-variants="transcript"]'),
+    rsid: section.querySelector('[data-filter-variants="rsid"]'),
     classification: section.querySelector('[data-filter-variants="classification"]'),
     criteria: section.querySelector('[data-filter-variants="criteria"]'),
     variant_type: section.querySelector('[data-filter-variants="variant_type"]'),
@@ -5040,6 +5318,7 @@ function renderVariants(section) {
       order: filterInputs.order?.value.trim().toLowerCase() || '',
       gene: filterInputs.gene?.value.trim().toLowerCase() || '',
       transcript: filterInputs.transcript?.value.trim().toLowerCase() || '',
+      rsid: filterInputs.rsid?.value.trim().toLowerCase() || '',
       classification: filterInputs.classification?.value.trim().toLowerCase() || '',
       criteria: filterInputs.criteria?.value.trim().toLowerCase() || '',
       variant_type: filterInputs.variant_type?.value.trim().toLowerCase() || '',
@@ -5057,10 +5336,12 @@ function renderVariants(section) {
         v.transcript,
         v.hgvs_c,
         v.hgvs_p,
+        v.rsid,
         v.criteria,
         v.zygosity,
         v.iscn,
         v.chromosome,
+        getStructureTypeLabel(v.sv_subtype),
         v.description,
         v.affected_genes,
         formatVariantGenomicRange(v),
@@ -5074,6 +5355,7 @@ function renderVariants(section) {
       if (filters.order && !(String(v.order_id || '')).toLowerCase().includes(filters.order)) return false;
       if (filters.gene && !(v.gene || '').toLowerCase().includes(filters.gene)) return false;
       if (filters.transcript && !(v.transcript || '').toLowerCase().includes(filters.transcript)) return false;
+      if (filters.rsid && !(v.rsid || '').toLowerCase().includes(filters.rsid)) return false;
       if (filters.classification && !(String(v.classification || '')).toLowerCase().includes(filters.classification)) return false;
       if (filters.criteria && !(v.criteria || '').toLowerCase().includes(filters.criteria)) return false;
       if (filters.variant_type && normalizeVariantType(v.variant_type) !== normalizeVariantType(filters.variant_type)) return false;
@@ -5092,7 +5374,7 @@ function renderVariants(section) {
       const selectedAttr = v.id === selectedVariantId ? ' data-selected="true"' : '';
       const title = formatVariantTitle(v);
       const typeLabel = getVariantTypeLabel(v.variant_type);
-      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td>${v.order_id}</td><td>${esc(title)}</td><td>${esc(typeLabel)}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(createdBy)}</td></tr>`;
+      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td>${v.order_id}</td><td>${esc(title)}</td><td>${formatRsIdCell(v.rsid)}</td><td>${esc(typeLabel)}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -5212,6 +5494,14 @@ function renderVariants(section) {
     if (!ensureWrite('variants')) return;
     const action = e.submitter?.dataset.action || 'save';
     const data = Object.fromEntries(new FormData(form).entries());
+    Object.keys(data).forEach(key => {
+      if (typeof data[key] === 'string') {
+        data[key] = data[key].trim();
+      }
+    });
+    data.variant_type = normalizeVariantType(data.variant_type);
+    data.rsid = normalizeRsId(data.rsid);
+    data.sv_subtype = normalizeStructureTypeValue(data.sv_subtype);
     data.order_id = Number(data.order_id);
     data.classification = String(data.classification);
     if (data.af) data.af = Number(data.af);
@@ -5246,6 +5536,7 @@ function renderVariants(section) {
       if (form.elements.transcript) form.elements.transcript.value = variant.transcript || '';
       if (form.elements.hgvs_c) form.elements.hgvs_c.value = variant.hgvs_c || '';
       if (form.elements.hgvs_p) form.elements.hgvs_p.value = variant.hgvs_p || '';
+      if (form.elements.rsid) form.elements.rsid.value = variant.rsid || '';
       if (form.elements.criteria) form.elements.criteria.value = variant.criteria || '';
       if (form.elements.genome_build) form.elements.genome_build.value = variant.genome_build || '';
       if (form.elements.chromosome) form.elements.chromosome.value = variant.chromosome || '';
@@ -5288,7 +5579,13 @@ function renderVariants(section) {
   section.querySelector('#variantToLibrary').addEventListener('click', async () => {
     if (!ensureWrite('variant_library')) return;
     const data = Object.fromEntries(new FormData(form).entries());
+    Object.keys(data).forEach(key => {
+      if (typeof data[key] === 'string') {
+        data[key] = data[key].trim();
+      }
+    });
     data.variant_type = normalizeVariantType(data.variant_type);
+    data.rsid = normalizeRsId(data.rsid);
     if (!data.gene && !data.hgvs_c && !data.hgvs_p && !data.iscn && !data.description) {
       return alert('Udfyld mindst ét kendetegn (gen, HGVS eller ISCN).');
     }
@@ -5301,6 +5598,7 @@ function renderVariants(section) {
       transcript: data.transcript,
       hgvs_c: data.hgvs_c,
       hgvs_p: data.hgvs_p,
+      rsid: data.rsid,
       classification: String(data.classification || ''),
       criteria: data.criteria,
       evidence: evidenceParts.join('\n').trim(),
@@ -5348,6 +5646,7 @@ function renderVariantLibrary(section) {
             <label>Transkript<input type="search" data-filter-library="transcript" placeholder="RefSeq/ENST"></label>
             <label>HGVS c.<input type="search" data-filter-library="hgvs_c" placeholder="c."></label>
             <label>HGVS p.<input type="search" data-filter-library="hgvs_p" placeholder="p."></label>
+            <label>rsID<input type="search" data-filter-library="rsid" placeholder="rs123456"></label>
             <label>Klasse<input type="search" data-filter-library="classification" placeholder="1-5/VUS"></label>
             <label>Kriterier<input type="search" data-filter-library="criteria" placeholder="PM1,PP3..."></label>
             <label>Varianttype
@@ -5375,7 +5674,7 @@ function renderVariantLibrary(section) {
         </details>
         <table>
           <thead>
-            <tr><th>ID</th><th>Variant</th><th>Type</th><th>Genomisk position</th><th>HGVS c.</th><th>HGVS p.</th><th>Klasse</th><th>Kriterier</th><th>ISCN</th><th>Tilstand</th><th>Nedarvning</th><th>Kurateret af</th><th>Sidst gennemgået</th></tr>
+            <tr><th>ID</th><th>Variant</th><th>Type</th><th>Genomisk position</th><th>HGVS c.</th><th>HGVS p.</th><th>rsID</th><th>Klasse</th><th>Kriterier</th><th>ISCN</th><th>Tilstand</th><th>Nedarvning</th><th>Kurateret af</th><th>Sidst gennemgået</th></tr>
           </thead>
           <tbody></tbody>
         </table>
@@ -5399,6 +5698,7 @@ function renderVariantLibrary(section) {
             <label>Transkript<input name="transcript"></label>
             <label>HGVS c.<input name="hgvs_c"></label>
             <label>HGVS p.<input name="hgvs_p"></label>
+            <label>dbSNP rsID<input name="rsid" placeholder="rs123456"></label>
           </div>
           <div class="variant-field-group" data-variant-types="cnv sv cyto">
             <div class="variant-structure-grid">
@@ -5407,7 +5707,7 @@ function renderVariantLibrary(section) {
               <label>Start<input name="start"></label>
               <label>Slut<input name="end"></label>
               <label>Kopital<input name="copy_number"></label>
-              <label>Varianttype<input name="sv_subtype"></label>
+              <label>Strukturtype<select name="sv_subtype" data-allow-legacy-option>${renderStructureTypeOptions({includeBlank: true})}</select></label>
               <label>Størrelse<input name="size_bp"></label>
             </div>
             <label>ISCN<input name="iscn"></label>
@@ -5442,28 +5742,34 @@ function renderVariantLibrary(section) {
   const importButton = section.querySelector('#libraryImportCsv');
   const importInput = section.querySelector('#variantLibraryImportInput');
   const defaultSaveLabel = saveButton?.textContent || 'Gem';
+  const {updateVariantTypeFields, variantTypeSelect} = setupVariantTypeForm(form);
   const csvColumns = [
     {key: 'id', label: 'ID'},
+    {label: 'Varianttitel', value: entry => formatVariantTitle(entry) || ''},
     {key: 'gene', label: 'Gen'},
     {key: 'transcript', label: 'Transkript'},
     {key: 'hgvs_c', label: 'HGVS c.'},
     {key: 'hgvs_p', label: 'HGVS p.'},
-    {key: 'variant_type', label: 'Varianttype'},
+    {key: 'rsid', label: 'rsID'},
+    {key: 'variant_type', label: 'Varianttype (kode)'},
+    {label: 'Varianttype', value: entry => getVariantTypeLabel(entry.variant_type) || ''},
     {key: 'classification', label: 'Klasse'},
     {key: 'criteria', label: 'Kriterier'},
+    {key: 'evidence', label: 'Evidens'},
+    {key: 'condition', label: 'Tilstand'},
+    {key: 'inheritance', label: 'Nedarvning'},
+    {label: 'Genomisk position', value: entry => formatVariantGenomicRange(entry) || ''},
     {key: 'genome_build', label: 'Genom'},
     {key: 'chromosome', label: 'Kromosom'},
     {key: 'start', label: 'Start'},
     {key: 'end', label: 'Slut'},
     {key: 'copy_number', label: 'Kopital'},
-    {key: 'sv_subtype', label: 'SV-type'},
+    {key: 'sv_subtype', label: 'Strukturtype (kode)'},
+    {label: 'Strukturtype', value: entry => getStructureTypeLabel(entry.sv_subtype) || ''},
     {key: 'size_bp', label: 'Størrelse'},
     {key: 'iscn', label: 'ISCN'},
     {key: 'description', label: 'Beskrivelse'},
     {key: 'affected_genes', label: 'Berørte gener'},
-    {key: 'condition', label: 'Tilstand'},
-    {key: 'inheritance', label: 'Nedarvning'},
-    {key: 'evidence', label: 'Evidens'},
     {key: 'curated_by', label: 'Kurateret af'},
     {key: 'last_review', label: 'Sidst gennemgået'},
     {key: 'created_at', label: 'Oprettet'},
@@ -5481,6 +5787,7 @@ function renderVariantLibrary(section) {
     transcript: section.querySelector('[data-filter-library="transcript"]'),
     hgvs_c: section.querySelector('[data-filter-library="hgvs_c"]'),
     hgvs_p: section.querySelector('[data-filter-library="hgvs_p"]'),
+    rsid: section.querySelector('[data-filter-library="rsid"]'),
     classification: section.querySelector('[data-filter-library="classification"]'),
     criteria: section.querySelector('[data-filter-library="criteria"]'),
     variant_type: section.querySelector('[data-filter-library="variant_type"]'),
@@ -5523,6 +5830,7 @@ function renderVariantLibrary(section) {
       transcript: filterInputs.transcript?.value.trim().toLowerCase() || '',
       hgvs_c: filterInputs.hgvs_c?.value.trim().toLowerCase() || '',
       hgvs_p: filterInputs.hgvs_p?.value.trim().toLowerCase() || '',
+      rsid: filterInputs.rsid?.value.trim().toLowerCase() || '',
       classification: filterInputs.classification?.value.trim().toLowerCase() || '',
       criteria: filterInputs.criteria?.value.trim().toLowerCase() || '',
       variant_type: filterInputs.variant_type?.value.trim().toLowerCase() || '',
@@ -5553,6 +5861,7 @@ function renderVariantLibrary(section) {
         v.transcript,
         v.hgvs_c,
         v.hgvs_p,
+        v.rsid,
         v.classification,
         v.criteria,
         v.condition,
@@ -5566,6 +5875,7 @@ function renderVariantLibrary(section) {
         v.end,
         v.copy_number,
         v.sv_subtype,
+        getStructureTypeLabel(v.sv_subtype),
         v.size_bp,
         v.description,
         v.affected_genes,
@@ -5578,6 +5888,7 @@ function renderVariantLibrary(section) {
       if (filters.transcript && !(v.transcript || '').toLowerCase().includes(filters.transcript)) return false;
       if (filters.hgvs_c && !(v.hgvs_c || '').toLowerCase().includes(filters.hgvs_c)) return false;
       if (filters.hgvs_p && !(v.hgvs_p || '').toLowerCase().includes(filters.hgvs_p)) return false;
+      if (filters.rsid && !(v.rsid || '').toLowerCase().includes(filters.rsid)) return false;
       if (filters.classification && !(String(v.classification || '')).toLowerCase().includes(filters.classification)) return false;
       if (filters.criteria && !(v.criteria || '').toLowerCase().includes(filters.criteria)) return false;
       if (filters.variant_type && normalizeVariantType(v.variant_type) !== normalizeVariantType(filters.variant_type)) return false;
@@ -5586,7 +5897,11 @@ function renderVariantLibrary(section) {
       if (filters.genome_build && !(v.genome_build || '').toLowerCase().includes(filters.genome_build)) return false;
       if (filters.start && !(v.start || '').toLowerCase().includes(filters.start)) return false;
       if (filters.end && !(v.end || '').toLowerCase().includes(filters.end)) return false;
-      if (filters.sv_subtype && !(v.sv_subtype || '').toLowerCase().includes(filters.sv_subtype)) return false;
+      if (filters.sv_subtype) {
+        const subtypeValue = (v.sv_subtype || '').toLowerCase();
+        const subtypeLabel = getStructureTypeLabel(v.sv_subtype || '').toLowerCase();
+        if (!subtypeValue.includes(filters.sv_subtype) && !subtypeLabel.includes(filters.sv_subtype)) return false;
+      }
       if (filters.copy_number && !(v.copy_number || '').toLowerCase().includes(filters.copy_number)) return false;
       if (filters.size_bp && !(v.size_bp || '').toLowerCase().includes(filters.size_bp)) return false;
       if (filters.condition && !(v.condition || '').toLowerCase().includes(filters.condition)) return false;
@@ -5611,7 +5926,7 @@ function renderVariantLibrary(section) {
       selectedId = null;
     }
     if (!filteredLibrary.length) {
-      tbody.innerHTML = `<tr><td colspan="13">Ingen poster matcher filtreringen.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="14">Ingen poster matcher filtreringen.</td></tr>`;
       annotateTableCells(section);
       return;
     }
@@ -5621,7 +5936,7 @@ function renderVariantLibrary(section) {
       const title = formatVariantTitle(v);
       const typeLabel = getVariantTypeLabel(v.variant_type);
       const genomic = formatVariantGenomicRange(v);
-      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td>${esc(title)}</td><td>${esc(typeLabel)}</td><td>${esc(genomic)}</td><td>${esc(v.hgvs_c || '')}</td><td>${esc(v.hgvs_p || '')}</td><td>${esc(v.classification || '')}</td><td>${esc(v.criteria || '')}</td><td>${esc(v.iscn || '')}</td><td>${esc(v.condition || '')}</td><td>${esc(v.inheritance || '')}</td><td>${esc(v.curated_by || '')}</td><td>${esc(lastReview)}</td></tr>`;
+      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td>${esc(title)}</td><td>${esc(typeLabel)}</td><td>${esc(genomic)}</td><td>${esc(v.hgvs_c || '')}</td><td>${esc(v.hgvs_p || '')}</td><td>${formatRsIdCell(v.rsid)}</td><td>${esc(v.classification || '')}</td><td>${esc(v.criteria || '')}</td><td>${esc(v.iscn || '')}</td><td>${esc(v.condition || '')}</td><td>${esc(v.inheritance || '')}</td><td>${esc(v.curated_by || '')}</td><td>${esc(lastReview)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -5673,7 +5988,9 @@ function renderVariantLibrary(section) {
         data[key] = data[key].trim();
       }
     });
+    data.rsid = normalizeRsId(data.rsid);
     data.variant_type = normalizeVariantType(data.variant_type);
+    data.sv_subtype = normalizeStructureTypeValue(data.sv_subtype);
     const editingId = Number(form.dataset.editingId || data.id || 0);
     const creatingNew = submitterAction === 'create' || !editingId;
     const payload = {
@@ -5682,6 +5999,7 @@ function renderVariantLibrary(section) {
       transcript: data.transcript || '',
       hgvs_c: data.hgvs_c || '',
       hgvs_p: data.hgvs_p || '',
+      rsid: data.rsid || '',
       classification: data.classification || '',
       criteria: data.criteria || '',
       genome_build: data.genome_build || '',
@@ -5741,7 +6059,8 @@ function renderVariantLibrary(section) {
   exportButton?.addEventListener('click', () => {
     const exportRows = filteredLibrary.map(entry => ({
       ...entry,
-      variant_type: normalizeVariantType(entry.variant_type)
+      variant_type: normalizeVariantType(entry.variant_type),
+      sv_subtype: normalizeStructureTypeValue(entry.sv_subtype)
     }));
     const filename = downloadCsvFile(exportRows, csvColumns, 'glimr-variantbibliotek.csv');
     setStatus(`Eksporterede ${filteredLibrary.length} biblioteksposter til ${filename}.`);
@@ -5768,8 +6087,16 @@ function renderVariantLibrary(section) {
         hgvs_c_: 'hgvs_c',
         hgvs: 'hgvs_c',
         hgvs_p: 'hgvs_p',
+        rsid: 'rsid',
+        dbsnp: 'rsid',
+        dbsnp_id: 'rsid',
+        dbsnpid: 'rsid',
+        dbsnp_rs: 'rsid',
+        rs_id: 'rsid',
         variant_type: 'variant_type',
         varianttype: 'variant_type',
+        varianttypekode: 'variant_type',
+        varianttype_kode: 'variant_type',
         type: 'variant_type',
         klassifikation: 'classification',
         classification: 'classification',
@@ -5807,6 +6134,9 @@ function renderVariantLibrary(section) {
         cn: 'copy_number',
         sv_subtype: 'sv_subtype',
         svtype: 'sv_subtype',
+        strukturtype: 'sv_subtype',
+        strukturtypekode: 'sv_subtype',
+        strukturtype_kode: 'sv_subtype',
         variant_subtype: 'sv_subtype',
         structuraltype: 'sv_subtype',
         size: 'size_bp',
@@ -5841,7 +6171,16 @@ function renderVariantLibrary(section) {
         const entry = {};
         columnKeys.forEach((key, idx) => {
           if (!key) return;
-          entry[key] = (rowValues[idx] || '').trim();
+          const raw = (rowValues[idx] || '').trim();
+          if (key === 'rsid') {
+            entry.rsid = normalizeRsId(raw);
+            return;
+          }
+          if (key === 'sv_subtype') {
+            entry.sv_subtype = normalizeStructureTypeValue(raw);
+            return;
+          }
+          entry[key] = raw;
         });
         entry.variant_type = normalizeVariantType(entry.variant_type);
         let id = null;
@@ -5912,6 +6251,7 @@ function snapshotVariant(variant) {
     transcript: variant.transcript || '',
     hgvs_c: variant.hgvs_c || '',
     hgvs_p: variant.hgvs_p || '',
+    rsid: normalizeRsId(variant.rsid || variant.rs_id || ''),
     zygosity: variant.zygosity || '',
     classification: variant.classification || '',
     criteria: variant.criteria || '',
@@ -5923,7 +6263,7 @@ function snapshotVariant(variant) {
     start: variant.start || '',
     end: variant.end || '',
     copy_number: variant.copy_number || '',
-    sv_subtype: variant.sv_subtype || variant.structural_type || '',
+    sv_subtype: normalizeStructureTypeValue(variant.sv_subtype || variant.structural_type || ''),
     size_bp: variant.size_bp || '',
     iscn: variant.iscn || variant.cytogenetic || '',
     description: variant.description || '',
@@ -5979,7 +6319,11 @@ function describeVariantNarrative(variant) {
   if (variant.criteria) summaryParts.push(`ACMG: ${variant.criteria}`);
   if (variant.af !== undefined && variant.af !== null && variant.af !== '') summaryParts.push(`AF: ${variant.af}`);
   if (variant.zygosity) summaryParts.push(`Zygositet: ${variant.zygosity}`);
+  const subtypeLabel = getStructureTypeLabel(variant.sv_subtype || variant.structural_type || '');
+  if (subtypeLabel) summaryParts.push(`Type: ${subtypeLabel}`);
   if (variant.copy_number) summaryParts.push(`Kopital: ${variant.copy_number}`);
+  if (variant.size_bp) summaryParts.push(`Størrelse: ${variant.size_bp}`);
+  if (variant.affected_genes) summaryParts.push(`Berørte gener: ${variant.affected_genes}`);
   if (variant.iscn) summaryParts.push(`ISCN: ${variant.iscn}`);
   const genomic = formatVariantGenomicRange(variant);
   if (genomic) summaryParts.push(`Position: ${genomic}`);
@@ -6488,7 +6832,7 @@ function renderReports(section) {
     const iscnList = joinUnique(variants.map(v => v.iscn));
     const genomicList = joinUnique(variants.map(v => formatVariantGenomicRange(v)));
     const copyNumberList = joinUnique(variants.map(v => v.copy_number));
-    const subtypeList = joinUnique(variants.map(v => v.sv_subtype));
+    const subtypeList = joinUnique(variants.map(v => getStructureTypeLabel(v.sv_subtype || v.structural_type || '')));
     const annotationsText = joinUniqueParagraphs(variants.map(v => v.annotations));
     const interpretationText = joinUniqueParagraphs(variants.map(v => v.interpretation));
     const descriptionText = joinUniqueParagraphs(variants.map(v => v.description));
@@ -6532,7 +6876,7 @@ function renderReports(section) {
       add(['VariantISCN', 'Variant1ISCN'], firstVariant.iscn || '');
       add(['VariantGenomiskPosition', 'Variant1GenomiskPosition'], formatVariantGenomicRange(firstVariant));
       add(['VariantKopital', 'Variant1Kopital'], firstVariant.copy_number || '');
-      add(['VariantStrukturType', 'Variant1StrukturType', 'Variant1Subtype'], firstVariant.sv_subtype || '');
+      add(['VariantStrukturType', 'Variant1StrukturType', 'Variant1Subtype'], getStructureTypeLabel(firstVariant.sv_subtype || firstVariant.structural_type || ''));
       add(['VariantBeskrivelse', 'Variant1Beskrivelse'], firstVariant.description || '');
       add(['VariantBerørteGener', 'Variant1BerørteGener', 'Variant1AffectedGenes'], firstVariant.affected_genes || '');
     }
@@ -6553,7 +6897,7 @@ function renderReports(section) {
       add([`${prefix}ISCN`, `${prefix}.ISCN`], variant.iscn || '');
       add([`${prefix}GenomiskPosition`, `${prefix}.GenomiskPosition`], formatVariantGenomicRange(variant));
       add([`${prefix}Kopital`, `${prefix}.Kopital`], variant.copy_number || '');
-      add([`${prefix}StrukturType`, `${prefix}.StrukturType`, `${prefix}Subtype`, `${prefix}.Subtype`], variant.sv_subtype || '');
+      add([`${prefix}StrukturType`, `${prefix}.StrukturType`, `${prefix}Subtype`, `${prefix}.Subtype`], getStructureTypeLabel(variant.sv_subtype || variant.structural_type || ''));
       add([`${prefix}Beskrivelse`, `${prefix}.Beskrivelse`], variant.description || '');
       add([`${prefix}BerørteGener`, `${prefix}.BerørteGener`, `${prefix}AffectedGenes`, `${prefix}.AffectedGenes`], variant.affected_genes || '');
     });
