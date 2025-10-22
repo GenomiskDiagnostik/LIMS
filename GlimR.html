@@ -1946,6 +1946,21 @@ function setStatus(msg) {
   bar.textContent = msg;
   setTooltip(bar, msg);
 }
+window.addEventListener('error', event => {
+  if (!event) return;
+  const hasDetails = Boolean(event.message) || Boolean(event.error && event.error.message);
+  if (!hasDetails) return;
+  const detail = event.message || (event.error && event.error.message) || 'Ukendt fejl';
+  console.error('Ubehandlet fejl i GlimR:', event.error || detail, event);
+  setStatus('Fejl: ' + detail);
+});
+window.addEventListener('unhandledrejection', event => {
+  if (!event) return;
+  const reason = event.reason;
+  const detail = reason && (reason.message || String(reason)) || 'Ukendt asynkron fejl';
+  console.error('Ubehandlet promise-fejl i GlimR:', reason || event);
+  setStatus('Fejl: ' + detail);
+});
 function currentUserName() {
   return state.currentUser?.name || 'System';
 }
@@ -9389,7 +9404,11 @@ async function init() {
     setStatus('Kunne ikke åbne database: ' + err.message);
   }
 }
-document.addEventListener('DOMContentLoaded', init);
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
 })();
 </script>
 </body>
