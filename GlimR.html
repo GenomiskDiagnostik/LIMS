@@ -1556,6 +1556,54 @@ function getVariantTypeLabel(value) {
   return option ? option.label : normalized;
 }
 
+function setupVariantTypeForm(form, {defaultType = 'snv'} = {}) {
+  if (!form) {
+    return {
+      updateVariantTypeFields: () => {},
+      variantTypeSelect: null
+    };
+  }
+  const select = form.elements?.variant_type || null;
+  const groups = Array.from(form.querySelectorAll('[data-variant-types]'));
+  const typeRequiredFields = Array.from(form.querySelectorAll('[data-type-required]'));
+  const initialRequired = new Map(typeRequiredFields.map(field => [field, field.required]));
+  const normalizedDefault = normalizeVariantType(defaultType);
+  const update = () => {
+    const type = normalizeVariantType(select?.value || normalizedDefault);
+    if (select && select.value !== type) {
+      select.value = type;
+    }
+    groups.forEach(group => {
+      const types = (group.dataset.variantTypes || '')
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(normalizeVariantType);
+      group.hidden = types.length ? !types.includes(type) : false;
+    });
+    typeRequiredFields.forEach(field => {
+      const requiredFor = (field.dataset.typeRequired || '')
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(normalizeVariantType);
+      const defaultRequired = initialRequired.get(field) ?? field.required;
+      const shouldRequire = requiredFor.length ? requiredFor.includes(type) : defaultRequired;
+      field.required = shouldRequire;
+      const label = field.closest('label');
+      if (label) {
+        label.classList.toggle('required', shouldRequire);
+      }
+    });
+  };
+  if (select) {
+    select.addEventListener('change', update);
+  }
+  update();
+  return {
+    updateVariantTypeFields: update,
+    variantTypeSelect: select
+  };
+}
+
 function formatVariantGenomicRange(variant) {
   if (!variant) return '';
   const chromosome = variant.chromosome || variant.chrom;
@@ -4729,35 +4777,7 @@ function renderVariants(section) {
   const saveButton = form.querySelector('#variantSave');
   const saveNewButton = form.querySelector('#variantSaveNew');
   const defaultSaveLabel = saveButton?.textContent || 'Gem';
-  const variantTypeSelect = form.elements.variant_type;
-  const variantGroups = form.querySelectorAll('.variant-field-group');
-  const typeRequiredFields = form.querySelectorAll('[data-type-required]');
-  const updateVariantTypeFields = () => {
-    const type = normalizeVariantType(variantTypeSelect?.value);
-    if (variantTypeSelect && !variantTypeSelect.value) {
-      variantTypeSelect.value = type;
-    }
-    variantGroups.forEach(group => {
-      const types = (group.dataset.variantTypes || '').split(/\s+/).filter(Boolean).map(normalizeVariantType);
-      const show = !types.length || types.includes(type);
-      group.hidden = !show;
-    });
-    typeRequiredFields.forEach(field => {
-      const requiredFor = (field.dataset.typeRequired || '').split(/\s+/).filter(Boolean).map(normalizeVariantType);
-      const shouldRequire = requiredFor.length ? requiredFor.includes(type) : field.required;
-      field.required = shouldRequire;
-      const label = field.closest('label');
-      if (label) {
-        if (shouldRequire) {
-          label.classList.add('required');
-        } else {
-          label.classList.remove('required');
-        }
-      }
-    });
-  };
-  updateVariantTypeFields();
-  variantTypeSelect?.addEventListener('change', updateVariantTypeFields);
+  const {updateVariantTypeFields, variantTypeSelect} = setupVariantTypeForm(form);
   const batchList = section.querySelector('#variantBatchList');
   const batchAddBtn = section.querySelector('#variantBatchAdd');
   const batchImportBtn = section.querySelector('#variantBatchImport');
@@ -5452,6 +5472,7 @@ function renderVariantLibrary(section) {
   const importButton = section.querySelector('#libraryImportCsv');
   const importInput = section.querySelector('#variantLibraryImportInput');
   const defaultSaveLabel = saveButton?.textContent || 'Gem';
+  const {updateVariantTypeFields, variantTypeSelect} = setupVariantTypeForm(form);
   const csvColumns = [
     {key: 'id', label: 'ID'},
     {key: 'gene', label: 'Gen'},
