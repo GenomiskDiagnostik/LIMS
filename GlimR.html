@@ -15,6 +15,7 @@
   --shadow: 0 4px 14px rgba(18, 76, 135, 0.08);
   --accent: #186faf;
   --accent-strong: #124c87;
+  --accent-shadow: rgba(24, 111, 175, 0.2);
   --danger: #c0392b;
   --nav-bg: #ffffff;
   --nav-border: #c7d2e3;
@@ -44,6 +45,7 @@
   --shadow: 0 6px 18px rgba(8, 47, 73, 0.55);
   --accent: #38bdf8;
   --accent-strong: #0ea5e9;
+  --accent-shadow: rgba(56, 189, 248, 0.2);
   --danger: #ef4444;
   --nav-bg: #111c30;
   --nav-border: #1f2a3c;
@@ -735,6 +737,31 @@ button:disabled {
   background: var(--badge-bg);
   color: var(--badge-color);
   font-size: 0.75rem;
+}
+.rsid-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: var(--badge-bg);
+  color: var(--accent-strong);
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid currentColor;
+  transition: color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  line-height: 1.2;
+}
+.rsid-badge::after {
+  content: '\2197';
+  font-size: 0.75em;
+  opacity: 0.8;
+}
+.rsid-badge:hover,
+.rsid-badge:focus-visible {
+  background: var(--accent-strong);
+  color: #fff;
+  box-shadow: 0 0 0 3px var(--accent-shadow);
 }
 input[type="search"] {
   border-radius: 1rem;
@@ -1645,6 +1672,18 @@ function normalizeRsId(value) {
   return trimmed;
 }
 
+function formatRsIdCell(rsid) {
+  const normalized = normalizeRsId(rsid);
+  if (!normalized) return '';
+  if (/^rs\d+$/i.test(normalized)) {
+    const canonical = normalized.replace(/^rs/i, 'rs');
+    const url = `https://www.ncbi.nlm.nih.gov/snp/${encodeURIComponent(canonical)}`;
+    const label = esc(canonical);
+    return `<a class="rsid-badge" href="${url}" target="_blank" rel="noopener noreferrer" title="Åbn dbSNP-opslag for ${label}" aria-label="Åbn dbSNP-opslag for ${label}">${label}</a>`;
+  }
+  return esc(normalized);
+}
+
 function normalizeStructureTypeValue(value) {
   if (value == null) return '';
   const trimmed = String(value).trim();
@@ -1920,7 +1959,7 @@ function openVariantLibraryPicker(onSelect) {
         <td>${esc(genomic)}</td>
         <td>${esc(item.gene || '')}</td>
         <td>${esc(item.hgvs_c || '')}</td>
-        <td>${esc(item.rsid || '')}</td>
+        <td>${formatRsIdCell(item.rsid)}</td>
         <td>${esc(item.iscn || '')}</td>
         <td>${esc(item.classification || '')}</td>
         <td>${esc(item.criteria || '')}</td>
@@ -4873,7 +4912,7 @@ function renderVariants(section) {
             <label>Kromosom<input type="search" data-filter-variants="chromosome" placeholder="Chr/arm"></label>
           </div>
         </details>
-        <table><thead><tr><th>ID</th><th>Ordination</th><th>Variant</th><th>Type</th><th>Klasse</th><th>Kriterier</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
+        <table><thead><tr><th>ID</th><th>Ordination</th><th>Variant</th><th>rsID</th><th>Type</th><th>Klasse</th><th>Kriterier</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
           <button type="button" class="secondary" id="variantsExport">Eksportér filtrerede varianter</button>
         </div>
@@ -5335,7 +5374,7 @@ function renderVariants(section) {
       const selectedAttr = v.id === selectedVariantId ? ' data-selected="true"' : '';
       const title = formatVariantTitle(v);
       const typeLabel = getVariantTypeLabel(v.variant_type);
-      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td>${v.order_id}</td><td>${esc(title)}</td><td>${esc(typeLabel)}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(createdBy)}</td></tr>`;
+      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td>${v.order_id}</td><td>${esc(title)}</td><td>${formatRsIdCell(v.rsid)}</td><td>${esc(typeLabel)}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -5893,7 +5932,7 @@ function renderVariantLibrary(section) {
       const title = formatVariantTitle(v);
       const typeLabel = getVariantTypeLabel(v.variant_type);
       const genomic = formatVariantGenomicRange(v);
-      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td>${esc(title)}</td><td>${esc(typeLabel)}</td><td>${esc(genomic)}</td><td>${esc(v.hgvs_c || '')}</td><td>${esc(v.hgvs_p || '')}</td><td>${esc(v.rsid || '')}</td><td>${esc(v.classification || '')}</td><td>${esc(v.criteria || '')}</td><td>${esc(v.iscn || '')}</td><td>${esc(v.condition || '')}</td><td>${esc(v.inheritance || '')}</td><td>${esc(v.curated_by || '')}</td><td>${esc(lastReview)}</td></tr>`;
+      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td>${esc(title)}</td><td>${esc(typeLabel)}</td><td>${esc(genomic)}</td><td>${esc(v.hgvs_c || '')}</td><td>${esc(v.hgvs_p || '')}</td><td>${formatRsIdCell(v.rsid)}</td><td>${esc(v.classification || '')}</td><td>${esc(v.criteria || '')}</td><td>${esc(v.iscn || '')}</td><td>${esc(v.condition || '')}</td><td>${esc(v.inheritance || '')}</td><td>${esc(v.curated_by || '')}</td><td>${esc(lastReview)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
