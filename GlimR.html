@@ -5745,27 +5745,31 @@ function renderVariantLibrary(section) {
   const {updateVariantTypeFields, variantTypeSelect} = setupVariantTypeForm(form);
   const csvColumns = [
     {key: 'id', label: 'ID'},
+    {label: 'Varianttitel', value: entry => formatVariantTitle(entry) || ''},
     {key: 'gene', label: 'Gen'},
     {key: 'transcript', label: 'Transkript'},
     {key: 'hgvs_c', label: 'HGVS c.'},
     {key: 'hgvs_p', label: 'HGVS p.'},
     {key: 'rsid', label: 'rsID'},
-    {key: 'variant_type', label: 'Varianttype'},
+    {key: 'variant_type', label: 'Varianttype (kode)'},
+    {label: 'Varianttype', value: entry => getVariantTypeLabel(entry.variant_type) || ''},
     {key: 'classification', label: 'Klasse'},
     {key: 'criteria', label: 'Kriterier'},
+    {key: 'evidence', label: 'Evidens'},
+    {key: 'condition', label: 'Tilstand'},
+    {key: 'inheritance', label: 'Nedarvning'},
+    {label: 'Genomisk position', value: entry => formatVariantGenomicRange(entry) || ''},
     {key: 'genome_build', label: 'Genom'},
     {key: 'chromosome', label: 'Kromosom'},
     {key: 'start', label: 'Start'},
     {key: 'end', label: 'Slut'},
     {key: 'copy_number', label: 'Kopital'},
-    {key: 'sv_subtype', label: 'SV-type'},
+    {key: 'sv_subtype', label: 'Strukturtype (kode)'},
+    {label: 'Strukturtype', value: entry => getStructureTypeLabel(entry.sv_subtype) || ''},
     {key: 'size_bp', label: 'Størrelse'},
     {key: 'iscn', label: 'ISCN'},
     {key: 'description', label: 'Beskrivelse'},
     {key: 'affected_genes', label: 'Berørte gener'},
-    {key: 'condition', label: 'Tilstand'},
-    {key: 'inheritance', label: 'Nedarvning'},
-    {key: 'evidence', label: 'Evidens'},
     {key: 'curated_by', label: 'Kurateret af'},
     {key: 'last_review', label: 'Sidst gennemgået'},
     {key: 'created_at', label: 'Oprettet'},
@@ -6055,7 +6059,8 @@ function renderVariantLibrary(section) {
   exportButton?.addEventListener('click', () => {
     const exportRows = filteredLibrary.map(entry => ({
       ...entry,
-      variant_type: normalizeVariantType(entry.variant_type)
+      variant_type: normalizeVariantType(entry.variant_type),
+      sv_subtype: normalizeStructureTypeValue(entry.sv_subtype)
     }));
     const filename = downloadCsvFile(exportRows, csvColumns, 'glimr-variantbibliotek.csv');
     setStatus(`Eksporterede ${filteredLibrary.length} biblioteksposter til ${filename}.`);
@@ -6090,6 +6095,8 @@ function renderVariantLibrary(section) {
         rs_id: 'rsid',
         variant_type: 'variant_type',
         varianttype: 'variant_type',
+        varianttypekode: 'variant_type',
+        varianttype_kode: 'variant_type',
         type: 'variant_type',
         klassifikation: 'classification',
         classification: 'classification',
@@ -6127,6 +6134,9 @@ function renderVariantLibrary(section) {
         cn: 'copy_number',
         sv_subtype: 'sv_subtype',
         svtype: 'sv_subtype',
+        strukturtype: 'sv_subtype',
+        strukturtypekode: 'sv_subtype',
+        strukturtype_kode: 'sv_subtype',
         variant_subtype: 'sv_subtype',
         structuraltype: 'sv_subtype',
         size: 'size_bp',
