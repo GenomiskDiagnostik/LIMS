@@ -1941,8 +1941,10 @@ function esc(str) {
 }
 function setStatus(msg) {
   state.lastStatus = msg;
-  document.getElementById('statusBar').textContent = msg;
-  setTooltip(document.getElementById('statusBar'), msg);
+  const bar = document.getElementById('statusBar');
+  if (!bar) return;
+  bar.textContent = msg;
+  setTooltip(bar, msg);
 }
 function currentUserName() {
   return state.currentUser?.name || 'System';
