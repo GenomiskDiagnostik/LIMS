@@ -1556,6 +1556,54 @@ function getVariantTypeLabel(value) {
   return option ? option.label : normalized;
 }
 
+function setupVariantTypeForm(form, {defaultType = 'snv'} = {}) {
+  if (!form) {
+    return {
+      updateVariantTypeFields: () => {},
+      variantTypeSelect: null
+    };
+  }
+  const select = form.elements?.variant_type || null;
+  const groups = Array.from(form.querySelectorAll('[data-variant-types]'));
+  const typeRequiredFields = Array.from(form.querySelectorAll('[data-type-required]'));
+  const initialRequired = new Map(typeRequiredFields.map(field => [field, field.required]));
+  const normalizedDefault = normalizeVariantType(defaultType);
+  const update = () => {
+    const type = normalizeVariantType(select?.value || normalizedDefault);
+    if (select && select.value !== type) {
+      select.value = type;
+    }
+    groups.forEach(group => {
+      const types = (group.dataset.variantTypes || '')
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(normalizeVariantType);
+      group.hidden = types.length ? !types.includes(type) : false;
+    });
+    typeRequiredFields.forEach(field => {
+      const requiredFor = (field.dataset.typeRequired || '')
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(normalizeVariantType);
+      const defaultRequired = initialRequired.get(field) ?? field.required;
+      const shouldRequire = requiredFor.length ? requiredFor.includes(type) : defaultRequired;
+      field.required = shouldRequire;
+      const label = field.closest('label');
+      if (label) {
+        label.classList.toggle('required', shouldRequire);
+      }
+    });
+  };
+  if (select) {
+    select.addEventListener('change', update);
+  }
+  update();
+  return {
+    updateVariantTypeFields: update,
+    variantTypeSelect: select
+  };
+}
+
 function formatVariantGenomicRange(variant) {
   if (!variant) return '';
   const chromosome = variant.chromosome || variant.chrom;
@@ -1585,12 +1633,19 @@ function formatVariantTitle(variant) {
   const genomic = formatVariantGenomicRange(variant);
   const subtype = variant.sv_subtype || variant.structural_type || variant.variant_subtype || '';
   const affectedGenes = variant.affected_genes || variant.genes || '';
-  const parts = [];
-  if (iscn) parts.push(iscn);
-  if (genomic) parts.push(genomic);
-  if (subtype) parts.push(subtype);
-  if (affectedGenes) parts.push(affectedGenes);
-  if (parts.length) return parts.join(' · ');
+  const gene = variant.gene || variant.region || '';
+  const parts = [gene, iscn, genomic, subtype, affectedGenes];
+  const seen = new Set();
+  const uniqueParts = parts
+    .map(part => (part == null ? '' : String(part).trim()))
+    .filter(part => {
+      if (!part) return false;
+      const key = part.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  if (uniqueParts.length) return uniqueParts.join(' · ');
   if (variant.description) return variant.description;
   return variant.gene || subtype || getVariantTypeLabel(type);
 }
@@ -1600,6 +1655,7 @@ function formatVariantDetailLines(variant) {
   const type = normalizeVariantType(variant.variant_type);
   const details = [];
   if (type !== 'snv') {
+    if (variant.gene) details.push(`Gen/region: ${variant.gene}`);
     const genomeBuild = variant.genome_build || '';
     const range = formatVariantGenomicRange(variant);
     if (genomeBuild || range) {
@@ -1614,6 +1670,8 @@ function formatVariantDetailLines(variant) {
     if (variant.affected_genes) details.push(`Berørte gener: ${variant.affected_genes}`);
     if (variant.iscn) details.push(`ISCN: ${variant.iscn}`);
   }
+  if (variant.hgvs_c) details.push(`HGVS c.: ${variant.hgvs_c}`);
+  if (variant.hgvs_p) details.push(`HGVS p.: ${variant.hgvs_p}`);
   if (variant.transcript) details.push(`Transkript: ${variant.transcript}`);
   if (variant.zygosity) details.push(`Zygositet: ${variant.zygosity}`);
   if (variant.classification) details.push(`ACMG-klasse: ${variant.classification}`);
@@ -3126,7 +3184,7 @@ function renderCreateCase(section) {
         <label class="inline">Start<input type="text" data-field="start" placeholder="16287000"></label>
         <label class="inline">Slut<input type="text" data-field="end" placeholder="21100000"></label>
         <label class="inline">Kopital<input type="text" data-field="copy_number" placeholder="x1"></label>
-        <label class="inline">Varianttype<input type="text" data-field="sv_subtype" placeholder="Deletion"></label>
+        <label class="inline">Strukturtype<input type="text" data-field="sv_subtype" placeholder="Deletion"></label>
         <label class="inline">Størrelse<input type="text" data-field="size_bp" placeholder="4.8 Mb"></label>
         <label class="inline wide">ISCN<textarea class="small" data-field="iscn" placeholder="arr[GRCh38] 17p11.2p12(16287000_21100000)x1"></textarea></label>
         <label class="inline wide">Berørte gener<textarea class="small" data-field="affected_genes" placeholder="RAI1; PMP22"></textarea></label>
@@ -4667,7 +4725,7 @@ function renderVariants(section) {
               <label>Start<input name="start"></label>
               <label>Slut<input name="end"></label>
               <label>Kopital<input name="copy_number"></label>
-              <label>Varianttype<input name="sv_subtype"></label>
+              <label>Strukturtype<input name="sv_subtype"></label>
               <label>Størrelse<input name="size_bp"></label>
             </div>
             <label>ISCN<input name="iscn"></label>
@@ -4719,35 +4777,7 @@ function renderVariants(section) {
   const saveButton = form.querySelector('#variantSave');
   const saveNewButton = form.querySelector('#variantSaveNew');
   const defaultSaveLabel = saveButton?.textContent || 'Gem';
-  const variantTypeSelect = form.elements.variant_type;
-  const variantGroups = form.querySelectorAll('.variant-field-group');
-  const typeRequiredFields = form.querySelectorAll('[data-type-required]');
-  const updateVariantTypeFields = () => {
-    const type = normalizeVariantType(variantTypeSelect?.value);
-    if (variantTypeSelect && !variantTypeSelect.value) {
-      variantTypeSelect.value = type;
-    }
-    variantGroups.forEach(group => {
-      const types = (group.dataset.variantTypes || '').split(/\s+/).filter(Boolean).map(normalizeVariantType);
-      const show = !types.length || types.includes(type);
-      group.hidden = !show;
-    });
-    typeRequiredFields.forEach(field => {
-      const requiredFor = (field.dataset.typeRequired || '').split(/\s+/).filter(Boolean).map(normalizeVariantType);
-      const shouldRequire = requiredFor.length ? requiredFor.includes(type) : field.required;
-      field.required = shouldRequire;
-      const label = field.closest('label');
-      if (label) {
-        if (shouldRequire) {
-          label.classList.add('required');
-        } else {
-          label.classList.remove('required');
-        }
-      }
-    });
-  };
-  updateVariantTypeFields();
-  variantTypeSelect?.addEventListener('change', updateVariantTypeFields);
+  const {updateVariantTypeFields, variantTypeSelect} = setupVariantTypeForm(form);
   const batchList = section.querySelector('#variantBatchList');
   const batchAddBtn = section.querySelector('#variantBatchAdd');
   const batchImportBtn = section.querySelector('#variantBatchImport');
@@ -4783,7 +4813,7 @@ function renderVariants(section) {
         <label class="inline">Start<input type="text" data-field="start" placeholder="16287000"></label>
         <label class="inline">Slut<input type="text" data-field="end" placeholder="21100000"></label>
         <label class="inline">Kopital<input type="text" data-field="copy_number" placeholder="x1"></label>
-        <label class="inline">Varianttype<input type="text" data-field="sv_subtype" placeholder="Deletion"></label>
+        <label class="inline">Strukturtype<input type="text" data-field="sv_subtype" placeholder="Deletion"></label>
         <label class="inline">Størrelse<input type="text" data-field="size_bp" placeholder="4.8 Mb"></label>
         <label class="inline wide">ISCN<textarea class="small" data-field="iscn" placeholder="arr[GRCh38] 17p11.2p12(16287000_21100000)x1"></textarea></label>
         <label class="inline wide">Berørte gener<textarea class="small" data-field="affected_genes" placeholder="RAI1; PMP22"></textarea></label>
@@ -5407,7 +5437,7 @@ function renderVariantLibrary(section) {
               <label>Start<input name="start"></label>
               <label>Slut<input name="end"></label>
               <label>Kopital<input name="copy_number"></label>
-              <label>Varianttype<input name="sv_subtype"></label>
+              <label>Strukturtype<input name="sv_subtype"></label>
               <label>Størrelse<input name="size_bp"></label>
             </div>
             <label>ISCN<input name="iscn"></label>
@@ -5442,6 +5472,7 @@ function renderVariantLibrary(section) {
   const importButton = section.querySelector('#libraryImportCsv');
   const importInput = section.querySelector('#variantLibraryImportInput');
   const defaultSaveLabel = saveButton?.textContent || 'Gem';
+  const {updateVariantTypeFields, variantTypeSelect} = setupVariantTypeForm(form);
   const csvColumns = [
     {key: 'id', label: 'ID'},
     {key: 'gene', label: 'Gen'},
@@ -5979,7 +6010,10 @@ function describeVariantNarrative(variant) {
   if (variant.criteria) summaryParts.push(`ACMG: ${variant.criteria}`);
   if (variant.af !== undefined && variant.af !== null && variant.af !== '') summaryParts.push(`AF: ${variant.af}`);
   if (variant.zygosity) summaryParts.push(`Zygositet: ${variant.zygosity}`);
+  if (variant.sv_subtype) summaryParts.push(`Type: ${variant.sv_subtype}`);
   if (variant.copy_number) summaryParts.push(`Kopital: ${variant.copy_number}`);
+  if (variant.size_bp) summaryParts.push(`Størrelse: ${variant.size_bp}`);
+  if (variant.affected_genes) summaryParts.push(`Berørte gener: ${variant.affected_genes}`);
   if (variant.iscn) summaryParts.push(`ISCN: ${variant.iscn}`);
   const genomic = formatVariantGenomicRange(variant);
   if (genomic) summaryParts.push(`Position: ${genomic}`);
