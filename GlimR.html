@@ -1309,7 +1309,7 @@ const tooltipCatalog = {
     'Biobank': 'Prøver arkiveret i biobanken.'
   },
   headers: {
-    'ID': 'Intern databaseidentifikator for posten.',
+    'ID': 'Internt ID for posten eller patientens supplerende ID (valgfrit).',
     'MRN': 'Medicinsk journalnummer eller CPR-reference.',
     'Ekstra ID': 'Supplerende identifikator for patienten (valgfrit).',
     'Familienummer': 'Eksternt familienummer brugt til at gruppere beslægtede patienter.',
@@ -1360,7 +1360,7 @@ const tooltipCatalog = {
     'Detaljer': 'Supplerende oplysninger til testen.'
   },
   search: {
-    patientSearch: 'Filtrer patientlisten efter navn, MRN, ekstra ID, familienummer eller køn.',
+    patientSearch: 'Filtrer patientlisten efter navn, MRN, ID, familienummer eller køn.',
     sampleSearch: 'Filtrer prøver efter ID, PMB-nummer, status eller type.',
     panelSearch: 'Find paneler efter navn.',
     orderSearch: 'Søg efter ordination ud fra status eller ID.',
@@ -3376,7 +3376,7 @@ function renderCreateCase(section) {
         <div class="fieldset-body" hidden>
           <div class="inline-group">
             <label class="inline">MRN<input name="patient_mrn" required placeholder="Fx 010170-1234"></label>
-            <label class="inline">Ekstra ID<input name="patient_extra_id" placeholder="Fx intern ID"></label>
+            <label class="inline">ID<input name="patient_extra_id" placeholder="Fx intern ID"></label>
             <label class="inline">Navn<input name="patient_name" required placeholder="Patientnavn"></label>
             <label class="inline">Familienummer
               <div class="family-combo">
@@ -4290,14 +4290,14 @@ function renderPatients(section) {
           <div class="filter-grid">
             <label>ID<input type="search" data-filter-patients="id" placeholder="Fx 152"></label>
             <label>MRN<input type="search" data-filter-patients="mrn" placeholder="MRN eller CPR"></label>
-            <label>Ekstra ID<input type="search" data-filter-patients="extra" placeholder="Fx lokalt ID"></label>
+            <label>ID<input type="search" data-filter-patients="extra" placeholder="Fx lokalt ID"></label>
             <label>Familienummer<input type="search" data-filter-patients="family" placeholder="Fx FAM-001"></label>
             <label>Navn<input type="search" data-filter-patients="name" placeholder="Patientnavn"></label>
             <label>Køn<select data-filter-patients="gender"><option value="">Alle</option><option value="male">Mand</option><option value="female">Kvinde</option><option value="other">Andet</option></select></label>
             <label>Fødselsår<input type="search" data-filter-patients="birth" placeholder="ÅÅÅÅ"></label>
           </div>
         </details>
-        <table id="patientsTable"><thead><tr><th>ID</th><th>MRN</th><th>Ekstra ID</th><th>Familienummer</th><th>Navn</th><th>Køn</th><th>Født</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
+        <table id="patientsTable"><thead><tr><th>ID</th><th>MRN</th><th>ID</th><th>Familienummer</th><th>Navn</th><th>Køn</th><th>Født</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
           <button type="button" class="secondary" id="patientsExport">Eksportér filtrerede patienter</button>
         </div>
@@ -4307,7 +4307,7 @@ function renderPatients(section) {
         <form id="patientForm">
           <input type="hidden" name="id">
           <label>MRN<input name="mrn" required></label>
-          <label>Ekstra ID<input name="extra_id" placeholder="Fx lokalt ID"></label>
+          <label>ID<input name="extra_id" placeholder="Fx lokalt ID"></label>
           <label>Familienummer
             <div class="family-combo">
               <select data-family-select>
@@ -6615,7 +6615,7 @@ function buildConclusionPlaceholderGuide(context = 'report') {
             <ul>
               <li><code>[Patient]</code> – patientens navn</li>
               <li><code>[PatientMRN]</code> – patientens MRN/CPR</li>
-              <li><code>[PatientEkstraId]</code> – ekstra ID</li>
+              <li><code>[PatientID]</code> – ID</li>
               <li><code>[PatientFamilienummer]</code> – familienummer</li>
               <li><code>[PatientFødselsdato]</code> – fødselsdato (dd-mm-åååå)</li>
               <li><code>[OrdinationID]</code> – ordinationens ID</li>
@@ -7085,7 +7085,7 @@ function renderReports(section) {
     const firstVariant = variants[0] || null;
     add(['Patient', 'PatientNavn', 'Patient.Name'], patient?.name || '');
     add(['PatientMRN', 'MRN', 'Patient.MRN'], patient?.mrn || '');
-    add(['PatientEkstraId', 'PatientEkstraID', 'EkstraID', 'Patient.EkstraID'], patient?.extra_id || '');
+    add(['PatientID', 'PatientId', 'PatientEkstraId', 'PatientEkstraID', 'EkstraID', 'Patient.EkstraID'], patient?.extra_id || '');
     add(['PatientFamilienummer', 'Familienummer', 'Patient.Familienummer'], patient?.family_number || '');
     add(['PatientFodselsdato', 'PatientFødselsdato', 'Patient.BirthDate'], patient?.birth_date ? formatDanishDate(patient.birth_date) : '');
     add(['OrdinationID', 'Ordination.Id', 'OrderID'], orderId ? String(orderId) : '');
@@ -8061,7 +8061,7 @@ async function createReportPdfBlob(orderId, reportData, exportedAt = new Date())
     const patientRows = [
       {type: 'kv', label: 'Navn', value: patient?.name},
       {type: 'kv', label: 'MRN', value: patient?.mrn},
-      {type: 'kv', label: 'Ekstra ID', value: patient?.extra_id},
+      {type: 'kv', label: 'ID', value: patient?.extra_id},
       {type: 'kv', label: 'Familienummer', value: patient?.family_number},
       {type: 'kv', label: 'Køn', value: translateGender(patient?.gender)},
       {type: 'kv', label: 'Fødselsdato', value: patientBirthDate}
