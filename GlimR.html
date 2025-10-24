@@ -432,24 +432,70 @@ section[data-tab].active {
 }
 .placeholder-guide {
   margin-top: 1rem;
-  padding: 1rem 1.25rem;
   border-radius: 0.75rem;
   border: 1px solid var(--panel-border);
   background: rgba(24, 111, 175, 0.08);
+  padding: 0;
+  overflow: hidden;
 }
 [data-theme="dark"] .placeholder-guide {
   background: rgba(14, 165, 233, 0.12);
 }
-.placeholder-guide h3 {
-  margin-top: 0;
-  margin-bottom: 0.5rem;
+.placeholder-guide summary {
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  list-style: none;
+}
+.placeholder-guide summary::-webkit-details-marker {
+  display: none;
+}
+.placeholder-guide summary h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.placeholder-guide-subtitle {
+  margin-left: auto;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--muted-text);
+}
+.placeholder-guide summary::after {
+  content: '\25BC';
+  font-size: 0.9rem;
+  color: var(--muted-text);
+  margin-left: 0.5rem;
+  transition: transform 0.2s ease;
+}
+.placeholder-guide[open] summary::after {
+  transform: rotate(180deg);
+}
+.placeholder-guide summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 0.5rem;
+}
+.placeholder-guide summary:hover {
+  background: rgba(24, 111, 175, 0.12);
+}
+[data-theme="dark"] .placeholder-guide summary:hover {
+  background: rgba(14, 165, 233, 0.18);
+}
+.placeholder-guide-body {
+  padding: 0 1.25rem 1.25rem;
+}
+.placeholder-guide[open] .placeholder-guide-body {
+  border-top: 1px solid var(--panel-border);
+  padding-top: 1rem;
+}
+.placeholder-guide p {
+  margin: 0 0 0.75rem;
 }
 .placeholder-guide h4 {
   margin: 0.75rem 0 0.35rem;
   font-size: 0.95rem;
-}
-.placeholder-guide p {
-  margin: 0 0 0.5rem;
 }
 .placeholder-guide-columns {
   display: grid;
@@ -6546,52 +6592,67 @@ function buildConclusionPlaceholderGuide(context = 'report') {
     ? 'Indsæt pladsholdere i standardteksten for at få felter udfyldt automatisk, når teksten bruges i en rapport.'
     : 'Når du indsætter en standardtekst i rapporten, erstattes pladsholdere automatisk med data fra den valgte ordination.';
   return `
-    <div class="placeholder-guide">
-      <h3>Pladsholdere til konklusioner</h3>
-      <p>${intro} Skriv pladsholderen i firkantede parenteser, fx <code>[Patient]</code>.</p>
-      <div class="placeholder-guide-columns">
-        <div>
-          <h4>Patient &amp; ordination</h4>
-          <ul>
-            <li><code>[Patient]</code> – patientens navn</li>
-            <li><code>[PatientMRN]</code> – patientens MRN/CPR</li>
-            <li><code>[PatientFamilienummer]</code> – familienummer</li>
-            <li><code>[PatientFødselsdato]</code> – fødselsdato (dd-mm-åååå)</li>
-            <li><code>[OrdinationID]</code> – ordinationens ID</li>
-            <li><code>[OrdinationStatus]</code> – ordinationens status</li>
-            <li><code>[OrdinationDato]</code> – bestillingsdato</li>
-            <li><code>[OrdinationRekvirent]</code> – rekvirerende afdeling/læge</li>
-            <li><code>[OrdinationPanel]</code> – valgt panel</li>
-            <li><code>[OrdinationAnalyseansvarlig]</code> – analyseansvarlig</li>
-            <li><code>[OrdinationTolker]</code> – tolk/fortolker</li>
-            <li><code>[OrdinationGodkender]</code> – godkender</li>
-          </ul>
+    <details class="placeholder-guide">
+      <summary>
+        <h3>Pladsholdere til konklusioner</h3>
+        <span class="placeholder-guide-subtitle">Klik for at se tilgængelige felter fra ordination, prøve og varianter.</span>
+      </summary>
+      <div class="placeholder-guide-body">
+        <p>${intro} Skriv pladsholderen i firkantede parenteser, fx <code>[Patient]</code>.</p>
+        <div class="placeholder-guide-columns">
+          <div>
+            <h4>Patient &amp; ordination</h4>
+            <ul>
+              <li><code>[Patient]</code> – patientens navn</li>
+              <li><code>[PatientMRN]</code> – patientens MRN/CPR</li>
+              <li><code>[PatientFamilienummer]</code> – familienummer</li>
+              <li><code>[PatientFødselsdato]</code> – fødselsdato (dd-mm-åååå)</li>
+              <li><code>[OrdinationID]</code> – ordinationens ID</li>
+              <li><code>[OrdinationStatus]</code> – ordinationens status</li>
+              <li><code>[OrdinationDato]</code> – bestillingsdato</li>
+              <li><code>[OrdinationRekvirent]</code> – rekvirerende afdeling/læge</li>
+              <li><code>[OrdinationPanel]</code> – valgt panel</li>
+              <li><code>[OrdinationAnalyseansvarlig]</code> – analyseansvarlig</li>
+              <li><code>[OrdinationTolker]</code> – tolk/fortolker</li>
+              <li><code>[OrdinationGodkender]</code> – godkender</li>
+            </ul>
+          </div>
+          <div>
+            <h4>Prøve</h4>
+            <ul>
+              <li><code>[SampleID]</code> – prøve-ID</li>
+              <li><code>[SamplePMB]</code> – PMB-nummer</li>
+              <li><code>[SampleType]</code> – prøvetype</li>
+              <li><code>[SampleStatus]</code> – prøvens status</li>
+              <li><code>[SampleDato]</code> – prøvetagningsdato</li>
+            </ul>
+          </div>
+          <div>
+            <h4>Varianter (fælles)</h4>
+            <ul>
+              <li><code>[VariantAntal]</code> – antal valgte varianter</li>
+              <li><code>[VariantTyper]</code> / <code>[VariantType]</code> – liste over varianttyper (SNV, CNV, strukturel m.m.)</li>
+              <li><code>[Gen]</code>, <code>[Transkript]</code>, <code>[HGVS_c]</code>, <code>[HGVS_p]</code> – lister over værdier på tværs af varianter</li>
+              <li><code>[Zygositet]</code>, <code>[ACMG-klasse]</code>, <code>[Kriterier]</code> – kombinerede klassifikationer</li>
+              <li><code>[Annoteringer]</code> – samlede annoteringer (inkl. VarSeq-noter)</li>
+              <li><code>[Tolkning]</code> – samlede tolkninger</li>
+              <li><code>[VariantListe]</code> – nummereret oversigt med detaljer (inkl. type, HGVS, ISCN m.m.)</li>
+              <li><code>[Variant]</code> / <code>[Variant1]</code> – detaljeret tekst for den første variant</li>
+            </ul>
+            <h4>CNV, strukturelle &amp; cytogenetiske felter</h4>
+            <ul>
+              <li><code>[VariantISCN]</code> / <code>[ISCN]</code> – kombineret ISCN-notation for de valgte varianter</li>
+              <li><code>[VariantGenomiskPosition]</code> / <code>[VariantPosition]</code> – genomiske positioner eller intervaller</li>
+              <li><code>[VariantKopital]</code> / <code>[VariantCopyNumber]</code> – kopitaler/copy-number-resultater</li>
+              <li><code>[VariantStrukturType]</code> / <code>[VariantSubtype]</code> – navngivne strukturtyper eller subtyper</li>
+              <li><code>[VariantBeskrivelse]</code> – tekstbeskrivelser af strukturelle fund</li>
+              <li><code>[BerørteGener]</code> / <code>[AffectedGenes]</code> – liste over berørte eller involverede gener</li>
+            </ul>
+          </div>
         </div>
-        <div>
-          <h4>Prøve</h4>
-          <ul>
-            <li><code>[SampleID]</code> – prøve-ID</li>
-            <li><code>[SamplePMB]</code> – PMB-nummer</li>
-            <li><code>[SampleType]</code> – prøvetype</li>
-            <li><code>[SampleStatus]</code> – prøvens status</li>
-            <li><code>[SampleDato]</code> – prøvetagningsdato</li>
-          </ul>
-        </div>
-        <div>
-          <h4>Varianter</h4>
-          <ul>
-            <li><code>[VariantAntal]</code> – antal valgte varianter</li>
-            <li><code>[Gen]</code>, <code>[Transkript]</code>, <code>[HGVS_c]</code>, <code>[HGVS_p]</code> – lister over værdier på tværs af varianter</li>
-            <li><code>[Zygositet]</code>, <code>[ACMG-klasse]</code>, <code>[Kriterier]</code> – kombinerede klassifikationer</li>
-            <li><code>[Annoteringer]</code> – samlede annoteringer (inkl. VarSeq-noter)</li>
-            <li><code>[Tolkning]</code> – samlede tolkninger</li>
-            <li><code>[VariantListe]</code> – nummereret oversigt med detaljer for hver variant</li>
-            <li><code>[Variant]</code> / <code>[Variant1]</code> – detaljer for den første variant</li>
-          </ul>
-        </div>
+        <p class="placeholder-guide-footnote">Tilgå enkelte varianter med nummererede pladsholdere, fx <code>[Variant1Gene]</code>, <code>[Variant1StrukturType]</code> eller <code>[Variant2ISCN]</code>. Manglende oplysninger giver tom tekst, og pladsholdere er uafhængige af store/små bogstaver. Punktum kan bruges som adskillelse, fx <code>[Patient.MRN]</code>.</p>
       </div>
-      <p class="placeholder-guide-footnote">Tilgå enkelte varianter med nummererede pladsholdere, fx <code>[Variant1Gene]</code>, <code>[Variant2Tolkning]</code> eller <code>[Variant3.HGVS_c]</code>. Manglende oplysninger giver tom tekst, og pladsholdere er uafhængige af store/små bogstaver. Punktum kan bruges som adskillelse, fx <code>[Patient.MRN]</code>.</p>
-    </div>
+    </details>
   `;
 }
 
