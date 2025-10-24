@@ -646,6 +646,62 @@ form textarea {
   font-weight: 600;
   padding: 0 0.4rem;
   color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+.case-form legend .fieldset-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.case-form fieldset[data-collapsible] {
+  position: relative;
+}
+.case-form fieldset[data-collapsible] .fieldset-toggle {
+  border: none;
+  background: transparent;
+  color: var(--muted-text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.4rem;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+.case-form fieldset[data-collapsible] .fieldset-toggle::before {
+  content: '−';
+  font-size: 1rem;
+  line-height: 1;
+}
+.case-form fieldset[data-collapsible].collapsed .fieldset-toggle::before {
+  content: '+';
+}
+.case-form fieldset[data-collapsible] .fieldset-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.case-form fieldset[data-collapsible] .fieldset-toggle:hover {
+  color: var(--accent-strong);
+  background: var(--accent-shadow);
+}
+.case-form fieldset[data-collapsible].collapsed {
+  padding-bottom: 0.6rem;
+}
+.case-form fieldset[data-collapsible].collapsed > legend {
+  margin-bottom: 0;
+}
+.case-form fieldset[data-collapsible] .fieldset-body {
+  display: block;
+}
+.case-form fieldset[data-collapsible][data-collapsed="true"] > .fieldset-body,
+.case-form fieldset[data-collapsible].collapsed > .fieldset-body {
+  display: none;
 }
 .case-form .inline-group {
   display: flex;
@@ -685,6 +741,31 @@ form textarea {
 }
 .case-form .case-row button {
   align-self: flex-start;
+}
+.variant-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  align-items: start;
+}
+.variant-row > label,
+.variant-row > .variant-batch-group,
+.variant-row > button {
+  margin: 0;
+}
+.variant-row > label {
+  min-width: 0;
+}
+.variant-row > label.wide,
+.variant-row > .variant-batch-group > label.wide {
+  grid-column: 1 / -1;
+}
+.variant-row > button {
+  justify-self: flex-start;
+  min-width: 160px;
+}
+.variant-row .variant-batch-group {
+  display: contents;
 }
 .case-form .toggle {
   display: inline-flex;
@@ -1989,6 +2070,48 @@ function openVariantLibraryPicker(onSelect) {
   });
   setTimeout(() => searchInput?.focus(), 50);
 }
+function initCollapsibleFieldsets(root) {
+  if (!root) return;
+  const toggleState = (fieldset, toggle, body, collapsed) => {
+    const labelOpen = toggle.dataset.labelOpen || 'Minimér';
+    const labelClosed = toggle.dataset.labelClosed || 'Udvid';
+    fieldset.classList.toggle('collapsed', collapsed);
+    toggle.setAttribute('aria-expanded', String(!collapsed));
+    toggle.textContent = collapsed ? labelClosed : labelOpen;
+    const title = fieldset.querySelector('.fieldset-title');
+    const sectionName = title?.textContent?.trim();
+    if (typeof setTooltip === 'function') {
+      const tip = collapsed
+        ? sectionName ? `Udvid sektionen “${sectionName}”` : 'Udvid denne sektion'
+        : sectionName ? `Minimér sektionen “${sectionName}”` : 'Minimér denne sektion';
+      setTooltip(toggle, tip);
+    }
+    if (body) {
+      body.hidden = collapsed;
+    }
+  };
+  root.querySelectorAll('fieldset[data-collapsible]').forEach((fieldset, index) => {
+    if (fieldset.dataset.collapsibleInit) return;
+    const toggle = fieldset.querySelector('.fieldset-toggle');
+    if (!toggle) return;
+    if (!fieldset.id) {
+      fieldset.id = `collapsible-${Date.now()}-${index}`;
+    }
+    const body = fieldset.querySelector('.fieldset-body');
+    if (body && !body.id) {
+      body.id = `${fieldset.id}-body`;
+    }
+    const controlsId = body?.id || fieldset.id;
+    toggle.setAttribute('aria-controls', controlsId);
+    toggle.addEventListener('click', () => {
+      const collapsed = !fieldset.classList.contains('collapsed');
+      toggleState(fieldset, toggle, body, collapsed);
+    });
+    const defaultCollapsed = fieldset.dataset.collapsed === 'true';
+    toggleState(fieldset, toggle, body, defaultCollapsed);
+    fieldset.dataset.collapsibleInit = 'true';
+  });
+}
 function initFamilyCombos(root) {
   if (!root) return;
   root.querySelectorAll('.family-combo').forEach(combo => {
@@ -3158,112 +3281,137 @@ function renderCreateCase(section) {
   <div class="panel">
     <h2>Opret komplet sag</h2>
     <form id="createCaseForm" class="case-form">
-      <fieldset>
-        <legend>Patient</legend>
-        <div class="inline-group">
-          <label class="inline">MRN<input name="patient_mrn" required placeholder="Fx 010170-1234"></label>
-          <label class="inline">Navn<input name="patient_name" required placeholder="Patientnavn"></label>
-          <label class="inline">Familienummer
-            <div class="family-combo">
-              <select data-family-select>
-                ${familySelectOptions}
-              </select>
-              <input name="patient_family" data-family-input placeholder="Fx FAM-001">
-            </div>
-          </label>
-        </div>
-        <div class="inline-group">
-          <label class="inline">Køn<select name="patient_gender"><option value="">-</option><option value="male">Mand</option><option value="female">Kvinde</option><option value="other">Andet</option></select></label>
-          <label class="inline">Fødselsdato<input type="date" name="patient_birth"></label>
-        </div>
-        <label class="inline">Noter<textarea name="patient_notes" class="small" placeholder="Valgfrit"></textarea></label>
-      </fieldset>
-      <fieldset>
-        <legend>Prøve</legend>
-        <div class="inline-group">
-          <label class="inline">PMB-nummer<input name="sample_pmb" required placeholder="PMB-12345"></label>
-          <label class="inline">Prøvetype<select name="sample_type" required><option value="" selected>Vælg type</option>${typeOptions}</select></label>
-        </div>
-        <div class="inline-group">
-          <label class="inline">Status<select name="sample_status" required><option value="" selected>Vælg status</option>${statusOptions}</select></label>
-          <label class="inline">Opsamlet<input type="datetime-local" name="sample_collected"></label>
-        </div>
-        <label class="inline">Noter<textarea name="sample_notes" class="small" placeholder="Valgfrit"></textarea></label>
-        <label class="toggle"><input type="checkbox" id="includeControlSample"> Tilføj kontrolprøve</label>
-        <div id="controlSampleFields" hidden>
+      <fieldset data-collapsible>
+        <legend>
+          <span class="fieldset-title">Patient</span>
+          <button type="button" class="fieldset-toggle" data-label-open="Minimér" data-label-closed="Udvid" aria-expanded="true">Minimér</button>
+        </legend>
+        <div class="fieldset-body">
           <div class="inline-group">
-            <label class="inline">PMB-nummer<input name="control_pmb" placeholder="PMB-KONTROL"></label>
-            <label class="inline">Prøvetype<select name="control_type">${controlTypeOptions}</select></label>
+            <label class="inline">MRN<input name="patient_mrn" required placeholder="Fx 010170-1234"></label>
+            <label class="inline">Navn<input name="patient_name" required placeholder="Patientnavn"></label>
+            <label class="inline">Familienummer
+              <div class="family-combo">
+                <select data-family-select>
+                  ${familySelectOptions}
+                </select>
+                <input name="patient_family" data-family-input placeholder="Fx FAM-001">
+              </div>
+            </label>
           </div>
           <div class="inline-group">
-            <label class="inline">Status<select name="control_status"><option value="" selected>Vælg status</option>${statusOptions}</select></label>
-            <label class="inline">Opsamlet<input type="datetime-local" name="control_collected"></label>
+            <label class="inline">Køn<select name="patient_gender"><option value="">-</option><option value="male">Mand</option><option value="female">Kvinde</option><option value="other">Andet</option></select></label>
+            <label class="inline">Fødselsdato<input type="date" name="patient_birth"></label>
           </div>
-          <label class="inline">Noter<textarea name="control_notes" class="small" placeholder="Valgfrit"></textarea></label>
+          <label class="inline">Noter<textarea name="patient_notes" class="small" placeholder="Valgfrit"></textarea></label>
         </div>
       </fieldset>
-      <fieldset>
-        <legend>Ordination</legend>
-        <div class="inline-group">
-          <label class="inline">Panel
-            <div class="filterable-select">
-              <input type="search" data-select-filter placeholder="Filtrer paneler">
-              <select name="order_panel_id" ${panels.length ? 'required' : ''}>
-                <option value="" selected>Vælg panel</option>
-                ${panelOptions}
-              </select>
+      <fieldset data-collapsible>
+        <legend>
+          <span class="fieldset-title">Prøve</span>
+          <button type="button" class="fieldset-toggle" data-label-open="Minimér" data-label-closed="Udvid" aria-expanded="true">Minimér</button>
+        </legend>
+        <div class="fieldset-body">
+          <div class="inline-group">
+            <label class="inline">PMB-nummer<input name="sample_pmb" required placeholder="PMB-12345"></label>
+            <label class="inline">Prøvetype<select name="sample_type" required><option value="" selected>Vælg type</option>${typeOptions}</select></label>
+          </div>
+          <div class="inline-group">
+            <label class="inline">Status<select name="sample_status" required><option value="" selected>Vælg status</option>${statusOptions}</select></label>
+            <label class="inline">Opsamlet<input type="datetime-local" name="sample_collected"></label>
+          </div>
+          <label class="inline">Noter<textarea name="sample_notes" class="small" placeholder="Valgfrit"></textarea></label>
+          <label class="toggle"><input type="checkbox" id="includeControlSample"> Tilføj kontrolprøve</label>
+          <div id="controlSampleFields" hidden>
+            <div class="inline-group">
+              <label class="inline">PMB-nummer<input name="control_pmb" placeholder="PMB-KONTROL"></label>
+              <label class="inline">Prøvetype<select name="control_type">${controlTypeOptions}</select></label>
             </div>
-          </label>
-          <label class="inline">Rekvirent<input name="order_clinician" placeholder="Afdeling/Læge"></label>
+            <div class="inline-group">
+              <label class="inline">Status<select name="control_status"><option value="" selected>Vælg status</option>${statusOptions}</select></label>
+              <label class="inline">Opsamlet<input type="datetime-local" name="control_collected"></label>
+            </div>
+            <label class="inline">Noter<textarea name="control_notes" class="small" placeholder="Valgfrit"></textarea></label>
+          </div>
         </div>
-        <div class="inline-group">
-          <label class="inline">Analyseansvarlig
-            <div class="filterable-select">
-              <input type="search" data-select-filter placeholder="Filtrer brugere">
-              <select name="order_analysis_responsible">
-                <option value="" selected>Vælg bruger</option>
-                ${userOptions}
-              </select>
-            </div>
-          </label>
-          <label class="inline">Tolker
-            <div class="filterable-select">
-              <input type="search" data-select-filter placeholder="Filtrer brugere">
-              <select name="order_interpreter">
-                <option value="" selected>Vælg bruger</option>
-                ${userOptions}
-              </select>
-            </div>
-          </label>
-        </div>
-        <div class="inline-group">
-          <label class="inline">Godkender
-            <div class="filterable-select">
-              <input type="search" data-select-filter placeholder="Filtrer brugere">
-              <select name="order_approver">
-                <option value="" selected>Vælg bruger</option>
-                ${userOptions}
-              </select>
-            </div>
-          </label>
-          <label class="inline">Bestilt<input type="datetime-local" name="order_ordered_at"></label>
-        </div>
-        <p class="form-hint" id="orderStatusPreview">Ordinationsstatus følger prøven: <strong id="orderStatusValue">–</strong></p>
       </fieldset>
-      <fieldset>
-        <legend>Kvalitetskontrol</legend>
-        <p class="form-hint">Tilføj QC-målinger for prøven (valgfrit).</p>
-        <div id="qcList" class="repeater"></div>
-        <button type="button" class="secondary" id="addQcRow">Tilføj måling</button>
+      <fieldset data-collapsible>
+        <legend>
+          <span class="fieldset-title">Ordination</span>
+          <button type="button" class="fieldset-toggle" data-label-open="Minimér" data-label-closed="Udvid" aria-expanded="true">Minimér</button>
+        </legend>
+        <div class="fieldset-body">
+          <div class="inline-group">
+            <label class="inline">Panel
+              <div class="filterable-select">
+                <input type="search" data-select-filter placeholder="Filtrer paneler">
+                <select name="order_panel_id" ${panels.length ? 'required' : ''}>
+                  <option value="" selected>Vælg panel</option>
+                  ${panelOptions}
+                </select>
+              </div>
+            </label>
+            <label class="inline">Rekvirent<input name="order_clinician" placeholder="Afdeling/Læge"></label>
+          </div>
+          <div class="inline-group">
+            <label class="inline">Analyseansvarlig
+              <div class="filterable-select">
+                <input type="search" data-select-filter placeholder="Filtrer brugere">
+                <select name="order_analysis_responsible">
+                  <option value="" selected>Vælg bruger</option>
+                  ${userOptions}
+                </select>
+              </div>
+            </label>
+            <label class="inline">Tolker
+              <div class="filterable-select">
+                <input type="search" data-select-filter placeholder="Filtrer brugere">
+                <select name="order_interpreter">
+                  <option value="" selected>Vælg bruger</option>
+                  ${userOptions}
+                </select>
+              </div>
+            </label>
+          </div>
+          <div class="inline-group">
+            <label class="inline">Godkender
+              <div class="filterable-select">
+                <input type="search" data-select-filter placeholder="Filtrer brugere">
+                <select name="order_approver">
+                  <option value="" selected>Vælg bruger</option>
+                  ${userOptions}
+                </select>
+              </div>
+            </label>
+            <label class="inline">Bestilt<input type="datetime-local" name="order_ordered_at"></label>
+          </div>
+          <p class="form-hint" id="orderStatusPreview">Ordinationsstatus følger prøven: <strong id="orderStatusValue">–</strong></p>
+        </div>
       </fieldset>
-      <fieldset>
-        <legend>Varianter</legend>
-        <p class="form-hint" id="caseVariantHint">Registrer varianter fundet ved analysen. Tomme rækker ignoreres.</p>
-        <div id="variantList" class="repeater"></div>
-        <div class="btn-row">
-          <button type="button" class="secondary" id="addVariantRow">Tilføj variant</button>
-          <button type="button" class="secondary" id="caseImportVarSeq">Importér VarSeq CSV</button>
-          <input type="file" id="caseImportVarSeqInput" accept=".csv,text/csv" hidden>
+      <fieldset data-collapsible>
+        <legend>
+          <span class="fieldset-title">Kvalitetskontrol</span>
+          <button type="button" class="fieldset-toggle" data-label-open="Minimér" data-label-closed="Udvid" aria-expanded="true">Minimér</button>
+        </legend>
+        <div class="fieldset-body">
+          <p class="form-hint">Tilføj QC-målinger for prøven (valgfrit).</p>
+          <div id="qcList" class="repeater"></div>
+          <button type="button" class="secondary" id="addQcRow">Tilføj måling</button>
+        </div>
+      </fieldset>
+      <fieldset data-collapsible>
+        <legend>
+          <span class="fieldset-title">Varianter</span>
+          <button type="button" class="fieldset-toggle" data-label-open="Minimér" data-label-closed="Udvid" aria-expanded="true">Minimér</button>
+        </legend>
+        <div class="fieldset-body">
+          <p class="form-hint" id="caseVariantHint">Registrer varianter fundet ved analysen. Tomme rækker ignoreres.</p>
+          <div id="variantList" class="repeater"></div>
+          <div class="btn-row">
+            <button type="button" class="secondary" id="addVariantRow">Tilføj variant</button>
+            <button type="button" class="secondary" id="caseImportVarSeq">Importér VarSeq CSV</button>
+            <input type="file" id="caseImportVarSeqInput" accept=".csv,text/csv" hidden>
+          </div>
         </div>
       </fieldset>
       <div class="btn-row">
@@ -3572,6 +3720,7 @@ function renderCreateCase(section) {
   applyButtonTooltips(section);
   applyControlTooltips(section);
   applyFormTooltips(form);
+  initCollapsibleFieldsets(form);
   initFamilyCombos(form);
   applySelectFilters(section);
   updateControlVisibility();
