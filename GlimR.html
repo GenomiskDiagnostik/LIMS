@@ -2548,6 +2548,9 @@ async function loadStore(name) {
   const req = store.getAll();
   const rows = await requestToPromise(req);
   state.cache.set(name, rows);
+  if (name === 'orders') {
+    clearOrderDisplayNameCache();
+  }
   if (name === 'audit') {
     rebuildCreationLookup();
   }
@@ -2564,6 +2567,49 @@ function getCached(name) {
 }
 function findById(store, id) {
   return getCached(store).find(item => item.id === id);
+}
+
+const orderDisplayNameCache = new Map();
+function clearOrderDisplayNameCache() {
+  orderDisplayNameCache.clear();
+}
+function getOrderDisplayName(orderId) {
+  const numericId = Number(orderId);
+  if (!Number.isFinite(numericId) || numericId === 0) return '';
+  if (orderDisplayNameCache.has(numericId)) {
+    return orderDisplayNameCache.get(numericId);
+  }
+  const order = findById('orders', numericId);
+  let display = '';
+  if (order) {
+    for (const key of ['name', 'title', 'display_name', 'displayName', 'label']) {
+      const value = order?.[key];
+      if (typeof value === 'string' && value.trim()) {
+        display = value.trim();
+        break;
+      }
+    }
+    if (!display) {
+      const patientId = Number(order.patient_id);
+      const panelId = Number(order.panel_id);
+      const sampleId = Number(order.sample_id);
+      const patientName = Number.isFinite(patientId) && patientId > 0 ? getName('patients', patientId) : '';
+      const panel = Number.isFinite(panelId) && panelId > 0 ? findById('panels', panelId) : null;
+      const sample = Number.isFinite(sampleId) && sampleId > 0 ? findById('samples', sampleId) : null;
+      const sampleLabel = sample?.pmb_number || '';
+      const parts = [patientName, sampleLabel, panel?.name].filter(part => part && String(part).trim());
+      if (parts.length) {
+        display = parts.join(' • ');
+      } else if (order.id != null) {
+        display = `Ordination #${order.id}`;
+      }
+    }
+  }
+  if (!display && Number.isFinite(numericId)) {
+    display = `Ordination #${numericId}`;
+  }
+  orderDisplayNameCache.set(numericId, display);
+  return display;
 }
 async function addRecord(store, record) {
   const now = new Date().toISOString();
@@ -6897,7 +6943,7 @@ function renderReports(section) {
           <summary>Avanceret filter</summary>
           <div class="filter-grid">
             <label>ID<input type="search" data-filter-reports="id" placeholder="Rapport-ID"></label>
-            <label>Ordination<input type="search" data-filter-reports="order" placeholder="Ordinations-ID"></label>
+            <label>Ordination<input type="search" data-filter-reports="order" placeholder="Ordination (navn eller ID)"></label>
             <label>Status<input type="search" data-filter-reports="status" placeholder="Status"></label>
             <label>Udstedt fra<input type="date" data-filter-reports="issued_from"></label>
             <label>Udstedt til<input type="date" data-filter-reports="issued_to"></label>
@@ -7376,10 +7422,16 @@ function renderReports(section) {
       const raw = (r.status || '').toLowerCase();
       const display = (statusMap[r.status] || r.status || '').toLowerCase();
       const creator = determineCreatedBy('reports', r).toLowerCase();
-      return [raw, display, creator].some(value => value.includes(term));
+      const orderName = getOrderDisplayName(r.order_id).toLowerCase();
+      const orderId = String(r.order_id || '').toLowerCase();
+      return [raw, display, creator, orderName, orderId].some(value => value.includes(term));
     }).filter(r => {
       if (filters.id && !String(r.id).includes(filters.id)) return false;
-      if (filters.order && !(String(r.order_id || '')).toLowerCase().includes(filters.order)) return false;
+      if (filters.order) {
+        const orderIdString = String(r.order_id || '').toLowerCase();
+        const orderName = getOrderDisplayName(r.order_id).toLowerCase();
+        if (!orderIdString.includes(filters.order) && !orderName.includes(filters.order)) return false;
+      }
       const statusStrings = [(r.status || '').toLowerCase(), (statusMap[r.status] || '').toLowerCase()];
       if (filters.status && !statusStrings.some(v => v.includes(filters.status))) return false;
       if (fromDate || toDate) {
@@ -7398,8 +7450,10 @@ function renderReports(section) {
       const displayStatus = statusMap[r.status] || r.status || '';
       const createdBy = determineCreatedBy('reports', r);
       const issuedAt = formatDanishDate(r.issued_at);
+      const orderName = getOrderDisplayName(r.order_id);
+      const orderTitle = r.order_id != null ? ` title="Ordination #${r.order_id}"` : '';
       const selectedAttr = r.id === selectedReportId ? ' data-selected="true"' : '';
-      return `<tr data-id="${r.id}"${selectedAttr}><td>${r.id}</td><td>${r.order_id}</td><td>${esc(displayStatus)}</td><td>${esc(createdBy)}</td><td>${esc(issuedAt)}</td></tr>`;
+      return `<tr data-id="${r.id}"${selectedAttr}><td>${r.id}</td><td${orderTitle}>${esc(orderName)}</td><td>${esc(displayStatus)}</td><td>${esc(createdBy)}</td><td>${esc(issuedAt)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
