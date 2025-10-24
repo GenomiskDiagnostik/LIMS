@@ -5142,6 +5142,46 @@ function renderOrders(section) {
 function renderVariants(section) {
   let list = getCached('variants');
   const orders = getCached('orders');
+  const orderMap = new Map(orders.map(order => [Number(order.id), order]));
+  const orderNameCache = new Map();
+  const getOrderDisplayName = orderId => {
+    const numericId = Number(orderId);
+    if (!Number.isFinite(numericId) || numericId === 0) return '';
+    if (orderNameCache.has(numericId)) {
+      return orderNameCache.get(numericId);
+    }
+    const order = orderMap.get(numericId);
+    let display = '';
+    if (order) {
+      for (const key of ['name', 'title', 'display_name', 'displayName', 'label']) {
+        const value = order?.[key];
+        if (typeof value === 'string' && value.trim()) {
+          display = value.trim();
+          break;
+        }
+      }
+      if (!display) {
+        const patientId = Number(order.patient_id);
+        const panelId = Number(order.panel_id);
+        const sampleId = Number(order.sample_id);
+        const patientName = Number.isFinite(patientId) && patientId > 0 ? getName('patients', patientId) : '';
+        const panel = Number.isFinite(panelId) && panelId > 0 ? findById('panels', panelId) : null;
+        const sample = Number.isFinite(sampleId) && sampleId > 0 ? findById('samples', sampleId) : null;
+        const sampleLabel = sample?.pmb_number || '';
+        const parts = [patientName, sampleLabel, panel?.name].filter(part => part && String(part).trim());
+        if (parts.length) {
+          display = parts.join(' • ');
+        } else if (order.id != null) {
+          display = `Ordination #${order.id}`;
+        }
+      }
+    }
+    if (!display && Number.isFinite(numericId)) {
+      display = `Ordination #${numericId}`;
+    }
+    orderNameCache.set(numericId, display);
+    return display;
+  };
   section.innerHTML = `
   <div class="panel">
     <div class="flex">
@@ -5595,6 +5635,7 @@ function renderVariants(section) {
     filteredVariants = list.filter(v => {
       if (!term) return true;
       const creator = determineCreatedBy('variants', v);
+      const orderName = getOrderDisplayName(v.order_id);
       const searchValues = [
         v.gene,
         v.transcript,
@@ -5611,12 +5652,18 @@ function renderVariants(section) {
         formatVariantGenomicRange(v),
         formatVariantTitle(v),
         getVariantTypeLabel(v.variant_type),
-        creator
+        creator,
+        orderName,
+        String(v.order_id || '')
       ];
       return searchValues.some(val => (val || '').toString().toLowerCase().includes(term));
     }).filter(v => {
       if (filters.id && !String(v.id).includes(filters.id)) return false;
-      if (filters.order && !(String(v.order_id || '')).toLowerCase().includes(filters.order)) return false;
+      if (filters.order) {
+        const orderIdString = (String(v.order_id || '')).toLowerCase();
+        const orderName = getOrderDisplayName(v.order_id).toLowerCase();
+        if (!orderIdString.includes(filters.order) && !orderName.includes(filters.order)) return false;
+      }
       if (filters.gene && !(v.gene || '').toLowerCase().includes(filters.gene)) return false;
       if (filters.transcript && !(v.transcript || '').toLowerCase().includes(filters.transcript)) return false;
       if (filters.rsid && !(v.rsid || '').toLowerCase().includes(filters.rsid)) return false;
@@ -5638,7 +5685,9 @@ function renderVariants(section) {
       const selectedAttr = v.id === selectedVariantId ? ' data-selected="true"' : '';
       const title = formatVariantTitle(v);
       const typeLabel = getVariantTypeLabel(v.variant_type);
-      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td>${v.order_id}</td><td>${esc(title)}</td><td>${formatRsIdCell(v.rsid)}</td><td>${esc(typeLabel)}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(createdBy)}</td></tr>`;
+      const orderName = getOrderDisplayName(v.order_id);
+      const orderTitle = v.order_id != null ? ` title="Ordination #${v.order_id}"` : '';
+      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td${orderTitle}>${esc(orderName)}</td><td>${esc(title)}</td><td>${formatRsIdCell(v.rsid)}</td><td>${esc(typeLabel)}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
