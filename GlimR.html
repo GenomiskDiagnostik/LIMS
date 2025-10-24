@@ -2109,6 +2109,11 @@ function initCollapsibleFieldsets(root) {
     const labelOpen = toggle.dataset.labelOpen || 'Minimér';
     const labelClosed = toggle.dataset.labelClosed || 'Udvid';
     fieldset.classList.toggle('collapsed', collapsed);
+    if (collapsed) {
+      fieldset.dataset.collapsed = 'true';
+    } else {
+      delete fieldset.dataset.collapsed;
+    }
     toggle.setAttribute('aria-expanded', String(!collapsed));
     toggle.textContent = collapsed ? labelClosed : labelOpen;
     const title = fieldset.querySelector('.fieldset-title');
