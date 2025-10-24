@@ -767,6 +767,9 @@ form textarea {
 .variant-row .variant-batch-group {
   display: contents;
 }
+.variant-row .variant-structure-grid {
+  display: contents;
+}
 .case-form .toggle {
   display: inline-flex;
   align-items: center;
@@ -1817,14 +1820,17 @@ function getVariantTypeLabel(value) {
   return option ? option.label : normalized;
 }
 
-function setupVariantTypeForm(form, {defaultType = 'snv'} = {}) {
+function setupVariantTypeForm(form, {defaultType = 'snv', disableInactiveGroups = false} = {}) {
   if (!form) {
     return {
       updateVariantTypeFields: () => {},
       variantTypeSelect: null
     };
   }
-  const select = form.elements?.variant_type || null;
+  const select = form.elements?.variant_type
+    || form.querySelector('[name="variant_type"]')
+    || form.querySelector('[data-field="variant_type"]')
+    || null;
   const groups = Array.from(form.querySelectorAll('[data-variant-types]'));
   const typeRequiredFields = Array.from(form.querySelectorAll('[data-type-required]'));
   const initialRequired = new Map(typeRequiredFields.map(field => [field, field.required]));
@@ -1839,7 +1845,16 @@ function setupVariantTypeForm(form, {defaultType = 'snv'} = {}) {
         .split(/\s+/)
         .filter(Boolean)
         .map(normalizeVariantType);
-      group.hidden = types.length ? !types.includes(type) : false;
+      const active = types.length ? types.includes(type) : true;
+      group.hidden = !active;
+      group.classList.toggle('variant-type-hidden', !active);
+      if (disableInactiveGroups) {
+        const fields = group.querySelectorAll('input, select, textarea, button');
+        fields.forEach(field => {
+          if (field.matches('[name="variant_type"],[data-field="variant_type"]')) return;
+          field.disabled = !active;
+        });
+      }
     });
     typeRequiredFields.forEach(field => {
       const requiredFor = (field.dataset.typeRequired || '')
@@ -3511,22 +3526,24 @@ function renderCreateCase(section) {
     row.className = 'case-row variant-row';
     row.innerHTML = `
       <label class="inline">Varianttype<select data-field="variant_type">${VARIANT_TYPE_OPTIONS.map(option => `<option value="${option.value}">${option.label}</option>`).join('')}</select></label>
-      <label class="inline">Gen / region<input type="text" data-field="gene" placeholder="BRCA1"></label>
-      <div class="variant-batch-group" data-variant-types="snv">
-        <label class="inline">Transkript<input type="text" data-field="transcript" placeholder="NM_007294.3"></label>
-        <label class="inline">HGVS c.<input type="text" data-field="hgvs_c" placeholder="c.5266dupC"></label>
+      <label class="inline">Gen / region<input type="text" data-field="gene" data-type-required="snv" placeholder="BRCA1"></label>
+      <div class="variant-batch-group variant-field-group" data-variant-types="snv">
+        <label class="inline">Transkript<input type="text" data-field="transcript" data-type-required="snv" placeholder="NM_007294.3"></label>
+        <label class="inline">HGVS c.<input type="text" data-field="hgvs_c" data-type-required="snv" placeholder="c.5266dupC"></label>
         <label class="inline">HGVS p.<input type="text" data-field="hgvs_p" placeholder="p.(Gln1756Profs*74)"></label>
         <label class="inline">dbSNP rsID<input type="text" data-field="rsid" placeholder="rs123456"></label>
         <label class="inline">Zygositet<input type="text" data-field="zygosity" placeholder="Heterozygot"></label>
       </div>
-      <div class="variant-batch-group" data-variant-types="cnv sv cyto">
-        <label class="inline">Genom ref.<input type="text" data-field="genome_build" placeholder="GRCh38"></label>
-        <label class="inline">Kromosom<input type="text" data-field="chromosome" placeholder="17p"></label>
-        <label class="inline">Start<input type="text" data-field="start" placeholder="16287000"></label>
-        <label class="inline">Slut<input type="text" data-field="end" placeholder="21100000"></label>
-        <label class="inline">Kopital<input type="text" data-field="copy_number" placeholder="x1"></label>
-        <label class="inline">Strukturtype<select data-field="sv_subtype" data-allow-legacy-option>${renderStructureTypeOptions({includeBlank: true})}</select></label>
-        <label class="inline">Størrelse<input type="text" data-field="size_bp" placeholder="4.8 Mb"></label>
+      <div class="variant-batch-group variant-field-group" data-variant-types="cnv sv cyto">
+        <div class="variant-structure-grid">
+          <label class="inline">Genom ref.<input type="text" data-field="genome_build" placeholder="GRCh38"></label>
+          <label class="inline">Kromosom<input type="text" data-field="chromosome" placeholder="17p"></label>
+          <label class="inline">Start<input type="text" data-field="start" placeholder="16287000"></label>
+          <label class="inline">Slut<input type="text" data-field="end" placeholder="21100000"></label>
+          <label class="inline">Kopital<input type="text" data-field="copy_number" placeholder="x1"></label>
+          <label class="inline">Strukturtype<select data-field="sv_subtype" data-allow-legacy-option>${renderStructureTypeOptions({includeBlank: true})}</select></label>
+          <label class="inline">Størrelse<input type="text" data-field="size_bp" placeholder="4.8 Mb"></label>
+        </div>
         <label class="inline wide">ISCN<textarea class="small" data-field="iscn" placeholder="arr[GRCh38] 17p11.2p12(16287000_21100000)x1"></textarea></label>
         <label class="inline wide">Berørte gener<textarea class="small" data-field="affected_genes" placeholder="RAI1; PMP22"></textarea></label>
       </div>
@@ -3590,18 +3607,10 @@ function renderCreateCase(section) {
     if (interpretationField) interpretationField.value = values.interpretation || '';
     const annotationsField = row.querySelector('[data-field="annotations"]');
     if (annotationsField) annotationsField.value = values.annotations || '';
-    const typeSelect = row.querySelector('[data-field="variant_type"]');
-    const typeGroups = row.querySelectorAll('[data-variant-types]');
-    const updateRowVariantType = () => {
-      const type = normalizeVariantType(typeSelect?.value || 'snv');
-      if (typeSelect && typeSelect.value !== type) typeSelect.value = type;
-      typeGroups.forEach(group => {
-        const allowed = (group.dataset.variantTypes || '').split(/\s+/).filter(Boolean).map(normalizeVariantType);
-        group.hidden = allowed.length ? !allowed.includes(type) : false;
-      });
-    };
-    updateRowVariantType();
-    typeSelect?.addEventListener('change', updateRowVariantType);
+    const {updateVariantTypeFields} = setupVariantTypeForm(row, {
+      defaultType: row.querySelector('[data-field="variant_type"]')?.value || 'snv',
+      disableInactiveGroups: true
+    });
     const removeBtn = row.querySelector('.case-remove-row');
     removeBtn?.addEventListener('click', () => row.remove());
     if (removeBtn) setTooltip(removeBtn, 'Fjern varianten fra oprettelsen.');
@@ -3614,6 +3623,7 @@ function renderCreateCase(section) {
         setValue('[data-field="hgvs_c"]', variant.hgvs_c);
         setValue('[data-field="hgvs_p"]', variant.hgvs_p);
         setValue('[data-field="rsid"]', variant.rsid);
+        setValue('[data-field="zygosity"]', variant.zygosity);
         setValue('[data-field="criteria"]', variant.criteria);
         setValue('[data-field="genome_build"]', variant.genome_build);
         setValue('[data-field="chromosome"]', variant.chromosome);
@@ -3633,7 +3643,7 @@ function renderCreateCase(section) {
         if (interpretationField) interpretationField.value = variant.evidence || variant.interpretation || '';
         const annotationsField = row.querySelector('[data-field="annotations"]');
         if (annotationsField) annotationsField.value = variant.annotations || variant.annotation_summary || '';
-        updateRowVariantType();
+        updateVariantTypeFields();
       });
     });
     if (libraryBtn) setTooltip(libraryBtn, 'Vælg en variant fra biblioteket.');
@@ -3649,6 +3659,11 @@ function renderCreateCase(section) {
     const get = field => {
       const el = row.querySelector(`[data-field="${field}"]`);
       if (!el) return '';
+      if (el.disabled) return '';
+      const group = el.closest('[data-variant-types]');
+      if (group && (group.hidden || group.classList.contains('variant-type-hidden'))) {
+        return '';
+      }
       if (el.type === 'number') return el.value.trim();
       return (el.value || '').trim();
     };
@@ -3867,27 +3882,40 @@ function renderCreateCase(section) {
     if (variantList) {
       for (const row of variantList.querySelectorAll('.variant-row')) {
         const variantType = normalizeVariantType(row.querySelector('[data-field="variant_type"]')?.value || 'snv');
-        const gene = row.querySelector('[data-field="gene"]')?.value.trim() || '';
-        const transcript = row.querySelector('[data-field="transcript"]')?.value.trim() || '';
-        const hgvsC = row.querySelector('[data-field="hgvs_c"]')?.value.trim() || '';
-        const hgvsP = row.querySelector('[data-field="hgvs_p"]')?.value.trim() || '';
-        const rsid = row.querySelector('[data-field="rsid"]')?.value.trim() || '';
-        const zygosity = row.querySelector('[data-field="zygosity"]')?.value.trim() || '';
+        const getFieldValue = fieldName => {
+          const el = row.querySelector(`[data-field="${fieldName}"]`);
+          if (!el) return '';
+          if (el.disabled) return '';
+          const group = el.closest('[data-variant-types]');
+          if (group && (group.hidden || group.classList.contains('variant-type-hidden'))) {
+            return '';
+          }
+          if (el.type === 'number') {
+            return el.value.trim();
+          }
+          return (el.value || '').trim();
+        };
+        const gene = getFieldValue('gene');
+        const transcript = getFieldValue('transcript');
+        const hgvsC = getFieldValue('hgvs_c');
+        const hgvsP = getFieldValue('hgvs_p');
+        const rsid = getFieldValue('rsid');
+        const zygosity = getFieldValue('zygosity');
         const classification = row.querySelector('[data-field="classification"]')?.value || '3';
-        const criteria = row.querySelector('[data-field="criteria"]')?.value.trim() || '';
-        const afRaw = row.querySelector('[data-field="af"]')?.value.trim() || '';
-        const interpretation = row.querySelector('[data-field="interpretation"]')?.value.trim() || '';
-        const annotations = row.querySelector('[data-field="annotations"]')?.value.trim() || '';
-        const genomeBuild = row.querySelector('[data-field="genome_build"]')?.value.trim() || '';
-        const chromosome = row.querySelector('[data-field="chromosome"]')?.value.trim() || '';
-        const start = row.querySelector('[data-field="start"]')?.value.trim() || '';
-        const end = row.querySelector('[data-field="end"]')?.value.trim() || '';
-        const copyNumber = row.querySelector('[data-field="copy_number"]')?.value.trim() || '';
-        const svSubtype = normalizeStructureTypeValue(row.querySelector('[data-field="sv_subtype"]')?.value.trim() || '');
-        const sizeBp = row.querySelector('[data-field="size_bp"]')?.value.trim() || '';
-        const iscn = row.querySelector('[data-field="iscn"]')?.value.trim() || '';
-        const description = row.querySelector('[data-field="description"]')?.value.trim() || '';
-        const affectedGenes = row.querySelector('[data-field="affected_genes"]')?.value.trim() || '';
+        const criteria = getFieldValue('criteria');
+        const afRaw = getFieldValue('af');
+        const interpretation = getFieldValue('interpretation');
+        const annotations = getFieldValue('annotations');
+        const genomeBuild = getFieldValue('genome_build');
+        const chromosome = getFieldValue('chromosome');
+        const start = getFieldValue('start');
+        const end = getFieldValue('end');
+        const copyNumber = getFieldValue('copy_number');
+        const svSubtype = normalizeStructureTypeValue(getFieldValue('sv_subtype'));
+        const sizeBp = getFieldValue('size_bp');
+        const iscn = getFieldValue('iscn');
+        const description = getFieldValue('description');
+        const affectedGenes = getFieldValue('affected_genes');
         const isEmpty = !gene && !transcript && !hgvsC && !hgvsP && !rsid && !zygosity && !criteria && !afRaw && !interpretation && !annotations && !genomeBuild && !chromosome && !start && !end && !copyNumber && !svSubtype && !sizeBp && !iscn && !description && !affectedGenes;
         if (isEmpty) continue;
         if (variantType === 'snv') {
