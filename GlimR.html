@@ -1550,11 +1550,11 @@ const tooltipCatalog = {
     distanceSwap: 'Byt start- og slutposition for beregningen.',
     gcUpper: 'Fjern mellemrum og konverter sekvensen til store bogstaver.',
     gcReverse: 'Beregn og indsæt den omvendt komplementære sekvens.',
-    patientsExport: 'Eksportér den aktuelt filtrerede patientliste til en JSON-fil.',
-    samplesExport: 'Eksportér de filtrerede prøver til JSON til deling eller videre analyse.',
-    ordersExport: 'Eksportér ordinationerne der matcher filtrene.',
-    variantsExport: 'Eksportér filtrerede varianter inklusive ACMG-data.',
-    reportsExport: 'Eksportér rapportlisten med de valgte filtre.',
+    patientsExport: 'Eksportér den aktuelt filtrerede patientliste til en CSV-fil.',
+    samplesExport: 'Eksportér de filtrerede prøver som CSV til deling eller videre analyse.',
+    ordersExport: 'Eksportér ordinationerne der matcher filtrene som CSV.',
+    variantsExport: 'Eksportér filtrerede varianter inklusive ACMG-data til CSV.',
+    reportsExport: 'Eksportér rapportlisten med de valgte filtre som CSV.',
     themeToggle: 'Skifter mellem lyst og mørkt layout for GlimR.',
     logoutBtn: 'Log brugeren ud og lås GlimR for redigering.',
     generateFhir: 'Generér og download et FHIR-svar for ordinationen.',
@@ -2812,28 +2812,98 @@ async function backupAndResetData() {
     }
   }
 }
-function exportFilteredJson(filename, rows, meta = {}) {
-  const filters = meta.filters ? Object.fromEntries(Object.entries(meta.filters).filter(([, value]) => value !== '' && value != null)) : undefined;
-  const payload = {
-    titel: meta.title || 'GlimR filtreret eksport',
-    entitet: meta.entity || 'ukendt',
-    antal: rows.length,
-    genereret: new Date().toISOString(),
-    poster: rows
-  };
-  if (filters && Object.keys(filters).length) {
-    payload.filtre = filters;
+const CSV_LABEL_OVERRIDES = {
+  id: 'ID',
+  mrn: 'MRN',
+  extra_id: 'Ekstra ID',
+  family_number: 'Familienummer',
+  name: 'Navn',
+  gender: 'Køn (kode)',
+  birth_date: 'Fødselsdato',
+  notes: 'Noter',
+  created_by: 'Oprettet af',
+  created_at: 'Oprettet (ISO)',
+  updated_at: 'Opdateret (ISO)',
+  patient_id: 'Patient-ID',
+  sample_id: 'Prøve-ID',
+  panel_id: 'Panel-ID',
+  pmb_number: 'PMB-nummer',
+  sample_type: 'Prøvetype',
+  collected_at: 'Opsamlet (ISO)',
+  status: 'Status (kode)',
+  ordered_at: 'Bestilt (ISO)',
+  variant_type: 'Varianttype (kode)',
+  hgvs_c: 'HGVS c.',
+  hgvs_p: 'HGVS p.',
+  rsid: 'rsID',
+  af: 'Allelfrekvens',
+  genome_build: 'Genom reference',
+  sv_subtype: 'Strukturtype (kode)',
+  size_bp: 'Størrelse (bp)',
+  copy_number: 'Kopital',
+  affected_genes: 'Berørte gener',
+  order_id: 'Ordination-ID',
+  summary: 'Konklusion',
+  issued_at: 'Udstedt (ISO)',
+  findings: 'Fund',
+  variant_ids: 'Variant-ID\'er',
+  variant_details: 'Variantdetaljer',
+  annotations: 'Annoteringer',
+  interpretation: 'Tolkning',
+  clinician: 'Rekvirent',
+  analysis_responsible_id: 'Analyseansvarlig-ID',
+  interpreter_id: 'Tolker-ID',
+  approver_id: 'Godkender-ID',
+  gene: 'Gen/Region',
+  transcript: 'Transkript',
+  zygosity: 'Zygositet',
+  chromosome: 'Kromosom',
+  start: 'Start',
+  end: 'Slut',
+  description: 'Beskrivelse'
+};
+function getCsvLabel(key) {
+  if (!key) return '';
+  if (CSV_LABEL_OVERRIDES[key]) return CSV_LABEL_OVERRIDES[key];
+  const parts = key.split('_').map(part => {
+    if (!part) return '';
+    if (part.length <= 3) return part.toUpperCase();
+    return part.charAt(0).toUpperCase() + part.slice(1);
+  });
+  return parts.join(' ');
+}
+function inferCsvColumns(rows) {
+  const keys = Array.from(new Set(rows.flatMap(row => row ? Object.keys(row) : [])));
+  if (!keys.length) {
+    return [{
+      key: '__serialized__',
+      label: 'Data',
+      value: row => {
+        try {
+          return JSON.stringify(row ?? {});
+        } catch (err) {
+          return '';
+        }
+      }
+    }];
   }
-  if (meta.tab) {
-    payload.fane = meta.tab;
+  return keys.map(key => ({key, label: getCsvLabel(key)}));
+}
+function formatJsonCell(value) {
+  if (value == null || value === '') return '';
+  if (typeof value === 'string') return value;
+  try {
+    return JSON.stringify(value);
+  } catch (err) {
+    return String(value);
   }
-  const blob = new Blob([JSON.stringify(payload, null, 2)], {type: 'application/json'});
-  const url = URL.createObjectURL(blob);
-  const stamped = withDateStamp(filename);
-  triggerDownload(url, stamped);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function exportFilteredCsv(baseName, rows, columns, meta = {}) {
+  const data = Array.isArray(rows) ? rows : [];
+  const cols = Array.isArray(columns) && columns.length ? columns : inferCsvColumns(data);
+  const filename = downloadCsvFile(data, cols, baseName, meta.delimiter || ';');
   const plural = meta.plural || meta.entity || 'poster';
-  setStatus(`Eksporterede ${rows.length} ${plural} til ${stamped}.`);
+  setStatus(`Eksporterede ${data.length} ${plural} til ${filename}.`);
 }
 function triggerDownload(url, filename) {
   const a = document.createElement('a');
@@ -4467,12 +4537,28 @@ function renderPatients(section) {
   renderRows();
   searchInput.addEventListener('input', renderRows);
   Object.values(filterInputs).forEach(input => input?.addEventListener('input', renderRows));
+  const patientExportColumns = [
+    {key:'id', label:'ID'},
+    {key:'mrn', label:'MRN'},
+    {key:'extra_id', label:'Ekstra ID'},
+    {key:'family_number', label:'Familienummer'},
+    {key:'name', label:'Navn'},
+    {key:'gender', label:'Køn (kode)'},
+    {key:'gender_label', label:'Køn', value: row => genderMap[row.gender] || row.gender || ''},
+    {key:'birth_date', label:'Fødselsdato'},
+    {key:'birth_date_formatted', label:'Fødselsdato (formateret)', value: row => formatDanishDate(row.birth_date)},
+    {key:'notes', label:'Noter'},
+    {key:'created_by', label:'Oprettet af'},
+    {key:'created_at', label:'Oprettet (ISO)'},
+    {key:'created_at_formatted', label:'Oprettet', value: row => formatDanishDate(row.created_at, true)},
+    {key:'updated_at', label:'Opdateret (ISO)'},
+    {key:'updated_at_formatted', label:'Opdateret', value: row => formatDanishDate(row.updated_at, true)}
+  ];
   section.querySelector('#patientsExport').addEventListener('click', () => {
-    exportFilteredJson('glimr-patienter-filtreret.json', cloneWithCreatedBy('patients', filteredPatients), {
+    const rows = cloneWithCreatedBy('patients', filteredPatients);
+    exportFilteredCsv('glimr-patienter-filtreret.csv', rows, patientExportColumns, {
       entity: 'patienter',
-      plural: 'patienter',
-      tab: 'Patienter',
-      filters: activeFilters
+      plural: 'patienter'
     });
   });
   tbody.addEventListener('click', e => {
@@ -4666,12 +4752,28 @@ function renderSamples(section) {
   renderRows();
   search.addEventListener('input', renderRows);
   Object.values(filterInputs).forEach(input => input?.addEventListener('input', renderRows));
+  const sampleExportColumns = [
+    {key:'id', label:'ID'},
+    {key:'pmb_number', label:'PMB-nummer'},
+    {key:'patient_id', label:'Patient-ID'},
+    {key:'patient_name', label:'Patient', value: row => getName('patients', Number(row.patient_id))},
+    {key:'sample_type', label:'Prøvetype'},
+    {key:'status', label:'Status (kode)'},
+    {key:'status_display', label:'Status', value: row => row.status || ''},
+    {key:'collected_at', label:'Opsamlet (ISO)'},
+    {key:'collected_at_formatted', label:'Opsamlet', value: row => formatDanishDate(row.collected_at, true)},
+    {key:'notes', label:'Noter'},
+    {key:'created_by', label:'Oprettet af'},
+    {key:'created_at', label:'Oprettet (ISO)'},
+    {key:'created_at_formatted', label:'Oprettet', value: row => formatDanishDate(row.created_at, true)},
+    {key:'updated_at', label:'Opdateret (ISO)'},
+    {key:'updated_at_formatted', label:'Opdateret', value: row => formatDanishDate(row.updated_at, true)}
+  ];
   section.querySelector('#samplesExport').addEventListener('click', () => {
-    exportFilteredJson('glimr-proever-filtreret.json', cloneWithCreatedBy('samples', filteredSamples), {
+    const rows = cloneWithCreatedBy('samples', filteredSamples);
+    exportFilteredCsv('glimr-proever-filtreret.csv', rows, sampleExportColumns, {
       entity: 'prøver',
-      plural: 'prøver',
-      tab: 'Prøver',
-      filters: activeFilters
+      plural: 'prøver'
     });
   });
   tbody.addEventListener('click', e => {
@@ -4869,6 +4971,7 @@ function renderOrders(section) {
   const sampleMap = new Map(samples.map(s => [s.id, s]));
   const panelMap = new Map(panels.map(p => [p.id, p]));
   const userMap = new Map(users.map(u => [u.id, u]));
+  const resolveUserName = id => userMap.get(Number(id))?.name || '';
   const userOptions = users.map(u => `<option value="${u.id}">${esc(u.name || `Bruger #${u.id}`)}</option>`).join('');
   section.innerHTML = `
   <div class="panel">
@@ -5120,7 +5223,7 @@ function renderOrders(section) {
       }
       return true;
     });
-    const userName = id => userMap.get(Number(id))?.name || '';
+    const userName = id => resolveUserName(id);
     if (selectedOrderId != null && !filteredOrders.some(o => o.id === selectedOrderId)) {
       selectedOrderId = null;
     }
@@ -5144,12 +5247,39 @@ function renderOrders(section) {
       input.addEventListener('input', renderRows);
     }
   });
+  const orderExportColumns = [
+    {key:'id', label:'ID'},
+    {key:'patient_id', label:'Patient-ID'},
+    {key:'patient_name', label:'Patient', value: row => getName('patients', Number(row.patient_id))},
+    {key:'sample_id', label:'Prøve-ID'},
+    {key:'sample_label', label:'Prøve', value: row => getName('samples', Number(row.sample_id))},
+    {key:'panel_id', label:'Panel-ID'},
+    {key:'panel_name', label:'Panel', value: row => getName('panels', Number(row.panel_id))},
+    {key:'status', label:'Status (kode)'},
+    {key:'status_display', label:'Status', value: row => {
+      const sample = sampleMap.get(Number(row.sample_id));
+      return sample?.status || row.status || '';
+    }},
+    {key:'analysis_responsible_id', label:'Analyseansvarlig-ID'},
+    {key:'analysis_responsible', label:'Analyseansvarlig', value: row => resolveUserName(row.analysis_responsible_id)},
+    {key:'interpreter_id', label:'Tolker-ID'},
+    {key:'interpreter', label:'Tolker', value: row => resolveUserName(row.interpreter_id)},
+    {key:'approver_id', label:'Godkender-ID'},
+    {key:'approver', label:'Godkender', value: row => resolveUserName(row.approver_id)},
+    {key:'clinician', label:'Rekvirent'},
+    {key:'ordered_at', label:'Bestilt (ISO)'},
+    {key:'ordered_at_formatted', label:'Bestilt', value: row => formatDanishDate(row.ordered_at, true)},
+    {key:'created_by', label:'Oprettet af'},
+    {key:'created_at', label:'Oprettet (ISO)'},
+    {key:'created_at_formatted', label:'Oprettet', value: row => formatDanishDate(row.created_at, true)},
+    {key:'updated_at', label:'Opdateret (ISO)'},
+    {key:'updated_at_formatted', label:'Opdateret', value: row => formatDanishDate(row.updated_at, true)}
+  ];
   section.querySelector('#ordersExport').addEventListener('click', () => {
-    exportFilteredJson('glimr-ordinationer-filtreret.json', cloneWithCreatedBy('orders', filteredOrders), {
+    const rows = cloneWithCreatedBy('orders', filteredOrders);
+    exportFilteredCsv('glimr-ordinationer-filtreret.csv', rows, orderExportColumns, {
       entity: 'ordinationer',
-      plural: 'ordinationer',
-      tab: 'Ordinationer',
-      filters: activeFilters
+      plural: 'ordinationer'
     });
   });
   tbody.addEventListener('click', e => {
@@ -5767,12 +5897,51 @@ function renderVariants(section) {
   renderRows();
   search.addEventListener('input', renderRows);
   Object.values(filterInputs).forEach(input => input?.addEventListener('input', renderRows));
+  const variantExportColumns = [
+    {key:'id', label:'ID'},
+    {key:'order_id', label:'Ordination-ID'},
+    {key:'order_name', label:'Ordination', value: row => getOrderDisplayName(row.order_id)},
+    {key:'variant_type', label:'Varianttype (kode)'},
+    {key:'variant_type_label', label:'Varianttype', value: row => getVariantTypeLabel(row.variant_type)},
+    {key:'gene', label:'Gen/Region'},
+    {key:'transcript', label:'Transkript'},
+    {key:'hgvs_c', label:'HGVS c.'},
+    {key:'hgvs_p', label:'HGVS p.'},
+    {key:'rsid', label:'rsID'},
+    {key:'zygosity', label:'Zygositet'},
+    {key:'classification', label:'Klasse'},
+    {key:'classification_label', label:'Klasse (tekst)', value: row => {
+      const key = String(row.classification ?? '');
+      return classificationMap?.[key]?.display || '';
+    }},
+    {key:'criteria', label:'Kriterier'},
+    {key:'af', label:'Allelfrekvens'},
+    {key:'genome_build', label:'Genom reference'},
+    {key:'chromosome', label:'Kromosom'},
+    {key:'start', label:'Start'},
+    {key:'end', label:'Slut'},
+    {key:'copy_number', label:'Kopital'},
+    {key:'sv_subtype', label:'Strukturtype (kode)'},
+    {key:'sv_subtype_label', label:'Strukturtype', value: row => getStructureTypeLabel(row.sv_subtype)},
+    {key:'size_bp', label:'Størrelse (bp)'},
+    {key:'iscn', label:'ISCN'},
+    {key:'description', label:'Beskrivelse'},
+    {key:'affected_genes', label:'Berørte gener'},
+    {key:'annotations', label:'Annoteringer'},
+    {key:'interpretation', label:'Tolkning'},
+    {key:'variant_title', label:'Varianttitel', value: row => formatVariantTitle(row)},
+    {key:'variant_range', label:'Genomisk interval', value: row => formatVariantGenomicRange(row)},
+    {key:'created_by', label:'Oprettet af'},
+    {key:'created_at', label:'Oprettet (ISO)'},
+    {key:'created_at_formatted', label:'Oprettet', value: row => formatDanishDate(row.created_at, true)},
+    {key:'updated_at', label:'Opdateret (ISO)'},
+    {key:'updated_at_formatted', label:'Opdateret', value: row => formatDanishDate(row.updated_at, true)}
+  ];
   section.querySelector('#variantsExport').addEventListener('click', () => {
-    exportFilteredJson('glimr-varianter-filtreret.json', cloneWithCreatedBy('variants', filteredVariants), {
+    const rows = cloneWithCreatedBy('variants', filteredVariants);
+    exportFilteredCsv('glimr-varianter-filtreret.csv', rows, variantExportColumns, {
       entity: 'varianter',
-      plural: 'varianter',
-      tab: 'Varianter',
-      filters: activeFilters
+      plural: 'varianter'
     });
   });
   tbody.addEventListener('click', e => {
@@ -7460,12 +7629,29 @@ function renderReports(section) {
   renderRows();
   search.addEventListener('input', renderRows);
   Object.values(filterInputs).forEach(input => input?.addEventListener('input', renderRows));
+  const reportExportColumns = [
+    {key:'id', label:'ID'},
+    {key:'order_id', label:'Ordination-ID'},
+    {key:'order_name', label:'Ordination', value: row => getOrderDisplayName(row.order_id)},
+    {key:'status', label:'Status (kode)'},
+    {key:'status_label', label:'Status', value: row => statusMap[row.status] || row.status || ''},
+    {key:'summary', label:'Konklusion'},
+    {key:'findings', label:'Fund'},
+    {key:'variant_ids', label:'Variant-ID\'er'},
+    {key:'variant_details', label:'Variantdetaljer', value: row => formatJsonCell(row.variant_details)},
+    {key:'issued_at', label:'Udstedt (ISO)'},
+    {key:'issued_at_formatted', label:'Udstedt', value: row => formatDanishDate(row.issued_at, true)},
+    {key:'created_by', label:'Oprettet af'},
+    {key:'created_at', label:'Oprettet (ISO)'},
+    {key:'created_at_formatted', label:'Oprettet', value: row => formatDanishDate(row.created_at, true)},
+    {key:'updated_at', label:'Opdateret (ISO)'},
+    {key:'updated_at_formatted', label:'Opdateret', value: row => formatDanishDate(row.updated_at, true)}
+  ];
   section.querySelector('#reportsExport').addEventListener('click', () => {
-    exportFilteredJson('glimr-rapporter-filtreret.json', cloneWithCreatedBy('reports', filteredReports), {
+    const rows = cloneWithCreatedBy('reports', filteredReports);
+    exportFilteredCsv('glimr-rapporter-filtreret.csv', rows, reportExportColumns, {
       entity: 'rapporter',
-      plural: 'rapporter',
-      tab: 'Rapporter',
-      filters: activeFilters
+      plural: 'rapporter'
     });
   });
   tbody.addEventListener('click', e => {
