@@ -636,13 +636,15 @@ form textarea {
   color: var(--danger);
   font-weight: 600;
 }
-.case-form fieldset {
+.case-form fieldset,
+.panel fieldset[data-collapsible] {
   border: 1px solid var(--panel-border);
   border-radius: 0.65rem;
   padding: 1rem;
   margin: 0 0 1rem 0;
 }
-.case-form legend {
+.case-form legend,
+.panel fieldset[data-collapsible] > legend {
   font-weight: 600;
   padding: 0 0.4rem;
   color: var(--text);
@@ -652,15 +654,18 @@ form textarea {
   gap: 0.5rem;
   margin-bottom: 0.6rem;
 }
-.case-form legend .fieldset-title {
+.case-form legend .fieldset-title,
+.panel fieldset[data-collapsible] > legend .fieldset-title {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
 }
-.case-form fieldset[data-collapsible] {
+.case-form fieldset[data-collapsible],
+.panel fieldset[data-collapsible] {
   position: relative;
 }
-.case-form fieldset[data-collapsible] .fieldset-toggle {
+.case-form fieldset[data-collapsible] .fieldset-toggle,
+.panel fieldset[data-collapsible] .fieldset-toggle {
   border: none;
   background: transparent;
   color: var(--muted-text);
@@ -674,33 +679,42 @@ form textarea {
   border-radius: 0.4rem;
   transition: color 0.2s ease, background 0.2s ease;
 }
-.case-form fieldset[data-collapsible] .fieldset-toggle::before {
+.case-form fieldset[data-collapsible] .fieldset-toggle::before,
+.panel fieldset[data-collapsible] .fieldset-toggle::before {
   content: '−';
   font-size: 1rem;
   line-height: 1;
 }
-.case-form fieldset[data-collapsible].collapsed .fieldset-toggle::before {
+.case-form fieldset[data-collapsible].collapsed .fieldset-toggle::before,
+.panel fieldset[data-collapsible].collapsed .fieldset-toggle::before {
   content: '+';
 }
-.case-form fieldset[data-collapsible] .fieldset-toggle:focus-visible {
+.case-form fieldset[data-collapsible] .fieldset-toggle:focus-visible,
+.panel fieldset[data-collapsible] .fieldset-toggle:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.case-form fieldset[data-collapsible] .fieldset-toggle:hover {
+.case-form fieldset[data-collapsible] .fieldset-toggle:hover,
+.panel fieldset[data-collapsible] .fieldset-toggle:hover {
   color: var(--accent-strong);
   background: var(--accent-shadow);
 }
-.case-form fieldset[data-collapsible].collapsed {
+.case-form fieldset[data-collapsible].collapsed,
+.panel fieldset[data-collapsible].collapsed {
   padding-bottom: 0.6rem;
 }
-.case-form fieldset[data-collapsible].collapsed > legend {
+.case-form fieldset[data-collapsible].collapsed > legend,
+.panel fieldset[data-collapsible].collapsed > legend {
   margin-bottom: 0;
 }
-.case-form fieldset[data-collapsible] .fieldset-body {
+.case-form fieldset[data-collapsible] .fieldset-body,
+.panel fieldset[data-collapsible] .fieldset-body {
   display: block;
 }
 .case-form fieldset[data-collapsible][data-collapsed="true"] > .fieldset-body,
-.case-form fieldset[data-collapsible].collapsed > .fieldset-body {
+.case-form fieldset[data-collapsible].collapsed > .fieldset-body,
+.panel fieldset[data-collapsible][data-collapsed="true"] > .fieldset-body,
+.panel fieldset[data-collapsible].collapsed > .fieldset-body {
   display: none;
 }
 .case-form .inline-group {
@@ -3300,12 +3314,12 @@ function renderCreateCase(section) {
   <div class="panel">
     <h2>Opret komplet sag</h2>
     <form id="createCaseForm" class="case-form">
-      <fieldset data-collapsible>
+      <fieldset data-collapsible data-collapsed="true">
         <legend>
           <span class="fieldset-title">Patient</span>
-          <button type="button" class="fieldset-toggle" data-label-open="Minimér" data-label-closed="Udvid" aria-expanded="true">Minimér</button>
+          <button type="button" class="fieldset-toggle" data-label-open="Minimér" data-label-closed="Udvid" aria-expanded="false">Udvid</button>
         </legend>
-        <div class="fieldset-body">
+        <div class="fieldset-body" hidden>
           <div class="inline-group">
             <label class="inline">MRN<input name="patient_mrn" required placeholder="Fx 010170-1234"></label>
             <label class="inline">Navn<input name="patient_name" required placeholder="Patientnavn"></label>
@@ -3325,12 +3339,12 @@ function renderCreateCase(section) {
           <label class="inline">Noter<textarea name="patient_notes" class="small" placeholder="Valgfrit"></textarea></label>
         </div>
       </fieldset>
-      <fieldset data-collapsible>
+      <fieldset data-collapsible data-collapsed="true">
         <legend>
           <span class="fieldset-title">Prøve</span>
-          <button type="button" class="fieldset-toggle" data-label-open="Minimér" data-label-closed="Udvid" aria-expanded="true">Minimér</button>
+          <button type="button" class="fieldset-toggle" data-label-open="Minimér" data-label-closed="Udvid" aria-expanded="false">Udvid</button>
         </legend>
-        <div class="fieldset-body">
+        <div class="fieldset-body" hidden>
           <div class="inline-group">
             <label class="inline">PMB-nummer<input name="sample_pmb" required placeholder="PMB-12345"></label>
             <label class="inline">Prøvetype<select name="sample_type" required><option value="" selected>Vælg type</option>${typeOptions}</select></label>
@@ -3354,12 +3368,12 @@ function renderCreateCase(section) {
           </div>
         </div>
       </fieldset>
-      <fieldset data-collapsible>
+      <fieldset data-collapsible data-collapsed="true">
         <legend>
           <span class="fieldset-title">Ordination</span>
-          <button type="button" class="fieldset-toggle" data-label-open="Minimér" data-label-closed="Udvid" aria-expanded="true">Minimér</button>
+          <button type="button" class="fieldset-toggle" data-label-open="Minimér" data-label-closed="Udvid" aria-expanded="false">Udvid</button>
         </legend>
-        <div class="fieldset-body">
+        <div class="fieldset-body" hidden>
           <div class="inline-group">
             <label class="inline">Panel
               <div class="filterable-select">
@@ -3407,23 +3421,23 @@ function renderCreateCase(section) {
           <p class="form-hint" id="orderStatusPreview">Ordinationsstatus følger prøven: <strong id="orderStatusValue">–</strong></p>
         </div>
       </fieldset>
-      <fieldset data-collapsible>
+      <fieldset data-collapsible data-collapsed="true">
         <legend>
           <span class="fieldset-title">Kvalitetskontrol</span>
-          <button type="button" class="fieldset-toggle" data-label-open="Minimér" data-label-closed="Udvid" aria-expanded="true">Minimér</button>
+          <button type="button" class="fieldset-toggle" data-label-open="Minimér" data-label-closed="Udvid" aria-expanded="false">Udvid</button>
         </legend>
-        <div class="fieldset-body">
+        <div class="fieldset-body" hidden>
           <p class="form-hint">Tilføj QC-målinger for prøven (valgfrit).</p>
           <div id="qcList" class="repeater"></div>
           <button type="button" class="secondary" id="addQcRow">Tilføj måling</button>
         </div>
       </fieldset>
-      <fieldset data-collapsible>
+      <fieldset data-collapsible data-collapsed="true">
         <legend>
           <span class="fieldset-title">Varianter</span>
-          <button type="button" class="fieldset-toggle" data-label-open="Minimér" data-label-closed="Udvid" aria-expanded="true">Minimér</button>
+          <button type="button" class="fieldset-toggle" data-label-open="Minimér" data-label-closed="Udvid" aria-expanded="false">Udvid</button>
         </legend>
-        <div class="fieldset-body">
+        <div class="fieldset-body" hidden>
           <p class="form-hint" id="caseVariantHint">Registrer varianter fundet ved analysen. Tomme rækker ignoreres.</p>
           <div id="variantList" class="repeater"></div>
           <div class="btn-row">
@@ -5156,26 +5170,33 @@ function renderVariants(section) {
     </div>
   </div>
   <div class="panel">
-    <h2>Massetilføj varianter</h2>
-    <p class="panel-hint">Tilføj flere varianter til en eksisterende ordination via import eller manuel indtastning.</p>
-    <label>Ordination
-      <div class="filterable-select">
-        <input type="search" data-select-filter placeholder="Filtrer ordinationer">
-        <select id="variantBatchOrder">
-          <option value="" selected>Vælg ordination</option>
-          ${orders.map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}
-        </select>
+    <fieldset data-collapsible data-collapsed="true" class="panel-fieldset">
+      <legend>
+        <span class="fieldset-title">Massetilføj varianter</span>
+        <button type="button" class="fieldset-toggle" data-label-open="Minimér" data-label-closed="Udvid" aria-expanded="false">Udvid</button>
+      </legend>
+      <div class="fieldset-body" hidden>
+        <p class="panel-hint">Tilføj flere varianter til en eksisterende ordination via import eller manuel indtastning.</p>
+        <label>Ordination
+          <div class="filterable-select">
+            <input type="search" data-select-filter placeholder="Filtrer ordinationer">
+            <select id="variantBatchOrder">
+              <option value="" selected>Vælg ordination</option>
+              ${orders.map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}
+            </select>
+          </div>
+        </label>
+        <div id="variantBatchList" class="repeater"></div>
+        <div class="btn-row">
+          <button type="button" class="secondary" id="variantBatchAdd">Tilføj variant</button>
+          <button type="button" class="secondary" id="variantBatchImport">Importér VarSeq CSV</button>
+          <input type="file" id="variantBatchFile" accept=".csv,text/csv" hidden>
+          <button type="button" class="primary" id="variantBatchSave">Gem varianter</button>
+          <button type="button" class="secondary" id="variantBatchClear">Ryd rækker</button>
+        </div>
+        <div class="form-hint" id="variantBatchMessage" role="status" aria-live="polite"></div>
       </div>
-    </label>
-    <div id="variantBatchList" class="repeater"></div>
-    <div class="btn-row">
-      <button type="button" class="secondary" id="variantBatchAdd">Tilføj variant</button>
-      <button type="button" class="secondary" id="variantBatchImport">Importér VarSeq CSV</button>
-      <input type="file" id="variantBatchFile" accept=".csv,text/csv" hidden>
-      <button type="button" class="primary" id="variantBatchSave">Gem varianter</button>
-      <button type="button" class="secondary" id="variantBatchClear">Ryd rækker</button>
-    </div>
-    <div class="form-hint" id="variantBatchMessage" role="status" aria-live="polite"></div>
+    </fieldset>
   </div>`;
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#variantSearch');
@@ -5489,6 +5510,7 @@ function renderVariants(section) {
   applyControlTooltips(section);
   applyFormTooltips(form);
   applySelectFilters(section);
+  initCollapsibleFieldsets(section);
   let filteredVariants = list.slice();
   let activeFilters = {};
   let selectedVariantId = null;
