@@ -641,6 +641,13 @@ form label {
   margin-top: 0.4rem;
   color: var(--muted-text);
 }
+.label-note {
+  display: inline-block;
+  margin-left: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--muted-text);
+}
 form input,
 form select,
 form textarea {
@@ -4318,7 +4325,7 @@ function renderPatients(section) {
           </label>
           <label>Navn<input name="name" required></label>
           <label>Køn<select name="gender"><option value="">-</option><option value="male">Mand</option><option value="female">Kvinde</option><option value="other">Andet</option></select></label>
-          <label>Fødselsdato<input type="date" name="birth_date"></label>
+          <label>Fødselsdato<span class="label-note" data-patient-age hidden></span><input type="date" name="birth_date"></label>
           <label>Noter<textarea name="notes"></textarea></label>
           <div class="btn-row">
             <button type="submit" class="primary">Gem</button>
@@ -4343,6 +4350,20 @@ function renderPatients(section) {
     gender: section.querySelector('[data-filter-patients="gender"]'),
     birth: section.querySelector('[data-filter-patients="birth"]')
   };
+  const birthDateInput = form?.elements.birth_date;
+  const ageNote = form?.querySelector('[data-patient-age]');
+  const updateAgeNote = () => {
+    if (!ageNote) return;
+    const ageText = birthDateInput ? formatAgeFromBirthDate(birthDateInput.value) : '';
+    if (ageText) {
+      ageNote.textContent = `(${ageText})`;
+      ageNote.hidden = false;
+    } else {
+      ageNote.textContent = '';
+      ageNote.hidden = true;
+    }
+  };
+  birthDateInput?.addEventListener('input', updateAgeNote);
   let filteredPatients = list.slice();
   let activeFilters = {};
   let selectedPatientId = null;
@@ -4388,9 +4409,12 @@ function renderPatients(section) {
     tbody.innerHTML = filteredPatients.map(p => {
       const gender = genderMap[p.gender] || p.gender || '';
       const createdBy = determineCreatedBy('patients', p);
-      const birthDate = formatDanishDate(p.birth_date);
+      const rawBirth = p.birth_date;
+      const formattedBirth = formatDanishDate(rawBirth) || (rawBirth || '');
+      const ageDisplay = formatAgeFromBirthDate(rawBirth);
+      const birthDisplay = formattedBirth && ageDisplay ? `${formattedBirth} (${ageDisplay})` : formattedBirth;
       const selectedAttr = p.id === selectedPatientId ? ' data-selected="true"' : '';
-      return `<tr data-id="${p.id}"${selectedAttr}><td>${p.id}</td><td>${esc(p.mrn)}</td><td>${esc(p.extra_id||'')}</td><td>${esc(p.family_number||'')}</td><td>${esc(p.name)}</td><td>${esc(gender)}</td><td>${esc(birthDate)}</td><td>${esc(createdBy)}</td></tr>`;
+      return `<tr data-id="${p.id}"${selectedAttr}><td>${p.id}</td><td>${esc(p.mrn)}</td><td>${esc(p.extra_id||'')}</td><td>${esc(p.family_number||'')}</td><td>${esc(p.name)}</td><td>${esc(gender)}</td><td>${esc(birthDisplay)}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -4413,6 +4437,7 @@ function renderPatients(section) {
     if (!patient) return;
     selectedPatientId = id;
     fillForm(form, patient);
+    updateAgeNote();
     renderRows();
   });
   form.addEventListener('submit', async e => {
@@ -4447,9 +4472,11 @@ function renderPatients(section) {
   form.addEventListener('reset', () => {
     clearFormIdentifier(form);
     selectedPatientId = null;
+    updateAgeNote();
     renderRows();
   });
   clearBtn.addEventListener('click', () => form.reset());
+  updateAgeNote();
 }
 function renderSamples(section) {
   const list = getCached('samples');
@@ -7747,6 +7774,65 @@ function formatDanishDate(value, includeTimeHint) {
     }
   }
   return '';
+}
+
+function normalizeDateOnly(value) {
+  if (!value && value !== 0) return null;
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const dateOnlyMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dateOnlyMatch) {
+      const [, year, month, day] = dateOnlyMatch;
+      const y = Number(year);
+      const m = Number(month);
+      const d = Number(day);
+      if (Number.isFinite(y) && Number.isFinite(m) && Number.isFinite(d)) {
+        const parsed = new Date(y, m - 1, d);
+        if (!Number.isNaN(parsed.getTime())) return parsed;
+      }
+      return null;
+    }
+    const parsed = new Date(trimmed);
+    if (!Number.isNaN(parsed.getTime())) {
+      return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+    }
+    return null;
+  }
+  if (typeof value === 'number') {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+    }
+  }
+  return null;
+}
+
+function formatAgeFromBirthDate(birthValue, referenceValue = new Date()) {
+  const birthDate = normalizeDateOnly(birthValue);
+  const referenceDate = normalizeDateOnly(referenceValue) || normalizeDateOnly(new Date());
+  if (!birthDate || !referenceDate) return '';
+  if (referenceDate < birthDate) return '';
+  let years = referenceDate.getFullYear() - birthDate.getFullYear();
+  const hasHadBirthday =
+    referenceDate.getMonth() > birthDate.getMonth() ||
+    (referenceDate.getMonth() === birthDate.getMonth() && referenceDate.getDate() >= birthDate.getDate());
+  if (!hasHadBirthday) years -= 1;
+  if (years > 1) return `${years} år`;
+  if (years === 1) return '1 år';
+  const totalMonths = (referenceDate.getFullYear() - birthDate.getFullYear()) * 12 + referenceDate.getMonth() - birthDate.getMonth();
+  const adjustedMonths = hasHadBirthday ? totalMonths : totalMonths - 1;
+  if (adjustedMonths > 1) return `${adjustedMonths} mdr`;
+  if (adjustedMonths === 1) return '1 mdr';
+  const diffMs = referenceDate.getTime() - birthDate.getTime();
+  const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+  if (diffDays > 1) return `${diffDays} dage`;
+  if (diffDays === 1) return '1 dag';
+  return '0 dage';
 }
 
 function translateGender(value) {
