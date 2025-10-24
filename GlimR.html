@@ -1262,7 +1262,7 @@ const tabs = [
 const SAMPLE_TYPES = ['Blod','Kindskrab','Biopsi','Kontrol'];
 const SAMPLE_STATUSES = ['Modtaget','Afventer','QC','Analyse','Tolkning','Rapport','Svaret','Biobank','Annulleret'];
 const schemaFields = {
-  patients: ['id','mrn','family_number','name','gender','birth_date','notes','created_by','created_at','updated_at'],
+  patients: ['id','mrn','extra_id','family_number','name','gender','birth_date','notes','created_by','created_at','updated_at'],
   samples: ['id','pmb_number','patient_id','sample_type','collected_at','status','notes','created_by','created_at','updated_at'],
   panels: ['id','name','description','created_at','updated_at'],
   orders: ['id','patient_id','sample_id','panel_id','analysis_responsible_id','interpreter_id','approver_id','clinician','status','ordered_at','created_by','created_at','updated_at'],
@@ -1311,6 +1311,7 @@ const tooltipCatalog = {
   headers: {
     'ID': 'Intern databaseidentifikator for posten.',
     'MRN': 'Medicinsk journalnummer eller CPR-reference.',
+    'Ekstra ID': 'Supplerende identifikator for patienten (valgfrit).',
     'Familienummer': 'Eksternt familienummer brugt til at gruppere beslægtede patienter.',
     'Navn': 'Navnet på patient, panel eller bruger.',
     'Køn': 'Patientens registrerede køn.',
@@ -1359,7 +1360,7 @@ const tooltipCatalog = {
     'Detaljer': 'Supplerende oplysninger til testen.'
   },
   search: {
-    patientSearch: 'Filtrer patientlisten efter navn, MRN, familienummer eller køn.',
+    patientSearch: 'Filtrer patientlisten efter navn, MRN, ekstra ID, familienummer eller køn.',
     sampleSearch: 'Filtrer prøver efter ID, PMB-nummer, status eller type.',
     panelSearch: 'Find paneler efter navn.',
     orderSearch: 'Søg efter ordination ud fra status eller ID.',
@@ -1372,6 +1373,7 @@ const tooltipCatalog = {
   forms: {
     patientForm: {
       mrn: 'Patientens MRN/CPR til entydig identifikation.',
+      extra_id: 'Supplerende identifikator til intern brug (valgfrit).',
       family_number: 'Familienummer anvendt til at gruppere beslægtede patienter.',
       name: 'Patientens fulde navn som angivet i journalen.',
       gender: 'Registreret køn for patienten.',
@@ -1471,6 +1473,7 @@ const tooltipCatalog = {
     },
     createCaseForm: {
       patient_mrn: 'Patientens MRN eller CPR til entydig identifikation.',
+      patient_extra_id: 'Supplerende identifikator til lokal brug (valgfrit).',
       patient_family: 'Evt. familienummer der kobler patienten til andre sager.',
       patient_name: 'Patientens fulde navn.',
       patient_gender: 'Patientens registrerede køn.',
@@ -3373,6 +3376,7 @@ function renderCreateCase(section) {
         <div class="fieldset-body" hidden>
           <div class="inline-group">
             <label class="inline">MRN<input name="patient_mrn" required placeholder="Fx 010170-1234"></label>
+            <label class="inline">Ekstra ID<input name="patient_extra_id" placeholder="Fx intern ID"></label>
             <label class="inline">Navn<input name="patient_name" required placeholder="Patientnavn"></label>
             <label class="inline">Familienummer
               <div class="family-combo">
@@ -3853,6 +3857,7 @@ function renderCreateCase(section) {
     }
     const patient = {
       mrn: patientMrn,
+      extra_id: form.elements.patient_extra_id?.value.trim() || '',
       family_number: form.elements.patient_family?.value.trim() || '',
       name: patientName,
       gender: form.elements.patient_gender.value || '',
@@ -4128,12 +4133,12 @@ function getName(store, id) {
   if (!row) return '';
   if (store === 'patients') {
     const name = row.name || '';
-    const details = [row.mrn, row.family_number].filter(Boolean).join(' • ');
+    const details = [row.mrn, row.extra_id, row.family_number].filter(Boolean).join(' • ');
     if (name && details) return `${name} (${details})`;
     if (name) return name;
     if (details) return details;
   }
-  return row.pmb_number || row.name || row.mrn || `#${id}`;
+  return row.pmb_number || row.name || row.mrn || row.extra_id || `#${id}`;
 }
 function creationKey(entity, id) {
   if (!entity || id === undefined || id === null) return null;
@@ -4279,19 +4284,20 @@ function renderPatients(section) {
     <div class="flex">
       <div>
         <label for="patientSearch">Søg</label>
-        <input id="patientSearch" type="search" placeholder="Navn/MRN/familie...">
+        <input id="patientSearch" type="search" placeholder="Navn/MRN/ID/familie...">
         <details class="advanced-filter" id="patientsFilterPanel">
           <summary>Avanceret filter</summary>
           <div class="filter-grid">
             <label>ID<input type="search" data-filter-patients="id" placeholder="Fx 152"></label>
             <label>MRN<input type="search" data-filter-patients="mrn" placeholder="MRN eller CPR"></label>
+            <label>Ekstra ID<input type="search" data-filter-patients="extra" placeholder="Fx lokalt ID"></label>
             <label>Familienummer<input type="search" data-filter-patients="family" placeholder="Fx FAM-001"></label>
             <label>Navn<input type="search" data-filter-patients="name" placeholder="Patientnavn"></label>
             <label>Køn<select data-filter-patients="gender"><option value="">Alle</option><option value="male">Mand</option><option value="female">Kvinde</option><option value="other">Andet</option></select></label>
             <label>Fødselsår<input type="search" data-filter-patients="birth" placeholder="ÅÅÅÅ"></label>
           </div>
         </details>
-        <table id="patientsTable"><thead><tr><th>ID</th><th>MRN</th><th>Familienummer</th><th>Navn</th><th>Køn</th><th>Født</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
+        <table id="patientsTable"><thead><tr><th>ID</th><th>MRN</th><th>Ekstra ID</th><th>Familienummer</th><th>Navn</th><th>Køn</th><th>Født</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
           <button type="button" class="secondary" id="patientsExport">Eksportér filtrerede patienter</button>
         </div>
@@ -4301,6 +4307,7 @@ function renderPatients(section) {
         <form id="patientForm">
           <input type="hidden" name="id">
           <label>MRN<input name="mrn" required></label>
+          <label>Ekstra ID<input name="extra_id" placeholder="Fx lokalt ID"></label>
           <label>Familienummer
             <div class="family-combo">
               <select data-family-select>
@@ -4330,6 +4337,7 @@ function renderPatients(section) {
   const filterInputs = {
     id: section.querySelector('[data-filter-patients="id"]'),
     mrn: section.querySelector('[data-filter-patients="mrn"]'),
+    extra: section.querySelector('[data-filter-patients="extra"]'),
     family: section.querySelector('[data-filter-patients="family"]'),
     name: section.querySelector('[data-filter-patients="name"]'),
     gender: section.querySelector('[data-filter-patients="gender"]'),
@@ -4350,6 +4358,7 @@ function renderPatients(section) {
     const filters = {
       id: filterInputs.id?.value.trim() || '',
       mrn: filterInputs.mrn?.value.trim().toLowerCase() || '',
+      extra: filterInputs.extra?.value.trim().toLowerCase() || '',
       family: filterInputs.family?.value.trim().toLowerCase() || '',
       name: filterInputs.name?.value.trim().toLowerCase() || '',
       gender: filterInputs.gender?.value || '',
@@ -4362,10 +4371,11 @@ function renderPatients(section) {
       if (!term) return true;
       const displayGender = genderMap[p.gender];
       const creator = determineCreatedBy('patients', p);
-      return [p.name, p.mrn, p.family_number, p.gender, displayGender, creator].some(v => (v||'').toLowerCase().includes(term));
+      return [p.name, p.mrn, p.extra_id, p.family_number, p.gender, displayGender, creator].some(v => (v||'').toLowerCase().includes(term));
     }).filter(p => {
       if (filters.id && !String(p.id).includes(filters.id)) return false;
       if (filters.mrn && !(p.mrn||'').toLowerCase().includes(filters.mrn)) return false;
+      if (filters.extra && !(p.extra_id||'').toLowerCase().includes(filters.extra)) return false;
       if (filters.family && !(p.family_number||'').toLowerCase().includes(filters.family)) return false;
       if (filters.name && !(p.name||'').toLowerCase().includes(filters.name)) return false;
       if (filters.gender && (p.gender||'') !== filters.gender) return false;
@@ -4380,7 +4390,7 @@ function renderPatients(section) {
       const createdBy = determineCreatedBy('patients', p);
       const birthDate = formatDanishDate(p.birth_date);
       const selectedAttr = p.id === selectedPatientId ? ' data-selected="true"' : '';
-      return `<tr data-id="${p.id}"${selectedAttr}><td>${p.id}</td><td>${esc(p.mrn)}</td><td>${esc(p.family_number||'')}</td><td>${esc(p.name)}</td><td>${esc(gender)}</td><td>${esc(birthDate)}</td><td>${esc(createdBy)}</td></tr>`;
+      return `<tr data-id="${p.id}"${selectedAttr}><td>${p.id}</td><td>${esc(p.mrn)}</td><td>${esc(p.extra_id||'')}</td><td>${esc(p.family_number||'')}</td><td>${esc(p.name)}</td><td>${esc(gender)}</td><td>${esc(birthDate)}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -4456,7 +4466,7 @@ function renderSamples(section) {
           <div class="filter-grid">
             <label>ID<input type="search" data-filter-samples="id" placeholder="Sample-ID"></label>
             <label>PMB-nummer<input type="search" data-filter-samples="pmb" placeholder="PMB"></label>
-            <label>Patient<input type="search" data-filter-samples="patient" placeholder="Patientnavn/MRN/familie"></label>
+            <label>Patient<input type="search" data-filter-samples="patient" placeholder="Patientnavn/MRN/ID/familie"></label>
             <label>Prøvetype<input type="search" data-filter-samples="type" placeholder="Type"></label>
             <label>Status<input type="search" data-filter-samples="status" placeholder="Status"></label>
             <label>Opsamlet fra<input type="date" data-filter-samples="collected_from"></label>
@@ -4478,7 +4488,7 @@ function renderSamples(section) {
               <select name="patient_id" required>
                 <option value="" selected>Vælg patient</option>
                 ${patients.map(p => {
-                  const details = [p.mrn, p.family_number].filter(Boolean).map(esc).join(' • ');
+                  const details = [p.mrn, p.extra_id, p.family_number].filter(Boolean).map(esc).join(' • ');
                   return `<option value="${p.id}">${esc(p.name)}${details ? ` (${details})` : ''}</option>`;
                 }).join('')}
               </select>
@@ -4554,7 +4564,7 @@ function renderSamples(section) {
       return [s.id, s.pmb_number, s.status, s.sample_type, creator].some(v => (v ?? '').toString().toLowerCase().includes(term));
     }).filter(s => {
       const patient = patientMap.get(Number(s.patient_id));
-      const patientString = [patient?.name, patient?.mrn, patient?.family_number].filter(Boolean).join(' ').toLowerCase();
+      const patientString = [patient?.name, patient?.mrn, patient?.extra_id, patient?.family_number].filter(Boolean).join(' ').toLowerCase();
       if (filters.id && !String(s.id).includes(filters.id)) return false;
       if (filters.pmb && !(s.pmb_number || '').toLowerCase().includes(filters.pmb)) return false;
       if (filters.patient && !patientString.includes(filters.patient)) return false;
@@ -4797,7 +4807,7 @@ function renderOrders(section) {
           <summary>Avanceret filter</summary>
           <div class="filter-grid">
             <label>ID<input type="search" data-filter-orders="id" placeholder="Ordination-ID"></label>
-            <label>Patient<input type="search" data-filter-orders="patient" placeholder="Patientnavn/MRN/familie"></label>
+            <label>Patient<input type="search" data-filter-orders="patient" placeholder="Patientnavn/MRN/ID/familie"></label>
             <label>Prøve<input type="search" data-filter-orders="sample" placeholder="Prøve-ID eller PMB"></label>
             <label>Panel<input type="search" data-filter-orders="panel" placeholder="Panelnavn"></label>
             <label>Analyseansvarlig
@@ -4847,7 +4857,7 @@ function renderOrders(section) {
               <select name="patient_id" required>
                 <option value="" selected>Vælg patient</option>
                 ${patients.map(p => {
-                  const details = [p.mrn, p.family_number].filter(Boolean).map(esc).join(' • ');
+                  const details = [p.mrn, p.extra_id, p.family_number].filter(Boolean).map(esc).join(' • ');
                   return `<option value="${p.id}">${esc(p.name)}${details ? ` (${details})` : ''}</option>`;
                 }).join('')}
               </select>
@@ -5014,7 +5024,7 @@ function renderOrders(section) {
       const patient = patientMap.get(Number(o.patient_id));
       const sample = sampleMap.get(Number(o.sample_id));
       const panel = panelMap.get(Number(o.panel_id));
-      const patientString = [patient?.name, patient?.mrn, patient?.family_number].filter(Boolean).join(' ').toLowerCase();
+      const patientString = [patient?.name, patient?.mrn, patient?.extra_id, patient?.family_number].filter(Boolean).join(' ').toLowerCase();
       const sampleString = [o.sample_id, sample?.pmb_number, sample?.sample_type, getName('patients', sample?.patient_id)].filter(Boolean).join(' ').toLowerCase();
       if (filters.id && !String(o.id).includes(filters.id)) return false;
       if (filters.patient && !patientString.includes(filters.patient)) return false;
@@ -6605,6 +6615,7 @@ function buildConclusionPlaceholderGuide(context = 'report') {
             <ul>
               <li><code>[Patient]</code> – patientens navn</li>
               <li><code>[PatientMRN]</code> – patientens MRN/CPR</li>
+              <li><code>[PatientEkstraId]</code> – ekstra ID</li>
               <li><code>[PatientFamilienummer]</code> – familienummer</li>
               <li><code>[PatientFødselsdato]</code> – fødselsdato (dd-mm-åååå)</li>
               <li><code>[OrdinationID]</code> – ordinationens ID</li>
@@ -7074,6 +7085,7 @@ function renderReports(section) {
     const firstVariant = variants[0] || null;
     add(['Patient', 'PatientNavn', 'Patient.Name'], patient?.name || '');
     add(['PatientMRN', 'MRN', 'Patient.MRN'], patient?.mrn || '');
+    add(['PatientEkstraId', 'PatientEkstraID', 'EkstraID', 'Patient.EkstraID'], patient?.extra_id || '');
     add(['PatientFamilienummer', 'Familienummer', 'Patient.Familienummer'], patient?.family_number || '');
     add(['PatientFodselsdato', 'PatientFødselsdato', 'Patient.BirthDate'], patient?.birth_date ? formatDanishDate(patient.birth_date) : '');
     add(['OrdinationID', 'Ordination.Id', 'OrderID'], orderId ? String(orderId) : '');
@@ -7487,10 +7499,14 @@ function buildReportHtml(orderId, reportData) {
     const metaList = meta.length ? `<ul>${meta.join('')}</ul>` : '';
     return `<div class="report-variant-detail"><h3>${esc(heading)}</h3>${metaList}${interpretation}</div>`;
   }).join('') : '<p>Ingen variantdetaljer registreret.</p>';
+  const patientIdentifiersDisplay = (() => {
+    const parts = [patient?.mrn, patient?.extra_id, patient?.family_number].filter(Boolean).map(esc);
+    return parts.length ? ` (${parts.join(' • ')})` : '';
+  })();
   return `
   <h1>Diagnostisk rapport</h1>
   <p><strong>Ordination:</strong> ${orderId}</p>
-  <p><strong>Patient:</strong> ${esc(patient?.name||'')} (${esc(patient?.mrn||'')})</p>
+  <p><strong>Patient:</strong> ${esc(patient?.name||'')}${patientIdentifiersDisplay}</p>
   <p><strong>Prøve:</strong> ${esc(sample?.sample_type||'')}${sampleIdentifier ? ` (${esc(sampleIdentifier)})` : ''}</p>
   <p><strong>Status:</strong> ${esc(reportData.status||'')}</p>
   <p><strong>Udstedt:</strong> ${esc(formatDanishDate(reportData.issued_at))}</p>
@@ -8045,6 +8061,7 @@ async function createReportPdfBlob(orderId, reportData, exportedAt = new Date())
     const patientRows = [
       {type: 'kv', label: 'Navn', value: patient?.name},
       {type: 'kv', label: 'MRN', value: patient?.mrn},
+      {type: 'kv', label: 'Ekstra ID', value: patient?.extra_id},
       {type: 'kv', label: 'Familienummer', value: patient?.family_number},
       {type: 'kv', label: 'Køn', value: translateGender(patient?.gender)},
       {type: 'kv', label: 'Fødselsdato', value: patientBirthDate}
@@ -8185,7 +8202,7 @@ function sanitizeFilenameComponent(value) {
 function buildReportPdfFilename(orderId, reportData, exportedAt = new Date()) {
   const order = findById('orders', Number(orderId));
   const patient = order ? findById('patients', Number(order?.patient_id)) : null;
-  const mrnPart = sanitizeFilenameComponent(patient?.mrn || patient?.cpr || 'ukendt');
+  const mrnPart = sanitizeFilenameComponent(patient?.mrn || patient?.extra_id || patient?.cpr || 'ukendt');
   const dateStamp = exportedAt.toISOString().slice(0, 10).replace(/-/g, '');
   return `${mrnPart}_Diagnostisk_Rapport_${dateStamp}.pdf`;
 }
@@ -9245,10 +9262,13 @@ function buildFhirBundle(orderId) {
     variants = getCached('variants').filter(v => v.order_id === orderId).map(snapshotVariant);
   }
   const timestamp = new Date().toISOString();
+  const patientIdentifiers = [];
+  if (patient?.mrn) patientIdentifiers.push({system:'urn:oid:1.2.208.176.1.2', value:patient.mrn});
+  if (patient?.extra_id) patientIdentifiers.push({system:'urn:glimr:patient-extra-id', value:patient.extra_id});
   const patientResource = {
     resourceType:'Patient',
     id:`patient-${patient?.id||order.patient_id}`,
-    identifier: patient?.mrn ? [{system:'urn:oid:1.2.208.176.1.2', value:patient.mrn}] : undefined,
+    identifier: patientIdentifiers.length ? patientIdentifiers : undefined,
     name: patient?.name ? [{text:patient.name}] : undefined,
     gender: patient?.gender || undefined,
     birthDate: patient?.birth_date || undefined
@@ -9790,6 +9810,7 @@ SET FOREIGN_KEY_CHECKS=0;
 CREATE TABLE IF NOT EXISTS \`patients\` (
   \`id\` INT AUTO_INCREMENT PRIMARY KEY,
   \`mrn\` VARCHAR(64),
+  \`extra_id\` VARCHAR(64),
   \`family_number\` VARCHAR(64),
   \`name\` VARCHAR(255),
   \`gender\` VARCHAR(32),
@@ -9982,8 +10003,8 @@ async function loadDemoData() {
   if (!ensureWrite('patients')) return;
   if (!confirm('Indlæse demo-data? Dette overskriver ikke eksisterende poster men tilføjer hvis tomt.')) return;
   if (!getCached('patients').length) {
-    const p1 = await addRecord('patients', {mrn:'MRN001', family_number:'FAM-001', name:'Anna Jensen', gender:'female', birth_date:'1985-03-12', notes:'Familiehistorik positiv'});
-    const p2 = await addRecord('patients', {mrn:'MRN002', family_number:'FAM-002', name:'Lars Petersen', gender:'male', birth_date:'1978-11-03', notes:''});
+    const p1 = await addRecord('patients', {mrn:'MRN001', extra_id:'ALT-001', family_number:'FAM-001', name:'Anna Jensen', gender:'female', birth_date:'1985-03-12', notes:'Familiehistorik positiv'});
+    const p2 = await addRecord('patients', {mrn:'MRN002', extra_id:'ALT-002', family_number:'FAM-002', name:'Lars Petersen', gender:'male', birth_date:'1978-11-03', notes:''});
     const s1 = await addRecord('samples', {patient_id:p1, pmb_number:'PMB-0001', sample_type:'Blod', status:'QC', collected_at:new Date().toISOString(), notes:''});
     const s2 = await addRecord('samples', {patient_id:p2, pmb_number:'PMB-0002', sample_type:'Kindskrab', status:'Analyse', collected_at:new Date().toISOString(), notes:''});
     const panel = await addRecord('panels', {name:'Onko-panel', description:'50 gener'});
