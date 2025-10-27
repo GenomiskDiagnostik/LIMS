@@ -7404,7 +7404,7 @@ function renderVariantLibrary(section) {
         </details>
         <table>
           <thead>
-            <tr><th>ID</th><th>Variant</th><th>Type</th><th>Genomisk position</th><th>HGVS c.</th><th>HGVS p.</th><th>rsID</th><th>Klasse</th><th>Frekvens</th><th>Kriterier</th><th>ISCN</th><th>Tilstand</th><th>Nedarvning</th><th>Kurateret af</th><th>Sidst gennemgået</th></tr>
+            <tr><th>ID</th><th>Variant</th><th>Type</th><th>Genomisk position</th><th>HGVS c.</th><th>HGVS p.</th><th>rsID</th><th>Klasse</th><th>Frekvens</th><th>Forekomst</th><th>Kriterier</th><th>ISCN</th><th>Tilstand</th><th>Nedarvning</th><th>Kurateret af</th><th>Sidst gennemgået</th></tr>
           </thead>
           <tbody></tbody>
         </table>
@@ -7483,6 +7483,20 @@ function renderVariantLibrary(section) {
     const count = getVariantFrequencyCount(entry);
     if (!count && !variantFrequencyPatientCount) return '0';
     return formatVariantFrequencyLabel(count, variantFrequencyPatientCount);
+  };
+  const getVariantFrequencyCategory = entry => {
+    if (!variantFrequencyPatientCount) return 'Ukendt';
+    const count = getVariantFrequencyCount(entry);
+    if (!count) return 'Ukendt';
+    const ratio = count / variantFrequencyPatientCount;
+    if (!Number.isFinite(ratio) || ratio <= 0) return 'Ukendt';
+    if (ratio >= 0.05) return 'Polymorf';
+    if (ratio >= 0.01) return 'Hyppig';
+    if (ratio >= 0.005) return 'Mellemfrekvent';
+    if (ratio >= 0.001) return 'Lavfrekvent';
+    if (ratio >= 0.0001) return 'Sjælden';
+    if (ratio >= 0.00001) return 'Meget sjælden';
+    return 'Ultra sjælden';
   };
   const csvColumns = [
     {key: 'id', label: 'ID'},
@@ -7624,7 +7638,8 @@ function renderVariantLibrary(section) {
         formatVariantGenomicRange(v),
         getVariantTypeLabel(v.variant_type),
         formatVariantTitle(v),
-        getVariantFrequencyLabel(v)
+        getVariantFrequencyLabel(v),
+        getVariantFrequencyCategory(v)
       ].some(val => (val || '').toString().toLowerCase().includes(term));
     }).filter(v => {
       if (filters.gene && !(v.gene || '').toLowerCase().includes(filters.gene)) return false;
@@ -7669,7 +7684,7 @@ function renderVariantLibrary(section) {
       selectedId = null;
     }
     if (!filteredLibrary.length) {
-      tbody.innerHTML = `<tr><td colspan="15">Ingen poster matcher filtreringen.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="16">Ingen poster matcher filtreringen.</td></tr>`;
       annotateTableCells(section);
       return;
     }
@@ -7684,7 +7699,11 @@ function renderVariantLibrary(section) {
       const frequencyTitle = variantFrequencyPatientCount
         ? `${frequencyCount} registrering${frequencyCount === 1 ? '' : 'er'} blandt ${variantFrequencyPatientCount} patient${variantFrequencyPatientCount === 1 ? '' : 'er'}`
         : `${frequencyCount} registrering${frequencyCount === 1 ? '' : 'er'}`;
-      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td>${esc(title)}</td><td>${esc(typeLabel)}</td><td>${esc(genomic)}</td><td>${esc(v.hgvs_c || '')}</td><td>${esc(v.hgvs_p || '')}</td><td>${formatRsIdCell(v.rsid)}</td><td>${esc(v.classification || '')}</td><td title="${esc(frequencyTitle)}">${esc(frequencyLabel)}</td><td>${esc(v.criteria || '')}</td><td>${esc(v.iscn || '')}</td><td>${esc(v.condition || '')}</td><td>${esc(v.inheritance || '')}</td><td>${esc(v.curated_by || '')}</td><td>${esc(lastReview)}</td></tr>`;
+      const frequencyCategory = getVariantFrequencyCategory(v);
+      const frequencyCategoryTitle = frequencyCategory === 'Ukendt'
+        ? 'Forekomst er ikke tilgængelig.'
+        : `${frequencyCategory} forekomst baseret på ${frequencyLabel}`;
+      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td>${esc(title)}</td><td>${esc(typeLabel)}</td><td>${esc(genomic)}</td><td>${esc(v.hgvs_c || '')}</td><td>${esc(v.hgvs_p || '')}</td><td>${formatRsIdCell(v.rsid)}</td><td>${esc(v.classification || '')}</td><td title="${esc(frequencyTitle)}">${esc(frequencyLabel)}</td><td title="${esc(frequencyCategoryTitle)}">${esc(frequencyCategory)}</td><td>${esc(v.criteria || '')}</td><td>${esc(v.iscn || '')}</td><td>${esc(v.condition || '')}</td><td>${esc(v.inheritance || '')}</td><td>${esc(v.curated_by || '')}</td><td>${esc(lastReview)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
