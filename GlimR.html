@@ -9652,6 +9652,7 @@ function renderQC(section) {
       <div>
         <label for="qcSearch">Søg</label>
         <input id="qcSearch" type="search" placeholder="Måling...">
+        <label class="list-toggle"><input type="checkbox" id="qcActiveOnly" checked> Vis kun aktive</label>
         <table><thead><tr><th>ID</th><th>Prøve</th><th>Måling</th><th>Værdi</th><th>Enhed</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
       </div>
       <div>
@@ -9683,32 +9684,60 @@ function renderQC(section) {
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#qcSearch');
   const form = section.querySelector('#qcForm');
+  const activeToggle = section.querySelector('#qcActiveOnly');
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
   applyControlTooltips(section);
   applyFormTooltips(form);
   applySelectFilters(section);
+  const sampleMap = new Map(samples.map(s => [Number(s.id), s]));
   let selectedQcId = null;
+  let showActiveOnly = activeToggle ? activeToggle.checked : false;
   const renderRows = () => {
-    const term = search.value.toLowerCase();
+    const term = search.value.trim().toLowerCase();
     const filteredQc = list.filter(q => {
+      const sample = sampleMap.get(Number(q.sample_id));
+      const sampleStatus = sample?.status || '';
+      if (showActiveOnly && sampleStatus && !isActiveStatus(sampleStatus)) return false;
       if (!term) return true;
       const creator = determineCreatedBy('qc', q);
-      return [q.metric, q.unit, creator].some(v => (v || '').toString().toLowerCase().includes(term));
+      return [
+        q.metric,
+        q.unit,
+        q.notes,
+        creator,
+        q.sample_id,
+        sample?.pmb_number,
+        sample?.sample_type,
+        sampleStatus
+      ].some(v => String(v ?? '').toLowerCase().includes(term));
     });
     if (selectedQcId != null && !filteredQc.some(q => q.id === selectedQcId)) {
       selectedQcId = null;
     }
     tbody.innerHTML = filteredQc.map(q => {
       const createdBy = determineCreatedBy('qc', q);
+      const sample = sampleMap.get(Number(q.sample_id));
+      const sampleStatus = sample?.status || '';
+      const sampleIdDisplay = sample?.id != null ? sample.id : q.sample_id;
+      const samplePmbMeta = sample?.pmb_number
+        ? ` <span class="table-meta">(${esc(sample.pmb_number)})</span>`
+        : '';
+      const sampleStatusMeta = sampleStatus && !isActiveStatus(sampleStatus)
+        ? ` <span class="table-meta">(${esc(sampleStatus)})</span>`
+        : '';
       const selectedAttr = q.id === selectedQcId ? ' data-selected="true"' : '';
-      return `<tr data-id="${q.id}"${selectedAttr}><td>${q.id}</td><td>${esc(q.sample_id)}</td><td>${esc(q.metric)}</td><td>${esc(q.value)}</td><td>${esc(q.unit||'')}</td><td>${esc(createdBy)}</td></tr>`;
+      return `<tr data-id="${q.id}"${selectedAttr}><td>${q.id}</td><td>${esc(sampleIdDisplay)}${samplePmbMeta}${sampleStatusMeta}</td><td>${esc(q.metric)}</td><td>${esc(q.value)}</td><td>${esc(q.unit||'')}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
   renderRows();
   search.addEventListener('input', renderRows);
+  activeToggle?.addEventListener('change', () => {
+    showActiveOnly = activeToggle.checked;
+    renderRows();
+  });
   tbody.addEventListener('click', e => {
     const tr = e.target.closest('tr');
     if (!tr) return;
