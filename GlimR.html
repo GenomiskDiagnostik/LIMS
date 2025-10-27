@@ -4240,7 +4240,7 @@ function renderDashboard(section) {
     `).join('');
   const statsCards = [
     {icon: 'clock', label: "Svarstid (90%-fraktil)", value: formatDurationDays(responseTimeP90)},
-    {icon: 'arrows-up-down', label: 'Nettoflow', value: netOrdersDisplay},
+    {icon: 'arrows-up-down', label: 'Nettoflow (30 dage)', value: netOrdersDisplay},
     {icon: 'inbox', label: 'Prøver modtaget (7 dage)', value: formatNumberDa(samplesLastWeek)},
     {icon: 'beaker', label: 'Prøver modtaget (30 dage)', value: formatNumberDa(samplesLastMonth)},
     {icon: 'document-chart-bar', label: 'Gns. ordinationer/uge (30 dage)', value: formatNumberDa(avgOrdersPerWeek, 1)},
