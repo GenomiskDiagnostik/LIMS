@@ -1081,6 +1081,18 @@ form textarea {
 .table-actions button {
   min-width: 220px;
 }
+.list-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.6rem 0;
+  font-weight: 600;
+  color: var(--muted-text);
+}
+.list-toggle input[type="checkbox"] {
+  width: auto;
+  accent-color: var(--accent);
+}
 button.primary {
   background: var(--accent);
   color: #fff;
@@ -1716,6 +1728,10 @@ function applyIconSlots(scope = document) {
 applyIconSlots(document);
 const SAMPLE_TYPES = ['Blod','Kindskrab','Biopsi','Kontrol'];
 const SAMPLE_STATUSES = ['Modtaget','Afventer','QC','Analyse','Tolkning','Rapport','Svaret','Biobank','Annulleret'];
+const INACTIVE_SAMPLE_STATUSES = new Set(['svaret','biobank','annulleret']);
+function isActiveStatus(status) {
+  return !INACTIVE_SAMPLE_STATUSES.has((status || '').toLowerCase());
+}
 const DEFAULT_PATIENT_GROUPS = [
   'Arvelige hjertesygdomme',
   'Arvelig hæmatologisk sygdom',
@@ -5384,6 +5400,7 @@ function renderSamples(section) {
       <div>
         <label for="sampleSearch">Søg</label>
         <input id="sampleSearch" type="search" placeholder="ID/PMB/status...">
+        <label class="list-toggle"><input type="checkbox" id="samplesActiveOnly" checked> Vis kun aktive</label>
         <details class="advanced-filter" id="samplesFilterPanel">
           <summary>Avanceret filter</summary>
           <div class="filter-grid">
@@ -5453,6 +5470,7 @@ function renderSamples(section) {
     collected_from: section.querySelector('[data-filter-samples="collected_from"]'),
     collected_to: section.querySelector('[data-filter-samples="collected_to"]')
   };
+  const activeToggle = section.querySelector('#samplesActiveOnly');
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
@@ -5462,6 +5480,7 @@ function renderSamples(section) {
   let filteredSamples = list.slice();
   let activeFilters = {};
   let selectedSampleId = null;
+  let showActiveOnly = activeToggle ? activeToggle.checked : false;
   const renderRows = () => {
     const term = search.value.toLowerCase();
     const filters = {
@@ -5480,6 +5499,7 @@ function renderSamples(section) {
     }
     const filterSummary = {...filters};
     if (term) filterSummary.fritekst = term;
+    filterSummary.visning = showActiveOnly ? 'Kun aktive' : 'Alle';
     activeFilters = filterSummary;
     filteredSamples = list.filter(s => {
       if (!term) return true;
@@ -5493,6 +5513,7 @@ function renderSamples(section) {
       if (filters.patient && !patientString.includes(filters.patient)) return false;
       if (filters.type && !(s.sample_type || '').toLowerCase().includes(filters.type)) return false;
       if (filters.status && !(s.status || '').toLowerCase().includes(filters.status)) return false;
+      if (showActiveOnly && !isActiveStatus(s.status)) return false;
       if (fromDate || toDate) {
         if (!s.collected_at) return false;
         const collectedAt = new Date(s.collected_at);
@@ -5518,6 +5539,10 @@ function renderSamples(section) {
     annotateTableCells(section);
   };
   renderRows();
+  activeToggle?.addEventListener('change', () => {
+    showActiveOnly = activeToggle.checked;
+    renderRows();
+  });
   search.addEventListener('input', renderRows);
   Object.values(filterInputs).forEach(input => input?.addEventListener('input', renderRows));
   const sampleExportColumns = [
@@ -5749,6 +5774,7 @@ function renderOrders(section) {
       <div>
         <label for="orderSearch">Søg</label>
         <input id="orderSearch" type="search" placeholder="Status/ID/PMB...">
+        <label class="list-toggle"><input type="checkbox" id="ordersActiveOnly" checked> Vis kun aktive</label>
         <details class="advanced-filter" id="ordersFilterPanel">
           <summary>Avanceret filter</summary>
           <div class="filter-grid">
@@ -5911,6 +5937,7 @@ function renderOrders(section) {
     ordered_from: section.querySelector('[data-filter-orders="ordered_from"]'),
     ordered_to: section.querySelector('[data-filter-orders="ordered_to"]')
   };
+  const activeToggle = section.querySelector('#ordersActiveOnly');
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
@@ -5951,6 +5978,7 @@ function renderOrders(section) {
   let filteredOrders = list.slice();
   let activeFilters = {};
   let selectedOrderId = null;
+  let showActiveOnly = activeToggle ? activeToggle.checked : false;
   const renderRows = () => {
     const term = (search?.value || '').trim().toLowerCase();
     const filters = {
@@ -5984,6 +6012,7 @@ function renderOrders(section) {
     if (filters.interpreter) filterSummary.interpreter = getName('users', Number(filters.interpreter));
     if (filters.approver) filterSummary.approver = getName('users', Number(filters.approver));
     if (term) filterSummary.fritekst = term;
+    filterSummary.visning = showActiveOnly ? 'Kun aktive' : 'Alle';
     activeFilters = filterSummary;
     filteredOrders = list.filter(o => {
       if (!term) return true;
@@ -6035,6 +6064,7 @@ function renderOrders(section) {
       if (filters.approver && String(o.approver_id || '') !== filters.approver) return false;
       const statusValue = (sample?.status || o.status || '').toLowerCase();
       if (filters.status && !statusValue.includes(filters.status)) return false;
+      if (showActiveOnly && !isActiveStatus(statusValue)) return false;
       if (fromDate || toDate) {
         if (!o.ordered_at) return false;
         const ordered = new Date(o.ordered_at);
@@ -6079,6 +6109,10 @@ function renderOrders(section) {
     annotateTableCells(section);
   };
   renderRows();
+  activeToggle?.addEventListener('change', () => {
+    showActiveOnly = activeToggle.checked;
+    renderRows();
+  });
   search.addEventListener('input', renderRows);
   Object.values(filterInputs).forEach(input => {
     if (!input) return;
@@ -7961,7 +7995,9 @@ function renderConclusionLibrary(section) {
 function renderReports(section) {
   const list = getCached('reports');
   const orders = getCached('orders');
+  const samples = getCached('samples');
   const orderMap = new Map(orders.map(o => [Number(o.id), o]));
+  const sampleMap = new Map(samples.map(s => [Number(s.id), s]));
   const orderOptions = orders.map(o => {
     const patientName = getName('patients', o.patient_id);
     const patientGroupName = getPatientGroupName(o.patient_group_id);
@@ -7978,6 +8014,7 @@ function renderReports(section) {
       <div>
         <label for="reportSearch">Søg</label>
         <input id="reportSearch" type="search" placeholder="Status...">
+        <label class="list-toggle"><input type="checkbox" id="reportsActiveOnly" checked> Vis kun aktive</label>
         <details class="advanced-filter" id="reportsFilterPanel">
           <summary>Avanceret filter</summary>
           <div class="filter-grid">
@@ -8175,6 +8212,7 @@ function renderReports(section) {
     issued_from: section.querySelector('[data-filter-reports="issued_from"]'),
     issued_to: section.querySelector('[data-filter-reports="issued_to"]')
   };
+  const activeToggle = section.querySelector('#reportsActiveOnly');
   const updateConclusionButtons = () => {
     const hasSelection = !!conclusionSelect?.value;
     if (conclusionInsertBtn) conclusionInsertBtn.disabled = !hasSelection;
@@ -8445,6 +8483,7 @@ function renderReports(section) {
   let filteredReports = list.slice();
   let activeFilters = {};
   let selectedReportId = null;
+  let showActiveOnly = activeToggle ? activeToggle.checked : false;
   const renderRows = () => {
     const term = search.value.toLowerCase();
     const filters = {
@@ -8459,15 +8498,25 @@ function renderReports(section) {
     if (toDate) toDate.setHours(23, 59, 59, 999);
     const filterSummary = {...filters};
     if (term) filterSummary.fritekst = term;
+    filterSummary.visning = showActiveOnly ? 'Kun aktive' : 'Alle';
     activeFilters = filterSummary;
     filteredReports = list.filter(r => {
-      if (!term) return true;
+      const order = orderMap.get(Number(r.order_id));
+      const sample = order ? sampleMap.get(Number(order.sample_id)) : null;
+      const sampleStatus = (sample?.status || order?.status || '').toLowerCase();
+      if (!term) {
+        if (showActiveOnly && !isActiveStatus(sampleStatus)) return false;
+        return true;
+      }
       const raw = (r.status || '').toLowerCase();
       const display = (statusMap[r.status] || r.status || '').toLowerCase();
       const creator = determineCreatedBy('reports', r).toLowerCase();
       const orderName = getOrderDisplayName(r.order_id).toLowerCase();
       const orderId = String(r.order_id || '').toLowerCase();
-      return [raw, display, creator, orderName, orderId].some(value => value.includes(term));
+      const matches = [raw, display, creator, orderName, orderId, sampleStatus].some(value => value.includes(term));
+      if (!matches) return false;
+      if (showActiveOnly && !isActiveStatus(sampleStatus)) return false;
+      return true;
     }).filter(r => {
       if (filters.id && !String(r.id).includes(filters.id)) return false;
       if (filters.order) {
@@ -8475,7 +8524,10 @@ function renderReports(section) {
         const orderName = getOrderDisplayName(r.order_id).toLowerCase();
         if (!orderIdString.includes(filters.order) && !orderName.includes(filters.order)) return false;
       }
-      const statusStrings = [(r.status || '').toLowerCase(), (statusMap[r.status] || '').toLowerCase()];
+      const order = orderMap.get(Number(r.order_id));
+      const sample = order ? sampleMap.get(Number(order.sample_id)) : null;
+      const sampleStatus = (sample?.status || order?.status || '').toLowerCase();
+      const statusStrings = [(r.status || '').toLowerCase(), (statusMap[r.status] || '').toLowerCase(), sampleStatus];
       if (filters.status && !statusStrings.some(v => v.includes(filters.status))) return false;
       if (fromDate || toDate) {
         if (!r.issued_at) return false;
@@ -8484,25 +8536,36 @@ function renderReports(section) {
         if (fromDate && issued < fromDate) return false;
         if (toDate && issued > toDate) return false;
       }
+      if (showActiveOnly && !isActiveStatus(sampleStatus)) return false;
       return true;
     });
     if (selectedReportId != null && !filteredReports.some(r => r.id === selectedReportId)) {
       selectedReportId = null;
     }
     tbody.innerHTML = filteredReports.map(r => {
+      const order = orderMap.get(Number(r.order_id));
+      const sample = order ? sampleMap.get(Number(order?.sample_id)) : null;
+      const sampleStatus = sample?.status || order?.status || '';
       const displayStatus = statusMap[r.status] || r.status || '';
       const createdBy = determineCreatedBy('reports', r);
       const issuedAt = formatDanishDate(r.issued_at);
       const orderName = getOrderDisplayName(r.order_id);
       const orderTitle = r.order_id != null ? ` title="Ordination #${r.order_id}"` : '';
+      const sampleStatusBadge = sampleStatus && !isActiveStatus(sampleStatus)
+        ? ` <span class="table-meta">(${esc(sampleStatus)})</span>`
+        : '';
       const selectedAttr = r.id === selectedReportId ? ' data-selected="true"' : '';
-      return `<tr data-id="${r.id}"${selectedAttr}><td>${r.id}</td><td${orderTitle}>${esc(orderName)}</td><td>${esc(displayStatus)}</td><td>${esc(createdBy)}</td><td>${esc(issuedAt)}</td></tr>`;
+      return `<tr data-id="${r.id}"${selectedAttr}><td>${r.id}</td><td${orderTitle}>${esc(orderName)}</td><td>${esc(displayStatus)}${sampleStatusBadge}</td><td>${esc(createdBy)}</td><td>${esc(issuedAt)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
   renderRows();
   search.addEventListener('input', renderRows);
   Object.values(filterInputs).forEach(input => input?.addEventListener('input', renderRows));
+  activeToggle?.addEventListener('change', () => {
+    showActiveOnly = activeToggle.checked;
+    renderRows();
+  });
   const reportExportColumns = [
     {key:'id', label:'ID'},
     {key:'order_id', label:'Ordination-ID'},
@@ -9589,6 +9652,7 @@ function renderQC(section) {
       <div>
         <label for="qcSearch">Søg</label>
         <input id="qcSearch" type="search" placeholder="Måling...">
+        <label class="list-toggle"><input type="checkbox" id="qcActiveOnly" checked> Vis kun aktive</label>
         <table><thead><tr><th>ID</th><th>Prøve</th><th>Måling</th><th>Værdi</th><th>Enhed</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
       </div>
       <div>
@@ -9620,32 +9684,58 @@ function renderQC(section) {
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#qcSearch');
   const form = section.querySelector('#qcForm');
+  const activeToggle = section.querySelector('#qcActiveOnly');
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
   applyControlTooltips(section);
   applyFormTooltips(form);
   applySelectFilters(section);
+  const sampleMap = new Map(samples.map(s => [Number(s.id), s]));
   let selectedQcId = null;
+  let showActiveOnly = activeToggle ? activeToggle.checked : false;
   const renderRows = () => {
-    const term = search.value.toLowerCase();
+    const term = search.value.trim().toLowerCase();
     const filteredQc = list.filter(q => {
+      const sample = sampleMap.get(Number(q.sample_id));
+      const sampleStatus = sample?.status || '';
+      if (showActiveOnly && sampleStatus && !isActiveStatus(sampleStatus)) return false;
       if (!term) return true;
       const creator = determineCreatedBy('qc', q);
-      return [q.metric, q.unit, creator].some(v => (v || '').toString().toLowerCase().includes(term));
+      return [
+        q.metric,
+        q.unit,
+        q.notes,
+        creator,
+        q.sample_id,
+        sample?.pmb_number,
+        sample?.sample_type,
+        sampleStatus
+      ].some(v => String(v ?? '').toLowerCase().includes(term));
     });
     if (selectedQcId != null && !filteredQc.some(q => q.id === selectedQcId)) {
       selectedQcId = null;
     }
     tbody.innerHTML = filteredQc.map(q => {
       const createdBy = determineCreatedBy('qc', q);
+      const sample = sampleMap.get(Number(q.sample_id));
+      const sampleStatus = sample?.status || '';
+      const sampleLabel = getName('samples', Number(q.sample_id));
+      const sampleDisplay = sampleLabel || (q.sample_id != null ? `#${q.sample_id}` : '');
+      const sampleStatusMeta = sampleStatus && !isActiveStatus(sampleStatus)
+        ? ` <span class="table-meta">(${esc(sampleStatus)})</span>`
+        : '';
       const selectedAttr = q.id === selectedQcId ? ' data-selected="true"' : '';
-      return `<tr data-id="${q.id}"${selectedAttr}><td>${q.id}</td><td>${esc(q.sample_id)}</td><td>${esc(q.metric)}</td><td>${esc(q.value)}</td><td>${esc(q.unit||'')}</td><td>${esc(createdBy)}</td></tr>`;
+      return `<tr data-id="${q.id}"${selectedAttr}><td>${q.id}</td><td>${esc(sampleDisplay)}${sampleStatusMeta}</td><td>${esc(q.metric)}</td><td>${esc(q.value)}</td><td>${esc(q.unit||'')}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
   renderRows();
   search.addEventListener('input', renderRows);
+  activeToggle?.addEventListener('change', () => {
+    showActiveOnly = activeToggle.checked;
+    renderRows();
+  });
   tbody.addEventListener('click', e => {
     const tr = e.target.closest('tr');
     if (!tr) return;
