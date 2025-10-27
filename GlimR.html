@@ -2072,6 +2072,8 @@ const tooltipCatalog = {
     distanceSwap: 'Byt start- og slutposition for beregningen.',
     gcUpper: 'Fjern mellemrum og konverter sekvensen til store bogstaver.',
     gcReverse: 'Beregn og indsæt den omvendt komplementære sekvens.',
+    blastSubmit: 'Sender sekvensen til NCBI BLAST i en ny fane.',
+    blastClear: 'Rydder felterne for en ny BLAST-forespørgsel.',
     patientsExport: 'Eksportér den aktuelt filtrerede patientliste til en CSV-fil.',
     samplesExport: 'Eksportér de filtrerede prøver som CSV til deling eller videre analyse.',
     ordersExport: 'Eksportér ordinationerne der matcher filtrene som CSV.',
@@ -2130,7 +2132,16 @@ const tooltipCatalog = {
     distanceResult: 'Viser antal baser mellem positionerne (inkl./ekskl.).',
     gcSequence: 'Indsæt DNA/RNA-sekvens for at beregne længde og GC%.',
     acmgResult: 'Opsummering af den foreslåede klassifikation baseret på kriterierne.',
-    gcResult: 'Opsummerer længde, GC% og basefordeling for sekvensen.'
+    gcResult: 'Opsummerer længde, GC% og basefordeling for sekvensen.',
+    blastForm: 'Send sekvensen til NCBI BLAST via en ny browserfane.',
+    blastProgram: 'Vælg BLAST-program ud fra om sekvensen er nukleotid eller protein.',
+    blastDatabase: 'Vælg hvilken NCBI-database der skal søges imod.',
+    blastExpect: 'Valgfrit E-værditærskel (fx 1e-5) for resultaterne.',
+    blastTitle: 'Valgfri titel der indsættes som FASTA-header hvis den mangler.',
+    blastOrganism: 'Filtrér mod en organisme via Entrez-søgestreng (fx Homo sapiens [taxid:9606]).',
+    blastQuery: 'Indsæt DNA- eller proteinsekvens (FASTA eller rå tekst).',
+    blastMegablast: 'Brug MEGABLAST for hurtig søgning efter meget lignende DNA-sekvenser (kun blastn).',
+    blastStatus: 'Statusbeskeder for BLAST-forespørgsler og eventuelle fejl.'
   }
 };
 function setTooltip(el, text) {
@@ -10425,6 +10436,61 @@ function renderTools(section) {
   const consangOptions = consanguinityProfiles.map(profile => `
     <option value="${esc(profile.value)}"${profile.defaultSelected ? ' selected' : ''}>${esc(profile.label)}</option>
   `).join('');
+  const BLAST_PROGRAMS = [
+    {value: 'blastn', label: 'blastn – nukleotid mod nukleotid'},
+    {value: 'blastp', label: 'blastp – protein mod protein'},
+    {value: 'blastx', label: 'blastx – oversæt nukleotid mod protein'},
+    {value: 'tblastn', label: 'tblastn – protein mod oversatte nukleotider'},
+    {value: 'tblastx', label: 'tblastx – oversatte nukleotider mod oversatte nukleotider'}
+  ];
+  const BLAST_DATABASES = {
+    blastn: [
+      {value: 'nt', label: 'nt – NCBI nukleotid-database'},
+      {value: 'refseq_rna', label: 'refseq_rna – RefSeq RNA'},
+      {value: 'refseq_genomic', label: 'refseq_genomic – RefSeq genom'},
+      {value: 'wgs', label: 'wgs – whole genome shotgun contigs'}
+    ],
+    blastp: [
+      {value: 'nr', label: 'nr – NCBI protein'},
+      {value: 'swissprot', label: 'swissprot – Swiss-Prot kurateret'},
+      {value: 'refseq_protein', label: 'refseq_protein – RefSeq protein'}
+    ],
+    blastx: [
+      {value: 'nr', label: 'nr – NCBI protein'},
+      {value: 'swissprot', label: 'swissprot – Swiss-Prot kurateret'},
+      {value: 'refseq_protein', label: 'refseq_protein – RefSeq protein'}
+    ],
+    tblastn: [
+      {value: 'nt', label: 'nt – NCBI nukleotid-database'},
+      {value: 'refseq_rna', label: 'refseq_rna – RefSeq RNA'},
+      {value: 'refseq_genomic', label: 'refseq_genomic – RefSeq genom'}
+    ],
+    tblastx: [
+      {value: 'nt', label: 'nt – NCBI nukleotid-database'},
+      {value: 'refseq_rna', label: 'refseq_rna – RefSeq RNA'}
+    ]
+  };
+  const DEFAULT_BLAST_PROGRAM = 'blastn';
+  const DEFAULT_BLAST_DATABASE = 'nt';
+  const renderBlastDatabaseOptions = (program, selectedValue) => {
+    const items = BLAST_DATABASES[program] || [];
+    if (!items.length) {
+      return '<option value="" disabled>Ingen database tilgængelig</option>';
+    }
+    return items.map((item, index) => {
+      const value = esc(item.value);
+      const label = esc(item.label);
+      const selected = selectedValue ? selectedValue === item.value : index === 0;
+      return `<option value="${value}"${selected ? ' selected' : ''}>${label}</option>`;
+    }).join('');
+  };
+  const blastProgramOptions = BLAST_PROGRAMS.map(item => {
+    const value = esc(item.value);
+    const label = esc(item.label);
+    const selected = item.value === DEFAULT_BLAST_PROGRAM ? ' selected' : '';
+    return `<option value="${value}"${selected}>${label}</option>`;
+  }).join('');
+  const initialBlastDatabaseOptions = renderBlastDatabaseOptions(DEFAULT_BLAST_PROGRAM, DEFAULT_BLAST_DATABASE);
   const makeCriteriaList = list => list.map(item => {
     const code = esc(item.code);
     const label = esc(item.label);
@@ -10613,6 +10679,62 @@ function renderTools(section) {
       </form>
       <div class="tool-result" id="distanceResult">Indtast positioner for at se resultatet.</div>
       <p class="tool-note">Resultatet viser både eksklusiv (end-start) og inklusiv (end-start+1) afstand.</p>
+    </div>
+  </details>
+  <details class="panel tool-panel">
+    <summary>
+      <div class="tool-summary-text">
+        <span class="tool-title">Sekvens BLAST</span>
+        <span class="tool-subtitle">Send sekvenser til NCBI BLAST i en ny fane.</span>
+      </div>
+    </summary>
+    <div class="tool-body">
+      <h3>Sekvens BLAST</h3>
+      <p>Indsæt en DNA- eller proteinsekvens og vælg program og database. Forespørgslen sendes til NCBI BLAST i en ny browserfane.</p>
+      <form id="blastForm">
+        <div class="tool-inline">
+          <label for="blastProgram">
+            Program
+            <select id="blastProgram" name="program">
+              ${blastProgramOptions}
+            </select>
+          </label>
+          <label for="blastDatabase">
+            Database
+            <select id="blastDatabase" name="database">
+              ${initialBlastDatabaseOptions}
+            </select>
+          </label>
+          <label for="blastExpect">
+            E-værdi (valgfri)
+            <input id="blastExpect" name="expect" placeholder="fx 1e-5">
+          </label>
+        </div>
+        <div class="tool-inline">
+          <label for="blastTitle">
+            Sekvenstitel (valgfri)
+            <input id="blastTitle" name="title" placeholder="fx Patient123_variant">
+          </label>
+          <label for="blastOrganism">
+            Organisme-filter (valgfri)
+            <input id="blastOrganism" name="organism" placeholder="fx Homo sapiens [taxid:9606]">
+          </label>
+        </div>
+        <label for="blastQuery">
+          Sekvens
+          <textarea id="blastQuery" name="query" rows="6" placeholder="Indsæt DNA- eller proteinsekvens (FASTA eller rå tekst)"></textarea>
+        </label>
+        <label class="list-toggle" id="blastMegablastRow">
+          <input type="checkbox" id="blastMegablast" name="megablast" checked>
+          <span>Brug MEGABLAST for højt lignende DNA-sekvenser (blastn)</span>
+        </label>
+        <div class="btn-row">
+          <button type="submit" class="primary" id="blastSubmit">Kør BLAST (NCBI)</button>
+          <button type="button" class="secondary" id="blastClear">Ryd</button>
+        </div>
+      </form>
+      <div class="tool-result" id="blastStatus">Indsæt en sekvens og kør BLAST for at åbne resultatet hos NCBI.</div>
+      <p class="tool-note">Sekvensen sendes direkte til NCBI BLAST via en ny fane og gemmes ikke i GlimR.</p>
     </div>
   </details>
   <details class="panel tool-panel">
@@ -11024,6 +11146,158 @@ function renderTools(section) {
     updateDistance();
   });
   updateDistance();
+
+  const blastForm = section.querySelector('#blastForm');
+  const blastStatus = section.querySelector('#blastStatus');
+  if (blastForm && blastStatus) {
+    const sequenceInput = blastForm.querySelector('#blastQuery');
+    const titleInput = blastForm.querySelector('#blastTitle');
+    const programSelect = blastForm.querySelector('#blastProgram');
+    const databaseSelect = blastForm.querySelector('#blastDatabase');
+    const organismInput = blastForm.querySelector('#blastOrganism');
+    const expectInput = blastForm.querySelector('#blastExpect');
+    const megablastToggle = blastForm.querySelector('#blastMegablast');
+    const megablastRow = blastForm.querySelector('#blastMegablastRow');
+    let lastMegablastState = megablastToggle?.checked ?? true;
+
+    const updateBlastDatabases = () => {
+      if (programSelect && databaseSelect) {
+        const program = programSelect.value || DEFAULT_BLAST_PROGRAM;
+        const current = databaseSelect.value;
+        databaseSelect.innerHTML = renderBlastDatabaseOptions(program, current);
+        if (!Array.from(databaseSelect.options).some(opt => opt.selected) && databaseSelect.options.length) {
+          databaseSelect.selectedIndex = 0;
+        }
+        if (megablastRow) {
+          const isBlastn = program === 'blastn';
+          megablastRow.hidden = !isBlastn;
+          if (megablastToggle) {
+            if (!isBlastn) {
+              lastMegablastState = megablastToggle.checked;
+              megablastToggle.checked = false;
+            } else {
+              megablastToggle.checked = lastMegablastState;
+            }
+          }
+        }
+      }
+    };
+
+    const normaliseFastaTitle = title => {
+      return (title || '')
+        .trim()
+        .replace(/\s+/g, '_')
+        .replace(/[^A-Za-z0-9_.-]/g, '_')
+        .slice(0, 80);
+    };
+
+    const wrapSequence = seq => seq.replace(/(.{1,70})/g, '$1\n').trim();
+
+    const ensureFastaInput = (title, text) => {
+      const trimmed = (text || '').replace(/\r\n/g, '\n').trim();
+      if (!trimmed) return '';
+      if (trimmed.startsWith('>')) {
+        return trimmed;
+      }
+      const sequence = trimmed.replace(/[^A-Za-z*\-]/g, '').toUpperCase();
+      if (!sequence) return '';
+      const safeTitle = normaliseFastaTitle(title) || 'Query';
+      return `>${safeTitle}\n${wrapSequence(sequence)}`;
+    };
+
+    const countLetters = text => (text || '').replace(/^>.*$/gm, '').replace(/[^A-Za-z]/g, '').length;
+
+    updateBlastDatabases();
+    programSelect?.addEventListener('change', updateBlastDatabases);
+
+    blastForm.addEventListener('submit', event => {
+      event.preventDefault();
+      const raw = sequenceInput?.value || '';
+      const letters = countLetters(raw);
+      if (!letters) {
+        blastStatus.textContent = 'Indsæt en sekvens før du kører BLAST.';
+        sequenceInput?.focus();
+        return;
+      }
+      if (letters < 10) {
+        blastStatus.textContent = 'Sekvensen er meget kort – BLAST kræver typisk mindst 10 baser/aminosyrer.';
+        sequenceInput?.focus();
+        return;
+      }
+      const fasta = ensureFastaInput(titleInput?.value || '', raw);
+      if (!fasta) {
+        blastStatus.textContent = 'Kunne ikke formatere sekvensen til FASTA. Kontroller indholdet.';
+        return;
+      }
+      const program = programSelect?.value;
+      if (!program) {
+        blastStatus.textContent = 'Vælg et BLAST-program.';
+        programSelect?.focus();
+        return;
+      }
+      const database = databaseSelect?.value;
+      if (!database) {
+        blastStatus.textContent = 'Vælg en database for søgningen.';
+        databaseSelect?.focus();
+        return;
+      }
+      const hiddenForm = document.createElement('form');
+      hiddenForm.method = 'post';
+      hiddenForm.action = 'https://blast.ncbi.nlm.nih.gov/Blast.cgi';
+      hiddenForm.target = '_blank';
+      const appendField = (name, value) => {
+        if (value === undefined || value === null || value === '') return;
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = name;
+        input.value = value;
+        hiddenForm.appendChild(input);
+      };
+      appendField('CMD', 'Put');
+      appendField('PROGRAM', program);
+      appendField('DATABASE', database);
+      appendField('QUERY', fasta);
+      const expect = expectInput?.value.trim();
+      if (expect) appendField('EXPECT', expect);
+      const organism = organismInput?.value.trim();
+      if (organism) appendField('ENTREZ_QUERY', organism);
+      if (program === 'blastn' && megablastToggle?.checked) {
+        appendField('MEGABLAST', 'on');
+      }
+      appendField('CLIENT', 'GlimR');
+      document.body.appendChild(hiddenForm);
+      const offline = typeof navigator !== 'undefined' && navigator && navigator.onLine === false;
+      if (offline) {
+        blastStatus.textContent = 'Forsøger at åbne NCBI BLAST, men der er ingen registreret internetforbindelse.';
+      } else {
+        blastStatus.textContent = 'Sekvens sendt til NCBI BLAST i en ny fane. Følg status i den åbne fane.';
+      }
+      try {
+        hiddenForm.submit();
+        setStatus('BLAST-forespørgsel åbnet i ny fane.');
+      } catch (err) {
+        console.error(err);
+        blastStatus.textContent = 'Kunne ikke åbne NCBI BLAST. Kontrollér popup-blokering og internetforbindelse.';
+      } finally {
+        window.setTimeout(() => hiddenForm.remove(), 1000);
+      }
+    });
+
+    section.querySelector('#blastClear')?.addEventListener('click', () => {
+      if (sequenceInput) sequenceInput.value = '';
+      if (titleInput) titleInput.value = '';
+      if (organismInput) organismInput.value = '';
+      if (expectInput) expectInput.value = '';
+      if (programSelect) programSelect.value = DEFAULT_BLAST_PROGRAM;
+      updateBlastDatabases();
+      if (megablastToggle) {
+        megablastToggle.checked = true;
+        lastMegablastState = true;
+      }
+      blastStatus.textContent = 'Indsæt en sekvens og kør BLAST for at åbne resultatet hos NCBI.';
+      sequenceInput?.focus();
+    });
+  }
 
   const gcTextarea = section.querySelector('#gcSequence');
   const gcResult = section.querySelector('#gcResult');
