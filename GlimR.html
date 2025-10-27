@@ -8235,6 +8235,9 @@ function buildReportHtml(orderId, reportData) {
   if (sample?.pmb_number) sampleIdentifierParts.push(sample.pmb_number);
   if (sample?.id != null) sampleIdentifierParts.push(`ID ${sample.id}`);
   const sampleIdentifier = sampleIdentifierParts.join(' / ');
+  const hasIndication = !!collapseSpaces(order?.indication);
+  const indicationHtml = hasIndication ? formatMultilineCell(order.indication) : esc('Ikke angivet');
+  const hpoHtml = formatHpoHtml(order?.hpo_terms);
   const rows = variants.map(v => {
     const title = formatVariantTitle(v);
     const typeLabel = getVariantTypeLabel(v.variant_type);
@@ -8267,6 +8270,8 @@ function buildReportHtml(orderId, reportData) {
   return `
   <h1>Diagnostisk rapport</h1>
   <p><strong>Ordination:</strong> ${orderId}</p>
+  <p><strong>Indikation:</strong><br>${indicationHtml}</p>
+  ${hpoHtml ? `<p><strong>HPO-termer:</strong><br>${hpoHtml}</p>` : ''}
   <p><strong>Patient:</strong> ${esc(patient?.name||'')}${patientIdentifiersDisplay}</p>
   <p><strong>Prøve:</strong> ${esc(sample?.sample_type||'')}${sampleIdentifier ? ` (${esc(sampleIdentifier)})` : ''}</p>
   <p><strong>Status:</strong> ${esc(reportData.status||'')}</p>
@@ -8893,12 +8898,14 @@ async function createReportPdfBlob(orderId, reportData, exportedAt = new Date())
       {type: 'kv', label: 'Opsamlet', value: sample?.collected_at},
       {type: 'paragraph', label: 'Noter', value: sample?.notes, emptyText: 'Ingen noter.', indent: '  '}
     ];
+    const orderIndicationText = collapseSpaces(order?.indication) ? order.indication : '';
     const analysisRows = [
       {type: 'kv', label: 'Panel', value: panel?.name},
       {type: 'kv', label: 'Analyseansvarlig', value: analysisResponsible},
       {type: 'kv', label: 'Rekvirent', value: clinician},
       {type: 'kv', label: 'Ordinationsstatus', value: order?.status},
-      {type: 'kv', label: 'Bestilt', value: order?.ordered_at}
+      {type: 'kv', label: 'Bestilt', value: order?.ordered_at},
+      {type: 'paragraph', label: 'Indikation', value: orderIndicationText, emptyText: 'Ingen indikation angivet.'}
     ];
     const qcRows = [];
     if (qcEntries.length) {
