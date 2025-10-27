@@ -10714,6 +10714,60 @@ function renderTools(section) {
   <details class="panel tool-panel">
     <summary>
       <div class="tool-summary-text">
+        <span class="tool-title">Genome browser opslag</span>
+        <span class="tool-subtitle">Åbn koordinater, gener eller varianter direkte i Ensembl eller UCSC.</span>
+      </div>
+    </summary>
+    <div class="tool-body">
+      <h3>Genome browser opslag</h3>
+      <p>Angiv en position (fx chr1:123456-123789), et gen (fx BRCA1) eller et variant-id (fx rs80357713) og vælg browser og reference.</p>
+      <form id="genomeBrowserForm">
+        <div class="tool-inline">
+          <label for="genomeLookupType">
+            Opslagstype
+            <select id="genomeLookupType" name="lookup_type">
+              <option value="position">Position</option>
+              <option value="gene">Gen</option>
+              <option value="variant">Variant-id</option>
+            </select>
+          </label>
+          <label for="genomeAssembly">
+            Reference
+            <select id="genomeAssembly" name="assembly">
+              <option value="grch38" selected>GRCh38 / hg38</option>
+              <option value="grch37">GRCh37 / hg19</option>
+            </select>
+          </label>
+          <label for="genomeBrowserChoice">
+            Browser
+            <select id="genomeBrowserChoice" name="browser">
+              <option value="ensembl" selected>Ensembl</option>
+              <option value="ucsc">UCSC Genome Browser</option>
+            </select>
+          </label>
+        </div>
+        <label for="genomeLookupValue">
+          Søgeværdi
+          <input id="genomeLookupValue" name="value" placeholder="fx chr7:140453136-140453250 eller BRCA1" autocomplete="off">
+        </label>
+        <div class="tool-inline" data-padding-row>
+          <label for="genomePadding" title="Bruges når kun en enkelt position angives for at definere visningsvinduet omkring positionen.">
+            Visningsvindue (bp)
+            <input type="number" id="genomePadding" name="padding" min="10" max="2000000" value="1000">
+          </label>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="primary" id="genomeBrowserOpen">Åbn i ny fane</button>
+          <button type="button" class="secondary" id="genomeBrowserClear">Ryd</button>
+        </div>
+      </form>
+      <div class="tool-result" id="genomeBrowserStatus">Indtast en søgeværdi og vælg browser for at åbne visningen.</div>
+      <p class="tool-note">Positioner udvides automatisk med et vindue omkring koordinatet, hvis der ikke angives et interval.</p>
+    </div>
+  </details>
+  <details class="panel tool-panel">
+    <summary>
+      <div class="tool-summary-text">
         <span class="tool-title">Sekvens BLAST</span>
         <span class="tool-subtitle">Send sekvenser til NCBI BLAST i en ny fane.</span>
       </div>
@@ -11051,6 +11105,155 @@ function renderTools(section) {
         }
       });
     }
+  }
+
+  const genomeBrowserForm = section.querySelector('#genomeBrowserForm');
+  const genomeBrowserStatus = section.querySelector('#genomeBrowserStatus');
+  if (genomeBrowserForm && genomeBrowserStatus) {
+    const typeField = genomeBrowserForm.querySelector('#genomeLookupType');
+    const assemblyField = genomeBrowserForm.querySelector('#genomeAssembly');
+    const browserField = genomeBrowserForm.querySelector('#genomeBrowserChoice');
+    const valueField = genomeBrowserForm.querySelector('#genomeLookupValue');
+    const paddingField = genomeBrowserForm.querySelector('#genomePadding');
+    const clearButton = genomeBrowserForm.querySelector('#genomeBrowserClear');
+    const paddingRow = genomeBrowserForm.querySelector('[data-padding-row]');
+    const placeholders = {
+      position: 'fx chr7:140453136-140453250',
+      gene: 'fx BRCA1',
+      variant: 'fx rs80357713 eller NM_007294.3:c.68_69del'
+    };
+    const assemblyConfig = {
+      grch38: {label: 'GRCh38 / hg38', ensemblHost: 'https://www.ensembl.org', ucscDb: 'hg38'},
+      grch37: {label: 'GRCh37 / hg19', ensemblHost: 'https://grch37.ensembl.org', ucscDb: 'hg19'}
+    };
+    const browserLabels = {
+      ensembl: 'Ensembl',
+      ucsc: 'UCSC Genome Browser'
+    };
+    const typeStatusLabels = {
+      position: 'positionen',
+      gene: 'genet',
+      variant: 'varianten'
+    };
+    const updateLookupUi = () => {
+      const type = typeField?.value || 'position';
+      if (valueField) {
+        valueField.placeholder = placeholders[type] || 'Angiv søgeværdi';
+      }
+      if (paddingRow) {
+        paddingRow.hidden = type !== 'position';
+      }
+    };
+    updateLookupUi();
+    typeField?.addEventListener('change', updateLookupUi);
+
+    const parseWindowSize = () => {
+      if (!paddingField) return 1000;
+      const parsed = Number.parseInt(paddingField.value, 10);
+      if (!Number.isFinite(parsed) || parsed <= 0) return 1000;
+      return Math.min(parsed, 2000000);
+    };
+    const parsePositionValue = (value, windowSize) => {
+      if (!value) return null;
+      const normalised = value.toString().trim().replace(/\s+/g, '');
+      if (!normalised) return null;
+      const match = normalised.match(/^(?:chr)?([0-9]{1,2}|X|Y|M|MT)(?::(\d+)(?:-(\d+))?)?$/i);
+      if (!match) return null;
+      let chrom = match[1].toUpperCase();
+      if (chrom === 'M') chrom = 'MT';
+      let start = match[2] ? Number.parseInt(match[2], 10) : NaN;
+      let end = match[3] ? Number.parseInt(match[3], 10) : NaN;
+      if (!Number.isFinite(start)) return null;
+      start = Math.max(1, start);
+      if (Number.isFinite(end)) {
+        end = Math.max(1, end);
+        if (end < start) [start, end] = [end, start];
+        if (end === start) end = start + 1;
+      } else {
+        const span = Number.isFinite(windowSize) && windowSize > 0 ? windowSize : 1000;
+        const half = Math.max(1, Math.round(span / 2));
+        const startCandidate = Math.max(1, start - half);
+        const endCandidate = startCandidate + span;
+        start = startCandidate;
+        end = endCandidate;
+      }
+      const ensemblRange = `${chrom}:${start}-${end}`;
+      const ucscChrom = chrom === 'MT' ? 'chrM' : `chr${chrom}`;
+      const ucscRange = `${ucscChrom}:${start}-${end}`;
+      return {chrom, start, end, ensemblRange, ucscRange, displayRange: ucscRange};
+    };
+    const isRsId = value => /^rs\d+$/i.test((value || '').trim());
+    const buildStatusLink = (url, text) => `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(text)}</a>`;
+
+    genomeBrowserForm.addEventListener('submit', event => {
+      event.preventDefault();
+      const type = typeField?.value || 'position';
+      const assemblyKey = assemblyField?.value || 'grch38';
+      const browserKey = browserField?.value || 'ensembl';
+      const assembly = assemblyConfig[assemblyKey];
+      if (!assembly) {
+        genomeBrowserStatus.textContent = 'Vælg en understøttet reference.';
+        return;
+      }
+      const rawValue = (valueField?.value || '').trim();
+      if (!rawValue) {
+        genomeBrowserStatus.textContent = 'Angiv en søgeværdi først.';
+        valueField?.focus();
+        return;
+      }
+      let url = '';
+      let displayValue = rawValue;
+      if (type === 'position') {
+        const windowSize = parseWindowSize();
+        const parsed = parsePositionValue(rawValue, windowSize);
+        if (!parsed) {
+          genomeBrowserStatus.textContent = 'Kunne ikke tolke positionen. Brug formatet chr1:123456-123789.';
+          return;
+        }
+        displayValue = parsed.displayRange;
+        if (browserKey === 'ensembl') {
+          url = `${assembly.ensemblHost}/Homo_sapiens/Location/View?r=${encodeURIComponent(parsed.ensemblRange)}`;
+        } else if (browserKey === 'ucsc') {
+          url = `https://genome.ucsc.edu/cgi-bin/hgTracks?db=${encodeURIComponent(assembly.ucscDb)}&position=${encodeURIComponent(parsed.ucscRange)}`;
+        }
+      } else if (type === 'gene') {
+        if (browserKey === 'ensembl') {
+          url = `${assembly.ensemblHost}/Multi/Search/Results?q=${encodeURIComponent(rawValue)};site=ensembl`;
+        } else if (browserKey === 'ucsc') {
+          url = `https://genome.ucsc.edu/cgi-bin/hgTracks?db=${encodeURIComponent(assembly.ucscDb)}&position=${encodeURIComponent(rawValue)}`;
+        }
+      } else {
+        if (browserKey === 'ensembl') {
+          if (isRsId(rawValue)) {
+            url = `${assembly.ensemblHost}/Homo_sapiens/Variation/Summary?v=${encodeURIComponent(rawValue)}`;
+          } else {
+            url = `${assembly.ensemblHost}/Multi/Search/Results?q=${encodeURIComponent(rawValue)};site=ensembl`;
+          }
+        } else if (browserKey === 'ucsc') {
+          url = `https://genome.ucsc.edu/cgi-bin/hgTracks?db=${encodeURIComponent(assembly.ucscDb)}&position=${encodeURIComponent(rawValue)}`;
+        }
+      }
+      if (!url) {
+        genomeBrowserStatus.textContent = 'Kombinationen understøttes ikke endnu.';
+        return;
+      }
+      const browserLabel = browserLabels[browserKey] || browserKey;
+      const opened = window.open(url, '_blank', 'noopener');
+      const linkHtml = buildStatusLink(url, displayValue);
+      if (opened) {
+        genomeBrowserStatus.innerHTML = `<strong>Åbnede:</strong> ${linkHtml} i ${esc(browserLabel)} (${esc(assembly.label || assemblyKey)}).`;
+        const typeLabel = typeStatusLabels[type] || 'opslaget';
+        setStatus(`Åbnede ${typeLabel} ${displayValue} i ${browserLabel}.`);
+      } else {
+        genomeBrowserStatus.innerHTML = `Pop-up blev blokeret. Åbn manuelt: ${linkHtml}`;
+      }
+    });
+
+    clearButton?.addEventListener('click', () => {
+      genomeBrowserForm.reset();
+      updateLookupUi();
+      genomeBrowserStatus.textContent = 'Indtast en søgeværdi og vælg browser for at åbne visningen.';
+    });
   }
 
   const consangForm = section.querySelector('#consangForm');
