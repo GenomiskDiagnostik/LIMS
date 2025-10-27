@@ -1563,7 +1563,7 @@ const schemaFields = {
   patients: ['id','mrn','extra_id','family_number','name','gender','birth_date','notes','created_by','created_at','updated_at'],
   samples: ['id','pmb_number','patient_id','sample_type','collected_at','status','notes','created_by','created_at','updated_at'],
   panels: ['id','name','description','created_at','updated_at'],
-  orders: ['id','patient_id','sample_id','panel_id','analysis_responsible_id','interpreter_id','approver_id','clinician','status','ordered_at','created_by','created_at','updated_at'],
+  orders: ['id','patient_id','sample_id','panel_id','analysis_responsible_id','interpreter_id','approver_id','clinician','indication','hpo_terms','status','ordered_at','created_by','created_at','updated_at'],
   variants: ['id','order_id','variant_type','gene','transcript','hgvs_c','hgvs_p','rsid','zygosity','classification','criteria','af','annotations','interpretation','genome_build','chromosome','start','end','copy_number','sv_subtype','size_bp','iscn','description','affected_genes','created_by','created_at','updated_at'],
   qc: ['id','sample_id','metric','value','unit','notes','created_by','created_at','updated_at'],
   reports: ['id','order_id','findings','variant_ids','variant_details','summary','status','issued_at','created_by','created_at','updated_at'],
@@ -1621,6 +1621,9 @@ const tooltipCatalog = {
     'Analyseansvarlig': 'Bruger der har det overordnede ansvar for analysen.',
     'Tolker': 'Bruger der tolker de genetiske fund.',
     'Godkender': 'Bruger der godkender ordinationen eller rapporten.',
+    'Indikation': 'Klinisk indikation angivet for ordinationen.',
+    'Indikationer': 'Kommasepareret liste over ordinationers indikationer for patienten.',
+    'HPO-termer': 'Registrerede HPO-termer knyttet til ordinationen.',
     'Status': 'Aktuel status for posten.',
     'Opdateret': 'Seneste ændringstidspunkt.',
     'Bestilt': 'Tidspunkt for oprettelse af ordinationen.',
@@ -1698,6 +1701,8 @@ const tooltipCatalog = {
       interpreter_id: 'Vælg den bruger der tolker resultaterne.',
       approver_id: 'Vælg den bruger der godkender ordinationen.',
       clinician: 'Navn på rekvirerende kliniker eller afdeling.',
+      indication: 'Klinisk indikation eller henvisningsårsag for ordinationen.',
+      hpo_terms: 'Valgfri liste over relevante HPO-termer (én per linje eller separeret af semikolon).',
       status: 'Ordinationens arbejdsgangstatus.',
       ordered_at: 'Tidspunkt for oprettelse af ordinationen.'
     },
@@ -1792,6 +1797,8 @@ const tooltipCatalog = {
       order_interpreter: 'Vælg den bruger der tolker fundene.',
       order_approver: 'Vælg den bruger der godkender ordinationen.',
       order_clinician: 'Rekvirerende kliniker eller afdeling.',
+      order_indication: 'Klinisk indikation eller henvisningsårsag for ordinationen.',
+      order_hpo_terms: 'Valgfri liste over HPO-termer (én per linje eller separeret af semikolon).',
       order_ordered_at: 'Tidspunkt hvor ordinationen registreres.'
     },
     userForm: {
@@ -2701,6 +2708,56 @@ function handleLogin(event) {
 }
 function esc(str) {
   return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
+}
+
+function collapseSpaces(value) {
+  return String(value ?? '').replace(/\s+/g, ' ').trim();
+}
+
+function formatMultilineCell(value) {
+  const text = String(value ?? '').trim();
+  if (!text) return '';
+  return esc(text).replace(/\n/g, '<br>');
+}
+
+function splitHpoInput(value) {
+  const raw = String(value ?? '');
+  if (!raw.trim()) return [];
+  const hasPreferredDelimiter = /[\n;]/.test(raw);
+  const parts = hasPreferredDelimiter ? raw.split(/[\n;]+/) : raw.split(/,+/);
+  return parts.map(part => collapseSpaces(part)).filter(Boolean);
+}
+
+function normalizeHpoTerms(value) {
+  const seen = new Set();
+  const terms = [];
+  for (const term of splitHpoInput(value)) {
+    const key = term.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    terms.push(term);
+  }
+  return terms.join('\n');
+}
+
+function parseHpoTerms(value) {
+  const normalized = normalizeHpoTerms(value);
+  if (!normalized) return [];
+  return normalized.split('\n');
+}
+
+function formatHpoList(value, separator = ', ') {
+  return parseHpoTerms(value).join(separator);
+}
+
+function formatHpoHtml(value) {
+  const terms = parseHpoTerms(value);
+  if (!terms.length) return '';
+  return terms.map(term => esc(term)).join('<br>');
+}
+
+function formatIndicationForList(value) {
+  return collapseSpaces(value);
 }
 function setStatus(msg) {
   state.lastStatus = msg;
@@ -3897,6 +3954,8 @@ function renderCreateCase(section) {
               </div>
             </label>
           </div>
+          <label>Indikation<textarea name="order_indication" rows="3" placeholder="Beskriv klinisk indikation"></textarea></label>
+          <label>HPO-termer<textarea name="order_hpo_terms" class="small" placeholder="HP:0001250; HP:0004321"></textarea></label>
           <div class="inline-group">
             <label class="inline">Godkender
               <div class="filterable-select">
@@ -4361,12 +4420,16 @@ function renderCreateCase(section) {
     }
     let orderedAt = form.elements.order_ordered_at.value;
     if (!orderedAt) orderedAt = toLocalDateTimeValue();
+    const orderIndication = form.elements.order_indication.value.trim();
+    const orderHpoTerms = normalizeHpoTerms(form.elements.order_hpo_terms.value);
     const order = {
       panel_id: Number(panelIdValue),
       analysis_responsible_id: form.elements.order_analysis_responsible.value ? Number(form.elements.order_analysis_responsible.value) : null,
       interpreter_id: form.elements.order_interpreter.value ? Number(form.elements.order_interpreter.value) : null,
       approver_id: form.elements.order_approver.value ? Number(form.elements.order_approver.value) : null,
       clinician: form.elements.order_clinician.value.trim(),
+      indication: orderIndication,
+      hpo_terms: orderHpoTerms,
       status: sample.status,
       ordered_at: orderedAt
     };
@@ -4710,6 +4773,24 @@ function clearFormIdentifier(form, fieldName = 'id') {
 }
 function renderPatients(section) {
   const list = getCached('patients');
+  const orders = getCached('orders');
+  const patientIndicationSets = new Map();
+  for (const order of orders) {
+    if (!order) continue;
+    const patientId = Number(order.patient_id);
+    if (!Number.isFinite(patientId) || patientId <= 0) continue;
+    const indication = formatIndicationForList(order.indication);
+    if (!indication) continue;
+    if (!patientIndicationSets.has(patientId)) {
+      patientIndicationSets.set(patientId, new Set());
+    }
+    patientIndicationSets.get(patientId).add(indication);
+  }
+  const getPatientIndications = id => {
+    const set = patientIndicationSets.get(Number(id));
+    if (!set || !set.size) return '';
+    return Array.from(set).join(', ');
+  };
   const existingFamilyNumbers = Array.from(new Set(list.map(p => (p.family_number || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'da'));
   const familySelectOptions = ['<option value="">Vælg familienummer</option>']
     .concat(existingFamilyNumbers.map(num => `<option value="${esc(num)}">${esc(num)}</option>`))
@@ -4731,9 +4812,10 @@ function renderPatients(section) {
             <label>Navn<input type="search" data-filter-patients="name" placeholder="Patientnavn"></label>
             <label>Køn<select data-filter-patients="gender"><option value="">Alle</option><option value="male">Mand</option><option value="female">Kvinde</option><option value="other">Andet</option></select></label>
             <label>Fødselsår<input type="search" data-filter-patients="birth" placeholder="ÅÅÅÅ"></label>
+            <label>Indikation<input type="search" data-filter-patients="indication" placeholder="Indikation"></label>
           </div>
         </details>
-        <table id="patientsTable"><thead><tr><th>ID</th><th>MRN</th><th>ID</th><th>Familienummer</th><th>Navn</th><th>Køn</th><th>Født</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
+        <table id="patientsTable"><thead><tr><th>ID</th><th>MRN</th><th>ID</th><th>Familienummer</th><th>Navn</th><th>Køn</th><th>Født</th><th>Indikationer</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
           <button type="button" class="secondary" id="patientsExport">Eksportér filtrerede patienter</button>
         </div>
@@ -4777,7 +4859,8 @@ function renderPatients(section) {
     family: section.querySelector('[data-filter-patients="family"]'),
     name: section.querySelector('[data-filter-patients="name"]'),
     gender: section.querySelector('[data-filter-patients="gender"]'),
-    birth: section.querySelector('[data-filter-patients="birth"]')
+    birth: section.querySelector('[data-filter-patients="birth"]'),
+    indication: section.querySelector('[data-filter-patients="indication"]')
   };
   const birthDateInput = form?.elements.birth_date;
   const ageNote = form?.querySelector('[data-patient-age]');
@@ -4812,17 +4895,22 @@ function renderPatients(section) {
       family: filterInputs.family?.value.trim().toLowerCase() || '',
       name: filterInputs.name?.value.trim().toLowerCase() || '',
       gender: filterInputs.gender?.value || '',
-      birth: filterInputs.birth?.value.trim().toLowerCase() || ''
+      birth: filterInputs.birth?.value.trim().toLowerCase() || '',
+      indication: filterInputs.indication?.value.trim().toLowerCase() || ''
     };
     const filterSummary = {...filters};
+    if (filters.indication) filterSummary.indikation = filters.indication;
+    delete filterSummary.indication;
     if (term) filterSummary.fritekst = term;
     activeFilters = filterSummary;
     filteredPatients = list.filter(p => {
       if (!term) return true;
       const displayGender = genderMap[p.gender];
       const creator = determineCreatedBy('patients', p);
-      return [p.name, p.mrn, p.extra_id, p.family_number, p.gender, displayGender, creator].some(v => (v||'').toLowerCase().includes(term));
+      const indications = getPatientIndications(p.id);
+      return [p.name, p.mrn, p.extra_id, p.family_number, p.gender, displayGender, creator, indications].some(v => (v||'').toLowerCase().includes(term));
     }).filter(p => {
+      const indicationText = getPatientIndications(p.id).toLowerCase();
       if (filters.id && !String(p.id).includes(filters.id)) return false;
       if (filters.mrn && !(p.mrn||'').toLowerCase().includes(filters.mrn)) return false;
       if (filters.extra && !(p.extra_id||'').toLowerCase().includes(filters.extra)) return false;
@@ -4830,6 +4918,7 @@ function renderPatients(section) {
       if (filters.name && !(p.name||'').toLowerCase().includes(filters.name)) return false;
       if (filters.gender && (p.gender||'') !== filters.gender) return false;
       if (filters.birth && !(p.birth_date||'').toLowerCase().startsWith(filters.birth)) return false;
+      if (filters.indication && !indicationText.includes(filters.indication)) return false;
       return true;
     });
     if (selectedPatientId != null && !filteredPatients.some(p => p.id === selectedPatientId)) {
@@ -4842,8 +4931,9 @@ function renderPatients(section) {
       const formattedBirth = formatDanishDate(rawBirth) || (rawBirth || '');
       const ageDisplay = formatAgeFromBirthDate(rawBirth);
       const birthDisplay = formattedBirth && ageDisplay ? `${formattedBirth} (${ageDisplay})` : formattedBirth;
+      const indicationsList = getPatientIndications(p.id);
       const selectedAttr = p.id === selectedPatientId ? ' data-selected="true"' : '';
-      return `<tr data-id="${p.id}"${selectedAttr}><td>${p.id}</td><td>${esc(p.mrn)}</td><td>${esc(p.extra_id||'')}</td><td>${esc(p.family_number||'')}</td><td>${esc(p.name)}</td><td>${esc(gender)}</td><td>${esc(birthDisplay)}</td><td>${esc(createdBy)}</td></tr>`;
+      return `<tr data-id="${p.id}"${selectedAttr}><td>${p.id}</td><td>${esc(p.mrn)}</td><td>${esc(p.extra_id||'')}</td><td>${esc(p.family_number||'')}</td><td>${esc(p.name)}</td><td>${esc(gender)}</td><td>${esc(birthDisplay)}</td><td>${esc(indicationsList)}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -4861,6 +4951,7 @@ function renderPatients(section) {
     {key:'birth_date', label:'Fødselsdato'},
     {key:'birth_date_formatted', label:'Fødselsdato (formateret)', value: row => formatDanishDate(row.birth_date)},
     {key:'notes', label:'Noter'},
+    {key:'indications', label:'Indikationer', value: row => getPatientIndications(row.id)},
     {key:'created_by', label:'Oprettet af'},
     {key:'created_at', label:'Oprettet (ISO)'},
     {key:'created_at_formatted', label:'Oprettet', value: row => formatDanishDate(row.created_at, true)},
@@ -5299,6 +5390,8 @@ function renderOrders(section) {
             <label>Patient<input type="search" data-filter-orders="patient" placeholder="Patientnavn/MRN/ID/familie"></label>
             <label>Prøve<input type="search" data-filter-orders="sample" placeholder="Prøve-ID eller PMB"></label>
             <label>Panel<input type="search" data-filter-orders="panel" placeholder="Panelnavn"></label>
+            <label>Indikation<input type="search" data-filter-orders="indication" placeholder="Indikation"></label>
+            <label>HPO-termer<input type="search" data-filter-orders="hpo" placeholder="HP:0001250"></label>
             <label>Analyseansvarlig
               <div class="filterable-select">
                 <input type="search" data-select-filter placeholder="Filtrer brugere">
@@ -5331,7 +5424,7 @@ function renderOrders(section) {
             <label>Bestilt til<input type="date" data-filter-orders="ordered_to"></label>
           </div>
         </details>
-        <table><thead><tr><th>ID</th><th>Patient</th><th>Prøve</th><th>Panel</th><th>Analyseansvarlig</th><th>Tolker</th><th>Godkender</th><th>Status</th><th>Oprettet af</th><th>Bestilt</th></tr></thead><tbody></tbody></table>
+        <table><thead><tr><th>ID</th><th>Patient</th><th>Prøve</th><th>Panel</th><th>Analyseansvarlig</th><th>Tolker</th><th>Godkender</th><th>Indikation</th><th>HPO-termer</th><th>Status</th><th>Oprettet af</th><th>Bestilt</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
           <button type="button" class="secondary" id="ordersExport">Eksportér filtrerede ordinationer</button>
         </div>
@@ -5395,6 +5488,8 @@ function renderOrders(section) {
             </div>
           </label>
           <label>Rekvirent<input name="clinician"></label>
+          <label>Indikation<textarea name="indication" rows="3" placeholder="Beskriv klinisk indikation"></textarea></label>
+          <label>HPO-termer<textarea name="hpo_terms" class="small" placeholder="HP:0001250; HP:0004321"></textarea></label>
           <label>Status
             <select name="status" required data-allow-legacy-option>
               <option value="" selected>Vælg status</option>
@@ -5419,6 +5514,8 @@ function renderOrders(section) {
     patient: section.querySelector('[data-filter-orders="patient"]'),
     sample: section.querySelector('[data-filter-orders="sample"]'),
     panel: section.querySelector('[data-filter-orders="panel"]'),
+    indication: section.querySelector('[data-filter-orders="indication"]'),
+    hpo: section.querySelector('[data-filter-orders="hpo"]'),
     analysis_responsible: section.querySelector('[data-filter-orders="analysis_responsible"]'),
     interpreter: section.querySelector('[data-filter-orders="interpreter"]'),
     approver: section.querySelector('[data-filter-orders="approver"]'),
@@ -5467,12 +5564,14 @@ function renderOrders(section) {
   let activeFilters = {};
   let selectedOrderId = null;
   const renderRows = () => {
-    const term = search.value.toLowerCase();
+    const term = (search?.value || '').trim().toLowerCase();
     const filters = {
       id: filterInputs.id?.value.trim() || '',
       patient: filterInputs.patient?.value.trim().toLowerCase() || '',
       sample: filterInputs.sample?.value.trim().toLowerCase() || '',
       panel: filterInputs.panel?.value.trim().toLowerCase() || '',
+      indication: filterInputs.indication?.value.trim().toLowerCase() || '',
+      hpo: filterInputs.hpo?.value.trim().toLowerCase() || '',
       analysis_responsible: filterInputs.analysis_responsible?.value || '',
       interpreter: filterInputs.interpreter?.value || '',
       approver: filterInputs.approver?.value || '',
@@ -5484,6 +5583,10 @@ function renderOrders(section) {
     const toDate = filters.ordered_to ? new Date(filters.ordered_to) : null;
     if (toDate) toDate.setHours(23, 59, 59, 999);
     const filterSummary = {...filters};
+    if (filters.indication) filterSummary.indikation = filters.indication;
+    if (filters.hpo) filterSummary['hpo-termer'] = filters.hpo;
+    delete filterSummary.indication;
+    delete filterSummary.hpo;
     if (filters.analysis_responsible) filterSummary.analysis_responsible = getName('users', Number(filters.analysis_responsible));
     if (filters.interpreter) filterSummary.interpreter = getName('users', Number(filters.interpreter));
     if (filters.approver) filterSummary.approver = getName('users', Number(filters.approver));
@@ -5496,6 +5599,8 @@ function renderOrders(section) {
       const interpreterUser = userMap.get(Number(o.interpreter_id));
       const approverUser = userMap.get(Number(o.approver_id));
       const creator = determineCreatedBy('orders', o);
+      const indicationText = formatIndicationForList(o.indication);
+      const hpoText = formatHpoList(o.hpo_terms);
       return [
         o.status,
         o.id,
@@ -5507,7 +5612,9 @@ function renderOrders(section) {
         analysisUser?.name,
         interpreterUser?.name,
         approverUser?.name,
-        creator
+        creator,
+        indicationText,
+        hpoText
       ].some(v => (v ?? '').toString().toLowerCase().includes(term));
     }).filter(o => {
       const patient = patientMap.get(Number(o.patient_id));
@@ -5515,6 +5622,8 @@ function renderOrders(section) {
       const panel = panelMap.get(Number(o.panel_id));
       const patientString = [patient?.name, patient?.mrn, patient?.extra_id, patient?.family_number].filter(Boolean).join(' ').toLowerCase();
       const sampleString = [o.sample_id, sample?.pmb_number, sample?.sample_type, getName('patients', sample?.patient_id)].filter(Boolean).join(' ').toLowerCase();
+      const indicationString = formatIndicationForList(o.indication).toLowerCase();
+      const hpoString = formatHpoList(o.hpo_terms).toLowerCase();
       if (filters.id && !String(o.id).includes(filters.id)) return false;
       if (filters.patient && !patientString.includes(filters.patient)) return false;
       if (filters.sample && !sampleString.includes(filters.sample)) return false;
@@ -5522,6 +5631,8 @@ function renderOrders(section) {
         const panelString = (panel?.name || String(o.panel_id || '')).toLowerCase();
         if (!panelString.includes(filters.panel)) return false;
       }
+      if (filters.indication && !indicationString.includes(filters.indication)) return false;
+      if (filters.hpo && !hpoString.includes(filters.hpo)) return false;
       if (filters.analysis_responsible && String(o.analysis_responsible_id || '') !== filters.analysis_responsible) return false;
       if (filters.interpreter && String(o.interpreter_id || '') !== filters.interpreter) return false;
       if (filters.approver && String(o.approver_id || '') !== filters.approver) return false;
@@ -5545,8 +5656,10 @@ function renderOrders(section) {
       const statusDisplay = sample?.status || o.status || '';
       const createdBy = determineCreatedBy('orders', o);
       const orderedAt = formatDanishDate(o.ordered_at);
+      const indicationCell = formatMultilineCell(o.indication);
+      const hpoCell = formatHpoHtml(o.hpo_terms);
       const selectedAttr = o.id === selectedOrderId ? ' data-selected="true"' : '';
-      return `<tr data-id="${o.id}"${selectedAttr}><td>${o.id}</td><td>${esc(getName('patients', Number(o.patient_id)))}</td><td>${esc(getName('samples', Number(o.sample_id)))}</td><td>${esc(getName('panels', Number(o.panel_id)))}</td><td>${esc(userName(o.analysis_responsible_id))}</td><td>${esc(userName(o.interpreter_id))}</td><td>${esc(userName(o.approver_id))}</td><td>${esc(statusDisplay)}</td><td>${esc(createdBy)}</td><td>${esc(orderedAt)}</td></tr>`;
+      return `<tr data-id="${o.id}"${selectedAttr}><td>${o.id}</td><td>${esc(getName('patients', Number(o.patient_id)))}</td><td>${esc(getName('samples', Number(o.sample_id)))}</td><td>${esc(getName('panels', Number(o.panel_id)))}</td><td>${esc(userName(o.analysis_responsible_id))}</td><td>${esc(userName(o.interpreter_id))}</td><td>${esc(userName(o.approver_id))}</td><td>${indicationCell}</td><td>${hpoCell}</td><td>${esc(statusDisplay)}</td><td>${esc(createdBy)}</td><td>${esc(orderedAt)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -5580,6 +5693,8 @@ function renderOrders(section) {
     {key:'approver_id', label:'Godkender-ID'},
     {key:'approver', label:'Godkender', value: row => resolveUserName(row.approver_id)},
     {key:'clinician', label:'Rekvirent'},
+    {key:'indication', label:'Indikation'},
+    {key:'hpo_terms', label:'HPO-termer', value: row => formatHpoList(row.hpo_terms)},
     {key:'ordered_at', label:'Bestilt (ISO)'},
     {key:'ordered_at_formatted', label:'Bestilt', value: row => formatDanishDate(row.ordered_at, true)},
     {key:'created_by', label:'Oprettet af'},
@@ -5616,6 +5731,12 @@ function renderOrders(section) {
     data.interpreter_id = data.interpreter_id ? Number(data.interpreter_id) : null;
     data.approver_id = data.approver_id ? Number(data.approver_id) : null;
     if (data.clinician) data.clinician = data.clinician.trim();
+    if (data.indication) {
+      data.indication = data.indication.trim();
+    } else {
+      data.indication = '';
+    }
+    data.hpo_terms = normalizeHpoTerms(data.hpo_terms);
     if (data.status) data.status = data.status.trim();
     if (data.id) {
       const id = Number(data.id);
@@ -5637,6 +5758,10 @@ function renderOrders(section) {
     await loadStore('orders');
     renderTab('orders');
     renderDashboard(document.querySelector('section[data-tab="dashboard"]'));
+    const patientsSection = document.querySelector('section[data-tab="patients"]');
+    if (patientsSection && patientsSection.classList.contains('active')) {
+      renderTab('patients');
+    }
   });
   section.querySelector('#orderDelete').addEventListener('click', async () => {
     const id = Number(form.elements.id.value);
@@ -7230,6 +7355,8 @@ function buildConclusionPlaceholderGuide(context = 'report') {
               <li><code>[OrdinationAnalyseansvarlig]</code> – analyseansvarlig</li>
               <li><code>[OrdinationTolker]</code> – tolk/fortolker</li>
               <li><code>[OrdinationGodkender]</code> – godkender</li>
+              <li><code>[OrdinationIndikation]</code> – ordinationens kliniske indikation</li>
+              <li><code>[OrdinationHPO]</code> / <code>[OrdinationHPOTermer]</code> – registrerede HPO-termer</li>
             </ul>
           </div>
           <div>
@@ -7413,6 +7540,7 @@ function renderConclusionLibrary(section) {
 function renderReports(section) {
   const list = getCached('reports');
   const orders = getCached('orders');
+  const orderMap = new Map(orders.map(o => [Number(o.id), o]));
   const conclusionLibrary = getCached('conclusion_library').slice().sort((a, b) => (a.title || '').localeCompare(b.title || '', 'da'));
   const conclusionOptions = conclusionLibrary.map(entry => `<option value="${entry.id}">${esc(entry.title || `Tekst #${entry.id}`)}</option>`).join('');
   section.innerHTML = `
@@ -7700,6 +7828,8 @@ function renderReports(section) {
     add(['OrdinationAnalyseansvarlig', 'Analyseansvarlig'], analysisUser?.name || '');
     add(['OrdinationTolker', 'Tolker'], interpreterUser?.name || '');
     add(['OrdinationGodkender', 'Godkender'], approverUser?.name || '');
+    add(['OrdinationIndikation', 'Ordination.Indikation', 'Indikation'], order?.indication || '');
+    add(['OrdinationHPO', 'OrdinationHPOTermer', 'Ordination.HPO', 'HPO', 'HPOliste', 'HPOList'], formatHpoList(order?.hpo_terms));
     add(['SampleID', 'ProeveID', 'PrøveID'], sample?.id ? String(sample.id) : '');
     add(['SamplePMB', 'PMB'], sample?.pmb_number || '');
     add(['SampleType', 'ProeveType', 'PrøveType'], sample?.sample_type || '');
@@ -7946,6 +8076,8 @@ function renderReports(section) {
     {key:'id', label:'ID'},
     {key:'order_id', label:'Ordination-ID'},
     {key:'order_name', label:'Ordination', value: row => getOrderDisplayName(row.order_id)},
+    {key:'order_indication', label:'Ordination – indikation', value: row => orderMap.get(Number(row.order_id))?.indication || ''},
+    {key:'order_hpo_terms', label:'Ordination – HPO-termer', value: row => formatHpoList(orderMap.get(Number(row.order_id))?.hpo_terms)},
     {key:'status', label:'Status (kode)'},
     {key:'status_label', label:'Status', value: row => statusMap[row.status] || row.status || ''},
     {key:'summary', label:'Konklusion'},
@@ -8103,6 +8235,9 @@ function buildReportHtml(orderId, reportData) {
   if (sample?.pmb_number) sampleIdentifierParts.push(sample.pmb_number);
   if (sample?.id != null) sampleIdentifierParts.push(`ID ${sample.id}`);
   const sampleIdentifier = sampleIdentifierParts.join(' / ');
+  const hasIndication = !!collapseSpaces(order?.indication);
+  const indicationHtml = hasIndication ? formatMultilineCell(order.indication) : esc('Ikke angivet');
+  const hpoHtml = formatHpoHtml(order?.hpo_terms);
   const rows = variants.map(v => {
     const title = formatVariantTitle(v);
     const typeLabel = getVariantTypeLabel(v.variant_type);
@@ -8135,6 +8270,8 @@ function buildReportHtml(orderId, reportData) {
   return `
   <h1>Diagnostisk rapport</h1>
   <p><strong>Ordination:</strong> ${orderId}</p>
+  <p><strong>Indikation:</strong><br>${indicationHtml}</p>
+  ${hpoHtml ? `<p><strong>HPO-termer:</strong><br>${hpoHtml}</p>` : ''}
   <p><strong>Patient:</strong> ${esc(patient?.name||'')}${patientIdentifiersDisplay}</p>
   <p><strong>Prøve:</strong> ${esc(sample?.sample_type||'')}${sampleIdentifier ? ` (${esc(sampleIdentifier)})` : ''}</p>
   <p><strong>Status:</strong> ${esc(reportData.status||'')}</p>
@@ -8761,12 +8898,14 @@ async function createReportPdfBlob(orderId, reportData, exportedAt = new Date())
       {type: 'kv', label: 'Opsamlet', value: sample?.collected_at},
       {type: 'paragraph', label: 'Noter', value: sample?.notes, emptyText: 'Ingen noter.', indent: '  '}
     ];
+    const orderIndicationText = collapseSpaces(order?.indication) ? order.indication : '';
     const analysisRows = [
       {type: 'kv', label: 'Panel', value: panel?.name},
       {type: 'kv', label: 'Analyseansvarlig', value: analysisResponsible},
       {type: 'kv', label: 'Rekvirent', value: clinician},
       {type: 'kv', label: 'Ordinationsstatus', value: order?.status},
-      {type: 'kv', label: 'Bestilt', value: order?.ordered_at}
+      {type: 'kv', label: 'Bestilt', value: order?.ordered_at},
+      {type: 'paragraph', label: 'Indikation', value: orderIndicationText, emptyText: 'Ingen indikation angivet.'}
     ];
     const qcRows = [];
     if (qcEntries.length) {
@@ -10696,8 +10835,8 @@ async function loadDemoData() {
     const s1 = await addRecord('samples', {patient_id:p1, pmb_number:'PMB-0001', sample_type:'Blod', status:'QC', collected_at:new Date().toISOString(), notes:''});
     const s2 = await addRecord('samples', {patient_id:p2, pmb_number:'PMB-0002', sample_type:'Kindskrab', status:'Analyse', collected_at:new Date().toISOString(), notes:''});
     const panel = await addRecord('panels', {name:'Onko-panel', description:'50 gener'});
-    const o1 = await addRecord('orders', {patient_id:p1, sample_id:s1, panel_id:panel, analysis_responsible_id:null, interpreter_id:null, approver_id:null, clinician:'Dr. Holm', status:'Analyse', ordered_at:new Date().toISOString()});
-    const o2 = await addRecord('orders', {patient_id:p2, sample_id:s2, panel_id:panel, analysis_responsible_id:null, interpreter_id:null, approver_id:null, clinician:'Dr. Holm', status:'Rapport', ordered_at:new Date().toISOString()});
+    const o1 = await addRecord('orders', {patient_id:p1, sample_id:s1, panel_id:panel, analysis_responsible_id:null, interpreter_id:null, approver_id:null, clinician:'Dr. Holm', indication:'Mistanke om arvelig brystkræft', hpo_terms:normalizeHpoTerms('HP:0003002; HP:0006770'), status:'Analyse', ordered_at:new Date().toISOString()});
+    const o2 = await addRecord('orders', {patient_id:p2, sample_id:s2, panel_id:panel, analysis_responsible_id:null, interpreter_id:null, approver_id:null, clinician:'Dr. Holm', indication:'Kolorektal cancer – postoperativ opfølgning', hpo_terms:normalizeHpoTerms('HP:0100242'), status:'Rapport', ordered_at:new Date().toISOString()});
     await addRecord('variants', {order_id:o1, gene:'BRCA1', transcript:'NM_007294.3', hgvs_c:'c.5266dupC', hgvs_p:'p.Gln1756Profs', zygosity:'heterozygot', classification:'5', criteria:'PVS1,PS3,PM2,PP3', af:0.0001, interpretation:'Patogen variant med høj risiko'});
     await addRecord('qc', {sample_id:s1, metric:'Dækning', value:98.5, unit:'%', notes:''});
     await addRecord('reports', {order_id:o2, variant_ids:'[]', variant_details:[], summary:'Negativ rapport', status:'final', issued_at:new Date().toISOString()});
