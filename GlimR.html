@@ -2879,6 +2879,8 @@ function logoutUser() {
   storage.removeItem('glimr-user-id');
   updateAuthUi();
   setStatus('Logget ud. Systemet er skrivebeskyttet.');
+  const dashboardSection = document.querySelector('section[data-tab="dashboard"]');
+  if (dashboardSection) renderDashboard(dashboardSection);
 }
 function handleLogin(event) {
   event.preventDefault();
@@ -2906,6 +2908,8 @@ function handleLogin(event) {
   pass.value = '';
   updateAuthUi();
   setStatus(`Logget ind som ${user.name}.`);
+  const dashboardSection = document.querySelector('section[data-tab="dashboard"]');
+  if (dashboardSection) renderDashboard(dashboardSection);
 }
 function esc(str) {
   return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
@@ -4069,6 +4073,52 @@ function renderDashboard(section) {
     .slice()
     .sort((a, b) => (a.updated_at || '').localeCompare(b.updated_at || ''))
     .slice(0, 5);
+  const currentUserId = state.currentUser?.id ? String(state.currentUser.id) : '';
+  let myActiveOrdersHtml = '';
+  if (currentUserId) {
+    const myActiveOrders = activeOrders.filter(order => {
+      const analysisMatch = order.analysis_responsible_id !== undefined && order.analysis_responsible_id !== null && String(order.analysis_responsible_id) === currentUserId;
+      const interpreterMatch = order.interpreter_id !== undefined && order.interpreter_id !== null && String(order.interpreter_id) === currentUserId;
+      const approverMatch = order.approver_id !== undefined && order.approver_id !== null && String(order.approver_id) === currentUserId;
+      return analysisMatch || interpreterMatch || approverMatch;
+    });
+    const sortedMyActiveOrders = myActiveOrders.slice().sort((a, b) => {
+      const sampleA = findById('samples', Number(a.sample_id));
+      const sampleB = findById('samples', Number(b.sample_id));
+      const dateA = parseDateTimeValue(sampleA?.collected_at || sampleA?.created_at || a.created_at || a.ordered_at);
+      const dateB = parseDateTimeValue(sampleB?.collected_at || sampleB?.created_at || b.created_at || b.ordered_at);
+      const timeA = dateA ? dateA.getTime() : Number.POSITIVE_INFINITY;
+      const timeB = dateB ? dateB.getTime() : Number.POSITIVE_INFINITY;
+      if (timeA !== timeB) return timeA - timeB;
+      const idA = Number(a.id);
+      const idB = Number(b.id);
+      if (Number.isFinite(idA) && Number.isFinite(idB)) return idA - idB;
+      return String(a.id || '').localeCompare(String(b.id || ''));
+    });
+    myActiveOrdersHtml = sortedMyActiveOrders.map(o => {
+      const sample = findById('samples', Number(o.sample_id));
+      const roleLabels = [];
+      if (o.analysis_responsible_id !== undefined && o.analysis_responsible_id !== null && String(o.analysis_responsible_id) === currentUserId) {
+        roleLabels.push('Analyseansvarlig');
+      }
+      if (o.interpreter_id !== undefined && o.interpreter_id !== null && String(o.interpreter_id) === currentUserId) {
+        roleLabels.push('Tolker');
+      }
+      if (o.approver_id !== undefined && o.approver_id !== null && String(o.approver_id) === currentUserId) {
+        roleLabels.push('Godkender');
+      }
+      const statusDisplay = sample?.status || o.status || '';
+      const collectedValue = sample?.collected_at || sample?.created_at || o.ordered_at || o.created_at;
+      const collectedAt = formatDanishDate(collectedValue);
+      const urgentIcon = o.urgent
+        ? '<span class="urgent-indicator" role="img" aria-label="Haster"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3.172 2.322 20.5h19.356L12 3.172zm1 13.828h-2v2h2v-2zm0-8h-2v6h2v-6z"></path></svg></span>'
+        : '';
+      const urgentAttr = o.urgent ? ' data-urgent="true"' : '';
+      const sampleDisplay = sample?.pmb_number || sample?.id || o.sample_id || '';
+      const rolesDisplay = roleLabels.length ? roleLabels.join(', ') : '—';
+      return `<tr${urgentAttr}><td>${urgentIcon}<span class="order-id">${esc(o.id)}</span></td><td>${esc(rolesDisplay)}</td><td>${esc(getName('patients', o.patient_id))}</td><td>${esc(sampleDisplay)}</td><td>${getName('panels', o.panel_id)}</td><td>${esc(statusDisplay)}</td><td>${esc(collectedAt)}</td></tr>`;
+    }).join('') || '<tr><td colspan="7">Ingen aktive ordinationer</td></tr>';
+  }
   const audit = getCached('audit').slice(-5).reverse();
   const recentOrdersHtml = recentOrders.map(o => {
     const sample = findById('samples', Number(o.sample_id));
@@ -4160,6 +4210,16 @@ function renderDashboard(section) {
       </tbody>
     </table>
   </div>
+  ${currentUserId ? `
+  <div class="panel">
+    <h2>Mine aktive ordinationer</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Rolle</th><th>Patient</th><th>Prøve</th><th>Panel</th><th>Status</th><th>Opsamlet</th></tr></thead>
+      <tbody>
+        ${myActiveOrdersHtml}
+      </tbody>
+    </table>
+  </div>` : ''}
   <div class="panel">
     <h2>Revision</h2>
     <table>
