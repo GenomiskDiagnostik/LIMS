@@ -2498,6 +2498,103 @@ function formatVariantCopyNumber(variant) {
   return `Kopital: ${copyNumber}`;
 }
 
+function normalizeVariantKeyPart(value) {
+  if (value == null) return '';
+  return String(value).trim().toLowerCase();
+}
+
+function createVariantComparisonKey(variant) {
+  if (!variant) return '';
+  const type = normalizeVariantType(variant.variant_type);
+  const parts = [`type:${type}`];
+  const seen = new Set(parts);
+  const addPart = (label, rawValue) => {
+    const value = normalizeVariantKeyPart(rawValue);
+    if (!value) return;
+    const part = `${label}:${value}`;
+    if (seen.has(part)) return;
+    seen.add(part);
+    parts.push(part);
+  };
+  const gene = variant.gene || variant.region;
+  const transcript = variant.transcript;
+  const hgvsC = variant.hgvs_c;
+  const hgvsP = variant.hgvs_p;
+  const rsid = normalizeRsId(variant.rsid || variant.rs_id);
+  const iscn = variant.iscn || variant.cytogenetic;
+  const chromosome = variant.chromosome || variant.chr;
+  const start = variant.start || variant.begin || variant.position_start;
+  const end = variant.end || variant.finish || variant.position_end;
+  const copyNumber = variant.copy_number || variant.copynumber || variant.copies;
+  const svSubtype = normalizeStructureTypeValue(variant.sv_subtype || variant.structural_type || variant.variant_subtype);
+  const description = variant.description;
+  const affectedGenes = variant.affected_genes || variant.genes;
+  if (type === 'snv') {
+    if (hgvsC || hgvsP || rsid) {
+      addPart('hgvs_c', hgvsC);
+      addPart('hgvs_p', hgvsP);
+      addPart('rsid', rsid);
+    } else {
+      if (transcript) addPart('transcript', transcript);
+      addPart('gene', gene);
+    }
+  } else {
+    addPart('iscn', iscn);
+    addPart('chromosome', chromosome);
+    addPart('start', start);
+    addPart('end', end);
+    addPart('copy_number', copyNumber);
+    addPart('sv_subtype', svSubtype);
+    if (!iscn && !start && !end) {
+      addPart('description', description);
+    }
+    if (!iscn && !description) {
+      if (gene) {
+        addPart('gene', gene);
+      } else {
+        addPart('affected_genes', affectedGenes);
+      }
+    }
+  }
+  if (parts.length <= 1) {
+    addPart('gene', gene);
+    addPart('description', description);
+    addPart('affected_genes', affectedGenes);
+  }
+  return parts.length > 1 ? parts.join('|') : '';
+}
+
+function computeVariantFrequencyData() {
+  const variants = getCached('variants') || [];
+  const patients = getCached('patients') || [];
+  const countMap = new Map();
+  let maxCount = 0;
+  variants.forEach(variant => {
+    const key = createVariantComparisonKey(variant);
+    if (!key) return;
+    const updatedCount = (countMap.get(key) || 0) + 1;
+    countMap.set(key, updatedCount);
+    if (updatedCount > maxCount) {
+      maxCount = updatedCount;
+    }
+  });
+  return {countMap, patientCount: patients.length, maxCount};
+}
+
+function formatVariantFrequencyLabel(count, patientCount) {
+  const registrations = Number(count) || 0;
+  const patientsTotal = Number(patientCount) || 0;
+  if (!patientsTotal) {
+    return String(registrations);
+  }
+  const percent = (registrations / patientsTotal) * 100;
+  const formattedPercent = percent.toLocaleString('da-DK', {
+    minimumFractionDigits: percent > 0 && percent < 1 ? 2 : percent > 0 && percent < 10 ? 1 : 0,
+    maximumFractionDigits: percent >= 10 ? 1 : 2
+  });
+  return `${registrations}/${patientsTotal} (${formattedPercent}%)`;
+}
+
 function formatVariantTitle(variant) {
   if (!variant) return '';
   const type = normalizeVariantType(variant.variant_type);
@@ -7312,7 +7409,7 @@ function renderVariantLibrary(section) {
         </details>
         <table>
           <thead>
-            <tr><th>ID</th><th>Variant</th><th>Type</th><th>Genomisk position</th><th>HGVS c.</th><th>HGVS p.</th><th>rsID</th><th>Klasse</th><th>Kriterier</th><th>ISCN</th><th>Tilstand</th><th>Nedarvning</th><th>Kurateret af</th><th>Sidst gennemgået</th></tr>
+            <tr><th>ID</th><th>Variant</th><th>Type</th><th>Genomisk position</th><th>HGVS c.</th><th>HGVS p.</th><th>rsID</th><th>Klasse</th><th>Frekvens</th><th>Forekomst</th><th>Kriterier</th><th>ISCN</th><th>Tilstand</th><th>Nedarvning</th><th>Kurateret af</th><th>Sidst gennemgået</th></tr>
           </thead>
           <tbody></tbody>
         </table>
@@ -7381,6 +7478,35 @@ function renderVariantLibrary(section) {
   const importInput = section.querySelector('#variantLibraryImportInput');
   const defaultSaveLabel = saveButton?.textContent || 'Gem';
   const {updateVariantTypeFields, variantTypeSelect} = setupVariantTypeForm(form);
+  const {
+    countMap: variantFrequencyMap,
+    patientCount: variantFrequencyPatientCount,
+    maxCount: variantFrequencyMaxCount
+  } = computeVariantFrequencyData();
+  const getVariantFrequencyCount = entry => {
+    const key = createVariantComparisonKey(entry);
+    if (!key) return 0;
+    return variantFrequencyMap.get(key) || 0;
+  };
+  const getVariantFrequencyLabel = entry => {
+    const count = getVariantFrequencyCount(entry);
+    if (!count && !variantFrequencyPatientCount) return '0';
+    return formatVariantFrequencyLabel(count, variantFrequencyPatientCount);
+  };
+  const getVariantFrequencyCategory = entry => {
+    if (!variantFrequencyMaxCount || variantFrequencyMaxCount <= 1) return 'Ukendt';
+    const count = getVariantFrequencyCount(entry);
+    if (!count) return 'Ukendt';
+    const ratio = count / variantFrequencyMaxCount;
+    if (!Number.isFinite(ratio) || ratio <= 0) return 'Ukendt';
+    if (ratio >= 0.95) return 'Polymorf';
+    if (ratio >= 0.65) return 'Hyppig';
+    if (ratio >= 0.35) return 'Mellemfrekvent';
+    if (ratio >= 0.2) return 'Lavfrekvent';
+    if (ratio >= 0.1) return 'Sjælden';
+    if (ratio >= 0.05) return 'Meget sjælden';
+    return 'Ultra sjælden';
+  };
   const csvColumns = [
     {key: 'id', label: 'ID'},
     {label: 'Varianttitel', value: entry => formatVariantTitle(entry) || ''},
@@ -7519,7 +7645,9 @@ function renderVariantLibrary(section) {
         v.affected_genes,
         formatVariantGenomicRange(v),
         getVariantTypeLabel(v.variant_type),
-        formatVariantTitle(v)
+        formatVariantTitle(v),
+        getVariantFrequencyLabel(v),
+        getVariantFrequencyCategory(v)
       ].some(val => (val || '').toString().toLowerCase().includes(term));
     }).filter(v => {
       if (filters.gene && !(v.gene || '').toLowerCase().includes(filters.gene)) return false;
@@ -7564,7 +7692,7 @@ function renderVariantLibrary(section) {
       selectedId = null;
     }
     if (!filteredLibrary.length) {
-      tbody.innerHTML = `<tr><td colspan="14">Ingen poster matcher filtreringen.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="16">Ingen poster matcher filtreringen.</td></tr>`;
       annotateTableCells(section);
       return;
     }
@@ -7574,7 +7702,25 @@ function renderVariantLibrary(section) {
       const title = formatVariantTitle(v);
       const typeLabel = getVariantTypeLabel(v.variant_type);
       const genomic = formatVariantGenomicRange(v);
-      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td>${esc(title)}</td><td>${esc(typeLabel)}</td><td>${esc(genomic)}</td><td>${esc(v.hgvs_c || '')}</td><td>${esc(v.hgvs_p || '')}</td><td>${formatRsIdCell(v.rsid)}</td><td>${esc(v.classification || '')}</td><td>${esc(v.criteria || '')}</td><td>${esc(v.iscn || '')}</td><td>${esc(v.condition || '')}</td><td>${esc(v.inheritance || '')}</td><td>${esc(v.curated_by || '')}</td><td>${esc(lastReview)}</td></tr>`;
+      const frequencyCount = getVariantFrequencyCount(v);
+      const frequencyLabel = getVariantFrequencyLabel(v);
+      const frequencyTitle = variantFrequencyPatientCount
+        ? `${frequencyCount} registrering${frequencyCount === 1 ? '' : 'er'} blandt ${variantFrequencyPatientCount} patient${variantFrequencyPatientCount === 1 ? '' : 'er'}`
+        : `${frequencyCount} registrering${frequencyCount === 1 ? '' : 'er'}`;
+      const frequencyCategory = getVariantFrequencyCategory(v);
+      const frequencyCategoryTitle = (() => {
+        if (frequencyCategory === 'Ukendt') {
+          if (!variantFrequencyMaxCount || variantFrequencyMaxCount <= 1) {
+            return 'Forekomst kan ikke vurderes før der er flere registreringer i variantbiblioteket.';
+          }
+          return 'Forekomst er ikke tilgængelig.';
+        }
+        const topSuffix = variantFrequencyMaxCount
+          ? ` sammenlignet med topposten på ${variantFrequencyMaxCount} registrering${variantFrequencyMaxCount === 1 ? '' : 'er'}`
+          : '';
+        return `${frequencyCategory} forekomst baseret på ${frequencyLabel}${topSuffix}.`;
+      })();
+      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td>${esc(title)}</td><td>${esc(typeLabel)}</td><td>${esc(genomic)}</td><td>${esc(v.hgvs_c || '')}</td><td>${esc(v.hgvs_p || '')}</td><td>${formatRsIdCell(v.rsid)}</td><td>${esc(v.classification || '')}</td><td title="${esc(frequencyTitle)}">${esc(frequencyLabel)}</td><td title="${esc(frequencyCategoryTitle)}">${esc(frequencyCategory)}</td><td>${esc(v.criteria || '')}</td><td>${esc(v.iscn || '')}</td><td>${esc(v.condition || '')}</td><td>${esc(v.inheritance || '')}</td><td>${esc(v.curated_by || '')}</td><td>${esc(lastReview)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
