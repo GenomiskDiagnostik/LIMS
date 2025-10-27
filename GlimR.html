@@ -4245,11 +4245,6 @@ function renderDashboard(section) {
 
 function openDashboardPrintView(metrics, stats) {
   if (!Array.isArray(metrics) || !Array.isArray(stats)) return;
-  const printWindow = window.open('', '_blank', 'noopener=yes,width=900,height=700');
-  if (!printWindow) {
-    alert('Kan ikke åbne udskriftsvisning. Tillad pop op-vinduer.');
-    return;
-  }
   const metricsRows = metrics.length
     ? metrics.map(item => `<tr><th scope="row">${esc(item.badge)}</th><td>${esc(String(item.value ?? ''))}</td></tr>`).join('')
     : '<tr><td colspan="2">Ingen data</td></tr>';
@@ -4299,22 +4294,61 @@ function openDashboardPrintView(metrics, stats) {
     </section>
   </body>
   </html>`;
-  printWindow.document.open();
-  printWindow.document.write(html);
-  printWindow.document.close();
-  printWindow.focus();
-  if ('onafterprint' in printWindow) {
-    printWindow.onafterprint = () => {
-      try { printWindow.close(); } catch (err) { console.error('Kunne ikke lukke udskriftsvindue', err); }
-    };
+  let printWindow = null;
+  try {
+    printWindow = window.open('about:blank', 'glimr-dashboard-print', 'popup=yes,width=900,height=700');
+  } catch (error) {
+    printWindow = null;
+  }
+  if (printWindow && !printWindow.closed) {
+    const doc = printWindow.document;
+    doc.open('text/html');
+    doc.write(html);
+    doc.close();
+    printWindow.focus();
+    setTimeout(() => {
+      try {
+        printWindow.print();
+      } catch (err) {
+        console.error('Udskrivning mislykkedes', err);
+      }
+    }, 50);
+    return;
+  }
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('title', 'Udskriftsvisning af KPI\'er og statistik');
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.position = 'fixed';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  iframe.style.visibility = 'hidden';
+  document.body.appendChild(iframe);
+  const iframeDoc = iframe.contentDocument;
+  if (!iframeDoc) {
+    iframe.remove();
+    return;
+  }
+  iframeDoc.open('text/html');
+  iframeDoc.write(html);
+  iframeDoc.close();
+  const iframeWindow = iframe.contentWindow;
+  if (!iframeWindow) {
+    iframe.remove();
+    return;
   }
   setTimeout(() => {
     try {
-      printWindow.print();
+      iframeWindow.focus();
+      iframeWindow.print();
     } catch (err) {
       console.error('Udskrivning mislykkedes', err);
+    } finally {
+      setTimeout(() => {
+        iframe.remove();
+      }, 400);
     }
-  }, 100);
+  }, 50);
 }
 
 function renderCreateCase(section) {
