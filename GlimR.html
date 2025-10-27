@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <title>GlimR – Genetic LIMS Reporter</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-dymDYb4C2m3XaGNsq4CPrlG/pXHiY/VKwxLBzj2YkdE+5EYXPL3ZX31lrT7xYuFeoDyAJRDig0lzVEHF7bW3+A==" crossorigin="anonymous" referrerpolicy="no-referrer">
 <style>
 :root {
   font-family: "Segoe UI", Arial, sans-serif;
@@ -796,8 +795,23 @@ tbody tr[data-selected="true"] {
   color: var(--danger);
   margin-right: 0.35rem;
 }
-.urgent-indicator i {
-  font-size: 0.9em;
+.urgent-indicator svg {
+  width: 0.95em;
+  height: 0.95em;
+}
+.inline-field-group {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.inline-field-group > label {
+  flex: 1 1 220px;
+  margin-top: 0.4rem;
+}
+.inline-field-group > .checkbox-field {
+  flex: 0 0 auto;
+  margin-top: 0.4rem;
 }
 .order-id {
   display: inline-block;
@@ -4039,7 +4053,7 @@ function renderDashboard(section) {
     const statusDisplay = sample?.status || o.status || '';
     const updatedAt = formatDanishDate(o.updated_at);
     const urgentIcon = o.urgent
-      ? '<span class="urgent-indicator" role="img" aria-label="Haster"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i></span>'
+      ? '<span class="urgent-indicator" role="img" aria-label="Haster"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3.172 2.322 20.5h19.356L12 3.172zm1 13.828h-2v2h2v-2zm0-8h-2v6h2v-6z"></path></svg></span>'
       : '';
     const urgentAttr = o.urgent ? ' data-urgent="true"' : '';
     return `<tr${urgentAttr}><td>${urgentIcon}<span class="order-id">${esc(o.id)}</span></td><td>${esc(getName('patients', o.patient_id))}</td><td>${esc(o.sample_id || '')}</td><td>${getName('panels', o.panel_id)}</td><td>${esc(statusDisplay)}</td><td>${esc(updatedAt)}</td></tr>`;
@@ -4049,7 +4063,7 @@ function renderDashboard(section) {
     const statusDisplay = sample?.status || o.status || '';
     const updatedAt = formatDanishDate(o.updated_at);
     const urgentIcon = o.urgent
-      ? '<span class="urgent-indicator" role="img" aria-label="Haster"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i></span>'
+      ? '<span class="urgent-indicator" role="img" aria-label="Haster"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3.172 2.322 20.5h19.356L12 3.172zm1 13.828h-2v2h2v-2zm0-8h-2v6h2v-6z"></path></svg></span>'
       : '';
     const urgentAttr = o.urgent ? ' data-urgent="true"' : '';
     return `<tr${urgentAttr}><td>${urgentIcon}<span class="order-id">${esc(o.id)}</span></td><td>${esc(getName('patients', o.patient_id))}</td><td>${esc(o.sample_id || '')}</td><td>${getName('panels', o.panel_id)}</td><td>${esc(statusDisplay)}</td><td>${esc(updatedAt)}</td></tr>`;
@@ -5850,13 +5864,15 @@ function renderOrders(section) {
             <label>Rekvirent<input name="clinician"></label>
             <label>Indikation<textarea name="indication" rows="3" placeholder="Beskriv klinisk indikation"></textarea></label>
           <label>HPO-termer<textarea name="hpo_terms" class="small" placeholder="HP:0001250; HP:0004321"></textarea></label>
-          <label class="checkbox-field"><input type="checkbox" name="urgent"> Markér ordinationen som haster</label>
-          <label>Status
-            <select name="status" required data-allow-legacy-option>
-              <option value="" selected>Vælg status</option>
-              ${SAMPLE_STATUSES.map(status => `<option value="${status}">${status}</option>`).join('')}
-            </select>
-          </label>
+          <div class="inline-field-group">
+            <label>Status
+              <select name="status" required data-allow-legacy-option>
+                <option value="" selected>Vælg status</option>
+                ${SAMPLE_STATUSES.map(status => `<option value="${status}">${status}</option>`).join('')}
+              </select>
+            </label>
+            <label class="checkbox-field"><input type="checkbox" name="urgent"> Markér ordinationen som haster</label>
+          </div>
           <label>Bestillingstidspunkt<input type="datetime-local" name="ordered_at"></label>
           <div class="btn-row">
             <button class="primary" type="submit">Gem</button>
@@ -6042,7 +6058,7 @@ function renderOrders(section) {
       const selectedAttr = o.id === selectedOrderId ? ' data-selected="true"' : '';
       const urgentAttr = o.urgent ? ' data-urgent="true"' : '';
       const urgentIcon = o.urgent
-        ? '<span class="urgent-indicator" role="img" aria-label="Haster"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i></span>'
+        ? '<span class="urgent-indicator" role="img" aria-label="Haster"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3.172 2.322 20.5h19.356L12 3.172zm1 13.828h-2v2h2v-2zm0-8h-2v6h2v-6z"></path></svg></span>'
         : '';
       return `<tr data-id="${o.id}"${selectedAttr}${urgentAttr}><td>${urgentIcon}<span class="order-id">${esc(o.id)}</span></td><td>${esc(getName('patients', Number(o.patient_id)))}</td><td>${esc(getName('samples', Number(o.sample_id)))}</td><td>${esc(getName('panels', Number(o.panel_id)))}</td><td>${esc(userName(o.analysis_responsible_id))}</td><td>${esc(userName(o.interpreter_id))}</td><td>${esc(userName(o.approver_id))}</td><td${patientGroupAttr}>${patientGroupCell}</td><td${indicationAttr}>${indicationCell}</td><td${hpoAttr}>${hpoCell}</td><td>${esc(statusDisplay)}</td><td>${esc(createdBy)}</td><td>${esc(orderedAt)}</td></tr>`;
     }).join('');
