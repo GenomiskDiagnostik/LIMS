@@ -1996,6 +1996,14 @@ const tooltipCatalog = {
       unit: 'Måleenhed (fx %, ng/µl).',
       notes: 'Supplerende noter om målingen.'
     },
+    primerTool: {
+      sequence: 'Indsæt sekvensen som primere skal designes imod (tillader A/C/G/T/U/N).',
+      start: '1-baseret startposition for det ønskede amplicon (valgfri).',
+      end: '1-baseret slutposition for ampliconet (valgfri).',
+      min_len: 'Mindste længde for foreslåede primere.',
+      max_len: 'Største længde for foreslåede primere.',
+      target_tm: 'Ønsket smeltetemperatur (Tm) for primerparret i °C.'
+    },
     createCaseForm: {
       patient_mrn: 'Patientens MRN eller CPR til entydig identifikation.',
       patient_extra_id: 'Supplerende identifikator til lokal brug (valgfrit).',
@@ -2070,6 +2078,8 @@ const tooltipCatalog = {
     userDelete: 'Slet den valgte bruger.',
     acmgReset: 'Ryd alle valgte ACMG-kriterier.',
     distanceSwap: 'Byt start- og slutposition for beregningen.',
+    primerDesign: 'Analyser sekvensen og foreslå et primerpar baseret på indstillingerne.',
+    primerClear: 'Ryd formularen for at starte et nyt primerdesign.',
     gcUpper: 'Fjern mellemrum og konverter sekvensen til store bogstaver.',
     gcReverse: 'Beregn og indsæt den omvendt komplementære sekvens.',
     blastSubmit: 'Sender sekvensen til NCBI BLAST i en ny fane.',
@@ -2130,6 +2140,14 @@ const tooltipCatalog = {
     distanceStart: 'Genomisk startposition, fx 123456 eller chr7:123456.',
     distanceEnd: 'Genomisk slutposition. Bogstaver ignoreres automatisk.',
     distanceResult: 'Viser antal baser mellem positionerne (inkl./ekskl.).',
+    primerTool: 'Design primere ud fra en målsekvens og ønskede parametre.',
+    primerSequence: 'Indsæt målsekvensen for primerdesign (A/C/G/T/U/N tilladt).',
+    primerStart: '1-baseret startposition for det ønskede amplicon (valgfri).',
+    primerEnd: '1-baseret slutposition for ampliconet (valgfri).',
+    primerMinLen: 'Mindste længde for foreslåede primere.',
+    primerMaxLen: 'Største længde for foreslåede primere.',
+    primerTargetTm: 'Ønsket smeltetemperatur (Tm) for primerparret.',
+    primerResult: 'Opsummerer det foreslåede primerpar og relevante advarsler.',
     gcSequence: 'Indsæt DNA/RNA-sekvens for at beregne længde og GC%.',
     acmgResult: 'Opsummering af den foreslåede klassifikation baseret på kriterierne.',
     gcResult: 'Opsummerer længde, GC% og basefordeling for sekvensen.',
@@ -10740,6 +10758,48 @@ function renderTools(section) {
   <details class="panel tool-panel">
     <summary>
       <div class="tool-summary-text">
+        <span class="tool-title">Primerdesign</span>
+        <span class="tool-subtitle">Foreslå primerpar ud fra sekvens, målområde og ønsket Tm.</span>
+      </div>
+    </summary>
+    <div class="tool-body">
+      <h3>Primerdesign</h3>
+      <p>Angiv en sekvens og evt. målområde for at få et forslag til forward og reverse primer baseret på simple heuristikker.</p>
+      <form id="primerTool">
+        <label for="primerSequence">Sekvens
+          <textarea id="primerSequence" name="sequence" rows="4" placeholder="Indsæt målsekvens (DNA) her"></textarea>
+        </label>
+        <div class="tool-inline">
+          <label for="primerStart">Amplicon-start (1-baseret)
+            <input type="number" id="primerStart" name="start" min="1" placeholder="fx 120">
+          </label>
+          <label for="primerEnd">Amplicon-slut (1-baseret)
+            <input type="number" id="primerEnd" name="end" min="1" placeholder="fx 420">
+          </label>
+        </div>
+        <div class="tool-inline">
+          <label for="primerMinLen">Minimum primerlængde
+            <input type="number" id="primerMinLen" name="min_len" min="10" max="60" value="18">
+          </label>
+          <label for="primerMaxLen">Maksimum primerlængde
+            <input type="number" id="primerMaxLen" name="max_len" min="10" max="60" value="24">
+          </label>
+          <label for="primerTargetTm">Ønsket Tm (°C)
+            <input type="number" step="0.1" id="primerTargetTm" name="target_tm" min="30" max="80" value="60">
+          </label>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="primary" id="primerDesign">Design primere</button>
+          <button type="button" class="secondary" id="primerClear">Ryd</button>
+        </div>
+      </form>
+      <div class="tool-result" id="primerResult">Indsæt en sekvens og angiv evt. målområde for at foreslå primere.</div>
+      <p class="tool-note">Primere beregnes med simple regler (Wallace-Tm og GC-clamp) og kræver laboratoriel validering før brug.</p>
+    </div>
+  </details>
+  <details class="panel tool-panel">
+    <summary>
+      <div class="tool-summary-text">
         <span class="tool-title">GC- og sekvensværktøj</span>
         <span class="tool-subtitle">Analyser sekvensen for GC-indhold og reverse komplement.</span>
       </div>
@@ -10763,6 +10823,11 @@ function renderTools(section) {
 
   applyButtonTooltips(section);
   applyControlTooltips(section);
+  section.querySelectorAll('form').forEach(form => applyFormTooltips(form));
+
+  const cleanSequence = value => value.replace(/[^A-Za-z]/g, '').toUpperCase();
+  const toDnaSequence = value => cleanSequence(value).replace(/U/g, 'T');
+  const COMPLEMENT_MAP = {A: 'T', T: 'A', U: 'A', G: 'C', C: 'G', Y: 'R', R: 'Y', S: 'S', W: 'W', K: 'M', M: 'K', B: 'V', V: 'B', D: 'H', H: 'D', N: 'N'};
 
   const acmgForm = section.querySelector('#acmgTool');
   const acmgResult = section.querySelector('#acmgResult');
@@ -11299,6 +11364,191 @@ function renderTools(section) {
     });
   }
 
+  const primerForm = section.querySelector('#primerTool');
+  if (primerForm) {
+    const primerResult = section.querySelector('#primerResult');
+    const sequenceField = primerForm.querySelector('#primerSequence');
+    const startField = primerForm.querySelector('#primerStart');
+    const endField = primerForm.querySelector('#primerEnd');
+    const minLenField = primerForm.querySelector('#primerMinLen');
+    const maxLenField = primerForm.querySelector('#primerMaxLen');
+    const targetTmField = primerForm.querySelector('#primerTargetTm');
+    const reverseComplement = seq => seq.split('').reverse().map(base => COMPLEMENT_MAP[base] || base).join('');
+    const calculateTm = seq => {
+      const gcCount = (seq.match(/[GC]/g) || []).length;
+      const atCount = seq.length - gcCount;
+      return (4 * gcCount) + (2 * atCount);
+    };
+    const calculateGc = seq => {
+      if (!seq.length) return 0;
+      const gcCount = (seq.match(/[GC]/g) || []).length;
+      return (gcCount / seq.length) * 100;
+    };
+    const hasHomopolymer = seq => /([ACGT])\1{3,}/.test(seq);
+    const readPositiveInt = (field, fallback) => {
+      if (!field) return fallback;
+      const value = (field.value || '').trim();
+      if (!value) return fallback;
+      const parsed = Number.parseInt(value, 10);
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : NaN;
+    };
+    const readNumber = (field, fallback) => {
+      if (!field) return fallback;
+      const value = (field.value || '').trim();
+      if (!value) return fallback;
+      const normalised = value.replace(',', '.');
+      const parsed = Number.parseFloat(normalised);
+      return Number.isFinite(parsed) ? parsed : NaN;
+    };
+    const buildWarnings = primer => {
+      const warnings = [];
+      if (!primer.clamp) warnings.push('Manglende GC-clamp i 3′-enden');
+      if (primer.gc < 35 || primer.gc > 65) warnings.push('GC% uden for 35–65 %');
+      if (primer.homopolymer) warnings.push('Homopolymer på ≥4 baser');
+      return warnings;
+    };
+    const designPrimers = () => {
+      const template = toDnaSequence(sequenceField?.value || '');
+      if (!template.length) {
+        primerResult.textContent = 'Indsæt en sekvens for at foreslå primere.';
+        return;
+      }
+      let start = readPositiveInt(startField, 1);
+      let end = readPositiveInt(endField, template.length);
+      if (Number.isNaN(start) || Number.isNaN(end)) {
+        primerResult.textContent = 'Angiv gyldige tal for start og slut (1-baseret).';
+        return;
+      }
+      start = Math.max(1, Math.min(start, template.length));
+      end = Math.max(1, Math.min(end, template.length));
+      if (start > end) {
+        const tmp = start;
+        start = end;
+        end = tmp;
+      }
+      let minLen = readPositiveInt(minLenField, 18);
+      let maxLen = readPositiveInt(maxLenField, 24);
+      if (Number.isNaN(minLen) || Number.isNaN(maxLen)) {
+        primerResult.textContent = 'Angiv gyldige primerlængder.';
+        return;
+      }
+      if (minLen > maxLen) [minLen, maxLen] = [maxLen, minLen];
+      minLen = Math.max(10, Math.min(minLen, 60));
+      maxLen = Math.max(minLen, Math.min(maxLen, 60));
+      let targetTm = readNumber(targetTmField, 60);
+      if (Number.isNaN(targetTm)) targetTm = 60;
+      targetTm = Math.max(30, Math.min(targetTm, 80));
+      const regionStartIndex = start - 1;
+      const regionEndIndex = end - 1;
+      if (regionEndIndex - regionStartIndex + 1 < minLen) {
+        primerResult.textContent = 'Målområdet er kortere end den ønskede primerlængde.';
+        return;
+      }
+      const invalidPattern = /[^ACGT]/;
+      const searchWindow = 80;
+      const evaluateForward = () => {
+        let best = null;
+        const limit = Math.min(regionEndIndex - minLen + 1, regionStartIndex + searchWindow);
+        for (let pos = regionStartIndex; pos <= limit; pos++) {
+          const maxLenAtPos = Math.min(maxLen, regionEndIndex - pos + 1);
+          for (let len = minLen; len <= maxLenAtPos; len++) {
+            const candidate = template.slice(pos, pos + len);
+            if (!candidate || invalidPattern.test(candidate)) continue;
+            const tm = calculateTm(candidate);
+            const gc = calculateGc(candidate);
+            const clamp = /[GC]$/.test(candidate);
+            const homopolymer = hasHomopolymer(candidate);
+            const score = Math.abs(tm - targetTm) + (clamp ? 0 : 1.5) + ((gc < 35 || gc > 65) ? 0.5 : 0) + (homopolymer ? 0.75 : 0) + ((pos - regionStartIndex) * 0.02);
+            if (!best || score < best.score) {
+              best = {
+                sequence: candidate,
+                tm,
+                gc,
+                clamp,
+                homopolymer,
+                length: len,
+                start: pos + 1,
+                end: pos + len,
+                score
+              };
+            }
+          }
+        }
+        return best;
+      };
+      const evaluateReverse = () => {
+        let best = null;
+        const startLimit = Math.max(regionStartIndex + minLen - 1, regionEndIndex - searchWindow);
+        for (let endPos = regionEndIndex; endPos >= startLimit; endPos--) {
+          const maxLenAtPos = Math.min(maxLen, endPos - regionStartIndex + 1);
+          for (let len = minLen; len <= maxLenAtPos; len++) {
+            const startPos = endPos - len + 1;
+            if (startPos < regionStartIndex) continue;
+            const templateSegment = template.slice(startPos, endPos + 1);
+            if (!templateSegment || invalidPattern.test(templateSegment)) continue;
+            const primerSeq = reverseComplement(templateSegment);
+            const tm = calculateTm(primerSeq);
+            const gc = calculateGc(primerSeq);
+            const clamp = /[GC]$/.test(primerSeq);
+            const homopolymer = hasHomopolymer(primerSeq);
+            const score = Math.abs(tm - targetTm) + (clamp ? 0 : 1.5) + ((gc < 35 || gc > 65) ? 0.5 : 0) + (homopolymer ? 0.75 : 0) + ((regionEndIndex - endPos) * 0.02);
+            if (!best || score < best.score) {
+              best = {
+                sequence: primerSeq,
+                tm,
+                gc,
+                clamp,
+                homopolymer,
+                length: len,
+                start: startPos + 1,
+                end: endPos + 1,
+                score
+              };
+            }
+          }
+        }
+        return best;
+      };
+      const forward = evaluateForward();
+      const reverse = evaluateReverse();
+      if (!forward || !reverse) {
+        primerResult.textContent = 'Kunne ikke finde egnede primere. Justér længder, Tm eller målområde.';
+        return;
+      }
+      const tmDelta = Math.abs(forward.tm - reverse.tm);
+      const ampliconSize = (reverse.end - forward.start) + 1;
+      if (ampliconSize <= 0) {
+        primerResult.textContent = 'Primere overlapper hinanden – udvid målområdet eller justér parametre.';
+        return;
+      }
+      const forwardWarnings = buildWarnings(forward);
+      const reverseWarnings = buildWarnings(reverse);
+      const summaryLines = [
+        `<strong>Amplicon:</strong> ${forward.start.toLocaleString('da-DK')}–${reverse.end.toLocaleString('da-DK')} (${ampliconSize.toLocaleString('da-DK')} bp)`,
+        `<strong>Forward primer (5′→3′)</strong> ${forward.sequence}`,
+        `• Position: ${forward.start.toLocaleString('da-DK')}–${forward.end.toLocaleString('da-DK')} | Længde: ${forward.length} bp | GC: ${forward.gc.toFixed(1)} % | Tm: ${forward.tm.toFixed(1)} °C${forward.clamp ? ' | 3′-ende: GC-clamp' : ''}`,
+        forwardWarnings.length ? `• Bemærkninger: ${forwardWarnings.join('; ')}` : '',
+        `<strong>Reverse primer (5′→3′)</strong> ${reverse.sequence}`,
+        `• Position: ${reverse.start.toLocaleString('da-DK')}–${reverse.end.toLocaleString('da-DK')} | Længde: ${reverse.length} bp | GC: ${reverse.gc.toFixed(1)} % | Tm: ${reverse.tm.toFixed(1)} °C${reverse.clamp ? ' | 3′-ende: GC-clamp' : ''}`,
+        reverseWarnings.length ? `• Bemærkninger: ${reverseWarnings.join('; ')}` : '',
+        `ΔTm mellem primere: ${tmDelta.toFixed(1)} °C (mål: ${targetTm.toFixed(1)} °C)`
+      ].filter(Boolean);
+      if (tmDelta > 3) {
+        summaryLines.push('Advarsel: Stor forskel i Tm – overvej at justere længder eller målområde.');
+      }
+      primerResult.innerHTML = summaryLines.join('<br>');
+    };
+    primerForm.addEventListener('submit', e => {
+      e.preventDefault();
+      designPrimers();
+    });
+    section.querySelector('#primerClear')?.addEventListener('click', () => {
+      primerForm.reset();
+      primerResult.textContent = 'Indsæt en sekvens og angiv evt. målområde for at foreslå primere.';
+      sequenceField?.focus();
+    });
+  }
+
   const gcTextarea = section.querySelector('#gcSequence');
   const gcResult = section.querySelector('#gcResult');
   const gcUpper = section.querySelector('#gcUpper');
@@ -11331,8 +11581,7 @@ function renderTools(section) {
       gcResult.textContent = 'Indsæt en sekvens for at beregne GC%.';
       return;
     }
-    const complementMap = {A: 'T', T: 'A', U: 'A', G: 'C', C: 'G', Y: 'R', R: 'Y', S: 'S', W: 'W', K: 'M', M: 'K', B: 'V', V: 'B', D: 'H', H: 'D', N: 'N'};
-    const reversed = seq.split('').reverse().map(base => complementMap[base] || base).join('');
+    const reversed = seq.split('').reverse().map(base => COMPLEMENT_MAP[base] || base).join('');
     gcTextarea.value = reversed;
     updateGc();
   });
