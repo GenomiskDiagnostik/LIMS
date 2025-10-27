@@ -7509,6 +7509,7 @@ function renderVariantLibrary(section) {
     {key: 'variant_type', label: 'Varianttype (kode)'},
     {label: 'Varianttype', value: entry => getVariantTypeLabel(entry.variant_type) || ''},
     {key: 'classification', label: 'Klasse'},
+    {label: 'Frekvens', value: entry => getVariantFrequencyLabel(entry)},
     {key: 'criteria', label: 'Kriterier'},
     {key: 'evidence', label: 'Evidens'},
     {key: 'condition', label: 'Tilstand'},
