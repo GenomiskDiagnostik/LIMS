@@ -694,6 +694,23 @@ tbody tr[data-selected="true"] {
 [data-theme="dark"] tbody tr[data-selected="true"] {
   background: rgba(56, 189, 248, 0.18);
 }
+td.truncate-cell {
+  vertical-align: top;
+}
+.truncate-text {
+  display: block;
+  width: 100%;
+  max-width: clamp(12rem, 40vw, 28rem);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.truncate-text--narrow {
+  max-width: clamp(10rem, 35vw, 22rem);
+}
+.truncate-text--wide {
+  max-width: clamp(16rem, 55vw, 36rem);
+}
 form label {
   display: block;
   font-size: 0.8rem;
@@ -1926,8 +1943,12 @@ function annotateHeaders(root) {
 function annotateTableCells(root) {
   if (!root) return;
   root.querySelectorAll('tbody td').forEach(td => {
-    const text = td.textContent.trim();
-    if (text) setTooltip(td, text);
+    const nested = td.querySelector('[data-full-text]');
+    const fullText = td.dataset.fullText || nested?.dataset.fullText || '';
+    const text = fullText || td.textContent.trim();
+    if (!text) return;
+    setTooltip(td, text);
+    td.querySelectorAll('.truncate-text').forEach(el => setTooltip(el, text));
   });
 }
 function annotateSearchInputs(root) {
@@ -2758,6 +2779,18 @@ function formatHpoHtml(value) {
 
 function formatIndicationForList(value) {
   return collapseSpaces(value);
+}
+function truncateForListDisplay(value, maxLength = 120) {
+  const text = collapseSpaces(value);
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  const ellipsis = '...';
+  if (maxLength <= ellipsis.length) return ellipsis;
+  const cut = maxLength - ellipsis.length;
+  let truncated = text.slice(0, cut).trimEnd();
+  truncated = truncated.replace(/[,;:.]$/, '');
+  if (!truncated) return ellipsis;
+  return truncated + ellipsis;
 }
 function setStatus(msg) {
   state.lastStatus = msg;
@@ -4932,8 +4965,13 @@ function renderPatients(section) {
       const ageDisplay = formatAgeFromBirthDate(rawBirth);
       const birthDisplay = formattedBirth && ageDisplay ? `${formattedBirth} (${ageDisplay})` : formattedBirth;
       const indicationsList = getPatientIndications(p.id);
+      const indicationDisplay = truncateForListDisplay(indicationsList, 140);
+      const indicationAttr = indicationsList
+        ? ` class="truncate-cell" data-full-text="${esc(indicationsList)}"`
+        : ' class="truncate-cell"';
+      const indicationContent = indicationDisplay ? `<span class="truncate-text truncate-text--wide">${esc(indicationDisplay)}</span>` : '';
       const selectedAttr = p.id === selectedPatientId ? ' data-selected="true"' : '';
-      return `<tr data-id="${p.id}"${selectedAttr}><td>${p.id}</td><td>${esc(p.mrn)}</td><td>${esc(p.extra_id||'')}</td><td>${esc(p.family_number||'')}</td><td>${esc(p.name)}</td><td>${esc(gender)}</td><td>${esc(birthDisplay)}</td><td>${esc(indicationsList)}</td><td>${esc(createdBy)}</td></tr>`;
+      return `<tr data-id="${p.id}"${selectedAttr}><td>${p.id}</td><td>${esc(p.mrn)}</td><td>${esc(p.extra_id||'')}</td><td>${esc(p.family_number||'')}</td><td>${esc(p.name)}</td><td>${esc(gender)}</td><td>${esc(birthDisplay)}</td><td${indicationAttr}>${indicationContent}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -5656,10 +5694,16 @@ function renderOrders(section) {
       const statusDisplay = sample?.status || o.status || '';
       const createdBy = determineCreatedBy('orders', o);
       const orderedAt = formatDanishDate(o.ordered_at);
-      const indicationCell = formatMultilineCell(o.indication);
-      const hpoCell = formatHpoHtml(o.hpo_terms);
+      const indicationFull = formatIndicationForList(o.indication);
+      const indicationDisplay = truncateForListDisplay(indicationFull, 160);
+      const indicationAttr = indicationFull ? ` class="truncate-cell" data-full-text="${esc(indicationFull)}"` : ' class="truncate-cell"';
+      const indicationCell = indicationDisplay ? `<span class="truncate-text truncate-text--wide">${esc(indicationDisplay)}</span>` : '';
+      const hpoFull = formatHpoList(o.hpo_terms);
+      const hpoDisplay = truncateForListDisplay(hpoFull, 120);
+      const hpoAttr = hpoFull ? ` class="truncate-cell" data-full-text="${esc(hpoFull)}"` : ' class="truncate-cell"';
+      const hpoCell = hpoDisplay ? `<span class="truncate-text truncate-text--narrow">${esc(hpoDisplay)}</span>` : '';
       const selectedAttr = o.id === selectedOrderId ? ' data-selected="true"' : '';
-      return `<tr data-id="${o.id}"${selectedAttr}><td>${o.id}</td><td>${esc(getName('patients', Number(o.patient_id)))}</td><td>${esc(getName('samples', Number(o.sample_id)))}</td><td>${esc(getName('panels', Number(o.panel_id)))}</td><td>${esc(userName(o.analysis_responsible_id))}</td><td>${esc(userName(o.interpreter_id))}</td><td>${esc(userName(o.approver_id))}</td><td>${indicationCell}</td><td>${hpoCell}</td><td>${esc(statusDisplay)}</td><td>${esc(createdBy)}</td><td>${esc(orderedAt)}</td></tr>`;
+      return `<tr data-id="${o.id}"${selectedAttr}><td>${o.id}</td><td>${esc(getName('patients', Number(o.patient_id)))}</td><td>${esc(getName('samples', Number(o.sample_id)))}</td><td>${esc(getName('panels', Number(o.panel_id)))}</td><td>${esc(userName(o.analysis_responsible_id))}</td><td>${esc(userName(o.interpreter_id))}</td><td>${esc(userName(o.approver_id))}</td><td${indicationAttr}>${indicationCell}</td><td${hpoAttr}>${hpoCell}</td><td>${esc(statusDisplay)}</td><td>${esc(createdBy)}</td><td>${esc(orderedAt)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
