@@ -89,6 +89,50 @@ header {
   flex: 1 1 260px;
   min-width: 200px;
 }
+.icon-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.icon {
+  width: 1.1em;
+  height: 1.1em;
+  display: block;
+}
+.with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.with-icon .icon-slot {
+  flex: 0 0 auto;
+}
+.brand-mark {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.18);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--header-text);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+.brand-mark .icon-slot {
+  width: 2.4rem;
+  height: 2.4rem;
+}
+.brand-mark .icon {
+  width: 100%;
+  height: 100%;
+}
+.brand.logo-missing .brand-mark {
+  display: flex;
+}
+[data-theme="dark"] .brand-mark {
+  background: rgba(15, 23, 42, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.45);
+}
 .brand img {
   width: 64px;
   height: 64px;
@@ -99,6 +143,10 @@ header {
   display: block;
   font-size: 0.75rem;
   color: var(--muted-text);
+}
+.with-icon .icon {
+  width: 1.2em;
+  height: 1.2em;
 }
 header h1 {
   margin: 0;
@@ -169,10 +217,21 @@ nav button {
   font-size: 0.95rem;
   cursor: pointer;
   transition: background 0.2s ease, color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 nav button.active {
   background: var(--nav-button-active-bg);
   color: var(--nav-button-active-color);
+}
+nav button .icon-slot {
+  width: 1.2em;
+  height: 1.2em;
+}
+nav button .icon {
+  width: 100%;
+  height: 100%;
 }
 main {
   padding: 1.5rem;
@@ -1145,6 +1204,9 @@ pre {
 <body>
 <header>
   <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <span class="icon-slot" data-icon="dna"></span>
+    </span>
     <img id="glimrLogo" src="logo.png" alt="G" loading="lazy">
     <div>
       <h1>GlimR – Genetic LIMS Reporter</h1>
@@ -1156,15 +1218,24 @@ pre {
       <form id="loginForm">
         <select id="loginUser" required></select>
         <input id="loginPass" type="password" placeholder="Adgangskode (valgfri)">
-        <button type="submit" class="primary">Log ind</button>
+        <button type="submit" class="primary with-icon">
+          <span class="icon-slot" data-icon="arrow-right-on-rectangle"></span>
+          <span>Log ind</span>
+        </button>
       </form>
       <div class="user-info" id="userInfo" hidden>
         <span id="currentUserLabel"></span>
-        <button type="button" class="secondary" id="logoutBtn">Log ud</button>
+        <button type="button" class="secondary with-icon" id="logoutBtn">
+          <span class="icon-slot" data-icon="arrow-left-on-rectangle"></span>
+          <span>Log ud</span>
+        </button>
       </div>
     </div>
     <div class="quick-actions">
-      <button class="secondary" id="themeToggle">Skift til mørkt tema</button>
+      <button class="secondary with-icon" id="themeToggle">
+        <span class="icon-slot" data-icon="moon"></span>
+        <span>Skift til mørkt tema</span>
+      </button>
     </div>
   </div>
 </header>
@@ -1266,6 +1337,225 @@ const tabs = [
   {id:'admin', label:'Administration'},
   {id:'tests', label:'Selvtest'}
 ];
+const tabIcons = {
+  dashboard: 'chart-bar',
+  case_create: 'folder-plus',
+  patients: 'user-circle',
+  samples: 'beaker',
+  orders: 'document-text',
+  panels: 'squares-2x2',
+  variants: 'dna',
+  variant_library: 'book-open',
+  conclusion_library: 'clipboard-document',
+  reports: 'document-chart-bar',
+  qc: 'clipboard-document-check',
+  responses: 'inbox',
+  tools: 'wrench-screwdriver',
+  users: 'user-group',
+  audit: 'clock',
+  db: 'circle-stack',
+  admin: 'shield-check',
+  tests: 'clipboard-document-list'
+};
+const ICON_NS = 'http://www.w3.org/2000/svg';
+const iconLibrary = {
+  'arrow-right-on-rectangle': {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9'}
+    ]
+  },
+  'arrow-left-on-rectangle': {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75'}
+    ]
+  },
+  moon: {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z'}
+    ]
+  },
+  sun: {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z'}
+    ]
+  },
+  'chart-bar': {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z'}
+    ]
+  },
+  'folder-plus': {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M12 10.5v6m3-3H9m4.06-7.19-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z'}
+    ]
+  },
+  'user-circle': {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z'}
+    ]
+  },
+  beaker: {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0 1 12 15a9.065 9.065 0 0 0-6.23-.693L5 14.5m14.8.8 1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0 1 12 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5'}
+    ]
+  },
+  'document-text': {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z'}
+    ]
+  },
+  'squares-2x2': {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z'}
+    ]
+  },
+  dna: {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.6'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M8 3C11 5.2 11 9 8 11.5S5 17.8 8 21'},
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M16 3C13 5.2 13 9 16 11.5S19 17.8 16 21'},
+      {'stroke-linecap': 'round', d: 'M6 5h4'},
+      {'stroke-linecap': 'round', d: 'M14 5h4'},
+      {'stroke-linecap': 'round', d: 'M6 11.5h4'},
+      {'stroke-linecap': 'round', d: 'M14 11.5h4'},
+      {'stroke-linecap': 'round', d: 'M6 18h4'},
+      {'stroke-linecap': 'round', d: 'M14 18h4'}
+    ]
+  },
+  'book-open': {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25'}
+    ]
+  },
+  'clipboard-document': {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M8.25 7.5V6.108c0-1.135.845-2.098 1.976-2.192.373-.03.748-.057 1.123-.08M15.75 18H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08M15.75 18.75v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5A3.375 3.375 0 0 0 6.375 7.5H5.25m11.9-3.664A2.251 2.251 0 0 0 15 2.25h-1.5a2.251 2.251 0 0 0-2.15 1.586m5.8 0c.065.21.1.433.1.664v.75h-6V4.5c0-.231.035-.454.1-.664M6.75 7.5H4.875c-.621 0-1.125.504-1.125 1.125v12c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V16.5a9 9 0 0 0-9-9Z'}
+    ]
+  },
+  'document-chart-bar': {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25M9 16.5v.75m3-3v3M15 12v5.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z'}
+    ]
+  },
+  'clipboard-document-check': {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0 1 18 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3 1.5 1.5 3-3.75'}
+    ]
+  },
+  inbox: {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H6.911a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661Z'}
+    ]
+  },
+  'wrench-screwdriver': {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437 1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008Z'}
+    ]
+  },
+  'user-group': {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z'}
+    ]
+  },
+  clock: {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z'}
+    ]
+  },
+  'circle-stack': {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125'}
+    ]
+  },
+  'shield-check': {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z'}
+    ]
+  },
+  'clipboard-document-list': {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z'}
+    ]
+  }
+};
+function createIconElement(name) {
+  const def = iconLibrary[name];
+  if (!def) return null;
+  const svg = document.createElementNS(ICON_NS, 'svg');
+  svg.classList.add('icon');
+  svg.setAttribute('viewBox', def.viewBox || '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  const attrs = def.attrs || {};
+  Object.entries(attrs).forEach(([key, value]) => svg.setAttribute(key, value));
+  (def.paths || []).forEach(segment => {
+    const node = document.createElementNS(ICON_NS, segment.type || 'path');
+    Object.entries(segment).forEach(([key, value]) => {
+      if (key === 'type') return;
+      node.setAttribute(key, value);
+    });
+    svg.appendChild(node);
+  });
+  return svg;
+}
+function setIcon(slot, name) {
+  if (!slot) return;
+  slot.dataset.icon = name;
+  const icon = createIconElement(name);
+  slot.innerHTML = '';
+  if (icon) {
+    slot.appendChild(icon);
+  }
+}
+function applyIconSlots(scope = document) {
+  const root = scope instanceof Element || scope instanceof DocumentFragment ? scope : document;
+  root.querySelectorAll('.icon-slot[data-icon]').forEach(slot => {
+    setIcon(slot, slot.dataset.icon);
+  });
+}
+applyIconSlots(document);
 const SAMPLE_TYPES = ['Blod','Kindskrab','Biopsi','Kontrol'];
 const SAMPLE_STATUSES = ['Modtaget','Afventer','QC','Analyse','Tolkning','Rapport','Svaret','Biobank','Annulleret'];
 const schemaFields = {
@@ -2342,7 +2632,16 @@ function applyTheme() {
   const btn = document.getElementById('themeToggle');
   if (btn) {
     const toDark = state.theme !== 'dark';
-    btn.textContent = toDark ? 'Skift til mørkt tema' : 'Skift til lyst tema';
+    const label = btn.querySelector('span:not(.icon-slot)');
+    if (label) {
+      label.textContent = toDark ? 'Skift til mørkt tema' : 'Skift til lyst tema';
+    } else {
+      btn.textContent = toDark ? 'Skift til mørkt tema' : 'Skift til lyst tema';
+    }
+    const iconSlot = btn.querySelector('.icon-slot');
+    if (iconSlot) {
+      setIcon(iconSlot, toDark ? 'moon' : 'sun');
+    }
     setTooltip(btn, tooltipCatalog.buttons.themeToggle);
   }
 }
@@ -2434,7 +2733,20 @@ function initTabs() {
   main.innerHTML = '';
   tabs.forEach(tab => {
     const btn = document.createElement('button');
-    btn.textContent = tab.label;
+    const iconName = tabIcons[tab.id];
+    if (iconName) {
+      btn.classList.add('with-icon');
+      const iconSlot = document.createElement('span');
+      iconSlot.className = 'icon-slot';
+      iconSlot.dataset.icon = iconName;
+      btn.appendChild(iconSlot);
+      setIcon(iconSlot, iconName);
+      const span = document.createElement('span');
+      span.textContent = tab.label;
+      btn.appendChild(span);
+    } else {
+      btn.textContent = tab.label;
+    }
     btn.dataset.tab = tab.id;
     setTooltip(btn, tooltipCatalog.tabs[tab.id]);
     btn.addEventListener('click', () => activateTab(tab.id));
@@ -10413,17 +10725,36 @@ function hookUi() {
   const logoImg = document.getElementById('glimrLogo');
   if (logoImg) {
     const brand = logoImg.closest('.brand');
+    const brandMark = brand ? brand.querySelector('.brand-mark') : null;
+    const showBrandMark = (show) => {
+      if (!brandMark) return;
+      brandMark.setAttribute('aria-hidden', show ? 'false' : 'true');
+    };
     const markMissing = () => {
       if (brand) {
         brand.classList.add('logo-missing');
       }
+      showBrandMark(true);
       if (logoImg.parentElement) {
         logoImg.remove();
       }
     };
+    const markLoaded = () => {
+      if (brand) {
+        brand.classList.remove('logo-missing');
+      }
+      showBrandMark(false);
+    };
     logoImg.addEventListener('error', markMissing, { once: true });
-    if (brand && logoImg.complete && logoImg.naturalWidth === 0) {
-      markMissing();
+    logoImg.addEventListener('load', markLoaded);
+    if (logoImg.complete) {
+      if (logoImg.naturalWidth === 0) {
+        markMissing();
+      } else {
+        markLoaded();
+      }
+    } else {
+      markLoaded();
     }
   }
   applyTheme();
