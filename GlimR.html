@@ -719,6 +719,47 @@ section[data-tab].active {
   gap: 0.4rem;
   font-size: 0.8rem;
 }
+.dashboard-stats {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.dashboard-stat {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.8rem;
+  border: 1px solid var(--panel-border);
+  background: rgba(24, 111, 175, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+[data-theme="dark"] .dashboard-stat {
+  background: rgba(56, 189, 248, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(14, 165, 233, 0.25);
+}
+.dashboard-stat .icon-slot {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 0.75rem;
+  background: rgba(24, 111, 175, 0.12);
+  color: var(--accent-strong);
+  flex: 0 0 auto;
+}
+[data-theme="dark"] .dashboard-stat .icon-slot {
+  background: rgba(56, 189, 248, 0.18);
+  color: var(--accent);
+}
+.dashboard-stat .stat-label {
+  font-size: 0.85rem;
+  color: var(--muted-text);
+}
+.dashboard-stat .stat-value {
+  margin-top: 0.2rem;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--text);
+}
 .flex {
   display: flex;
   gap: 1rem;
@@ -3888,6 +3929,7 @@ function renderDashboard(section) {
   const samples = getCached('samples');
   const sampleCount = samples.length;
   const orders = getCached('orders');
+  const reports = getCached('reports');
   const variants = getCached('variants');
   const statusCounts = samples.reduce((acc, sample) => {
     const status = (sample.status || '').toLowerCase();
@@ -3907,6 +3949,59 @@ function renderDashboard(section) {
     const status = (sample?.status || order.status || '').toLowerCase();
     return !inactiveSampleStatuses.has(status);
   });
+  const MS_PER_DAY = 86400000;
+  const MS_PER_WEEK = MS_PER_DAY * 7;
+  const now = new Date();
+  const weekAgo = new Date(now.getTime() - MS_PER_WEEK);
+  const monthAgo = new Date(now.getTime() - MS_PER_DAY * 30);
+  const responseDurations = [];
+  reports.forEach(report => {
+    const order = findById('orders', Number(report.order_id));
+    if (!order) return;
+    const sample = order.sample_id ? findById('samples', Number(order.sample_id)) : null;
+    const receivedAt = parseDateTimeValue(sample?.created_at || sample?.collected_at || sample?.updated_at);
+    const answeredAt = parseDateTimeValue(report.issued_at || report.updated_at || report.created_at);
+    if (!receivedAt || !answeredAt) return;
+    const diffDays = (answeredAt.getTime() - receivedAt.getTime()) / MS_PER_DAY;
+    if (Number.isFinite(diffDays) && diffDays >= 0) {
+      responseDurations.push(diffDays);
+    }
+  });
+  const responseTimeP90 = calculatePercentile(responseDurations, 0.9);
+  const samplesLastWeek = samples.filter(sample => {
+    const receivedAt = parseDateTimeValue(sample.created_at || sample.collected_at || sample.updated_at);
+    return receivedAt && receivedAt >= weekAgo;
+  }).length;
+  const samplesLastMonth = samples.filter(sample => {
+    const receivedAt = parseDateTimeValue(sample.created_at || sample.collected_at || sample.updated_at);
+    return receivedAt && receivedAt >= monthAgo;
+  }).length;
+  const ordersLastMonth = orders.filter(order => {
+    const orderedAt = parseDateTimeValue(order.ordered_at || order.created_at || order.updated_at);
+    return orderedAt && orderedAt >= monthAgo;
+  });
+  const weeksCovered = Math.max((now.getTime() - monthAgo.getTime()) / MS_PER_WEEK, 1 / 52);
+  const avgOrdersPerWeek = ordersLastMonth.length ? ordersLastMonth.length / weeksCovered : 0;
+  const reportsLastMonth = reports.filter(report => {
+    const issuedAt = parseDateTimeValue(report.issued_at || report.updated_at || report.created_at);
+    return issuedAt && issuedAt >= monthAgo;
+  }).length;
+  const statsCards = [
+    {icon: 'clock', label: "Svarstid (90%-fraktil)", value: formatDurationDays(responseTimeP90)},
+    {icon: 'inbox', label: 'Prøver modtaget (7 dage)', value: formatNumberDa(samplesLastWeek)},
+    {icon: 'beaker', label: 'Prøver modtaget (30 dage)', value: formatNumberDa(samplesLastMonth)},
+    {icon: 'document-chart-bar', label: 'Gns. ordinationer/uge (30 dage)', value: formatNumberDa(avgOrdersPerWeek, 1)},
+    {icon: 'clipboard-document-check', label: 'Rapporter udstedt (30 dage)', value: formatNumberDa(reportsLastMonth)}
+  ];
+  const statsCardsHtml = statsCards.map(stat => `
+      <div class="dashboard-stat">
+        <span class="icon-slot" data-icon="${stat.icon}"></span>
+        <div>
+          <div class="stat-label">${esc(stat.label)}</div>
+          <div class="stat-value">${esc(stat.value)}</div>
+        </div>
+      </div>
+    `).join('');
   const oldestActiveOrders = activeOrders
     .slice()
     .sort((a, b) => (a.updated_at || '').localeCompare(b.updated_at || ''))
@@ -3968,6 +4063,12 @@ function renderDashboard(section) {
         <span class="icon-slot" data-icon="circle-stack"></span>
         <div><div class="badge">Biobank</div><h3>${statusCounts.biobank}</h3></div>
       </div>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>Statistik</h2>
+    <div class="dashboard-stats">
+      ${statsCardsHtml}
     </div>
   </div>
   <div class="panel">
@@ -8723,6 +8824,73 @@ function formatDanishDate(value, includeTimeHint) {
     }
   }
   return '';
+}
+
+const numberFormatterCache = new Map();
+function formatNumberDa(value, decimals = 0) {
+  if (value === null || value === undefined) return '—';
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '—';
+  const key = `${decimals}`;
+  let formatter = numberFormatterCache.get(key);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat('da-DK', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    });
+    numberFormatterCache.set(key, formatter);
+  }
+  return formatter.format(numeric);
+}
+
+function parseDateTimeValue(value) {
+  if (!value && value !== 0) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const parsed = new Date(trimmed);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  if (typeof value === 'number') {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  return null;
+}
+
+function calculatePercentile(values, percentile) {
+  if (!Array.isArray(values) || !values.length) return null;
+  const sorted = values.slice().sort((a, b) => a - b);
+  const index = (sorted.length - 1) * percentile;
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+  if (lower === upper) return sorted[lower];
+  const weight = index - lower;
+  return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+}
+
+function formatDurationDays(days) {
+  if (days === null || days === undefined || Number.isNaN(days) || days < 0) {
+    return 'Ingen data';
+  }
+  if (days < 1) {
+    const hours = Math.round(days * 24);
+    if (hours <= 0) return '<1 time';
+    return `${hours} ${hours === 1 ? 'time' : 'timer'}`;
+  }
+  if (days < 7) {
+    const decimals = days < 3 ? 1 : 0;
+    return `${formatNumberDa(days, decimals)} dage`;
+  }
+  const weeks = days / 7;
+  if (weeks < 12) {
+    const decimals = weeks < 3 ? 1 : 0;
+    return `${formatNumberDa(weeks, decimals)} uger`;
+  }
+  return `${formatNumberDa(days, 0)} dage`;
 }
 
 function normalizeDateOnly(value) {
