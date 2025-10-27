@@ -5508,8 +5508,12 @@ function renderSamples(section) {
     tbody.innerHTML = filteredSamples.map(s => {
       const createdBy = determineCreatedBy('samples', s);
       const collectedAt = formatDanishDate(s.collected_at);
+      const collectedMeta = formatDaysSince(s.collected_at);
+      const collectedCell = collectedAt
+        ? `${esc(collectedAt)}${collectedMeta ? ` <span class="table-meta">(${esc(collectedMeta)})</span>` : ''}`
+        : '';
       const selectedAttr = s.id === selectedSampleId ? ' data-selected="true"' : '';
-      return `<tr data-id="${s.id}"${selectedAttr}><td>${s.id}</td><td>${esc(s.pmb_number||'')}</td><td>${esc(getName('patients', Number(s.patient_id)))}</td><td>${esc(s.sample_type)}</td><td>${esc(s.status||'')}</td><td>${esc(collectedAt)}</td><td>${esc(createdBy)}</td></tr>`;
+      return `<tr data-id="${s.id}"${selectedAttr}><td>${s.id}</td><td>${esc(s.pmb_number||'')}</td><td>${esc(getName('patients', Number(s.patient_id)))}</td><td>${esc(s.sample_type)}</td><td>${esc(s.status||'')}</td><td>${collectedCell}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
