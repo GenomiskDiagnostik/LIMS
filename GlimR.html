@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>GlimR – Genetic LIMS Reporter</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-dymDYb4C2m3XaGNsq4CPrlG/pXHiY/VKwxLBzj2YkdE+5EYXPL3ZX31lrT7xYuFeoDyAJRDig0lzVEHF7bW3+A==" crossorigin="anonymous" referrerpolicy="no-referrer">
 <style>
 :root {
   font-family: "Segoe UI", Arial, sans-serif;
@@ -89,6 +90,25 @@ header {
   flex: 1 1 260px;
   min-width: 200px;
 }
+.brand-mark {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.18);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.2rem;
+  color: var(--header-text);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+.brand.logo-missing .brand-mark {
+  display: flex;
+}
+[data-theme="dark"] .brand-mark {
+  background: rgba(15, 23, 42, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.45);
+}
 .brand img {
   width: 64px;
   height: 64px;
@@ -99,6 +119,14 @@ header {
   display: block;
   font-size: 0.75rem;
   color: var(--muted-text);
+}
+.with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.with-icon i {
+  flex: 0 0 auto;
 }
 header h1 {
   margin: 0;
@@ -169,10 +197,16 @@ nav button {
   font-size: 0.95rem;
   cursor: pointer;
   transition: background 0.2s ease, color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 nav button.active {
   background: var(--nav-button-active-bg);
   color: var(--nav-button-active-color);
+}
+nav button i {
+  font-size: 1.1rem;
 }
 main {
   padding: 1.5rem;
@@ -1145,6 +1179,9 @@ pre {
 <body>
 <header>
   <div class="brand">
+    <span class="brand-mark" role="img" aria-label="GlimR" aria-hidden="true">
+      <i class="fas fa-dna fa-fw" aria-hidden="true"></i>
+    </span>
     <img id="glimrLogo" src="logo.png" alt="G" loading="lazy">
     <div>
       <h1>GlimR – Genetic LIMS Reporter</h1>
@@ -1156,15 +1193,15 @@ pre {
       <form id="loginForm">
         <select id="loginUser" required></select>
         <input id="loginPass" type="password" placeholder="Adgangskode (valgfri)">
-        <button type="submit" class="primary">Log ind</button>
+        <button type="submit" class="primary with-icon"><i class="fas fa-sign-in-alt fa-fw" aria-hidden="true"></i><span>Log ind</span></button>
       </form>
       <div class="user-info" id="userInfo" hidden>
         <span id="currentUserLabel"></span>
-        <button type="button" class="secondary" id="logoutBtn">Log ud</button>
+        <button type="button" class="secondary with-icon" id="logoutBtn"><i class="fas fa-sign-out-alt fa-fw" aria-hidden="true"></i><span>Log ud</span></button>
       </div>
     </div>
     <div class="quick-actions">
-      <button class="secondary" id="themeToggle">Skift til mørkt tema</button>
+      <button class="secondary with-icon" id="themeToggle"><i class="fas fa-moon fa-fw" aria-hidden="true"></i><span>Skift til mørkt tema</span></button>
     </div>
   </div>
 </header>
@@ -1266,6 +1303,26 @@ const tabs = [
   {id:'admin', label:'Administration'},
   {id:'tests', label:'Selvtest'}
 ];
+const tabIcons = {
+  dashboard: 'fas fa-chart-line',
+  case_create: 'fas fa-plus-square',
+  patients: 'fas fa-user-friends',
+  samples: 'fas fa-vials',
+  orders: 'fas fa-file-medical',
+  panels: 'fas fa-flask',
+  variants: 'fas fa-dna',
+  variant_library: 'fas fa-book',
+  conclusion_library: 'fas fa-clipboard',
+  reports: 'fas fa-file-alt',
+  qc: 'fas fa-clipboard-check',
+  responses: 'fas fa-inbox',
+  tools: 'fas fa-toolbox',
+  users: 'fas fa-users-cog',
+  audit: 'fas fa-history',
+  db: 'fas fa-database',
+  admin: 'fas fa-user-shield',
+  tests: 'fas fa-clipboard-list'
+};
 const SAMPLE_TYPES = ['Blod','Kindskrab','Biopsi','Kontrol'];
 const SAMPLE_STATUSES = ['Modtaget','Afventer','QC','Analyse','Tolkning','Rapport','Svaret','Biobank','Annulleret'];
 const schemaFields = {
@@ -2342,7 +2399,17 @@ function applyTheme() {
   const btn = document.getElementById('themeToggle');
   if (btn) {
     const toDark = state.theme !== 'dark';
-    btn.textContent = toDark ? 'Skift til mørkt tema' : 'Skift til lyst tema';
+    const label = btn.querySelector('span');
+    if (label) {
+      label.textContent = toDark ? 'Skift til mørkt tema' : 'Skift til lyst tema';
+    } else {
+      btn.textContent = toDark ? 'Skift til mørkt tema' : 'Skift til lyst tema';
+    }
+    const icon = btn.querySelector('i');
+    if (icon) {
+      icon.className = toDark ? 'fas fa-moon fa-fw' : 'fas fa-sun fa-fw';
+      icon.setAttribute('aria-hidden', 'true');
+    }
     setTooltip(btn, tooltipCatalog.buttons.themeToggle);
   }
 }
@@ -2434,7 +2501,19 @@ function initTabs() {
   main.innerHTML = '';
   tabs.forEach(tab => {
     const btn = document.createElement('button');
-    btn.textContent = tab.label;
+    const iconClass = tabIcons[tab.id];
+    if (iconClass) {
+      btn.classList.add('with-icon');
+      const icon = document.createElement('i');
+      icon.className = iconClass + ' fa-fw';
+      icon.setAttribute('aria-hidden', 'true');
+      btn.appendChild(icon);
+      const span = document.createElement('span');
+      span.textContent = tab.label;
+      btn.appendChild(span);
+    } else {
+      btn.textContent = tab.label;
+    }
     btn.dataset.tab = tab.id;
     setTooltip(btn, tooltipCatalog.tabs[tab.id]);
     btn.addEventListener('click', () => activateTab(tab.id));
@@ -10413,17 +10492,36 @@ function hookUi() {
   const logoImg = document.getElementById('glimrLogo');
   if (logoImg) {
     const brand = logoImg.closest('.brand');
+    const brandMark = brand ? brand.querySelector('.brand-mark') : null;
+    const showBrandMark = (show) => {
+      if (!brandMark) return;
+      brandMark.setAttribute('aria-hidden', show ? 'false' : 'true');
+    };
     const markMissing = () => {
       if (brand) {
         brand.classList.add('logo-missing');
       }
+      showBrandMark(true);
       if (logoImg.parentElement) {
         logoImg.remove();
       }
     };
+    const markLoaded = () => {
+      if (brand) {
+        brand.classList.remove('logo-missing');
+      }
+      showBrandMark(false);
+    };
     logoImg.addEventListener('error', markMissing, { once: true });
-    if (brand && logoImg.complete && logoImg.naturalWidth === 0) {
-      markMissing();
+    logoImg.addEventListener('load', markLoaded);
+    if (logoImg.complete) {
+      if (logoImg.naturalWidth === 0) {
+        markMissing();
+      } else {
+        markLoaded();
+      }
+    } else {
+      markLoaded();
     }
   }
   applyTheme();
