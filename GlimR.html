@@ -2568,12 +2568,17 @@ function computeVariantFrequencyData() {
   const variants = getCached('variants') || [];
   const patients = getCached('patients') || [];
   const countMap = new Map();
+  let maxCount = 0;
   variants.forEach(variant => {
     const key = createVariantComparisonKey(variant);
     if (!key) return;
-    countMap.set(key, (countMap.get(key) || 0) + 1);
+    const updatedCount = (countMap.get(key) || 0) + 1;
+    countMap.set(key, updatedCount);
+    if (updatedCount > maxCount) {
+      maxCount = updatedCount;
+    }
   });
-  return {countMap, patientCount: patients.length};
+  return {countMap, patientCount: patients.length, maxCount};
 }
 
 function formatVariantFrequencyLabel(count, patientCount) {
@@ -7473,7 +7478,11 @@ function renderVariantLibrary(section) {
   const importInput = section.querySelector('#variantLibraryImportInput');
   const defaultSaveLabel = saveButton?.textContent || 'Gem';
   const {updateVariantTypeFields, variantTypeSelect} = setupVariantTypeForm(form);
-  const {countMap: variantFrequencyMap, patientCount: variantFrequencyPatientCount} = computeVariantFrequencyData();
+  const {
+    countMap: variantFrequencyMap,
+    patientCount: variantFrequencyPatientCount,
+    maxCount: variantFrequencyMaxCount
+  } = computeVariantFrequencyData();
   const getVariantFrequencyCount = entry => {
     const key = createVariantComparisonKey(entry);
     if (!key) return 0;
@@ -7485,17 +7494,17 @@ function renderVariantLibrary(section) {
     return formatVariantFrequencyLabel(count, variantFrequencyPatientCount);
   };
   const getVariantFrequencyCategory = entry => {
-    if (!variantFrequencyPatientCount) return 'Ukendt';
+    if (!variantFrequencyMaxCount || variantFrequencyMaxCount <= 1) return 'Ukendt';
     const count = getVariantFrequencyCount(entry);
     if (!count) return 'Ukendt';
-    const ratio = count / variantFrequencyPatientCount;
+    const ratio = count / variantFrequencyMaxCount;
     if (!Number.isFinite(ratio) || ratio <= 0) return 'Ukendt';
-    if (ratio >= 0.05) return 'Polymorf';
-    if (ratio >= 0.01) return 'Hyppig';
-    if (ratio >= 0.005) return 'Mellemfrekvent';
-    if (ratio >= 0.001) return 'Lavfrekvent';
-    if (ratio >= 0.0001) return 'Sjælden';
-    if (ratio >= 0.00001) return 'Meget sjælden';
+    if (ratio >= 0.95) return 'Polymorf';
+    if (ratio >= 0.65) return 'Hyppig';
+    if (ratio >= 0.35) return 'Mellemfrekvent';
+    if (ratio >= 0.2) return 'Lavfrekvent';
+    if (ratio >= 0.1) return 'Sjælden';
+    if (ratio >= 0.05) return 'Meget sjælden';
     return 'Ultra sjælden';
   };
   const csvColumns = [
@@ -7700,9 +7709,18 @@ function renderVariantLibrary(section) {
         ? `${frequencyCount} registrering${frequencyCount === 1 ? '' : 'er'} blandt ${variantFrequencyPatientCount} patient${variantFrequencyPatientCount === 1 ? '' : 'er'}`
         : `${frequencyCount} registrering${frequencyCount === 1 ? '' : 'er'}`;
       const frequencyCategory = getVariantFrequencyCategory(v);
-      const frequencyCategoryTitle = frequencyCategory === 'Ukendt'
-        ? 'Forekomst er ikke tilgængelig.'
-        : `${frequencyCategory} forekomst baseret på ${frequencyLabel}`;
+      const frequencyCategoryTitle = (() => {
+        if (frequencyCategory === 'Ukendt') {
+          if (!variantFrequencyMaxCount || variantFrequencyMaxCount <= 1) {
+            return 'Forekomst kan ikke vurderes før der er flere registreringer i variantbiblioteket.';
+          }
+          return 'Forekomst er ikke tilgængelig.';
+        }
+        const topSuffix = variantFrequencyMaxCount
+          ? ` sammenlignet med topposten på ${variantFrequencyMaxCount} registrering${variantFrequencyMaxCount === 1 ? '' : 'er'}`
+          : '';
+        return `${frequencyCategory} forekomst baseret på ${frequencyLabel}${topSuffix}.`;
+      })();
       return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td>${esc(title)}</td><td>${esc(typeLabel)}</td><td>${esc(genomic)}</td><td>${esc(v.hgvs_c || '')}</td><td>${esc(v.hgvs_p || '')}</td><td>${formatRsIdCell(v.rsid)}</td><td>${esc(v.classification || '')}</td><td title="${esc(frequencyTitle)}">${esc(frequencyLabel)}</td><td title="${esc(frequencyCategoryTitle)}">${esc(frequencyCategory)}</td><td>${esc(v.criteria || '')}</td><td>${esc(v.iscn || '')}</td><td>${esc(v.condition || '')}</td><td>${esc(v.inheritance || '')}</td><td>${esc(v.curated_by || '')}</td><td>${esc(lastReview)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
