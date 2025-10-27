@@ -373,9 +373,26 @@ section[data-tab].active {
 .tool-criteria input[type="checkbox"] {
   margin-top: 0.25rem;
 }
-.tool-criteria span {
+.tool-criteria .criterion-text {
   display: block;
   line-height: 1.35;
+}
+.tool-criteria .criterion-strength-wrapper {
+  display: block;
+  margin-top: 0.4rem;
+}
+.tool-criteria .criterion-strength {
+  width: 100%;
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.35rem 0.4rem;
+  border-radius: 0.45rem;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text);
+}
+.tool-criteria .criterion-strength:disabled {
+  opacity: 0.65;
 }
 .tool-result {
   margin-top: 0.9rem;
@@ -9954,37 +9971,54 @@ function renderQC(section) {
 }
 
 function renderTools(section) {
+  const STRENGTH_DEFINITIONS = {
+    pathogenic: {
+      veryStrong: {label: 'Meget stærk (+8)', summary: 'meget stærk', weight: 8},
+      strong: {label: 'Stærk (+4)', summary: 'stærk', weight: 4},
+      moderate: {label: 'Moderat (+2)', summary: 'moderat', weight: 2},
+      supporting: {label: 'Supporting (+1)', summary: 'supporting', weight: 1}
+    },
+    benign: {
+      standAlone: {label: 'Stand-alone (–8)', summary: 'stand-alone', weight: -8},
+      strong: {label: 'Stærk (–4)', summary: 'stærk', weight: -4},
+      supporting: {label: 'Supporting (–1)', summary: 'supporting', weight: -1}
+    }
+  };
+  const DEFAULT_STRENGTH_ORDER = {
+    pathogenic: ['veryStrong', 'strong', 'moderate', 'supporting'],
+    benign: ['standAlone', 'strong', 'supporting']
+  };
   const pathogenicCriteria = [
-    {code: 'PVS1', label: 'Loss-of-function variant i gen hvor loss-of-function er kendt sygdomsmekanisme.', weight: 8},
-    {code: 'PS1', label: 'Samme aminosyreændring som kendt patogen variant uden ændret nukleotid.', weight: 4},
-    {code: 'PS2', label: 'De novo (bekræftet) hos patient med sund(e) forælder(e).', weight: 4},
-    {code: 'PS3', label: 'Funktionelle studier viser skadelig effekt.', weight: 4},
-    {code: 'PS4', label: 'Signifikant øget forekomst i syge kontra kontroller.', weight: 4},
-    {code: 'PM1', label: 'Hotspot/domæne uden godartede variationer.', weight: 2},
-    {code: 'PM2', label: 'Fraværende eller ekstremt lav frekvens i kontroller.', weight: 2},
-    {code: 'PM3', label: 'Påvist i trans med patogen variant i recessiv sygdom.', weight: 2},
-    {code: 'PM4', label: 'Proteinaltering der påvirker læseramme eller stopper protein.', weight: 2},
-    {code: 'PM5', label: 'Ny missense på samme aminosyre som anden patogen variant.', weight: 2},
-    {code: 'PM6', label: 'De novo (uformelt) uden bekræftede forældre.', weight: 2},
-    {code: 'PP1', label: 'Segregerer med sygdommen i familien.', weight: 1},
-    {code: 'PP2', label: 'Missense i gen hvor missense er hyppig sygdomsmekanisme.', weight: 1},
-    {code: 'PP3', label: 'In silico-støtte for skadelig effekt.', weight: 1},
-    {code: 'PP4', label: 'Fænotype/specifik sygdom i tråd med genet.', weight: 1},
-    {code: 'PP5', label: 'Anført som patogen af velrenommeret kilde.', weight: 1}
+    {code: 'PVS1', label: 'Loss-of-function variant i gen hvor loss-of-function er kendt sygdomsmekanisme.', defaultStrength: 'veryStrong', strengths: ['veryStrong', 'strong', 'moderate', 'supporting'], description: 'Nedgrader ved usikker LoF-effekt (fx initierende exon, alternativ splejsning).'},
+    {code: 'PS1', label: 'Samme aminosyreændring som kendt patogen variant uden ændret nukleotid.', defaultStrength: 'strong', strengths: ['veryStrong', 'strong', 'moderate', 'supporting'], description: 'Overvej styrkejustering når evidens for ækvivalens er begrænset eller stærkere end reference.'},
+    {code: 'PS2', label: 'De novo (bekræftet) hos patient med sund(e) forælder(e).', defaultStrength: 'strong', strengths: ['strong', 'moderate', 'supporting'], description: 'Kræver verifikation af forældres status. Nedgrader ved begrænset test eller phenotypematch.'},
+    {code: 'PS3', label: 'Funktionelle studier viser skadelig effekt.', defaultStrength: 'strong', strengths: ['veryStrong', 'strong', 'moderate', 'supporting'], description: 'Justér efter kvalitet og sygdomsrelevans af den funktionelle evidens.'},
+    {code: 'PS4', label: 'Signifikant øget forekomst i syge kontra kontroller.', defaultStrength: 'strong', strengths: ['veryStrong', 'strong', 'moderate', 'supporting'], description: 'Styrke afhænger af størrelsen på kohorter og statistisk signifikans.'},
+    {code: 'PM1', label: 'Hotspot/domæne uden godartede variationer.', defaultStrength: 'moderate', strengths: ['strong', 'moderate', 'supporting'], description: 'Opjuster ved veletablerede hotspots; nedgrader ved begrænset domænedata.'},
+    {code: 'PM2', label: 'Fraværende eller ekstremt lav frekvens i kontroller.', defaultStrength: 'moderate', strengths: ['moderate', 'supporting'], description: 'Opdater med populationsdatabaser; nedgrader hvis sparsom dækning eller blandede populationer.'},
+    {code: 'PM3', label: 'Påvist i trans med patogen variant i recessiv sygdom.', defaultStrength: 'moderate', strengths: ['strong', 'moderate', 'supporting'], description: 'Opjuster ved flere uafhængige observationer; kræver kendt patogen partner-variant.'},
+    {code: 'PM4', label: 'Proteinaltering der påvirker læseramme eller stopper protein.', defaultStrength: 'moderate', strengths: ['strong', 'moderate', 'supporting'], description: 'Ekskluderer velkarakteriserede LoF-gen undtagelser; overvej nedgradering ved in-frame ændringer.'},
+    {code: 'PM5', label: 'Ny missense på samme aminosyre som anden patogen variant.', defaultStrength: 'moderate', strengths: ['moderate', 'supporting'], description: 'Forudsætter samme sygdomsmekanisme som den kendte variant; nedgrader hvis evidens er svag.'},
+    {code: 'PM6', label: 'De novo (uformelt) uden bekræftede forældre.', defaultStrength: 'moderate', strengths: ['moderate', 'supporting'], description: 'Nedgrader hvis fænotypen er mindre specifik eller forældrestatus er usikker.'},
+    {code: 'PP1', label: 'Segregerer med sygdommen i familien.', defaultStrength: 'supporting', strengths: ['strong', 'moderate', 'supporting'], description: 'Opgrader ved robuste LOD-beregninger; nedgrader ved få informative meioser.'},
+    {code: 'PP2', label: 'Missense i gen hvor missense er hyppig sygdomsmekanisme.', defaultStrength: 'supporting', strengths: ['moderate', 'supporting'], description: 'Kræver lav forekomst af godartede missense-varianter og LoF-dominans fraværende.'},
+    {code: 'PP3', label: 'In silico-støtte for skadelig effekt.', defaultStrength: 'supporting', strengths: ['moderate', 'supporting'], description: 'Vurder konsistens mellem flere algoritmer; undgå brug når modeller er uenige.'},
+    {code: 'PP4', label: 'Fænotype/specifik sygdom i tråd med genet.', defaultStrength: 'supporting', strengths: ['moderate', 'supporting'], description: 'Kræver høj specificitet i fænotypen; opgrader ved veldefinerede syndromer.'},
+    {code: 'PP5', label: 'Anført som patogen af velrenommeret kilde.', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Bruges kun når kilden dokumenterer evidens og er uafhængig.'}
   ];
   const benignCriteria = [
-    {code: 'BA1', label: 'Allelfrekvens >5 % i kontroller (stand-alone).', weight: 8, effect: 'benign'},
-    {code: 'BS1', label: 'Allelfrekvens større end forventet for lidelsen.', weight: 4, effect: 'benign'},
-    {code: 'BS2', label: 'Observeret hos sund homozygot/hemizygot.', weight: 4, effect: 'benign'},
-    {code: 'BS3', label: 'Funktionelle studier viser ingen skadelig effekt.', weight: 4, effect: 'benign'},
-    {code: 'BS4', label: 'Mangel på segregering med sygdommen.', weight: 4, effect: 'benign'},
-    {code: 'BP1', label: 'Missense i gen hvor loss-of-function er dominerende mekanisme.', weight: 1, effect: 'benign'},
-    {code: 'BP2', label: 'Observeret sammen med patogen variant for dominant sygdom.', weight: 1, effect: 'benign'},
-    {code: 'BP3', label: 'In-frame indel i repetitiv region uden kendt funktion.', weight: 1, effect: 'benign'},
-    {code: 'BP4', label: 'In silico understøtter benign effekt.', weight: 1, effect: 'benign'},
-    {code: 'BP5', label: 'Variant forklarer alternativ diagnose.', weight: 1, effect: 'benign'},
-    {code: 'BP6', label: 'Anført som godartet af velrenommeret kilde.', weight: 1, effect: 'benign'},
-    {code: 'BP7', label: 'Synonym variant uden splice-påvirkning.', weight: 1, effect: 'benign'}
+    {code: 'BA1', label: 'Allelfrekvens >5 % i kontroller (stand-alone).', effect: 'benign', defaultStrength: 'standAlone', strengths: ['standAlone', 'strong', 'supporting'], description: 'Kræver tilstrækkelig populationsrepræsentation og passende sygdomsprævalens.'},
+    {code: 'BS1', label: 'Allelfrekvens større end forventet for lidelsen.', effect: 'benign', defaultStrength: 'strong', strengths: ['strong', 'supporting'], description: 'Justér efter penetrans og genetisk heterogenitet.'},
+    {code: 'BS2', label: 'Observeret hos sund homozygot/hemizygot.', effect: 'benign', defaultStrength: 'strong', strengths: ['strong', 'supporting'], description: 'Kræver veldokumenteret fænotype og eksklusion af alder-afhængig debut.'},
+    {code: 'BS3', label: 'Funktionelle studier viser ingen skadelig effekt.', effect: 'benign', defaultStrength: 'strong', strengths: ['strong', 'supporting'], description: 'Vurder assayets robusthed; nedgrader ved begrænset sygdomsrelevans.'},
+    {code: 'BS4', label: 'Mangel på segregering med sygdommen.', effect: 'benign', defaultStrength: 'strong', strengths: ['strong', 'supporting'], description: 'Kræver flere informative familier; nedgrader ved mulige fenokopier.'},
+    {code: 'BP1', label: 'Missense i gen hvor loss-of-function er dominerende mekanisme.', effect: 'benign', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Anvendes når missense sjældent er sygdomsfremkaldende i genet.'},
+    {code: 'BP2', label: 'Observeret sammen med patogen variant for dominant sygdom.', effect: 'benign', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Forudsætter sikre fasedata og veldokumenteret patogen partner.'},
+    {code: 'BP3', label: 'In-frame indel i repetitiv region uden kendt funktion.', effect: 'benign', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Anvendes når indel ikke forventes at påvirke proteinfunktionen.'},
+    {code: 'BP4', label: 'In silico understøtter benign effekt.', effect: 'benign', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Kræver samstemmende modeller for neutral effekt.'},
+    {code: 'BP5', label: 'Variant forklarer alternativ diagnose.', effect: 'benign', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Kræver veldokumenteret alternativ årsag til fænotypen.'},
+    {code: 'BP6', label: 'Anført som godartet af velrenommeret kilde.', effect: 'benign', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Brug kun når kilde dokumenterer bevis for benignitet.'},
+    {code: 'BP7', label: 'Synonym variant uden splice-påvirkning.', effect: 'benign', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Kræver fravær af spliceeffekt i relevante modeller.'}
   ];
   const SNP_REFERENCE_BASELINE = 2.05; // Tidligere arrays (~2,05 i nordeuropæiske kohorter)
   const WGS_TARGET_BASELINE = 1.62;   // WGS-observation: "lige over 1,6" het/hom i nordeuropæiske patienter
@@ -10247,11 +10281,36 @@ function renderTools(section) {
   const makeCriteriaList = list => list.map(item => {
     const code = esc(item.code);
     const label = esc(item.label);
-    const effect = esc(item.effect || 'pathogenic');
+    const effectRaw = item.effect === 'benign' ? 'benign' : 'pathogenic';
+    const effect = esc(effectRaw);
+    const description = item.description ? ` ${item.description}` : '';
+    const tooltip = esc(`${item.code} – ${item.label}${description}`);
+    const allowedStrengths = Array.isArray(item.strengths) && item.strengths.length
+      ? item.strengths
+      : DEFAULT_STRENGTH_ORDER[effectRaw] || [];
+    const validStrengths = allowedStrengths.filter(strength => STRENGTH_DEFINITIONS[effectRaw]?.[strength]);
+    const fallbackStrength = DEFAULT_STRENGTH_ORDER[effectRaw]?.find(strength => STRENGTH_DEFINITIONS[effectRaw]?.[strength]);
+    const defaultStrength = (item.defaultStrength && STRENGTH_DEFINITIONS[effectRaw]?.[item.defaultStrength])
+      ? item.defaultStrength
+      : (validStrengths[0] || fallbackStrength || 'supporting');
+    const options = (validStrengths.length ? validStrengths : [defaultStrength]).map(strength => {
+      const definition = STRENGTH_DEFINITIONS[effectRaw]?.[strength];
+      if (!definition) return '';
+      const optionLabel = esc(definition.label);
+      const selected = strength === defaultStrength ? ' selected' : '';
+      return `<option value="${strength}"${selected}>${optionLabel}</option>`;
+    }).join('');
     return `
-    <label class="tool-criteria" title="${code} – ${label}">
-      <input type="checkbox" value="${code}" data-weight="${item.weight}" data-effect="${effect}">
-      <span><strong>${code}</strong> ${label}</span>
+    <label class="tool-criteria" title="${tooltip}">
+      <input type="checkbox" class="criterion-toggle" value="${code}" data-effect="${effect}">
+      <span>
+        <span class="criterion-text"><strong>${code}</strong> ${label}</span>
+        <span class="criterion-strength-wrapper">
+          <select class="criterion-strength" data-code="${code}" data-effect="${effect}" data-default-strength="${esc(defaultStrength)}" disabled>
+            ${options}
+          </select>
+        </span>
+      </span>
     </label>
   `;
   }).join('');
@@ -10438,23 +10497,42 @@ function renderTools(section) {
 
   const acmgForm = section.querySelector('#acmgTool');
   const acmgResult = section.querySelector('#acmgResult');
-  const acmgCheckboxes = Array.from(acmgForm.querySelectorAll('input[type="checkbox"]'));
+  const acmgToggles = Array.from(acmgForm.querySelectorAll('.criterion-toggle'));
   const acmgReset = section.querySelector('#acmgReset');
   const formatList = list => list.length ? list.join(', ') : 'Ingen';
+  const syncCriterionStrength = toggle => {
+    const container = toggle.closest('.tool-criteria');
+    const select = container?.querySelector('.criterion-strength');
+    if (!select) return;
+    if (toggle.checked) {
+      select.disabled = false;
+    } else {
+      select.disabled = true;
+      const defaultStrength = select.dataset.defaultStrength;
+      if (defaultStrength) {
+        select.value = defaultStrength;
+      }
+    }
+  };
   const updateAcmgResult = () => {
     let score = 0;
     const selectedPath = [];
     const selectedBenign = [];
-    acmgCheckboxes.forEach(cb => {
-      if (!cb.checked) return;
-      const weight = Number(cb.dataset.weight || '0');
-      const effect = cb.dataset.effect === 'benign' ? 'benign' : 'pathogenic';
+    acmgToggles.forEach(toggle => {
+      if (!toggle.checked) return;
+      const effect = toggle.dataset.effect === 'benign' ? 'benign' : 'pathogenic';
+      const container = toggle.closest('.tool-criteria');
+      const select = container?.querySelector('.criterion-strength');
+      const strength = select?.value;
+      const definition = strength ? STRENGTH_DEFINITIONS[effect]?.[strength] : null;
+      const delta = definition ? definition.weight : 0;
+      score += delta;
+      const summaryLabel = definition?.summary;
+      const entry = summaryLabel ? `${toggle.value} (${summaryLabel})` : toggle.value;
       if (effect === 'benign') {
-        score -= weight;
-        selectedBenign.push(cb.value);
+        selectedBenign.push(entry);
       } else {
-        score += weight;
-        selectedPath.push(cb.value);
+        selectedPath.push(entry);
       }
     });
     if (!selectedPath.length && !selectedBenign.length) {
@@ -10472,9 +10550,27 @@ function renderTools(section) {
       `Patogene kriterier: ${formatList(selectedPath)}.<br>` +
       `Benigne kriterier: ${formatList(selectedBenign)}.`;
   };
-  acmgForm.addEventListener('change', updateAcmgResult);
+  acmgToggles.forEach(toggle => {
+    syncCriterionStrength(toggle);
+    toggle.addEventListener('change', () => syncCriterionStrength(toggle));
+  });
+  acmgForm.addEventListener('change', event => {
+    if (event.target.classList.contains('criterion-strength') && event.target.disabled) {
+      return;
+    }
+    updateAcmgResult();
+  });
   acmgReset?.addEventListener('click', () => {
-    acmgCheckboxes.forEach(cb => { cb.checked = false; });
+    acmgToggles.forEach(toggle => {
+      toggle.checked = false;
+      syncCriterionStrength(toggle);
+    });
+    acmgForm.querySelectorAll('.criterion-strength').forEach(select => {
+      const defaultStrength = select.dataset.defaultStrength;
+      if (defaultStrength) {
+        select.value = defaultStrength;
+      }
+    });
     updateAcmgResult();
   });
   updateAcmgResult();
