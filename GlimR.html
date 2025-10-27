@@ -815,6 +815,15 @@ tbody tr[data-selected="true"] {
 [data-theme="dark"] tbody tr[data-selected="true"] {
   background: rgba(56, 189, 248, 0.18);
 }
+tbody tr[data-order-id] {
+  cursor: pointer;
+}
+tbody tr[data-order-id]:hover {
+  background: rgba(24, 111, 175, 0.08);
+}
+[data-theme="dark"] tbody tr[data-order-id]:hover {
+  background: rgba(56, 189, 248, 0.12);
+}
 .urgent-indicator {
   display: inline-flex;
   align-items: center;
@@ -1479,7 +1488,9 @@ const state = {
   theme: storage.getItem('glimr-theme') || 'light',
   testResults: [],
   lastStatus: '',
-  usingMemoryDb: false
+  usingMemoryDb: false,
+  pendingOrderId: null,
+  pendingOrderShowAll: false
 };
 const CREATED_BY_STORES = new Set(['patients','samples','orders','patient_groups','variants','qc','reports','conclusion_library']);
 const ROLE_OPTIONS = [
@@ -3201,6 +3212,14 @@ function activateTab(id) {
   });
   renderTab(id);
 }
+
+function openOrderDetails(orderId, options = {}) {
+  const numericId = Number(orderId);
+  if (!Number.isFinite(numericId)) return;
+  state.pendingOrderId = numericId;
+  state.pendingOrderShowAll = Boolean(options.showAll);
+  activateTab('orders');
+}
 function openDb() {
   return new Promise((resolve, reject) => {
     if (!('indexedDB' in window)) {
@@ -4305,7 +4324,7 @@ function renderDashboard(section) {
       const urgentAttr = o.urgent ? ' data-urgent="true"' : '';
       const sampleDisplay = sample?.pmb_number || sample?.id || o.sample_id || '';
       const rolesDisplay = roleLabels.length ? roleLabels.join(', ') : '—';
-      return `<tr${urgentAttr}><td>${urgentIcon}<span class="order-id">${esc(o.id)}</span></td><td>${esc(rolesDisplay)}</td><td>${esc(getName('patients', o.patient_id))}</td><td>${esc(sampleDisplay)}</td><td>${getName('panels', o.panel_id)}</td><td>${esc(statusDisplay)}</td><td>${esc(collectedAt)}</td></tr>`;
+      return `<tr data-order-id="${esc(o.id)}"${urgentAttr}><td>${urgentIcon}<span class="order-id">${esc(o.id)}</span></td><td>${esc(rolesDisplay)}</td><td>${esc(getName('patients', o.patient_id))}</td><td>${esc(sampleDisplay)}</td><td>${getName('panels', o.panel_id)}</td><td>${esc(statusDisplay)}</td><td>${esc(collectedAt)}</td></tr>`;
     }).join('') || '<tr><td colspan="7">Ingen aktive ordrer</td></tr>';
   }
   const audit = getCached('audit').slice(-5).reverse();
@@ -4317,7 +4336,7 @@ function renderDashboard(section) {
       ? '<span class="urgent-indicator" role="img" aria-label="Haster"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3.172 2.322 20.5h19.356L12 3.172zm1 13.828h-2v2h2v-2zm0-8h-2v6h2v-6z"></path></svg></span>'
       : '';
     const urgentAttr = o.urgent ? ' data-urgent="true"' : '';
-    return `<tr${urgentAttr}><td>${urgentIcon}<span class="order-id">${esc(o.id)}</span></td><td>${esc(getName('patients', o.patient_id))}</td><td>${esc(o.sample_id || '')}</td><td>${getName('panels', o.panel_id)}</td><td>${esc(statusDisplay)}</td><td>${esc(updatedAt)}</td></tr>`;
+    return `<tr data-order-id="${esc(o.id)}"${urgentAttr}><td>${urgentIcon}<span class="order-id">${esc(o.id)}</span></td><td>${esc(getName('patients', o.patient_id))}</td><td>${esc(o.sample_id || '')}</td><td>${getName('panels', o.panel_id)}</td><td>${esc(statusDisplay)}</td><td>${esc(updatedAt)}</td></tr>`;
   }).join('') || '<tr><td colspan="6">Ingen</td></tr>';
   const oldestOrdersHtml = oldestActiveOrders.map(o => {
     const sample = findById('samples', Number(o.sample_id));
@@ -4327,7 +4346,7 @@ function renderDashboard(section) {
       ? '<span class="urgent-indicator" role="img" aria-label="Haster"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3.172 2.322 20.5h19.356L12 3.172zm1 13.828h-2v2h2v-2zm0-8h-2v6h2v-6z"></path></svg></span>'
       : '';
     const urgentAttr = o.urgent ? ' data-urgent="true"' : '';
-    return `<tr${urgentAttr}><td>${urgentIcon}<span class="order-id">${esc(o.id)}</span></td><td>${esc(getName('patients', o.patient_id))}</td><td>${esc(o.sample_id || '')}</td><td>${getName('panels', o.panel_id)}</td><td>${esc(statusDisplay)}</td><td>${esc(updatedAt)}</td></tr>`;
+    return `<tr data-order-id="${esc(o.id)}"${urgentAttr}><td>${urgentIcon}<span class="order-id">${esc(o.id)}</span></td><td>${esc(getName('patients', o.patient_id))}</td><td>${esc(o.sample_id || '')}</td><td>${getName('panels', o.panel_id)}</td><td>${esc(statusDisplay)}</td><td>${esc(updatedAt)}</td></tr>`;
   }).join('') || '<tr><td colspan="6">Ingen aktive ordrer</td></tr>';
   const printableMetrics = metrics.map(item => ({badge: item.badge, value: item.value}));
   const printableStats = statsCards.map(item => ({label: item.label, value: item.value}));
@@ -4399,6 +4418,18 @@ function renderDashboard(section) {
   annotateTableCells(section);
   applyButtonTooltips(section);
   applyControlTooltips(section);
+  if (section._orderClickHandler) {
+    section.removeEventListener('click', section._orderClickHandler);
+  }
+  const handleOrderClick = event => {
+    const row = event.target.closest('tr[data-order-id]');
+    if (!row || !section.contains(row)) return;
+    const orderId = row.dataset.orderId;
+    if (!orderId) return;
+    openOrderDetails(orderId, {showAll: true});
+  };
+  section._orderClickHandler = handleOrderClick;
+  section.addEventListener('click', handleOrderClick);
 }
 
 function openDashboardPrintView(metrics, stats) {
@@ -6309,8 +6340,13 @@ function renderOrders(section) {
   });
   let filteredOrders = list.slice();
   let activeFilters = {};
-  let selectedOrderId = null;
+  let selectedOrderId = state.pendingOrderId != null ? Number(state.pendingOrderId) : null;
+  if (!Number.isFinite(selectedOrderId)) selectedOrderId = null;
   let showActiveOnly = activeToggle ? activeToggle.checked : false;
+  if (selectedOrderId != null && state.pendingOrderShowAll && activeToggle) {
+    showActiveOnly = false;
+    activeToggle.checked = false;
+  }
   const renderRows = () => {
     const term = (search?.value || '').trim().toLowerCase();
     const filters = {
@@ -6441,6 +6477,19 @@ function renderOrders(section) {
     annotateTableCells(section);
   };
   renderRows();
+  if (selectedOrderId != null) {
+    const pendingOrder = list.find(o => o.id === selectedOrderId);
+    if (pendingOrder) {
+      fillForm(form, pendingOrder);
+      syncStatusFromSample(pendingOrder.sample_id);
+      const pendingRow = tbody?.querySelector(`tr[data-id="${pendingOrder.id}"]`);
+      if (pendingRow) {
+        pendingRow.scrollIntoView({block: 'nearest'});
+      }
+    }
+  }
+  state.pendingOrderId = null;
+  state.pendingOrderShowAll = false;
   activeToggle?.addEventListener('change', () => {
     showActiveOnly = activeToggle.checked;
     renderRows();
