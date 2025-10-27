@@ -1799,7 +1799,7 @@ const DEFAULT_PATIENT_GROUPS = [
 const schemaFields = {
   patients: ['id','mrn','extra_id','family_number','name','gender','birth_date','notes','created_by','created_at','updated_at'],
   samples: ['id','pmb_number','patient_id','sample_type','collected_at','status','notes','created_by','created_at','updated_at'],
-  panels: ['id','name','description','created_at','updated_at'],
+  panels: ['id','name','description','version','created_at','updated_at'],
   orders: ['id','patient_id','sample_id','panel_id','analysis_responsible_id','interpreter_id','approver_id','clinician','indication','patient_group_id','hpo_terms','status','urgent','ordered_at','created_by','created_at','updated_at'],
   patient_groups: ['id','name','created_by','created_at','updated_at'],
   variants: ['id','order_id','variant_type','gene','transcript','hgvs_c','hgvs_p','rsid','zygosity','classification','criteria','af','annotations','interpretation','genome_build','chromosome','start','end','copy_number','sv_subtype','size_bp','iscn','description','affected_genes','created_by','created_at','updated_at'],
@@ -1856,6 +1856,7 @@ const tooltipCatalog = {
     'Prøve': 'Prøve-ID eller beskrivelse.',
     'Prøvetype': 'Type af biologisk materiale.',
     'Panel': 'Navn på det analyserede panel.',
+    'Version': 'Versionsnummer for panelet. Øges automatisk ved ændringer men kan justeres manuelt.',
     'Analyseansvarlig': 'Bruger der har det overordnede ansvar for analysen.',
     'Tolker': 'Bruger der tolker de genetiske fund.',
     'Godkender': 'Bruger der godkender ordinationen eller rapporten.',
@@ -6015,8 +6016,8 @@ function renderPanels(section) {
     <div class="flex">
       <div>
         <label for="panelSearch">Søg</label>
-        <input id="panelSearch" type="search" placeholder="Navn...">
-        <table><thead><tr><th>ID</th><th>Navn</th><th>Beskrivelse</th></tr></thead><tbody></tbody></table>
+        <input id="panelSearch" type="search" placeholder="Navn, version eller dato...">
+        <table><thead><tr><th>ID</th><th>Navn</th><th>Version</th><th>Oprettet</th><th>Opdateret</th><th>Beskrivelse</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
           <button type="button" class="secondary" id="panelsExport">Eksportér filtrerede paneler</button>
         </div>
@@ -6026,7 +6027,12 @@ function renderPanels(section) {
         <form id="panelForm">
           <input type="hidden" name="id">
           <label>Navn<input name="name" required></label>
+          <label>Version<input name="version" type="number" min="1" step="1" inputmode="numeric"></label>
           <label>Beskrivelse<textarea name="description"></textarea></label>
+          <div class="form-meta">
+            <p class="form-hint">Oprettet: <span data-panel-created>–</span></p>
+            <p class="form-hint">Senest ændret: <span data-panel-updated>–</span></p>
+          </div>
           <div class="btn-row">
             <button class="primary" type="submit">Gem</button>
             <button class="secondary" type="button" id="panelClear">Ny</button>
@@ -6040,23 +6046,76 @@ function renderPanels(section) {
   const search = section.querySelector('#panelSearch');
   const form = section.querySelector('#panelForm');
   const exportButton = section.querySelector('#panelsExport');
+  const versionInput = form?.elements?.version || null;
+  const createdMeta = section.querySelector('[data-panel-created]');
+  const updatedMeta = section.querySelector('[data-panel-updated]');
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
   applyControlTooltips(section);
   applyFormTooltips(form);
   applySelectFilters(section);
+  const normaliseVersionNumber = value => {
+    if (value == null) return null;
+    const numeric = Number.parseInt(String(value).trim(), 10);
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+  };
+  const formatPanelDate = value => formatDanishDate(value, true) || '';
+  const displayPanelDate = value => {
+    const formatted = formatPanelDate(value);
+    return formatted || '–';
+  };
+  const setVersionTouched = touched => {
+    if (!form) return;
+    form.dataset.versionTouched = touched ? 'true' : 'false';
+  };
+  const isVersionTouched = () => form?.dataset?.versionTouched === 'true';
+  const updatePanelMetaDisplay = panel => {
+    if (createdMeta) createdMeta.textContent = panel ? displayPanelDate(panel.created_at) : '–';
+    if (updatedMeta) updatedMeta.textContent = panel ? displayPanelDate(panel.updated_at) : '–';
+  };
+  const prepareFormForPanel = panel => {
+    const baseVersion = normaliseVersionNumber(panel?.version);
+    setVersionTouched(false);
+    if (versionInput) {
+      versionInput.value = baseVersion ?? 1;
+    }
+    updatePanelMetaDisplay(panel || null);
+  };
+  const resetPanelFormState = () => {
+    setVersionTouched(false);
+    if (versionInput) {
+      versionInput.value = 1;
+    }
+    updatePanelMetaDisplay(null);
+  };
+  resetPanelFormState();
+  versionInput?.addEventListener('input', () => setVersionTouched(true));
   let selectedPanelId = null;
   let filteredPanels = list.slice();
   const renderRows = () => {
     const term = search.value.trim().toLowerCase();
-    filteredPanels = list.filter(p => !term || (p.name || '').toLowerCase().includes(term));
+    filteredPanels = list.filter(p => {
+      if (!term) return true;
+      const values = [
+        p.name,
+        p.description,
+        normaliseVersionNumber(p.version)?.toString() || '',
+        formatPanelDate(p.created_at),
+        formatPanelDate(p.updated_at)
+      ];
+      return values.some(value => (value || '').toString().toLowerCase().includes(term));
+    });
     if (selectedPanelId != null && !filteredPanels.some(p => p.id === selectedPanelId)) {
       selectedPanelId = null;
     }
     tbody.innerHTML = filteredPanels.map(p => {
       const selectedAttr = p.id === selectedPanelId ? ' data-selected="true"' : '';
-      return `<tr data-id="${p.id}"${selectedAttr}><td>${p.id}</td><td>${esc(p.name)}</td><td>${esc(p.description||'')}</td></tr>`;
+      const versionValue = normaliseVersionNumber(p.version);
+      const versionDisplay = versionValue != null ? esc(versionValue) : '–';
+      const createdDisplay = esc(displayPanelDate(p.created_at));
+      const updatedDisplay = esc(displayPanelDate(p.updated_at));
+      return `<tr data-id="${p.id}"${selectedAttr}><td>${p.id}</td><td>${esc(p.name)}</td><td>${versionDisplay}</td><td>${createdDisplay}</td><td>${updatedDisplay}</td><td>${esc(p.description||'')}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -6070,7 +6129,15 @@ function renderPanels(section) {
     const lines = filteredPanels.map(p => {
       const name = (p.name ?? '').toString().trim() || '(uden navn)';
       const desc = (p.description ?? '').toString().replace(/\r?\n|\r/g, ' ').trim();
-      return `${name}: ${desc}`;
+      const versionValue = normaliseVersionNumber(p.version);
+      const versionSuffix = versionValue != null ? ` v${versionValue}` : '';
+      const created = formatPanelDate(p.created_at);
+      const updated = formatPanelDate(p.updated_at);
+      const metadataParts = [];
+      if (created) metadataParts.push(`oprettet ${created}`);
+      if (updated) metadataParts.push(`ændret ${updated}`);
+      const metadata = metadataParts.length ? ` (${metadataParts.join(', ')})` : '';
+      return `${name}${versionSuffix}${metadata}${desc ? `: ${desc}` : ''}`;
     });
     const text = lines.join('\r\n');
     const filename = downloadTextFile(text, 'glimr-paneler.txt');
@@ -6083,21 +6150,47 @@ function renderPanels(section) {
     if (!panel) return;
     selectedPanelId = panel.id;
     fillForm(form, panel);
+    prepareFormForPanel(panel);
     renderRows();
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
     if (!ensureWrite('panels')) return;
-    const data = Object.fromEntries(new FormData(form).entries());
-    if (data.id) {
-      const id = Number(data.id);
-      const before = {...findById('panels', id)};
-      const updated = {...before, ...data, id};
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+    const hasId = Boolean(data.id);
+    const id = hasId ? Number(data.id) : null;
+    const existingRecord = hasId && Number.isFinite(id) ? findById('panels', id) : null;
+    const existing = existingRecord ? {...existingRecord} : null;
+    if (hasId && (!Number.isFinite(id) || !existing)) {
+      alert('Panelet blev ikke fundet.');
+      return;
+    }
+    const existingVersion = existing ? normaliseVersionNumber(existing.version) : null;
+    let versionNumber = normaliseVersionNumber(formData.get('version'));
+    if (hasId) {
+      if (!isVersionTouched()) {
+        versionNumber = (existingVersion ?? 0) + 1;
+      } else if (versionNumber == null) {
+        versionNumber = existingVersion ?? 1;
+      }
+    } else if (!isVersionTouched() || versionNumber == null) {
+      versionNumber = 1;
+    }
+    const payload = {...data, version: versionNumber};
+    if (hasId) {
+      payload.id = id;
+      const before = existing || {};
+      const updated = {...before, ...payload, id};
       await updateRecord('panels', updated, before);
     } else {
-      delete data.id;
-      await addRecord('panels', data);
+      delete payload.id;
+      await addRecord('panels', payload);
     }
+    if (versionInput) {
+      versionInput.value = versionNumber;
+    }
+    setVersionTouched(false);
     await loadStore('panels');
     renderTab('panels');
   });
@@ -6113,6 +6206,7 @@ function renderPanels(section) {
   form.addEventListener('reset', () => {
     clearFormIdentifier(form);
     selectedPanelId = null;
+    resetPanelFormState();
     renderRows();
   });
   section.querySelector('#panelClear').addEventListener('click', () => form.reset());
