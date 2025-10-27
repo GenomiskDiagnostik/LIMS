@@ -3847,6 +3847,16 @@ function renderDashboard(section) {
   }, {received: 0, qc: 0, analysis: 0, interpretation: 0, report: 0, biobank: 0});
   const activeCount = statusCounts.qc + statusCounts.analysis + statusCounts.interpretation + statusCounts.report;
   const recentOrders = orders.slice().sort((a,b)=> (b.updated_at||'').localeCompare(a.updated_at||'' )).slice(0,5);
+  const inactiveSampleStatuses = new Set(['svaret','biobank','annulleret']);
+  const activeOrders = orders.filter(order => {
+    const sample = findById('samples', Number(order.sample_id));
+    const status = (sample?.status || order.status || '').toLowerCase();
+    return !inactiveSampleStatuses.has(status);
+  });
+  const oldestActiveOrders = activeOrders
+    .slice()
+    .sort((a, b) => (a.updated_at || '').localeCompare(b.updated_at || ''))
+    .slice(0, 5);
   const audit = getCached('audit').slice(-5).reverse();
   const recentOrdersHtml = recentOrders.map(o => {
     const sample = findById('samples', Number(o.sample_id));
@@ -3854,6 +3864,12 @@ function renderDashboard(section) {
     const updatedAt = formatDanishDate(o.updated_at);
     return `<tr><td>${o.id}</td><td>${esc(getName('patients', o.patient_id))}</td><td>${esc(o.sample_id || '')}</td><td>${getName('panels', o.panel_id)}</td><td>${esc(statusDisplay)}</td><td>${esc(updatedAt)}</td></tr>`;
   }).join('') || '<tr><td colspan="6">Ingen</td></tr>';
+  const oldestOrdersHtml = oldestActiveOrders.map(o => {
+    const sample = findById('samples', Number(o.sample_id));
+    const statusDisplay = sample?.status || o.status || '';
+    const updatedAt = formatDanishDate(o.updated_at);
+    return `<tr><td>${o.id}</td><td>${esc(getName('patients', o.patient_id))}</td><td>${esc(o.sample_id || '')}</td><td>${getName('panels', o.panel_id)}</td><td>${esc(statusDisplay)}</td><td>${esc(updatedAt)}</td></tr>`;
+  }).join('') || '<tr><td colspan="6">Ingen aktive ordrer</td></tr>';
   section.innerHTML = `
   <div class="panel">
     <h2>KPI'er</h2>
@@ -3876,6 +3892,15 @@ function renderDashboard(section) {
       <thead><tr><th>ID</th><th>Patient</th><th>Prøve</th><th>Panel</th><th>Status</th><th>Opdateret</th></tr></thead>
       <tbody>
         ${recentOrdersHtml}
+      </tbody>
+    </table>
+  </div>
+  <div class="panel">
+    <h2>Ældste aktive ordrer</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Patient</th><th>Prøve</th><th>Panel</th><th>Status</th><th>Opdateret</th></tr></thead>
+      <tbody>
+        ${oldestOrdersHtml}
       </tbody>
     </table>
   </div>
