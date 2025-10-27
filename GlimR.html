@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <title>GlimR – Genetic LIMS Reporter</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-dymDYb4C2m3XaGNsq4CPrlG/pXHiY/VKwxLBzj2YkdE+5EYXPL3ZX31lrT7xYuFeoDyAJRDig0lzVEHF7bW3+A==" crossorigin="anonymous" referrerpolicy="no-referrer">
 <style>
 :root {
   font-family: "Segoe UI", Arial, sans-serif;
@@ -788,6 +787,52 @@ tbody tr[data-selected="true"] {
 }
 [data-theme="dark"] tbody tr[data-selected="true"] {
   background: rgba(56, 189, 248, 0.18);
+}
+.urgent-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--danger);
+  margin-right: 0.35rem;
+}
+.urgent-indicator svg {
+  width: 0.95em;
+  height: 0.95em;
+}
+.inline-field-group {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.inline-field-group > label {
+  flex: 1 1 220px;
+  margin-top: 0.4rem;
+}
+.inline-field-group > .checkbox-field {
+  flex: 0 0 auto;
+  margin-top: 0.4rem;
+}
+.order-id {
+  display: inline-block;
+}
+.table-meta {
+  display: inline-block;
+  margin-left: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--muted-text);
+}
+label.checkbox-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted-text);
+  margin-top: 0.6rem;
+}
+label.checkbox-field input[type="checkbox"] {
+  transform: scale(1.05);
 }
 td.truncate-cell {
   vertical-align: top;
@@ -1694,7 +1739,7 @@ const schemaFields = {
   patients: ['id','mrn','extra_id','family_number','name','gender','birth_date','notes','created_by','created_at','updated_at'],
   samples: ['id','pmb_number','patient_id','sample_type','collected_at','status','notes','created_by','created_at','updated_at'],
   panels: ['id','name','description','created_at','updated_at'],
-  orders: ['id','patient_id','sample_id','panel_id','analysis_responsible_id','interpreter_id','approver_id','clinician','indication','patient_group_id','hpo_terms','status','ordered_at','created_by','created_at','updated_at'],
+  orders: ['id','patient_id','sample_id','panel_id','analysis_responsible_id','interpreter_id','approver_id','clinician','indication','patient_group_id','hpo_terms','status','urgent','ordered_at','created_by','created_at','updated_at'],
   patient_groups: ['id','name','created_by','created_at','updated_at'],
   variants: ['id','order_id','variant_type','gene','transcript','hgvs_c','hgvs_p','rsid','zygosity','classification','criteria','af','annotations','interpretation','genome_build','chromosome','start','end','copy_number','sv_subtype','size_bp','iscn','description','affected_genes','created_by','created_at','updated_at'],
   qc: ['id','sample_id','metric','value','unit','notes','created_by','created_at','updated_at'],
@@ -1837,6 +1882,7 @@ const tooltipCatalog = {
       patient_group_id: 'Valgfrit – klassificér ordinationen efter patientgruppe.',
       hpo_terms: 'Valgfri liste over relevante HPO-termer (én per linje eller separeret af semikolon).',
       status: 'Ordinationens arbejdsgangstatus.',
+      urgent: 'Markér ordinationen som haster – vises med advarselstrekant i oversigten.',
       ordered_at: 'Tidspunkt for oprettelse af ordinationen.'
     },
     variantForm: {
@@ -1931,6 +1977,7 @@ const tooltipCatalog = {
       order_approver: 'Vælg den bruger der godkender ordinationen.',
       order_clinician: 'Rekvirerende kliniker eller afdeling.',
       order_indication: 'Klinisk indikation eller henvisningsårsag for ordinationen.',
+      order_urgent: 'Markér ordinationen som haster – vises med advarselstrekant i oversigten.',
       order_patient_group: 'Valgfrit – vælg patientgruppe for ordinationen.',
       order_hpo_terms: 'Valgfri liste over HPO-termer (én per linje eller separeret af semikolon).',
       order_ordered_at: 'Tidspunkt hvor ordinationen registreres.'
@@ -4011,13 +4058,21 @@ function renderDashboard(section) {
     const sample = findById('samples', Number(o.sample_id));
     const statusDisplay = sample?.status || o.status || '';
     const updatedAt = formatDanishDate(o.updated_at);
-    return `<tr><td>${o.id}</td><td>${esc(getName('patients', o.patient_id))}</td><td>${esc(o.sample_id || '')}</td><td>${getName('panels', o.panel_id)}</td><td>${esc(statusDisplay)}</td><td>${esc(updatedAt)}</td></tr>`;
+    const urgentIcon = o.urgent
+      ? '<span class="urgent-indicator" role="img" aria-label="Haster"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3.172 2.322 20.5h19.356L12 3.172zm1 13.828h-2v2h2v-2zm0-8h-2v6h2v-6z"></path></svg></span>'
+      : '';
+    const urgentAttr = o.urgent ? ' data-urgent="true"' : '';
+    return `<tr${urgentAttr}><td>${urgentIcon}<span class="order-id">${esc(o.id)}</span></td><td>${esc(getName('patients', o.patient_id))}</td><td>${esc(o.sample_id || '')}</td><td>${getName('panels', o.panel_id)}</td><td>${esc(statusDisplay)}</td><td>${esc(updatedAt)}</td></tr>`;
   }).join('') || '<tr><td colspan="6">Ingen</td></tr>';
   const oldestOrdersHtml = oldestActiveOrders.map(o => {
     const sample = findById('samples', Number(o.sample_id));
     const statusDisplay = sample?.status || o.status || '';
     const updatedAt = formatDanishDate(o.updated_at);
-    return `<tr><td>${o.id}</td><td>${esc(getName('patients', o.patient_id))}</td><td>${esc(o.sample_id || '')}</td><td>${getName('panels', o.panel_id)}</td><td>${esc(statusDisplay)}</td><td>${esc(updatedAt)}</td></tr>`;
+    const urgentIcon = o.urgent
+      ? '<span class="urgent-indicator" role="img" aria-label="Haster"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3.172 2.322 20.5h19.356L12 3.172zm1 13.828h-2v2h2v-2zm0-8h-2v6h2v-6z"></path></svg></span>'
+      : '';
+    const urgentAttr = o.urgent ? ' data-urgent="true"' : '';
+    return `<tr${urgentAttr}><td>${urgentIcon}<span class="order-id">${esc(o.id)}</span></td><td>${esc(getName('patients', o.patient_id))}</td><td>${esc(o.sample_id || '')}</td><td>${getName('panels', o.panel_id)}</td><td>${esc(statusDisplay)}</td><td>${esc(updatedAt)}</td></tr>`;
   }).join('') || '<tr><td colspan="6">Ingen aktive ordrer</td></tr>';
   section.innerHTML = `
   <div class="panel">
@@ -4236,6 +4291,7 @@ function renderCreateCase(section) {
           </div>
           <label>Indikation<textarea name="order_indication" rows="3" placeholder="Beskriv klinisk indikation"></textarea></label>
           <label>HPO-termer<textarea name="order_hpo_terms" class="small" placeholder="HP:0001250; HP:0004321"></textarea></label>
+          <label class="toggle"><input type="checkbox" name="order_urgent"> Markér ordinationen som haster</label>
           <div class="inline-group">
             <label class="inline">Godkender
               <div class="filterable-select">
@@ -4712,6 +4768,7 @@ function renderCreateCase(section) {
       patient_group_id: form.elements.order_patient_group.value ? Number(form.elements.order_patient_group.value) : null,
       hpo_terms: orderHpoTerms,
       status: sample.status,
+      urgent: form.elements.order_urgent.checked,
       ordered_at: orderedAt
     };
     const qcEntries = [];
@@ -5813,12 +5870,15 @@ function renderOrders(section) {
             <label>Rekvirent<input name="clinician"></label>
             <label>Indikation<textarea name="indication" rows="3" placeholder="Beskriv klinisk indikation"></textarea></label>
           <label>HPO-termer<textarea name="hpo_terms" class="small" placeholder="HP:0001250; HP:0004321"></textarea></label>
-          <label>Status
-            <select name="status" required data-allow-legacy-option>
-              <option value="" selected>Vælg status</option>
-              ${SAMPLE_STATUSES.map(status => `<option value="${status}">${status}</option>`).join('')}
-            </select>
-          </label>
+          <div class="inline-field-group">
+            <label>Status
+              <select name="status" required data-allow-legacy-option>
+                <option value="" selected>Vælg status</option>
+                ${SAMPLE_STATUSES.map(status => `<option value="${status}">${status}</option>`).join('')}
+              </select>
+            </label>
+            <label class="checkbox-field"><input type="checkbox" name="urgent"> Markér ordinationen som haster</label>
+          </div>
           <label>Bestillingstidspunkt<input type="datetime-local" name="ordered_at"></label>
           <div class="btn-row">
             <button class="primary" type="submit">Gem</button>
@@ -5945,7 +6005,8 @@ function renderOrders(section) {
         creator,
         indicationText,
         hpoText,
-        patientGroupName
+        patientGroupName,
+        o.urgent ? 'haster' : ''
       ].some(v => (v ?? '').toString().toLowerCase().includes(term));
     }).filter(o => {
       const patient = patientMap.get(Number(o.patient_id));
@@ -5988,6 +6049,10 @@ function renderOrders(section) {
       const statusDisplay = sample?.status || o.status || '';
       const createdBy = determineCreatedBy('orders', o);
       const orderedAt = formatDanishDate(o.ordered_at);
+      const orderedMeta = formatDaysSince(o.ordered_at);
+      const orderedCell = orderedAt
+        ? `${esc(orderedAt)}${orderedMeta ? ` <span class="table-meta">(${esc(orderedMeta)})</span>` : ''}`
+        : '';
       const indicationFull = formatIndicationForList(o.indication);
       const indicationDisplay = truncateForListDisplay(indicationFull, 160);
       const indicationAttr = indicationFull ? ` class="truncate-cell" data-full-text="${esc(indicationFull)}"` : ' class="truncate-cell"';
@@ -6001,7 +6066,11 @@ function renderOrders(section) {
       const hpoAttr = hpoFull ? ` class="truncate-cell" data-full-text="${esc(hpoFull)}"` : ' class="truncate-cell"';
       const hpoCell = hpoDisplay ? `<span class="truncate-text truncate-text--narrow">${esc(hpoDisplay)}</span>` : '';
       const selectedAttr = o.id === selectedOrderId ? ' data-selected="true"' : '';
-      return `<tr data-id="${o.id}"${selectedAttr}><td>${o.id}</td><td>${esc(getName('patients', Number(o.patient_id)))}</td><td>${esc(getName('samples', Number(o.sample_id)))}</td><td>${esc(getName('panels', Number(o.panel_id)))}</td><td>${esc(userName(o.analysis_responsible_id))}</td><td>${esc(userName(o.interpreter_id))}</td><td>${esc(userName(o.approver_id))}</td><td${patientGroupAttr}>${patientGroupCell}</td><td${indicationAttr}>${indicationCell}</td><td${hpoAttr}>${hpoCell}</td><td>${esc(statusDisplay)}</td><td>${esc(createdBy)}</td><td>${esc(orderedAt)}</td></tr>`;
+      const urgentAttr = o.urgent ? ' data-urgent="true"' : '';
+      const urgentIcon = o.urgent
+        ? '<span class="urgent-indicator" role="img" aria-label="Haster"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3.172 2.322 20.5h19.356L12 3.172zm1 13.828h-2v2h2v-2zm0-8h-2v6h2v-6z"></path></svg></span>'
+        : '';
+      return `<tr data-id="${o.id}"${selectedAttr}${urgentAttr}><td>${urgentIcon}<span class="order-id">${esc(o.id)}</span></td><td>${esc(getName('patients', Number(o.patient_id)))}</td><td>${esc(getName('samples', Number(o.sample_id)))}</td><td>${esc(getName('panels', Number(o.panel_id)))}</td><td>${esc(userName(o.analysis_responsible_id))}</td><td>${esc(userName(o.interpreter_id))}</td><td>${esc(userName(o.approver_id))}</td><td${patientGroupAttr}>${patientGroupCell}</td><td${indicationAttr}>${indicationCell}</td><td${hpoAttr}>${hpoCell}</td><td>${esc(statusDisplay)}</td><td>${esc(createdBy)}</td><td>${orderedCell}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -6028,6 +6097,7 @@ function renderOrders(section) {
       const sample = sampleMap.get(Number(row.sample_id));
       return sample?.status || row.status || '';
     }},
+    {key:'urgent', label:'Haster', value: row => row.urgent ? 'Ja' : 'Nej'},
     {key:'analysis_responsible_id', label:'Analyseansvarlig-ID'},
     {key:'analysis_responsible', label:'Analyseansvarlig', value: row => resolveUserName(row.analysis_responsible_id)},
     {key:'interpreter_id', label:'Tolker-ID'},
@@ -6068,6 +6138,7 @@ function renderOrders(section) {
     e.preventDefault();
     if (!ensureWrite('orders')) return;
     const data = Object.fromEntries(new FormData(form).entries());
+    data.urgent = form.elements.urgent?.checked || false;
     data.patient_id = Number(data.patient_id);
     data.sample_id = Number(data.sample_id);
     data.panel_id = data.panel_id ? Number(data.panel_id) : null;
@@ -8861,6 +8932,18 @@ function parseDateTimeValue(value) {
   return null;
 }
 
+function formatDaysSince(value, referenceValue = new Date()) {
+  const baseDate = parseDateTimeValue(value);
+  const referenceDate = parseDateTimeValue(referenceValue) || new Date();
+  if (!baseDate || !referenceDate) return '';
+  const diffMs = referenceDate.getTime() - baseDate.getTime();
+  if (!Number.isFinite(diffMs) || diffMs < 0) return '';
+  const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+  if (diffDays === 0) return '0 dage siden';
+  if (diffDays === 1) return '1 dag siden';
+  return `${diffDays} dage siden`;
+}
+
 function calculatePercentile(values, percentile) {
   if (!Array.isArray(values) || !values.length) return null;
   const sorted = values.slice().sort((a, b) => a - b);
@@ -11054,7 +11137,7 @@ async function runTests() {
     const patient = findById('patients', patientId);
     results.push(['Oprettelse/udlæsning patient', patient?.name === 'Testpatient', `Navn: ${patient?.name}`]);
     const sampleId = await addRecord('samples', {patient_id:patientId, pmb_number:`PMB-SELFTST-${Date.now()}`, sample_type:'Blod', status:'Modtaget', collected_at:new Date().toISOString(), notes:''});
-    const orderId = await addRecord('orders', {patient_id:patientId, sample_id:sampleId, panel_id:null, clinician:'Testperson', status:'Analyse', ordered_at:new Date().toISOString()});
+    const orderId = await addRecord('orders', {patient_id:patientId, sample_id:sampleId, panel_id:null, clinician:'Testperson', status:'Analyse', urgent:false, ordered_at:new Date().toISOString()});
     await addRecord('variants', {
       order_id: orderId,
       gene: 'BRCA1',
@@ -11262,6 +11345,7 @@ CREATE TABLE IF NOT EXISTS \`samples\` (
     \`patient_group_id\` INT NULL,
     \`clinician\` VARCHAR(255),
     \`status\` VARCHAR(64),
+    \`urgent\` TINYINT(1) DEFAULT 0,
     \`ordered_at\` DATETIME,
     \`created_by\` VARCHAR(255),
     \`created_at\` DATETIME,
@@ -11423,8 +11507,8 @@ async function loadDemoData() {
     const s1 = await addRecord('samples', {patient_id:p1, pmb_number:'PMB-0001', sample_type:'Blod', status:'QC', collected_at:new Date().toISOString(), notes:''});
     const s2 = await addRecord('samples', {patient_id:p2, pmb_number:'PMB-0002', sample_type:'Kindskrab', status:'Analyse', collected_at:new Date().toISOString(), notes:''});
     const panel = await addRecord('panels', {name:'Onko-panel', description:'50 gener'});
-    const o1 = await addRecord('orders', {patient_id:p1, sample_id:s1, panel_id:panel, analysis_responsible_id:null, interpreter_id:null, approver_id:null, clinician:'Dr. Holm', indication:'Mistanke om arvelig brystkræft', patient_group_id:firstGroupId, hpo_terms:normalizeHpoTerms('HP:0003002; HP:0006770'), status:'Analyse', ordered_at:new Date().toISOString()});
-    const o2 = await addRecord('orders', {patient_id:p2, sample_id:s2, panel_id:panel, analysis_responsible_id:null, interpreter_id:null, approver_id:null, clinician:'Dr. Holm', indication:'Kolorektal cancer – postoperativ opfølgning', patient_group_id:secondGroupId, hpo_terms:normalizeHpoTerms('HP:0100242'), status:'Rapport', ordered_at:new Date().toISOString()});
+    const o1 = await addRecord('orders', {patient_id:p1, sample_id:s1, panel_id:panel, analysis_responsible_id:null, interpreter_id:null, approver_id:null, clinician:'Dr. Holm', indication:'Mistanke om arvelig brystkræft', patient_group_id:firstGroupId, hpo_terms:normalizeHpoTerms('HP:0003002; HP:0006770'), status:'Analyse', urgent:false, ordered_at:new Date().toISOString()});
+    const o2 = await addRecord('orders', {patient_id:p2, sample_id:s2, panel_id:panel, analysis_responsible_id:null, interpreter_id:null, approver_id:null, clinician:'Dr. Holm', indication:'Kolorektal cancer – postoperativ opfølgning', patient_group_id:secondGroupId, hpo_terms:normalizeHpoTerms('HP:0100242'), status:'Rapport', urgent:false, ordered_at:new Date().toISOString()});
     await addRecord('variants', {order_id:o1, gene:'BRCA1', transcript:'NM_007294.3', hgvs_c:'c.5266dupC', hgvs_p:'p.Gln1756Profs', zygosity:'heterozygot', classification:'5', criteria:'PVS1,PS3,PM2,PP3', af:0.0001, interpretation:'Patogen variant med høj risiko'});
     await addRecord('qc', {sample_id:s1, metric:'Dækning', value:98.5, unit:'%', notes:''});
     await addRecord('reports', {order_id:o2, variant_ids:'[]', variant_details:[], summary:'Negativ rapport', status:'final', issued_at:new Date().toISOString()});
