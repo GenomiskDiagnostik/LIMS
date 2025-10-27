@@ -8892,6 +8892,32 @@ function measurePdfTextWidth(text, fontSize) {
   return ctx.measureText(String(text || '')).width * (72 / 96);
 }
 
+function pdfValueIsBlank(value) {
+  if (value === null || value === undefined) return true;
+  if (typeof value === 'number') return false;
+  if (typeof value === 'boolean') return false;
+  if (value instanceof Date) return Number.isNaN(value.getTime());
+  if (Array.isArray(value)) return value.length === 0;
+  const text = collapseSpaces(value);
+  return text === '';
+}
+
+function shouldRenderPdfRow(row) {
+  if (!row || row.renderWhenEmpty) return true;
+  switch (row.type) {
+    case 'kv':
+      return !pdfValueIsBlank(row.value);
+    case 'paragraph':
+      return !pdfValueIsBlank(row.value);
+    case 'text':
+      return collapseSpaces(row.text) !== '';
+    case 'list':
+      return Array.isArray(row.items) && row.items.some(item => collapseSpaces(item) !== '');
+    default:
+      return true;
+  }
+}
+
 function buildSectionLayout(heading, rows, width) {
   const contentWidth = Math.max(10, width - PDF_SECTION_CARD_PADDING_X * 2);
   const layout = {
@@ -8901,15 +8927,18 @@ function buildSectionLayout(heading, rows, width) {
     blocks: [],
     height: PDF_SECTION_CARD_PADDING_TOP + PDF_HEADING_TEXT_OFFSET + PDF_HEADING_LEADING + PDF_HEADING_GAP + PDF_SECTION_CARD_PADDING_BOTTOM + PDF_SECTION_SPACING
   };
-  rows.forEach((row, index) => {
+  const sourceRows = Array.isArray(rows) ? rows : [];
+  const renderRows = sourceRows.filter(shouldRenderPdfRow);
+  renderRows.forEach((row, index) => {
     switch (row.type) {
       case 'kv': {
-        const value = row.value !== undefined && row.value !== null && row.value !== '' ? String(row.value) : row.fallback || '-';
+        const value = !pdfValueIsBlank(row.value) ? String(row.value) : row.fallback || '';
+        if (!value) break;
         const text = `${row.label}: ${value}`;
         const lines = wrapPdfText(text, contentWidth, PDF_BODY_FONT_SIZE);
         layout.blocks.push({lines});
         layout.height += lines.length * PDF_BODY_LEADING;
-        if (index < rows.length - 1) layout.height += PDF_ROW_SPACING;
+        if (index < renderRows.length - 1) layout.height += PDF_ROW_SPACING;
         break;
       }
       case 'paragraph': {
@@ -8919,19 +8948,21 @@ function buildSectionLayout(heading, rows, width) {
           layout.blocks.push({lines: labelLines});
           layout.height += labelLines.length * PDF_BODY_LEADING;
         }
-        const bodyText = row.value ? String(row.value) : (row.emptyText || 'Ingen oplysninger.');
+        const hasBody = !pdfValueIsBlank(row.value);
+        const bodyText = hasBody ? String(row.value) : (row.emptyText || '');
+        if (!bodyText) break;
         const bodyLines = wrapPdfText(bodyText, contentWidth, PDF_BODY_FONT_SIZE);
         const indented = row.indent ? indentWrappedLines(bodyLines, row.indent) : bodyLines;
         layout.blocks.push({lines: indented});
         layout.height += indented.length * PDF_BODY_LEADING;
-        if (index < rows.length - 1) layout.height += PDF_ROW_SPACING;
+        if (index < renderRows.length - 1) layout.height += PDF_ROW_SPACING;
         break;
       }
       case 'text': {
         const lines = wrapPdfText(row.text || '', contentWidth, PDF_BODY_FONT_SIZE);
         layout.blocks.push({lines});
         layout.height += lines.length * PDF_BODY_LEADING;
-        if (index < rows.length - 1) layout.height += PDF_ROW_SPACING;
+        if (index < renderRows.length - 1) layout.height += PDF_ROW_SPACING;
         break;
       }
       case 'list': {
@@ -8940,7 +8971,7 @@ function buildSectionLayout(heading, rows, width) {
           const emptyLines = wrapPdfText(row.emptyText || 'Ingen poster.', contentWidth, PDF_BODY_FONT_SIZE);
           layout.blocks.push({lines: emptyLines});
           layout.height += emptyLines.length * PDF_BODY_LEADING;
-          if (index < rows.length - 1) layout.height += PDF_ROW_SPACING;
+          if (index < renderRows.length - 1) layout.height += PDF_ROW_SPACING;
           break;
         }
         items.forEach((item, idx) => {
@@ -8949,7 +8980,7 @@ function buildSectionLayout(heading, rows, width) {
           layout.height += lines.length * PDF_BODY_LEADING;
           if (idx < items.length - 1) layout.height += PDF_ROW_SPACING / 2;
         });
-        if (index < rows.length - 1) layout.height += PDF_ROW_SPACING;
+        if (index < renderRows.length - 1) layout.height += PDF_ROW_SPACING;
         break;
       }
       default:
@@ -9115,7 +9146,8 @@ async function createReportPdfBlob(orderId, reportData, exportedAt = new Date())
           label: `${index + 1}. ${heading}`,
           value: bodyParts.join('\n\n'),
           emptyText: 'Ingen detaljer angivet.',
-          indent: '  '
+          indent: '  ',
+          renderWhenEmpty: true
         });
       });
     } else {
