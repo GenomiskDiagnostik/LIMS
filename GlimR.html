@@ -9720,15 +9720,13 @@ function renderQC(section) {
       const createdBy = determineCreatedBy('qc', q);
       const sample = sampleMap.get(Number(q.sample_id));
       const sampleStatus = sample?.status || '';
-      const sampleIdDisplay = sample?.id != null ? sample.id : q.sample_id;
-      const samplePmbMeta = sample?.pmb_number
-        ? ` <span class="table-meta">(${esc(sample.pmb_number)})</span>`
-        : '';
+      const sampleLabel = getName('samples', Number(q.sample_id));
+      const sampleDisplay = sampleLabel || (q.sample_id != null ? `#${q.sample_id}` : '');
       const sampleStatusMeta = sampleStatus && !isActiveStatus(sampleStatus)
         ? ` <span class="table-meta">(${esc(sampleStatus)})</span>`
         : '';
       const selectedAttr = q.id === selectedQcId ? ' data-selected="true"' : '';
-      return `<tr data-id="${q.id}"${selectedAttr}><td>${q.id}</td><td>${esc(sampleIdDisplay)}${samplePmbMeta}${sampleStatusMeta}</td><td>${esc(q.metric)}</td><td>${esc(q.value)}</td><td>${esc(q.unit||'')}</td><td>${esc(createdBy)}</td></tr>`;
+      return `<tr data-id="${q.id}"${selectedAttr}><td>${q.id}</td><td>${esc(sampleDisplay)}${sampleStatusMeta}</td><td>${esc(q.metric)}</td><td>${esc(q.value)}</td><td>${esc(q.unit||'')}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
