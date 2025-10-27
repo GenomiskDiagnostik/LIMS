@@ -1570,6 +1570,13 @@ const iconLibrary = {
       {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75'}
     ]
   },
+  'arrows-up-down': {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M3 16.5l3 3m0 0 3-3m-3 3V4.5M21 7.5l-3-3m0 0-3 3m3-3v15'}
+    ]
+  },
   moon: {
     viewBox: '0 0 24 24',
     attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
@@ -4200,12 +4207,19 @@ function renderDashboard(section) {
     const orderedAt = parseDateTimeValue(order.ordered_at || order.created_at || order.updated_at);
     return orderedAt && orderedAt >= monthAgo;
   });
+  const ordersLastMonthCount = ordersLastMonth.length;
   const weeksCovered = Math.max((now.getTime() - monthAgo.getTime()) / MS_PER_WEEK, 1 / 52);
-  const avgOrdersPerWeek = ordersLastMonth.length ? ordersLastMonth.length / weeksCovered : 0;
+  const avgOrdersPerWeek = ordersLastMonthCount ? ordersLastMonthCount / weeksCovered : 0;
   const reportsLastMonth = reports.filter(report => {
     const issuedAt = parseDateTimeValue(report.issued_at || report.updated_at || report.created_at);
     return issuedAt && issuedAt >= monthAgo;
-  }).length;
+  });
+  const reportsLastMonthCount = reportsLastMonth.length;
+  const avgReportsPerWeek = reportsLastMonthCount ? reportsLastMonthCount / weeksCovered : 0;
+  const netOrdersPerWeek = avgOrdersPerWeek - avgReportsPerWeek;
+  const netOrdersPerWeekRounded = Math.round(netOrdersPerWeek);
+  const netOrdersPerWeekSign = netOrdersPerWeekRounded > 0 ? '+' : netOrdersPerWeekRounded < 0 ? '-' : '';
+  const netOrdersDisplay = `${netOrdersPerWeekSign}${formatNumberDa(Math.abs(netOrdersPerWeekRounded))} pr. uge`;
   const metrics = [
     {icon: 'user-group', badge: 'Patienter', value: formatNumberDa(patients)},
     {icon: 'beaker', badge: 'Prøver', value: formatNumberDa(sampleCount)},
@@ -4226,10 +4240,11 @@ function renderDashboard(section) {
     `).join('');
   const statsCards = [
     {icon: 'clock', label: "Svarstid (90%-fraktil)", value: formatDurationDays(responseTimeP90)},
+    {icon: 'arrows-up-down', label: 'Nettoflow (30 dage)', value: netOrdersDisplay},
     {icon: 'inbox', label: 'Prøver modtaget (7 dage)', value: formatNumberDa(samplesLastWeek)},
     {icon: 'beaker', label: 'Prøver modtaget (30 dage)', value: formatNumberDa(samplesLastMonth)},
     {icon: 'document-chart-bar', label: 'Gns. ordinationer/uge (30 dage)', value: formatNumberDa(avgOrdersPerWeek, 1)},
-    {icon: 'clipboard-document-check', label: 'Rapporter udstedt (30 dage)', value: formatNumberDa(reportsLastMonth)}
+    {icon: 'clipboard-document-check', label: 'Rapporter udstedt (30 dage)', value: formatNumberDa(reportsLastMonthCount)}
   ];
   const statsCardsHtml = statsCards.map(stat => `
       <div class="dashboard-stat">
