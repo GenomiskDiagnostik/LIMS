@@ -4083,6 +4083,9 @@ function renderDashboard(section) {
       return analysisMatch || interpreterMatch || approverMatch;
     });
     const sortedMyActiveOrders = myActiveOrders.slice().sort((a, b) => {
+      const urgentA = a.urgent ? 1 : 0;
+      const urgentB = b.urgent ? 1 : 0;
+      if (urgentA !== urgentB) return urgentB - urgentA;
       const sampleA = findById('samples', Number(a.sample_id));
       const sampleB = findById('samples', Number(b.sample_id));
       const dateA = parseDateTimeValue(sampleA?.collected_at || sampleA?.created_at || a.created_at || a.ordered_at);
@@ -4117,7 +4120,7 @@ function renderDashboard(section) {
       const sampleDisplay = sample?.pmb_number || sample?.id || o.sample_id || '';
       const rolesDisplay = roleLabels.length ? roleLabels.join(', ') : '—';
       return `<tr${urgentAttr}><td>${urgentIcon}<span class="order-id">${esc(o.id)}</span></td><td>${esc(rolesDisplay)}</td><td>${esc(getName('patients', o.patient_id))}</td><td>${esc(sampleDisplay)}</td><td>${getName('panels', o.panel_id)}</td><td>${esc(statusDisplay)}</td><td>${esc(collectedAt)}</td></tr>`;
-    }).join('') || '<tr><td colspan="7">Ingen aktive ordinationer</td></tr>';
+    }).join('') || '<tr><td colspan="7">Ingen aktive ordrer</td></tr>';
   }
   const audit = getCached('audit').slice(-5).reverse();
   const recentOrdersHtml = recentOrders.map(o => {
@@ -4212,7 +4215,7 @@ function renderDashboard(section) {
   </div>
   ${currentUserId ? `
   <div class="panel">
-    <h2>Mine aktive ordinationer</h2>
+    <h2>Mine aktive ordrer</h2>
     <table>
       <thead><tr><th>ID</th><th>Rolle</th><th>Patient</th><th>Prøve</th><th>Panel</th><th>Status</th><th>Opsamlet</th></tr></thead>
       <tbody>
