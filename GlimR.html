@@ -839,6 +839,20 @@ tbody tr[data-order-id]:hover {
   width: 0.95em;
   height: 0.95em;
 }
+.role-status-indicator {
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: #86efac;
+  margin-right: 0.35rem;
+  box-shadow: 0 0 0 2px rgba(134, 239, 172, 0.4);
+  vertical-align: middle;
+}
+[data-theme="dark"] .role-status-indicator {
+  background: #4ade80;
+  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.35);
+}
 .urgent-indicator {
   color: var(--priority-urgent);
 }
@@ -4683,24 +4697,37 @@ function renderDashboard(section) {
     });
     myActiveOrdersHtml = sortedMyActiveOrders.map(o => {
       const sample = findById('samples', Number(o.sample_id));
+      const isAnalysisResponsible = o.analysis_responsible_id !== undefined && o.analysis_responsible_id !== null && String(o.analysis_responsible_id) === currentUserId;
+      const isInterpreter = o.interpreter_id !== undefined && o.interpreter_id !== null && String(o.interpreter_id) === currentUserId;
+      const isApprover = o.approver_id !== undefined && o.approver_id !== null && String(o.approver_id) === currentUserId;
       const roleLabels = [];
-      if (o.analysis_responsible_id !== undefined && o.analysis_responsible_id !== null && String(o.analysis_responsible_id) === currentUserId) {
+      if (isAnalysisResponsible) {
         roleLabels.push('Analyseansvarlig');
       }
-      if (o.interpreter_id !== undefined && o.interpreter_id !== null && String(o.interpreter_id) === currentUserId) {
+      if (isInterpreter) {
         roleLabels.push('Tolker');
       }
-      if (o.approver_id !== undefined && o.approver_id !== null && String(o.approver_id) === currentUserId) {
+      if (isApprover) {
         roleLabels.push('Godkender');
       }
       const statusDisplay = sample?.status || o.status || '';
+      const normalizedStatus = (statusDisplay || '').toString().trim().toLowerCase();
+      const statusMatches = (...expected) => expected.some(status => normalizedStatus === status || normalizedStatus.startsWith(`${status} `));
+      const roleStatusMatch = (
+        (isApprover && statusMatches('godkendelse', 'rapport')) ||
+        (isInterpreter && statusMatches('tolkning', 'rapport')) ||
+        (isAnalysisResponsible && statusMatches('qc', 'analyse'))
+      );
+      const roleStatusIndicator = roleStatusMatch
+        ? '<span class="role-status-indicator" role="img" aria-label="Rolle matcher status" title="Rolle matcher status"></span>'
+        : '';
       const collectedValue = sample?.collected_at || sample?.created_at || o.ordered_at || o.created_at;
       const collectedAt = formatDanishDate(collectedValue);
       const priorityIcons = renderOrderPriorityIcons(o);
       const priorityAttr = orderPriorityAttributes(o);
       const sampleDisplay = sample?.pmb_number || sample?.id || o.sample_id || '';
       const rolesDisplay = roleLabels.length ? roleLabels.join(', ') : '—';
-      return `<tr data-order-id="${esc(o.id)}"${priorityAttr}><td>${priorityIcons}<span class="order-id">${esc(o.id)}</span></td><td>${esc(rolesDisplay)}</td><td>${esc(getName('patients', o.patient_id))}</td><td>${esc(sampleDisplay)}</td><td>${getName('panels', o.panel_id)}</td><td>${esc(statusDisplay)}</td><td>${esc(collectedAt)}</td></tr>`;
+      return `<tr data-order-id="${esc(o.id)}"${priorityAttr}><td>${priorityIcons}${roleStatusIndicator}<span class="order-id">${esc(o.id)}</span></td><td>${esc(rolesDisplay)}</td><td>${esc(getName('patients', o.patient_id))}</td><td>${esc(sampleDisplay)}</td><td>${getName('panels', o.panel_id)}</td><td>${esc(statusDisplay)}</td><td>${esc(collectedAt)}</td></tr>`;
     }).join('') || '<tr><td colspan="7">Ingen aktive ordrer</td></tr>';
   }
   const audit = getCached('audit').slice(-5).reverse();
