@@ -706,11 +706,11 @@ section[data-tab].active {
   border: 1px solid var(--panel-border);
   background: rgba(24, 111, 175, 0.06);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: box-shadow 0.15s ease, background 0.15s ease;
 }
 .dashboard-metric:hover,
 .dashboard-metric:focus-within {
-  transform: translateY(-2px);
+  background: rgba(24, 111, 175, 0.1);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45), var(--shadow);
 }
 [data-theme="dark"] .dashboard-metric {
@@ -719,6 +719,7 @@ section[data-tab].active {
 }
 [data-theme="dark"] .dashboard-metric:hover,
 [data-theme="dark"] .dashboard-metric:focus-within {
+  background: rgba(56, 189, 248, 0.18);
   box-shadow: inset 0 0 0 1px rgba(14, 165, 233, 0.55), var(--shadow);
 }
 .dashboard-metric .icon-slot {
@@ -2035,6 +2036,7 @@ const tooltipCatalog = {
     'Ekstra ID': 'Supplerende identifikator for patienten (valgfrit).',
     'Familienummer': 'Eksternt familienummer brugt til at gruppere beslægtede patienter.',
     'Navn': 'Navnet på patient, panel eller bruger.',
+    'Rolle': 'Din registrerede funktion i relation til ordinationen (fx Analytiker eller Godkender).',
     'Køn': 'Patientens registrerede køn.',
     'Født': 'Patientens fødselsdato.',
     'Patient': 'Tilknyttet patient til posten.',
