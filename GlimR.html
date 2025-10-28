@@ -858,6 +858,81 @@ tbody tr[data-order-id]:hover {
   font-size: 0.75rem;
   color: var(--muted-text);
 }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.table-shortcuts {
+  width: 3.25rem;
+}
+.table-actions-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding-right: 0.4rem;
+}
+button.icon-button {
+  border: none;
+  background: transparent;
+  color: var(--muted-text);
+  padding: 0.35rem;
+  border-radius: 0.45rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+}
+button.icon-button .icon-slot {
+  width: 1.1em;
+  height: 1.1em;
+}
+button.icon-button:hover {
+  background: rgba(24, 111, 175, 0.12);
+  color: var(--accent-strong);
+}
+[data-theme="dark"] button.icon-button:hover {
+  background: rgba(56, 189, 248, 0.18);
+  color: var(--accent);
+}
+button.icon-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  background: rgba(24, 111, 175, 0.12);
+  color: var(--accent-strong);
+}
+[data-theme="dark"] button.icon-button:focus-visible {
+  background: rgba(56, 189, 248, 0.18);
+  color: var(--accent);
+}
+@media (hover: none) {
+  button.icon-button:hover {
+    background: transparent;
+    color: var(--muted-text);
+  }
+  button.icon-button:focus-visible {
+    background: rgba(24, 111, 175, 0.12);
+    color: var(--accent-strong);
+  }
+  [data-theme="dark"] button.icon-button:focus-visible {
+    background: rgba(56, 189, 248, 0.18);
+    color: var(--accent);
+  }
+}
+button.icon-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.table-actions-cell button.icon-button {
+  flex: 0 0 auto;
+}
 label.checkbox-field {
   display: inline-flex;
   align-items: center;
@@ -1490,7 +1565,16 @@ const state = {
   lastStatus: '',
   usingMemoryDb: false,
   pendingOrderId: null,
-  pendingOrderShowAll: false
+  pendingOrderShowAll: false,
+  pendingOrderFilterSampleId: null,
+  pendingOrderFilterId: null,
+  pendingSampleId: null,
+  pendingSampleShowAll: false,
+  pendingReportFilterOrderId: null,
+  pendingReportFilterSampleId: null,
+  pendingReportShowAll: false,
+  pendingReportSelectOrderId: null,
+  pendingReportSelectReportId: null
 };
 const CREATED_BY_STORES = new Set(['patients','samples','orders','patient_groups','variants','qc','reports','conclusion_library']);
 const UPDATED_BY_STORES = new Set(['panels']);
@@ -1870,6 +1954,7 @@ const tooltipCatalog = {
     'Antal gener': 'Optalt antal gener i panelets genliste.',
     'Genliste': 'Kommasepareret liste over gener inkluderet i panelet.',
     'Bestilt': 'Tidspunkt for oprettelse af ordinationen.',
+    'Genveje': 'Genveje til relaterede visninger for ordinationen.',
     'Opsamlet': 'Dato og tidspunkt for prøveindsamling.',
     'Ordination': 'Reference til ordinationen.',
     'Gen': 'Genet hvor varianten er fundet.',
@@ -3225,6 +3310,94 @@ function openOrderDetails(orderId, options = {}) {
   state.pendingOrderId = numericId;
   state.pendingOrderShowAll = Boolean(options.showAll);
   activateTab('orders');
+}
+function openSamplesForOrder(orderId) {
+  const numericId = Number(orderId);
+  if (!Number.isFinite(numericId)) return;
+  const order = findById('orders', numericId);
+  const sampleId = order?.sample_id != null ? Number(order.sample_id) : null;
+  state.pendingSampleId = Number.isFinite(sampleId) ? sampleId : null;
+  state.pendingSampleShowAll = true;
+  activateTab('samples');
+}
+function openReportsForOrder(orderId) {
+  const numericId = Number(orderId);
+  if (!Number.isFinite(numericId)) return;
+  state.pendingReportFilterOrderId = numericId;
+  state.pendingReportFilterSampleId = null;
+  state.pendingReportSelectOrderId = numericId;
+  state.pendingReportSelectReportId = null;
+  state.pendingReportShowAll = true;
+  activateTab('reports');
+}
+
+function openOrdersForSample(sampleId) {
+  const numericId = Number(sampleId);
+  if (!Number.isFinite(numericId)) return;
+  const orders = getCached('orders') || [];
+  const matching = orders.filter(o => Number(o.sample_id) === numericId);
+  matching.sort((a, b) => {
+    const timeA = (a.ordered_at || a.updated_at || a.created_at || '');
+    const timeB = (b.ordered_at || b.updated_at || b.created_at || '');
+    return timeB.localeCompare(timeA);
+  });
+  const first = matching[0] || null;
+  const selectedId = first ? Number(first.id) : null;
+  state.pendingOrderFilterSampleId = numericId;
+  state.pendingOrderFilterId = null;
+  state.pendingOrderId = Number.isFinite(selectedId) ? selectedId : null;
+  state.pendingOrderShowAll = true;
+  activateTab('orders');
+}
+
+function openReportsForSample(sampleId) {
+  const numericId = Number(sampleId);
+  if (!Number.isFinite(numericId)) return;
+  const orders = getCached('orders') || [];
+  const reports = getCached('reports') || [];
+  const orderIds = new Set(orders.filter(o => Number(o.sample_id) === numericId).map(o => Number(o.id)));
+  const matchingReports = reports.filter(r => orderIds.has(Number(r.order_id)));
+  matchingReports.sort((a, b) => {
+    const timeA = (a.issued_at || a.updated_at || a.created_at || '');
+    const timeB = (b.issued_at || b.updated_at || b.created_at || '');
+    return timeB.localeCompare(timeA);
+  });
+  const firstReport = matchingReports[0] || null;
+  const firstReportId = firstReport ? Number(firstReport.id) : null;
+  const firstOrderId = firstReport ? Number(firstReport.order_id) : (orderIds.size === 1 ? Array.from(orderIds)[0] : null);
+  state.pendingReportFilterSampleId = numericId;
+  state.pendingReportFilterOrderId = null;
+  state.pendingReportSelectOrderId = Number.isFinite(firstOrderId) ? firstOrderId : null;
+  state.pendingReportSelectReportId = Number.isFinite(firstReportId) ? firstReportId : null;
+  state.pendingReportShowAll = true;
+  activateTab('reports');
+}
+
+function openOrdersForReport(reportId) {
+  const numericId = Number(reportId);
+  if (!Number.isFinite(numericId)) return;
+  const report = findById('reports', numericId);
+  const orderId = report?.order_id != null ? Number(report.order_id) : null;
+  if (!Number.isFinite(orderId)) return;
+  state.pendingOrderFilterId = orderId;
+  state.pendingOrderFilterSampleId = null;
+  state.pendingOrderId = orderId;
+  state.pendingOrderShowAll = true;
+  activateTab('orders');
+}
+
+function openSamplesForReport(reportId) {
+  const numericId = Number(reportId);
+  if (!Number.isFinite(numericId)) return;
+  const report = findById('reports', numericId);
+  if (!report) return;
+  const orderId = report.order_id != null ? Number(report.order_id) : null;
+  const order = Number.isFinite(orderId) ? findById('orders', orderId) : null;
+  const sampleId = order?.sample_id != null ? Number(order.sample_id) : null;
+  if (!Number.isFinite(sampleId)) return;
+  state.pendingSampleId = sampleId;
+  state.pendingSampleShowAll = true;
+  activateTab('samples');
 }
 function openDb() {
   return new Promise((resolve, reject) => {
@@ -5788,7 +5961,7 @@ function renderSamples(section) {
             <label>Opsamlet til<input type="date" data-filter-samples="collected_to"></label>
           </div>
         </details>
-        <table><thead><tr><th>ID</th><th>PMB-nummer</th><th>Patient</th><th>Prøvetype</th><th>Status</th><th>Opsamlet</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
+        <table><thead><tr><th class="table-shortcuts"><span class="sr-only">Genveje</span></th><th>ID</th><th>PMB-nummer</th><th>Patient</th><th>Prøvetype</th><th>Status</th><th>Opsamlet</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
           <button type="button" class="secondary" id="samplesExport">Eksportér filtrerede prøver</button>
         </div>
@@ -5854,8 +6027,17 @@ function renderSamples(section) {
   applySelectFilters(section);
   let filteredSamples = list.slice();
   let activeFilters = {};
-  let selectedSampleId = null;
+  let selectedSampleId = state.pendingSampleId != null ? Number(state.pendingSampleId) : null;
+  if (!Number.isFinite(selectedSampleId)) selectedSampleId = null;
   let showActiveOnly = activeToggle ? activeToggle.checked : false;
+  if (selectedSampleId != null) {
+    if (filterInputs.id) filterInputs.id.value = String(selectedSampleId);
+    if (search) search.value = '';
+    if (state.pendingSampleShowAll && activeToggle) {
+      showActiveOnly = false;
+      activeToggle.checked = false;
+    }
+  }
   const renderRows = () => {
     const term = search.value.toLowerCase();
     const filters = {
@@ -5909,11 +6091,35 @@ function renderSamples(section) {
         ? `${esc(collectedAt)}${collectedMeta ? ` <span class="table-meta">(${esc(collectedMeta)})</span>` : ''}`
         : '';
       const selectedAttr = s.id === selectedSampleId ? ' data-selected="true"' : '';
-      return `<tr data-id="${s.id}"${selectedAttr}><td>${s.id}</td><td>${esc(s.pmb_number||'')}</td><td>${esc(getName('patients', Number(s.patient_id)))}</td><td>${esc(s.sample_type)}</td><td>${esc(s.status||'')}</td><td>${collectedCell}</td><td>${esc(createdBy)}</td></tr>`;
+      const shortcutsCell = `<td class="table-actions-cell"><button type="button" class="icon-button" data-sample-action="orders" data-sample-id="${s.id}"><span class="icon-slot" data-icon="clipboard-document-list"></span></button><button type="button" class="icon-button" data-sample-action="reports" data-sample-id="${s.id}"><span class="icon-slot" data-icon="document-chart-bar"></span></button></td>`;
+      return `<tr data-id="${s.id}"${selectedAttr}>${shortcutsCell}<td>${s.id}</td><td>${esc(s.pmb_number||'')}</td><td>${esc(getName('patients', Number(s.patient_id)))}</td><td>${esc(s.sample_type)}</td><td>${esc(s.status||'')}</td><td>${collectedCell}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
+    applyIconSlots(tbody);
+    tbody.querySelectorAll('button[data-sample-action]').forEach(btn => {
+      const action = btn.dataset.sampleAction;
+      let tip = '';
+      if (action === 'orders') {
+        tip = 'Åbn Ordinationer-fanen med filter for denne prøve.';
+      } else if (action === 'reports') {
+        tip = 'Åbn Rapporter-fanen med filter for denne prøve.';
+      }
+      if (tip) setTooltip(btn, tip);
+    });
     annotateTableCells(section);
   };
   renderRows();
+  if (selectedSampleId != null) {
+    const pendingSample = list.find(s => s.id === selectedSampleId);
+    if (pendingSample) {
+      fillForm(form, pendingSample);
+      const pendingRow = tbody?.querySelector(`tr[data-id="${pendingSample.id}"]`);
+      if (pendingRow) {
+        pendingRow.scrollIntoView({block: 'nearest'});
+      }
+    }
+  }
+  state.pendingSampleId = null;
+  state.pendingSampleShowAll = false;
   activeToggle?.addEventListener('change', () => {
     showActiveOnly = activeToggle.checked;
     renderRows();
@@ -5945,6 +6151,16 @@ function renderSamples(section) {
     });
   });
   tbody.addEventListener('click', e => {
+    const actionButton = e.target.closest('button[data-sample-action]');
+    if (actionButton) {
+      const {sampleId, sampleAction} = actionButton.dataset;
+      if (sampleAction === 'orders') {
+        openOrdersForSample(sampleId);
+      } else if (sampleAction === 'reports') {
+        openReportsForSample(sampleId);
+      }
+      return;
+    }
     const tr = e.target.closest('tr');
     if (!tr) return;
     const sample = list.find(s => s.id === Number(tr.dataset.id));
@@ -6363,7 +6579,7 @@ function renderOrders(section) {
             <label>Bestilt til<input type="date" data-filter-orders="ordered_to"></label>
           </div>
         </details>
-        <table><thead><tr><th>ID</th><th>Patient</th><th>Prøve</th><th>Panel</th><th>Analyseansvarlig</th><th>Tolker</th><th>Godkender</th><th>Patientgruppe</th><th>Indikation</th><th>HPO-termer</th><th>Status</th><th>Oprettet af</th><th>Bestilt</th></tr></thead><tbody></tbody></table>
+        <table><thead><tr><th class="table-shortcuts"><span class="sr-only">Genveje</span></th><th>ID</th><th>Patient</th><th>Prøve</th><th>Panel</th><th>Analyseansvarlig</th><th>Tolker</th><th>Godkender</th><th>Patientgruppe</th><th>Indikation</th><th>HPO-termer</th><th>Status</th><th>Oprettet af</th><th>Bestilt</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
           <button type="button" class="secondary" id="ordersExport">Eksportér filtrerede ordinationer</button>
         </div>
@@ -6476,6 +6692,7 @@ function renderOrders(section) {
     ordered_to: section.querySelector('[data-filter-orders="ordered_to"]')
   };
   const activeToggle = section.querySelector('#ordersActiveOnly');
+  applyIconSlots(section);
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
@@ -6517,10 +6734,40 @@ function renderOrders(section) {
   let activeFilters = {};
   let selectedOrderId = state.pendingOrderId != null ? Number(state.pendingOrderId) : null;
   if (!Number.isFinite(selectedOrderId)) selectedOrderId = null;
+  let pendingFilterSampleId = state.pendingOrderFilterSampleId != null ? Number(state.pendingOrderFilterSampleId) : null;
+  if (!Number.isFinite(pendingFilterSampleId)) pendingFilterSampleId = null;
+  let pendingFilterOrderId = state.pendingOrderFilterId != null ? Number(state.pendingOrderFilterId) : null;
+  if (!Number.isFinite(pendingFilterOrderId)) pendingFilterOrderId = null;
   let showActiveOnly = activeToggle ? activeToggle.checked : false;
   if (selectedOrderId != null && state.pendingOrderShowAll && activeToggle) {
     showActiveOnly = false;
     activeToggle.checked = false;
+  }
+  if (pendingFilterSampleId != null) {
+    if (filterInputs.sample) filterInputs.sample.value = String(pendingFilterSampleId);
+    if (search) search.value = '';
+    if (state.pendingOrderShowAll && activeToggle) {
+      showActiveOnly = false;
+      activeToggle.checked = false;
+    }
+    const sampleOrders = list.filter(o => Number(o.sample_id) === pendingFilterSampleId);
+    if (sampleOrders.length && selectedOrderId == null) {
+      sampleOrders.sort((a, b) => {
+        const timeA = (a.ordered_at || a.updated_at || a.created_at || '');
+        const timeB = (b.ordered_at || b.updated_at || b.created_at || '');
+        return timeB.localeCompare(timeA);
+      });
+      selectedOrderId = sampleOrders[0].id;
+    }
+  }
+  if (pendingFilterOrderId != null) {
+    if (filterInputs.id) filterInputs.id.value = String(pendingFilterOrderId);
+    if (search) search.value = '';
+    if (state.pendingOrderShowAll && activeToggle) {
+      showActiveOnly = false;
+      activeToggle.checked = false;
+    }
+    selectedOrderId = pendingFilterOrderId;
   }
   const renderRows = () => {
     const term = (search?.value || '').trim().toLowerCase();
@@ -6545,12 +6792,17 @@ function renderOrders(section) {
     const filterSummary = {...filters};
       if (filters.indication) filterSummary.indikation = filters.indication;
       if (filters.hpo) filterSummary['hpo-termer'] = filters.hpo;
+      if (filters.sample) {
+        const sample = sampleMap.get(Number(filters.sample));
+        filterSummary.prøve = sample ? `${sample.id} (${sample.pmb_number || '–'})` : filters.sample;
+      }
       if (filters.patient_group) {
         const groupLabel = getPatientGroupName(filters.patient_group);
         filterSummary.patient_group = groupLabel || filters.patient_group;
       }
       delete filterSummary.indication;
       delete filterSummary.hpo;
+      delete filterSummary.sample;
     if (filters.analysis_responsible) filterSummary.analysis_responsible = getName('users', Number(filters.analysis_responsible));
     if (filters.interpreter) filterSummary.interpreter = getName('users', Number(filters.interpreter));
     if (filters.approver) filterSummary.approver = getName('users', Number(filters.approver));
@@ -6647,8 +6899,22 @@ function renderOrders(section) {
       const urgentIcon = o.urgent
         ? '<span class="urgent-indicator" role="img" aria-label="Haster"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3.172 2.322 20.5h19.356L12 3.172zm1 13.828h-2v2h2v-2zm0-8h-2v6h2v-6z"></path></svg></span>'
         : '';
-      return `<tr data-id="${o.id}"${selectedAttr}${urgentAttr}><td>${urgentIcon}<span class="order-id">${esc(o.id)}</span></td><td>${esc(getName('patients', Number(o.patient_id)))}</td><td>${esc(getName('samples', Number(o.sample_id)))}</td><td>${esc(getName('panels', Number(o.panel_id)))}</td><td>${esc(userName(o.analysis_responsible_id))}</td><td>${esc(userName(o.interpreter_id))}</td><td>${esc(userName(o.approver_id))}</td><td${patientGroupAttr}>${patientGroupCell}</td><td${indicationAttr}>${indicationCell}</td><td${hpoAttr}>${hpoCell}</td><td>${esc(statusDisplay)}</td><td>${esc(createdBy)}</td><td>${orderedCell}</td></tr>`;
+      const sampleId = Number(o.sample_id);
+      const sampleButtonDisabledAttr = Number.isFinite(sampleId) ? '' : ' disabled';
+      const shortcutsCell = `<td class="table-actions-cell"><button type="button" class="icon-button" data-order-action="samples" data-order-id="${o.id}"${sampleButtonDisabledAttr}><span class="icon-slot" data-icon="beaker"></span></button><button type="button" class="icon-button" data-order-action="reports" data-order-id="${o.id}"><span class="icon-slot" data-icon="document-chart-bar"></span></button></td>`;
+      return `<tr data-id="${o.id}"${selectedAttr}${urgentAttr}>${shortcutsCell}<td>${urgentIcon}<span class="order-id">${esc(o.id)}</span></td><td>${esc(getName('patients', Number(o.patient_id)))}</td><td>${esc(getName('samples', Number(o.sample_id)))}</td><td>${esc(getName('panels', Number(o.panel_id)))}</td><td>${esc(userName(o.analysis_responsible_id))}</td><td>${esc(userName(o.interpreter_id))}</td><td>${esc(userName(o.approver_id))}</td><td${patientGroupAttr}>${patientGroupCell}</td><td${indicationAttr}>${indicationCell}</td><td${hpoAttr}>${hpoCell}</td><td>${esc(statusDisplay)}</td><td>${esc(createdBy)}</td><td>${orderedCell}</td></tr>`;
     }).join('');
+    applyIconSlots(tbody);
+    tbody.querySelectorAll('button[data-order-action]').forEach(btn => {
+      const action = btn.dataset.orderAction;
+      let tip = '';
+      if (action === 'samples') {
+        tip = 'Åbn Prøver-fanen med filter for denne ordination.';
+      } else if (action === 'reports') {
+        tip = 'Åbn Rapporter-fanen med filter for denne ordination.';
+      }
+      if (tip) setTooltip(btn, tip);
+    });
     annotateTableCells(section);
   };
   renderRows();
@@ -6665,6 +6931,8 @@ function renderOrders(section) {
   }
   state.pendingOrderId = null;
   state.pendingOrderShowAll = false;
+  state.pendingOrderFilterSampleId = null;
+  state.pendingOrderFilterId = null;
   activeToggle?.addEventListener('change', () => {
     showActiveOnly = activeToggle.checked;
     renderRows();
@@ -6719,6 +6987,17 @@ function renderOrders(section) {
     });
   });
   tbody.addEventListener('click', e => {
+    const actionButton = e.target.closest('button[data-order-action]');
+    if (actionButton) {
+      if (actionButton.disabled) return;
+      const {orderId, orderAction} = actionButton.dataset;
+      if (orderAction === 'samples') {
+        openSamplesForOrder(orderId);
+      } else if (orderAction === 'reports') {
+        openReportsForOrder(orderId);
+      }
+      return;
+    }
     const tr = e.target.closest('tr');
     if (!tr) return;
     const order = list.find(o => o.id === Number(tr.dataset.id));
@@ -8638,12 +8917,13 @@ function renderReports(section) {
           <div class="filter-grid">
             <label>ID<input type="search" data-filter-reports="id" placeholder="Rapport-ID"></label>
             <label>Ordination<input type="search" data-filter-reports="order" placeholder="Ordination (navn eller ID)"></label>
+            <label>Prøve<input type="search" data-filter-reports="sample" placeholder="Prøve (ID eller PMB)"></label>
             <label>Status<input type="search" data-filter-reports="status" placeholder="Status"></label>
             <label>Udstedt fra<input type="date" data-filter-reports="issued_from"></label>
             <label>Udstedt til<input type="date" data-filter-reports="issued_to"></label>
           </div>
         </details>
-        <table><thead><tr><th>ID</th><th>Ordination</th><th>Status</th><th>Oprettet af</th><th>Udstedt</th></tr></thead><tbody></tbody></table>
+        <table><thead><tr><th class="table-shortcuts"><span class="sr-only">Genveje</span></th><th>ID</th><th>Ordination</th><th>Status</th><th>Oprettet af</th><th>Udstedt</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
           <button type="button" class="secondary" id="reportsExport">Eksportér filtrerede rapporter</button>
         </div>
@@ -8826,6 +9106,7 @@ function renderReports(section) {
   const filterInputs = {
     id: section.querySelector('[data-filter-reports="id"]'),
     order: section.querySelector('[data-filter-reports="order"]'),
+    sample: section.querySelector('[data-filter-reports="sample"]'),
     status: section.querySelector('[data-filter-reports="status"]'),
     issued_from: section.querySelector('[data-filter-reports="issued_from"]'),
     issued_to: section.querySelector('[data-filter-reports="issued_to"]')
@@ -9100,13 +9381,70 @@ function renderReports(section) {
   const statusMap = {draft:'Udkast', final:'Endelig', amended:'Ændret'};
   let filteredReports = list.slice();
   let activeFilters = {};
+  let pendingFilterOrderId = state.pendingReportFilterOrderId != null ? Number(state.pendingReportFilterOrderId) : null;
+  if (!Number.isFinite(pendingFilterOrderId)) pendingFilterOrderId = null;
+  let pendingFilterSampleId = state.pendingReportFilterSampleId != null ? Number(state.pendingReportFilterSampleId) : null;
+  if (!Number.isFinite(pendingFilterSampleId)) pendingFilterSampleId = null;
+  const pendingSelectOrderIdRaw = state.pendingReportSelectOrderId != null ? Number(state.pendingReportSelectOrderId) : null;
+  let pendingSelectOrderId = Number.isFinite(pendingSelectOrderIdRaw) ? pendingSelectOrderIdRaw : null;
+  const pendingSelectReportIdRaw = state.pendingReportSelectReportId != null ? Number(state.pendingReportSelectReportId) : null;
+  const pendingSelectReportId = Number.isFinite(pendingSelectReportIdRaw) ? pendingSelectReportIdRaw : null;
   let selectedReportId = null;
   let showActiveOnly = activeToggle ? activeToggle.checked : false;
+  if (pendingFilterOrderId != null) {
+    if (filterInputs.order) filterInputs.order.value = String(pendingFilterOrderId);
+    if (search) search.value = '';
+    if (state.pendingReportShowAll && activeToggle) {
+      showActiveOnly = false;
+      activeToggle.checked = false;
+    }
+    const matchingReports = list.filter(r => Number(r.order_id) === pendingFilterOrderId);
+    if (matchingReports.length) {
+      matchingReports.sort((a, b) => {
+        const timeA = (a.issued_at || a.updated_at || a.created_at || '');
+        const timeB = (b.issued_at || b.updated_at || b.created_at || '');
+        return timeB.localeCompare(timeA);
+      });
+      selectedReportId = matchingReports[0].id;
+    }
+  }
+  if (pendingFilterSampleId != null) {
+    if (filterInputs.sample) filterInputs.sample.value = String(pendingFilterSampleId);
+    if (search) search.value = '';
+    if (state.pendingReportShowAll && activeToggle) {
+      showActiveOnly = false;
+      activeToggle.checked = false;
+    }
+    const relatedOrders = orders.filter(o => Number(o.sample_id) === pendingFilterSampleId);
+    const relatedOrderIds = new Set(relatedOrders.map(o => Number(o.id)).filter(id => Number.isFinite(id)));
+    const matchingReports = list.filter(r => relatedOrderIds.has(Number(r.order_id)));
+    if (matchingReports.length) {
+      matchingReports.sort((a, b) => {
+        const timeA = (a.issued_at || a.updated_at || a.created_at || '');
+        const timeB = (b.issued_at || b.updated_at || b.created_at || '');
+        return timeB.localeCompare(timeA);
+      });
+      if (selectedReportId == null) {
+        selectedReportId = matchingReports[0].id;
+      }
+      if (pendingSelectOrderId == null) {
+        const firstOrderId = Number(matchingReports[0].order_id);
+        if (Number.isFinite(firstOrderId)) pendingSelectOrderId = firstOrderId;
+      }
+    } else if (relatedOrderIds.size === 1 && pendingSelectOrderId == null) {
+      const onlyOrderId = relatedOrderIds.values().next().value;
+      if (Number.isFinite(onlyOrderId)) pendingSelectOrderId = Number(onlyOrderId);
+    }
+  }
+  if (selectedReportId == null && pendingSelectReportId != null) {
+    selectedReportId = pendingSelectReportId;
+  }
   const renderRows = () => {
     const term = search.value.toLowerCase();
     const filters = {
       id: filterInputs.id?.value.trim() || '',
       order: filterInputs.order?.value.trim().toLowerCase() || '',
+      sample: filterInputs.sample?.value.trim().toLowerCase() || '',
       status: filterInputs.status?.value.trim().toLowerCase() || '',
       issued_from: filterInputs.issued_from?.value || '',
       issued_to: filterInputs.issued_to?.value || ''
@@ -9116,12 +9454,18 @@ function renderReports(section) {
     if (toDate) toDate.setHours(23, 59, 59, 999);
     const filterSummary = {...filters};
     if (term) filterSummary.fritekst = term;
+    if (filters.sample) {
+      const sampleObj = sampleMap.get(Number(filters.sample));
+      filterSummary.prøve = sampleObj ? `${sampleObj.id} (${sampleObj.pmb_number || '–'})` : filters.sample;
+    }
+    delete filterSummary.sample;
     filterSummary.visning = showActiveOnly ? 'Kun aktive' : 'Alle';
     activeFilters = filterSummary;
     filteredReports = list.filter(r => {
       const order = orderMap.get(Number(r.order_id));
       const sample = order ? sampleMap.get(Number(order.sample_id)) : null;
       const sampleStatus = (sample?.status || order?.status || '').toLowerCase();
+      const samplePatientName = sample ? getName('patients', sample.patient_id) : '';
       if (!term) {
         if (showActiveOnly && !isActiveStatus(sampleStatus)) return false;
         return true;
@@ -9131,7 +9475,9 @@ function renderReports(section) {
       const creator = determineCreatedBy('reports', r).toLowerCase();
       const orderName = getOrderDisplayName(r.order_id).toLowerCase();
       const orderId = String(r.order_id || '').toLowerCase();
-      const matches = [raw, display, creator, orderName, orderId, sampleStatus].some(value => value.includes(term));
+      const sampleIdString = sample ? String(sample.id || '').toLowerCase() : '';
+      const samplePmb = (sample?.pmb_number || '').toLowerCase();
+      const matches = [raw, display, creator, orderName, orderId, sampleStatus, sampleIdString, samplePmb, (samplePatientName || '').toLowerCase()].some(value => value.includes(term));
       if (!matches) return false;
       if (showActiveOnly && !isActiveStatus(sampleStatus)) return false;
       return true;
@@ -9145,6 +9491,15 @@ function renderReports(section) {
       const order = orderMap.get(Number(r.order_id));
       const sample = order ? sampleMap.get(Number(order.sample_id)) : null;
       const sampleStatus = (sample?.status || order?.status || '').toLowerCase();
+      const samplePatientName = sample ? getName('patients', sample.patient_id) : '';
+      if (filters.sample) {
+        const sampleValues = [
+          sample ? String(sample.id || '').toLowerCase() : '',
+          (sample?.pmb_number || '').toLowerCase(),
+          (samplePatientName || '').toLowerCase()
+        ];
+        if (!sampleValues.some(v => v.includes(filters.sample))) return false;
+      }
       const statusStrings = [(r.status || '').toLowerCase(), (statusMap[r.status] || '').toLowerCase(), sampleStatus];
       if (filters.status && !statusStrings.some(v => v.includes(filters.status))) return false;
       if (fromDate || toDate) {
@@ -9173,11 +9528,49 @@ function renderReports(section) {
         ? ` <span class="table-meta">(${esc(sampleStatus)})</span>`
         : '';
       const selectedAttr = r.id === selectedReportId ? ' data-selected="true"' : '';
-      return `<tr data-id="${r.id}"${selectedAttr}><td>${r.id}</td><td${orderTitle}>${esc(orderName)}</td><td>${esc(displayStatus)}${sampleStatusBadge}</td><td>${esc(createdBy)}</td><td>${esc(issuedAt)}</td></tr>`;
+      const hasOrder = r.order_id != null && Number.isFinite(Number(r.order_id));
+      const sampleIdValue = sample ? Number(sample.id) : NaN;
+      const orderButtonDisabledAttr = hasOrder ? '' : ' disabled';
+      const sampleButtonDisabledAttr = Number.isFinite(sampleIdValue) ? '' : ' disabled';
+      const shortcutsCell = `<td class="table-actions-cell"><button type="button" class="icon-button" data-report-action="orders" data-report-id="${r.id}"${orderButtonDisabledAttr}><span class="icon-slot" data-icon="clipboard-document-list"></span></button><button type="button" class="icon-button" data-report-action="samples" data-report-id="${r.id}"${sampleButtonDisabledAttr}><span class="icon-slot" data-icon="beaker"></span></button></td>`;
+      return `<tr data-id="${r.id}"${selectedAttr}>${shortcutsCell}<td>${r.id}</td><td${orderTitle}>${esc(orderName)}</td><td>${esc(displayStatus)}${sampleStatusBadge}</td><td>${esc(createdBy)}</td><td>${esc(issuedAt)}</td></tr>`;
     }).join('');
+    applyIconSlots(tbody);
+    tbody.querySelectorAll('button[data-report-action]').forEach(btn => {
+      if (btn.disabled) return;
+      const action = btn.dataset.reportAction;
+      let tip = '';
+      if (action === 'orders') {
+        tip = 'Åbn Ordinationer-fanen med filter for denne rapport.';
+      } else if (action === 'samples') {
+        tip = 'Åbn Prøver-fanen med filter for denne rapport.';
+      }
+      if (tip) setTooltip(btn, tip);
+    });
     annotateTableCells(section);
   };
   renderRows();
+  if (selectedReportId != null) {
+    const pendingReport = list.find(r => r.id === selectedReportId);
+    if (pendingReport) {
+      fillForm(form, pendingReport);
+      const pendingRow = tbody?.querySelector(`tr[data-id="${pendingReport.id}"]`);
+      if (pendingRow) {
+        pendingRow.scrollIntoView({block: 'nearest'});
+      }
+      if (orderSelect) {
+        orderSelect.dispatchEvent(new Event('change'));
+      }
+    }
+  } else if (pendingSelectOrderId != null && orderSelect) {
+    orderSelect.value = String(pendingSelectOrderId);
+    orderSelect.dispatchEvent(new Event('change'));
+  }
+  state.pendingReportFilterOrderId = null;
+  state.pendingReportFilterSampleId = null;
+  state.pendingReportShowAll = false;
+  state.pendingReportSelectOrderId = null;
+  state.pendingReportSelectReportId = null;
   search.addEventListener('input', renderRows);
   Object.values(filterInputs).forEach(input => input?.addEventListener('input', renderRows));
   activeToggle?.addEventListener('change', () => {
@@ -9214,6 +9607,17 @@ function renderReports(section) {
     });
   });
   tbody.addEventListener('click', e => {
+    const actionButton = e.target.closest('button[data-report-action]');
+    if (actionButton) {
+      if (actionButton.disabled) return;
+      const {reportId, reportAction} = actionButton.dataset;
+      if (reportAction === 'orders') {
+        openOrdersForReport(reportId);
+      } else if (reportAction === 'samples') {
+        openSamplesForReport(reportId);
+      }
+      return;
+    }
     const tr = e.target.closest('tr');
     if (!tr) return;
     const report = list.find(r => r.id === Number(tr.dataset.id));
