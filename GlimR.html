@@ -6187,31 +6187,26 @@ function renderPanels(section) {
       alert('Ingen paneler matcher filtreringen.');
       return;
     }
-    const lines = filteredPanels.map(p => {
+    const entries = filteredPanels.map(p => {
       const name = (p.name ?? '').toString().trim() || '(uden navn)';
       const desc = (p.description ?? '').toString().replace(/\r?\n|\r/g, ' ').trim();
       const versionValue = normaliseVersionNumber(p.version);
-      const versionSuffix = versionValue != null ? ` v${versionValue}` : '';
-      const created = formatPanelDate(p.created_at);
-      const updated = formatPanelDate(p.updated_at);
-      const updatedBy = (p.updated_by ?? '').toString().trim();
+      const label = versionValue != null ? `${name}_${versionValue}` : name;
       const genes = parseGeneList(p.gene_list);
+      const geneList = genes.join(', ');
       const geneCount = genes.length;
-      const metadataParts = [];
-      if (created) metadataParts.push(`oprettet ${created}`);
-      if (updated) {
-        metadataParts.push(`ændret ${updated}${updatedBy ? ` af ${updatedBy}` : ''}`);
-      } else if (updatedBy) {
-        metadataParts.push(`ændret af ${updatedBy}`);
+      const geneLine = `${label} (${geneCount}): ${geneList || '(ingen gener)'}.`;
+      let descriptionLine = desc;
+      if (descriptionLine) {
+        if (!/[.!?]$/.test(descriptionLine)) {
+          descriptionLine = `${descriptionLine}.`;
+        }
+      } else {
+        descriptionLine = '.';
       }
-      const metadata = metadataParts.length ? ` (${metadataParts.join(', ')})` : '';
-      const detailParts = [];
-      if (desc) detailParts.push(desc);
-      if (geneCount) detailParts.push(`${geneCount} gener: ${genes.join(', ')}`);
-      const details = detailParts.length ? `: ${detailParts.join(' • ')}` : '';
-      return `${name}${versionSuffix}${metadata}${details}`;
+      return `${geneLine}\r\n${descriptionLine}`;
     });
-    const text = lines.join('\r\n');
+    const text = entries.join('\r\n\r\n');
     const filename = downloadTextFile(text, 'glimr-paneler.txt');
     setStatus(`Eksporterede ${filteredPanels.length} paneler til ${filename}.`);
   });
