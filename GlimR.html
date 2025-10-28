@@ -6191,7 +6191,7 @@ function renderPanels(section) {
       const name = (p.name ?? '').toString().trim() || '(uden navn)';
       const desc = (p.description ?? '').toString().replace(/\r?\n|\r/g, ' ').trim();
       const versionValue = normaliseVersionNumber(p.version);
-      const label = versionValue != null ? `${name}_${versionValue}` : name;
+      const label = versionValue != null ? `${name}_v${versionValue}` : name;
       const genes = parseGeneList(p.gene_list);
       const geneList = genes.join(', ');
       const geneCount = genes.length;
