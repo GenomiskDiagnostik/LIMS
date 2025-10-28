@@ -1975,7 +1975,7 @@ function applyIconSlots(scope = document) {
 }
 applyIconSlots(document);
 const SAMPLE_TYPES = ['Blod','Kindskrab','Biopsi','Kontrol'];
-const SAMPLE_STATUSES = ['Modtaget','Afventer','QC','Analyse','Tolkning','Rapport','Svaret','Biobank','Annulleret'];
+const SAMPLE_STATUSES = ['Modtaget','Afventer','QC','Analyse','Tolkning','Godkendelse','Rapport','Svaret','Biobank','Annulleret'];
 const INACTIVE_SAMPLE_STATUSES = new Set(['svaret','biobank','annulleret']);
 function isActiveStatus(status) {
   return !INACTIVE_SAMPLE_STATUSES.has((status || '').toLowerCase());
@@ -2042,7 +2042,7 @@ const tooltipCatalog = {
     'Modtaget': 'Prøver registreret som modtaget i laboratoriet.',
     'Akutte/Haster': 'Aktive ordinationer markeret som akut eller haster.',
     'Analyse': 'Prøver markeret som i analysefasen.',
-    'Tolkning': 'Prøver under tolkning af resultater.',
+    'Tolkning': 'Prøver under tolkning eller godkendelse af resultater.',
     'Rapport': 'Prøver i rapporteringsfasen.',
     'Varianter': 'Antal registrerede genetiske varianter.',
     'Biobank': 'Prøver arkiveret i biobanken.'
@@ -4553,17 +4553,16 @@ function renderDashboard(section) {
     if (status === 'modtaget') acc.received += 1;
     else if (status === 'qc') acc.qc += 1;
     else if (status === 'analyse') acc.analysis += 1;
-    else if (status === 'tolkning') acc.interpretation += 1;
+    else if (status === 'tolkning' || status === 'godkendelse') acc.interpretation += 1;
     else if (status === 'rapport') acc.report += 1;
     else if (status === 'biobank') acc.biobank += 1;
     return acc;
   }, {received: 0, qc: 0, analysis: 0, interpretation: 0, report: 0, biobank: 0});
   const recentOrders = orders.slice().sort((a,b)=> (b.updated_at||'').localeCompare(a.updated_at||'' )).slice(0,5);
-  const inactiveSampleStatuses = new Set(['svaret','biobank','annulleret']);
   const activeOrders = orders.filter(order => {
     const sample = findById('samples', Number(order.sample_id));
     const status = (sample?.status || order.status || '').toLowerCase();
-    return !inactiveSampleStatuses.has(status);
+    return isActiveStatus(status);
   });
   const priorityOrdersCount = activeOrders.filter(order => order.acute || order.urgent).length;
   const MS_PER_DAY = 86400000;
