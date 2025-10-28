@@ -858,6 +858,81 @@ tbody tr[data-order-id]:hover {
   font-size: 0.75rem;
   color: var(--muted-text);
 }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.table-shortcuts {
+  width: 3.25rem;
+}
+.table-actions-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding-right: 0.4rem;
+}
+button.icon-button {
+  border: none;
+  background: transparent;
+  color: var(--muted-text);
+  padding: 0.35rem;
+  border-radius: 0.45rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+}
+button.icon-button .icon-slot {
+  width: 1.1em;
+  height: 1.1em;
+}
+button.icon-button:hover {
+  background: rgba(24, 111, 175, 0.12);
+  color: var(--accent-strong);
+}
+[data-theme="dark"] button.icon-button:hover {
+  background: rgba(56, 189, 248, 0.18);
+  color: var(--accent);
+}
+button.icon-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  background: rgba(24, 111, 175, 0.12);
+  color: var(--accent-strong);
+}
+[data-theme="dark"] button.icon-button:focus-visible {
+  background: rgba(56, 189, 248, 0.18);
+  color: var(--accent);
+}
+@media (hover: none) {
+  button.icon-button:hover {
+    background: transparent;
+    color: var(--muted-text);
+  }
+  button.icon-button:focus-visible {
+    background: rgba(24, 111, 175, 0.12);
+    color: var(--accent-strong);
+  }
+  [data-theme="dark"] button.icon-button:focus-visible {
+    background: rgba(56, 189, 248, 0.18);
+    color: var(--accent);
+  }
+}
+button.icon-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.table-actions-cell button.icon-button {
+  flex: 0 0 auto;
+}
 label.checkbox-field {
   display: inline-flex;
   align-items: center;
@@ -1490,7 +1565,12 @@ const state = {
   lastStatus: '',
   usingMemoryDb: false,
   pendingOrderId: null,
-  pendingOrderShowAll: false
+  pendingOrderShowAll: false,
+  pendingSampleId: null,
+  pendingSampleShowAll: false,
+  pendingReportFilterOrderId: null,
+  pendingReportShowAll: false,
+  pendingReportSelectOrderId: null
 };
 const CREATED_BY_STORES = new Set(['patients','samples','orders','patient_groups','variants','qc','reports','conclusion_library']);
 const UPDATED_BY_STORES = new Set(['panels']);
@@ -1870,6 +1950,7 @@ const tooltipCatalog = {
     'Antal gener': 'Optalt antal gener i panelets genliste.',
     'Genliste': 'Kommasepareret liste over gener inkluderet i panelet.',
     'Bestilt': 'Tidspunkt for oprettelse af ordinationen.',
+    'Genveje': 'Genveje til relaterede visninger for ordinationen.',
     'Opsamlet': 'Dato og tidspunkt for prøveindsamling.',
     'Ordination': 'Reference til ordinationen.',
     'Gen': 'Genet hvor varianten er fundet.',
@@ -3225,6 +3306,23 @@ function openOrderDetails(orderId, options = {}) {
   state.pendingOrderId = numericId;
   state.pendingOrderShowAll = Boolean(options.showAll);
   activateTab('orders');
+}
+function openSamplesForOrder(orderId) {
+  const numericId = Number(orderId);
+  if (!Number.isFinite(numericId)) return;
+  const order = findById('orders', numericId);
+  const sampleId = order?.sample_id != null ? Number(order.sample_id) : null;
+  state.pendingSampleId = Number.isFinite(sampleId) ? sampleId : null;
+  state.pendingSampleShowAll = true;
+  activateTab('samples');
+}
+function openReportsForOrder(orderId) {
+  const numericId = Number(orderId);
+  if (!Number.isFinite(numericId)) return;
+  state.pendingReportFilterOrderId = numericId;
+  state.pendingReportSelectOrderId = numericId;
+  state.pendingReportShowAll = true;
+  activateTab('reports');
 }
 function openDb() {
   return new Promise((resolve, reject) => {
@@ -5854,8 +5952,17 @@ function renderSamples(section) {
   applySelectFilters(section);
   let filteredSamples = list.slice();
   let activeFilters = {};
-  let selectedSampleId = null;
+  let selectedSampleId = state.pendingSampleId != null ? Number(state.pendingSampleId) : null;
+  if (!Number.isFinite(selectedSampleId)) selectedSampleId = null;
   let showActiveOnly = activeToggle ? activeToggle.checked : false;
+  if (selectedSampleId != null) {
+    if (filterInputs.id) filterInputs.id.value = String(selectedSampleId);
+    if (search) search.value = '';
+    if (state.pendingSampleShowAll && activeToggle) {
+      showActiveOnly = false;
+      activeToggle.checked = false;
+    }
+  }
   const renderRows = () => {
     const term = search.value.toLowerCase();
     const filters = {
@@ -5914,6 +6021,18 @@ function renderSamples(section) {
     annotateTableCells(section);
   };
   renderRows();
+  if (selectedSampleId != null) {
+    const pendingSample = list.find(s => s.id === selectedSampleId);
+    if (pendingSample) {
+      fillForm(form, pendingSample);
+      const pendingRow = tbody?.querySelector(`tr[data-id="${pendingSample.id}"]`);
+      if (pendingRow) {
+        pendingRow.scrollIntoView({block: 'nearest'});
+      }
+    }
+  }
+  state.pendingSampleId = null;
+  state.pendingSampleShowAll = false;
   activeToggle?.addEventListener('change', () => {
     showActiveOnly = activeToggle.checked;
     renderRows();
@@ -6363,7 +6482,7 @@ function renderOrders(section) {
             <label>Bestilt til<input type="date" data-filter-orders="ordered_to"></label>
           </div>
         </details>
-        <table><thead><tr><th>ID</th><th>Patient</th><th>Prøve</th><th>Panel</th><th>Analyseansvarlig</th><th>Tolker</th><th>Godkender</th><th>Patientgruppe</th><th>Indikation</th><th>HPO-termer</th><th>Status</th><th>Oprettet af</th><th>Bestilt</th></tr></thead><tbody></tbody></table>
+        <table><thead><tr><th class="table-shortcuts"><span class="sr-only">Genveje</span></th><th>ID</th><th>Patient</th><th>Prøve</th><th>Panel</th><th>Analyseansvarlig</th><th>Tolker</th><th>Godkender</th><th>Patientgruppe</th><th>Indikation</th><th>HPO-termer</th><th>Status</th><th>Oprettet af</th><th>Bestilt</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
           <button type="button" class="secondary" id="ordersExport">Eksportér filtrerede ordinationer</button>
         </div>
@@ -6476,6 +6595,7 @@ function renderOrders(section) {
     ordered_to: section.querySelector('[data-filter-orders="ordered_to"]')
   };
   const activeToggle = section.querySelector('#ordersActiveOnly');
+  applyIconSlots(section);
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
@@ -6647,8 +6767,22 @@ function renderOrders(section) {
       const urgentIcon = o.urgent
         ? '<span class="urgent-indicator" role="img" aria-label="Haster"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3.172 2.322 20.5h19.356L12 3.172zm1 13.828h-2v2h2v-2zm0-8h-2v6h2v-6z"></path></svg></span>'
         : '';
-      return `<tr data-id="${o.id}"${selectedAttr}${urgentAttr}><td>${urgentIcon}<span class="order-id">${esc(o.id)}</span></td><td>${esc(getName('patients', Number(o.patient_id)))}</td><td>${esc(getName('samples', Number(o.sample_id)))}</td><td>${esc(getName('panels', Number(o.panel_id)))}</td><td>${esc(userName(o.analysis_responsible_id))}</td><td>${esc(userName(o.interpreter_id))}</td><td>${esc(userName(o.approver_id))}</td><td${patientGroupAttr}>${patientGroupCell}</td><td${indicationAttr}>${indicationCell}</td><td${hpoAttr}>${hpoCell}</td><td>${esc(statusDisplay)}</td><td>${esc(createdBy)}</td><td>${orderedCell}</td></tr>`;
+      const sampleId = Number(o.sample_id);
+      const sampleButtonDisabledAttr = Number.isFinite(sampleId) ? '' : ' disabled';
+      const shortcutsCell = `<td class="table-actions-cell"><button type="button" class="icon-button" data-order-action="samples" data-order-id="${o.id}"${sampleButtonDisabledAttr}><span class="icon-slot" data-icon="beaker"></span></button><button type="button" class="icon-button" data-order-action="reports" data-order-id="${o.id}"><span class="icon-slot" data-icon="document-chart-bar"></span></button></td>`;
+      return `<tr data-id="${o.id}"${selectedAttr}${urgentAttr}>${shortcutsCell}<td>${urgentIcon}<span class="order-id">${esc(o.id)}</span></td><td>${esc(getName('patients', Number(o.patient_id)))}</td><td>${esc(getName('samples', Number(o.sample_id)))}</td><td>${esc(getName('panels', Number(o.panel_id)))}</td><td>${esc(userName(o.analysis_responsible_id))}</td><td>${esc(userName(o.interpreter_id))}</td><td>${esc(userName(o.approver_id))}</td><td${patientGroupAttr}>${patientGroupCell}</td><td${indicationAttr}>${indicationCell}</td><td${hpoAttr}>${hpoCell}</td><td>${esc(statusDisplay)}</td><td>${esc(createdBy)}</td><td>${orderedCell}</td></tr>`;
     }).join('');
+    applyIconSlots(tbody);
+    tbody.querySelectorAll('button[data-order-action]').forEach(btn => {
+      const action = btn.dataset.orderAction;
+      let tip = '';
+      if (action === 'samples') {
+        tip = 'Åbn Prøver-fanen med filter for denne ordination.';
+      } else if (action === 'reports') {
+        tip = 'Åbn Rapporter-fanen med filter for denne ordination.';
+      }
+      if (tip) setTooltip(btn, tip);
+    });
     annotateTableCells(section);
   };
   renderRows();
@@ -6719,6 +6853,17 @@ function renderOrders(section) {
     });
   });
   tbody.addEventListener('click', e => {
+    const actionButton = e.target.closest('button[data-order-action]');
+    if (actionButton) {
+      if (actionButton.disabled) return;
+      const {orderId, orderAction} = actionButton.dataset;
+      if (orderAction === 'samples') {
+        openSamplesForOrder(orderId);
+      } else if (orderAction === 'reports') {
+        openReportsForOrder(orderId);
+      }
+      return;
+    }
     const tr = e.target.closest('tr');
     if (!tr) return;
     const order = list.find(o => o.id === Number(tr.dataset.id));
@@ -9100,8 +9245,29 @@ function renderReports(section) {
   const statusMap = {draft:'Udkast', final:'Endelig', amended:'Ændret'};
   let filteredReports = list.slice();
   let activeFilters = {};
+  let pendingFilterOrderId = state.pendingReportFilterOrderId != null ? Number(state.pendingReportFilterOrderId) : null;
+  if (!Number.isFinite(pendingFilterOrderId)) pendingFilterOrderId = null;
+  const pendingSelectOrderIdRaw = state.pendingReportSelectOrderId != null ? Number(state.pendingReportSelectOrderId) : null;
+  const pendingSelectOrderId = Number.isFinite(pendingSelectOrderIdRaw) ? pendingSelectOrderIdRaw : null;
   let selectedReportId = null;
   let showActiveOnly = activeToggle ? activeToggle.checked : false;
+  if (pendingFilterOrderId != null) {
+    if (filterInputs.order) filterInputs.order.value = String(pendingFilterOrderId);
+    if (search) search.value = '';
+    if (state.pendingReportShowAll && activeToggle) {
+      showActiveOnly = false;
+      activeToggle.checked = false;
+    }
+    const matchingReports = list.filter(r => Number(r.order_id) === pendingFilterOrderId);
+    if (matchingReports.length) {
+      matchingReports.sort((a, b) => {
+        const timeA = (a.issued_at || a.updated_at || a.created_at || '');
+        const timeB = (b.issued_at || b.updated_at || b.created_at || '');
+        return timeB.localeCompare(timeA);
+      });
+      selectedReportId = matchingReports[0].id;
+    }
+  }
   const renderRows = () => {
     const term = search.value.toLowerCase();
     const filters = {
@@ -9178,6 +9344,25 @@ function renderReports(section) {
     annotateTableCells(section);
   };
   renderRows();
+  if (selectedReportId != null) {
+    const pendingReport = list.find(r => r.id === selectedReportId);
+    if (pendingReport) {
+      fillForm(form, pendingReport);
+      const pendingRow = tbody?.querySelector(`tr[data-id="${pendingReport.id}"]`);
+      if (pendingRow) {
+        pendingRow.scrollIntoView({block: 'nearest'});
+      }
+      if (orderSelect) {
+        orderSelect.dispatchEvent(new Event('change'));
+      }
+    }
+  } else if (pendingSelectOrderId != null && orderSelect) {
+    orderSelect.value = String(pendingSelectOrderId);
+    orderSelect.dispatchEvent(new Event('change'));
+  }
+  state.pendingReportFilterOrderId = null;
+  state.pendingReportShowAll = false;
+  state.pendingReportSelectOrderId = null;
   search.addEventListener('input', renderRows);
   Object.values(filterInputs).forEach(input => input?.addEventListener('input', renderRows));
   activeToggle?.addEventListener('change', () => {
