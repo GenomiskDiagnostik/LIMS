@@ -13219,7 +13219,10 @@ function renderUsers(section) {
     }
     tbody.innerHTML = filteredUsers.map(u => {
       const selectedAttr = u.id === selectedUserId ? ' data-selected="true"' : '';
-      return `<tr data-id="${u.id}"${selectedAttr}><td>${u.id}</td><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${esc(roleLabel(u.role))}</td></tr>`;
+      const emailCell = u.email
+        ? `<a href="mailto:${encodeURIComponent(u.email)}">${esc(u.email)}</a>`
+        : '';
+      return `<tr data-id="${u.id}"${selectedAttr}><td>${u.id}</td><td>${esc(u.name)}</td><td>${emailCell}</td><td>${esc(roleLabel(u.role))}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
