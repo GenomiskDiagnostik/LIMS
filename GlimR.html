@@ -1204,232 +1204,26 @@ form textarea {
   width: auto;
   accent-color: var(--accent);
 }
-button {
-  font: inherit;
-}
-
 button.primary {
-  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  background: var(--accent);
   color: #fff;
-  box-shadow: 0 8px 18px var(--accent-shadow);
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
 }
-
-button.primary:hover {
-  background: linear-gradient(135deg, var(--accent-strong), var(--accent));
+button.danger {
+  background: var(--danger);
+  color: #fff;
 }
-
-[data-theme="dark"] button.primary {
-  box-shadow: 0 10px 22px rgba(14, 165, 233, 0.18);
-}
-
-button.secondary {
-  background: rgba(24, 111, 175, 0.08);
-  color: var(--accent-strong);
-  border-color: rgba(24, 111, 175, 0.25);
-  box-shadow: inset 0 0 0 1px rgba(24, 111, 175, 0.08);
-}
-
-button.secondary:hover {
-  background: rgba(24, 111, 175, 0.14);
-}
-
-[data-theme="dark"] button.secondary {
-  background: rgba(56, 189, 248, 0.15);
-  color: var(--accent);
-  border-color: rgba(56, 189, 248, 0.35);
-  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.2);
-}
-
-[data-theme="dark"] button.secondary:hover {
-  background: rgba(56, 189, 248, 0.22);
-}
-
 button.secondary {
   background: var(--nav-button-bg);
   color: var(--nav-button-color);
   border: 1px solid transparent;
-  border-radius: 0.5rem;
-  padding: 0.5rem 0.9rem;
-  cursor: pointer;
 }
-
-button.danger {
-  background: var(--danger);
-  color: #fff;
-  border: none;
-  border-radius: 0.5rem;
-  padding: 0.5rem 0.9rem;
-  cursor: pointer;
-}
-
 button:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
-  box-shadow: none;
-  transform: none;
-}
-
-button.btn-save,
-button.btn-new,
-button.btn-delete {
-  gap: 0.65rem;
-}
-
-button.btn-save::before,
-button.btn-new::before,
-button.btn-delete::before {
-  content: '';
-  width: 1.15em;
-  height: 1.15em;
-  display: inline-block;
-  background: currentColor;
-  mask-repeat: no-repeat;
-  mask-position: center;
-  mask-size: contain;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  -webkit-mask-size: contain;
-  opacity: 0.85;
-}
-
-button.btn-save::before {
-  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h9l5%205v11a2%202%200%200%201-2%202H7a2%202%200%200%201-2-2V5a2%202%200%200%201%202-2z%22/%3E%3Cpath%20d%3D%22M7%203v5h8%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2216%22%20r%3D%222.25%22/%3E%3C/svg%3E");
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h9l5%205v11a2%202%200%200%201-2%202H7a2%202%200%200%201-2-2V5a2%202%200%200%201%202-2z%22/%3E%3Cpath%20d%3D%22M7%203v5h8%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2216%22%20r%3D%222.25%22/%3E%3C/svg%3E");
-}
-
-button.btn-new::before {
-  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%205v14%22/%3E%3Cpath%20d%3D%22M5%2012h14%22/%3E%3C/svg%3E");
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%205v14%22/%3E%3Cpath%20d%3D%22M5%2012h14%22/%3E%3C/svg%3E");
-}
-
-button.btn-delete::before {
-  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%207h16%22/%3E%3Cpath%20d%3D%22M10%2011v6%22/%3E%3Cpath%20d%3D%22M14%2011v6%22/%3E%3Cpath%20d%3D%22M5%207l1%2012a2%202%200%200%200%202%202h8a2%202%200%200%200%202-2l1-12%22/%3E%3Cpath%20d%3D%22M9%207V4h6v3%22/%3E%3C/svg%3E");
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%207h16%22/%3E%3Cpath%20d%3D%22M10%2011v6%22/%3E%3Cpath%20d%3D%22M14%2011v6%22/%3E%3Cpath%20d%3D%22M5%207l1%2012a2%202%200%200%200%202%202h8a2%202%200%200%200%202-2l1-12%22/%3E%3Cpath%20d%3D%22M9%207V4h6v3%22/%3E%3C/svg%3E");
-}
-
-button.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.55rem;
-  font-weight: 600;
-  line-height: 1.1;
-  border-radius: 0.65rem;
-  padding: 0.55rem 1.1rem;
-  border: 1px solid transparent;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
-}
-
-button.btn:hover {
-  transform: translateY(-1px);
-}
-
-button.btn:active {
-  transform: translateY(0);
-}
-
-button.btn:focus-visible {
-  outline: 3px solid var(--input-focus);
-  outline-offset: 2px;
-}
-
-button.btn.primary {
-  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-  color: #fff;
-  box-shadow: 0 8px 18px var(--accent-shadow);
-  border: none;
-}
-
-button.btn.primary:hover {
-  background: linear-gradient(135deg, var(--accent-strong), var(--accent));
-}
-
-[data-theme="dark"] button.btn.primary {
-  box-shadow: 0 10px 22px rgba(14, 165, 233, 0.18);
-}
-
-button.btn.secondary {
-  background: rgba(24, 111, 175, 0.08);
-  color: var(--accent-strong);
-  border-color: rgba(24, 111, 175, 0.25);
-  box-shadow: inset 0 0 0 1px rgba(24, 111, 175, 0.08);
-}
-
-button.btn.secondary:hover {
-  background: rgba(24, 111, 175, 0.14);
-}
-
-[data-theme="dark"] button.btn.secondary {
-  background: rgba(56, 189, 248, 0.15);
-  color: var(--accent);
-  border-color: rgba(56, 189, 248, 0.35);
-  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.2);
-}
-
-[data-theme="dark"] button.btn.secondary:hover {
-  background: rgba(56, 189, 248, 0.22);
-}
-
-button.btn.danger {
-  background: linear-gradient(135deg, var(--danger), #96271d);
-  color: #fff;
-  box-shadow: 0 8px 18px rgba(192, 57, 43, 0.25);
-  border: none;
-}
-
-button.btn.danger:hover {
-  background: linear-gradient(135deg, #96271d, var(--danger));
-}
-
-[data-theme="dark"] button.btn.danger {
-  box-shadow: 0 10px 22px rgba(239, 68, 68, 0.3);
-}
-
-button.btn:disabled {
-  opacity: 0.6;
-  box-shadow: none;
-  transform: none;
-}
-
-button.btn-save,
-button.btn-new,
-button.btn-delete {
-  gap: 0.65rem;
-}
-
-button.btn-save::before,
-button.btn-new::before,
-button.btn-delete::before {
-  content: '';
-  width: 1.15em;
-  height: 1.15em;
-  display: inline-block;
-  background: currentColor;
-  mask-repeat: no-repeat;
-  mask-position: center;
-  mask-size: contain;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  -webkit-mask-size: contain;
-  opacity: 0.85;
-}
-
-button.btn-save::before {
-  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h9l5%205v11a2%202%200%200%201-2%202H7a2%202%200%200%201-2-2V5a2%202%200%200%201%202-2z%22/%3E%3Cpath%20d%3D%22M7%203v5h8%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2216%22%20r%3D%222.25%22/%3E%3C/svg%3E");
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h9l5%205v11a2%202%200%200%201-2%202H7a2%202%200%200%201-2-2V5a2%202%200%200%201%202-2z%22/%3E%3Cpath%20d%3D%22M7%203v5h8%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2216%22%20r%3D%222.25%22/%3E%3C/svg%3E");
-}
-
-button.btn-new::before {
-  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%205v14%22/%3E%3Cpath%20d%3D%22M5%2012h14%22/%3E%3C/svg%3E");
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%205v14%22/%3E%3Cpath%20d%3D%22M5%2012h14%22/%3E%3C/svg%3E");
-}
-
-button.btn-delete::before {
-  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%207h16%22/%3E%3Cpath%20d%3D%22M10%2011v6%22/%3E%3Cpath%20d%3D%22M14%2011v6%22/%3E%3Cpath%20d%3D%22M5%207l1%2012a2%202%200%200%200%202%202h8a2%202%200%200%200%202-2l1-12%22/%3E%3Cpath%20d%3D%22M9%207V4h6v3%22/%3E%3C/svg%3E");
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%207h16%22/%3E%3Cpath%20d%3D%22M10%2011v6%22/%3E%3Cpath%20d%3D%22M14%2011v6%22/%3E%3Cpath%20d%3D%22M5%207l1%2012a2%202%200%200%200%202%202h8a2%202%200%200%200%202-2l1-12%22/%3E%3Cpath%20d%3D%22M9%207V4h6v3%22/%3E%3C/svg%3E");
 }
 .badge {
   display: inline-block;
@@ -1705,21 +1499,21 @@ pre {
       <form id="loginForm">
         <select id="loginUser" required></select>
         <input id="loginPass" type="password" placeholder="Adgangskode (valgfri)">
-        <button type="submit" class="btn primary with-icon">
+        <button type="submit" class="primary with-icon">
           <span class="icon-slot" data-icon="arrow-right-on-rectangle"></span>
           <span>Log ind</span>
         </button>
       </form>
       <div class="user-info" id="userInfo" hidden>
         <span id="currentUserLabel"></span>
-        <button type="button" class="btn secondary with-icon" id="logoutBtn">
+        <button type="button" class="secondary with-icon" id="logoutBtn">
           <span class="icon-slot" data-icon="arrow-left-on-rectangle"></span>
           <span>Log ud</span>
         </button>
       </div>
     </div>
     <div class="quick-actions">
-      <button class="btn secondary with-icon" id="themeToggle">
+      <button class="secondary with-icon" id="themeToggle">
         <span class="icon-slot" data-icon="moon"></span>
         <span>Skift til mørkt tema</span>
       </button>
@@ -3024,7 +2818,7 @@ function openVariantLibraryPicker(onSelect) {
     <div class="variant-picker" role="dialog" aria-modal="true" aria-label="Vælg variant fra bibliotek">
       <header>
         <h3>Vælg variant fra bibliotek</h3>
-        <button type="button" class="btn secondary" data-action="close">Luk</button>
+        <button type="button" class="secondary" data-action="close">Luk</button>
       </header>
       <div class="picker-body">
         <label class="inline">Søg
@@ -4764,7 +4558,7 @@ function renderDashboard(section) {
   <div class="panel">
     <div class="panel-header">
       <h2>KPI'er</h2>
-      <button class="btn secondary with-icon" id="dashboardPrintButton" type="button">
+      <button class="secondary with-icon" id="dashboardPrintButton" type="button">
         <span class="icon-slot" data-icon="document-chart-bar"></span>
         <span>Udskriv KPI'er og statistik</span>
       </button>
@@ -5104,7 +4898,7 @@ function renderCreateCase(section) {
         <div class="fieldset-body" hidden>
           <p class="form-hint">Tilføj QC-målinger for prøven (valgfrit).</p>
           <div id="qcList" class="repeater"></div>
-          <button type="button" class="btn secondary" id="addQcRow">Tilføj måling</button>
+          <button type="button" class="secondary" id="addQcRow">Tilføj måling</button>
         </div>
       </fieldset>
       <fieldset data-collapsible data-collapsed="true">
@@ -5116,15 +4910,15 @@ function renderCreateCase(section) {
           <p class="form-hint" id="caseVariantHint">Registrer varianter fundet ved analysen. Tomme rækker ignoreres.</p>
           <div id="variantList" class="repeater"></div>
           <div class="btn-row">
-            <button type="button" class="btn secondary" id="addVariantRow">Tilføj variant</button>
-            <button type="button" class="btn secondary" id="caseImportVarSeq">Importér VarSeq CSV</button>
+            <button type="button" class="secondary" id="addVariantRow">Tilføj variant</button>
+            <button type="button" class="secondary" id="caseImportVarSeq">Importér VarSeq CSV</button>
             <input type="file" id="caseImportVarSeqInput" accept=".csv,text/csv" hidden>
           </div>
         </div>
       </fieldset>
       <div class="btn-row">
-        <button type="submit" class="btn primary" id="createCaseSubmit">Opret sag</button>
-        <button type="reset" class="btn secondary" id="createCaseReset">Ryd formular</button>
+        <button type="submit" class="primary" id="createCaseSubmit">Opret sag</button>
+        <button type="reset" class="secondary" id="createCaseReset">Ryd formular</button>
       </div>
     </form>
     <div id="createCaseMessage" class="form-hint" role="status" aria-live="polite"></div>
@@ -5196,7 +4990,7 @@ function renderCreateCase(section) {
       <label class="inline">Værdi<input type="number" step="0.0001" data-field="value" placeholder="42.0"></label>
       <label class="inline">Enhed<input type="text" data-field="unit" placeholder="ng/µl"></label>
       <label class="inline wide">Noter<input type="text" data-field="notes" placeholder="Valgfrit"></label>
-      <button type="button" class="btn secondary case-remove-row">Fjern</button>`;
+      <button type="button" class="secondary case-remove-row">Fjern</button>`;
     const metricInput = row.querySelector('[data-field="metric"]');
     const valueInput = row.querySelector('[data-field="value"]');
     const unitInput = row.querySelector('[data-field="unit"]');
@@ -5246,8 +5040,8 @@ function renderCreateCase(section) {
       <label class="inline">Allelfrekvens<input type="number" step="0.0001" data-field="af" placeholder="0.125"></label>
       <label class="inline wide">Annoteringer<textarea class="small" data-field="annotations" placeholder="VarSeq-annoteringer og noter"></textarea></label>
       <label class="inline wide">Tolkning<textarea class="small" data-field="interpretation" placeholder="Kort tolkning"></textarea></label>
-      <button type="button" class="btn secondary case-choose-library">Vælg fra bibliotek</button>
-      <button type="button" class="btn secondary case-remove-row">Fjern</button>`;
+      <button type="button" class="secondary case-choose-library">Vælg fra bibliotek</button>
+      <button type="button" class="secondary case-remove-row">Fjern</button>`;
     const setValue = (selector, value) => {
       const el = row.querySelector(selector);
       if (!el) return;
@@ -5961,7 +5755,7 @@ function renderPatients(section) {
         </details>
         <table id="patientsTable"><thead><tr><th>ID</th><th>MRN</th><th>ID</th><th>Familienummer</th><th>Navn</th><th>Køn</th><th>Født</th><th>Indikationer</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
-          <button type="button" class="btn secondary" id="patientsExport">Eksportér filtrerede patienter</button>
+          <button type="button" class="secondary" id="patientsExport">Eksportér filtrerede patienter</button>
         </div>
       </div>
       <div>
@@ -5983,9 +5777,9 @@ function renderPatients(section) {
           <label>Fødselsdato<span class="label-note" data-patient-age hidden></span><input type="date" name="birth_date"></label>
           <label>Noter<textarea name="notes"></textarea></label>
           <div class="btn-row">
-            <button type="submit" class="btn primary btn-save">Gem</button>
-            <button type="button" id="patientClear" class="btn secondary btn-new">Ny</button>
-            <button type="button" id="patientDelete" class="btn danger btn-delete">Slet</button>
+            <button type="submit" class="primary">Gem</button>
+            <button type="button" id="patientClear" class="secondary">Ny</button>
+            <button type="button" id="patientDelete" class="danger">Slet</button>
           </div>
         </form>
       </div>
@@ -6205,7 +5999,7 @@ function renderSamples(section) {
         </details>
         <table><thead><tr><th class="table-shortcuts"><span class="sr-only">Genveje</span></th><th>ID</th><th>PMB-nummer</th><th>Patient</th><th>Prøvetype</th><th>Status</th><th>Opsamlet</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
-          <button type="button" class="btn secondary" id="samplesExport">Eksportér filtrerede prøver</button>
+          <button type="button" class="secondary" id="samplesExport">Eksportér filtrerede prøver</button>
         </div>
       </div>
       <div>
@@ -6240,9 +6034,9 @@ function renderSamples(section) {
           <label>Opsamlet<input type="datetime-local" name="collected_at"></label>
           <label>Noter<textarea name="notes"></textarea></label>
           <div class="btn-row">
-            <button class="btn primary btn-save" type="submit">Gem</button>
-            <button class="btn secondary btn-new" type="button" id="sampleClear">Ny</button>
-            <button class="btn danger btn-delete" type="button" id="sampleDelete">Slet</button>
+            <button class="primary" type="submit">Gem</button>
+            <button class="secondary" type="button" id="sampleClear">Ny</button>
+            <button class="danger" type="button" id="sampleDelete">Slet</button>
           </div>
         </form>
       </div>
@@ -6495,7 +6289,7 @@ function renderPanels(section) {
         <input id="panelSearch" type="search" placeholder="Navn, version, dato, bruger eller gener...">
         <table><thead><tr><th>ID</th><th>Navn</th><th>Version</th><th>Oprettet</th><th>Opdateret</th><th>Opdateret af</th><th>Beskrivelse</th><th>Antal gener</th><th>Genliste</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
-          <button type="button" class="btn secondary" id="panelsExport">Eksportér filtrerede paneler</button>
+          <button type="button" class="secondary" id="panelsExport">Eksportér filtrerede paneler</button>
         </div>
       </div>
       <div>
@@ -6513,9 +6307,9 @@ function renderPanels(section) {
             <p class="form-hint">Antal gener: <span data-panel-gene-count>0</span></p>
           </div>
           <div class="btn-row">
-            <button class="btn primary btn-save" type="submit">Gem</button>
-            <button class="btn secondary btn-new" type="button" id="panelClear">Ny</button>
-            <button class="btn danger btn-delete" type="button" id="panelDelete">Slet</button>
+            <button class="primary" type="submit">Gem</button>
+            <button class="secondary" type="button" id="panelClear">Ny</button>
+            <button class="danger" type="button" id="panelDelete">Slet</button>
           </div>
         </form>
       </div>
@@ -6837,7 +6631,7 @@ function renderOrders(section) {
         </details>
         <table><thead><tr><th class="table-shortcuts"><span class="sr-only">Genveje</span></th><th>ID</th><th>Patient</th><th>Prøve</th><th>Panel</th><th>Analyseansvarlig</th><th>Tolker</th><th>Godkender</th><th>Patientgruppe</th><th>Indikation</th><th>HPO-termer</th><th>Status</th><th>Oprettet af</th><th>Bestilt</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
-          <button type="button" class="btn secondary" id="ordersExport">Eksportér filtrerede ordinationer</button>
+          <button type="button" class="secondary" id="ordersExport">Eksportér filtrerede ordinationer</button>
         </div>
       </div>
       <div>
@@ -6921,9 +6715,9 @@ function renderOrders(section) {
           </div>
           <label>Bestillingstidspunkt<input type="datetime-local" name="ordered_at"></label>
           <div class="btn-row">
-            <button class="btn primary btn-save" type="submit">Gem</button>
-            <button class="btn secondary btn-new" type="button" id="orderClear">Ny</button>
-            <button class="btn danger btn-delete" type="button" id="orderDelete">Slet</button>
+            <button class="primary" type="submit">Gem</button>
+            <button class="secondary" type="button" id="orderClear">Ny</button>
+            <button class="danger" type="button" id="orderDelete">Slet</button>
           </div>
         </form>
       </div>
@@ -7416,7 +7210,7 @@ function renderVariants(section) {
         </details>
         <table><thead><tr><th>ID</th><th>Ordination</th><th>Variant</th><th>rsID</th><th>Type</th><th>Klasse</th><th>Kriterier</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
-          <button type="button" class="btn secondary" id="variantsExport">Eksportér filtrerede varianter</button>
+          <button type="button" class="secondary" id="variantsExport">Eksportér filtrerede varianter</button>
         </div>
       </div>
       <div>
@@ -7465,10 +7259,10 @@ function renderVariants(section) {
           <label>Annoteringer<textarea name="annotations" placeholder="Importerede annoteringer fra VarSeq og andre værktøjer."></textarea></label>
           <label>Tolkning<textarea name="interpretation"></textarea></label>
           <div class="btn-row">
-            <button class="btn primary btn-save" type="submit" id="variantSave" data-action="save">Gem</button>
+            <button class="primary" type="submit" id="variantSave" data-action="save">Gem</button>
             <button class="secondary" type="submit" id="variantSaveNew" data-action="create" hidden>Gem som ny</button>
-            <button class="btn secondary btn-new" type="button" id="variantClear">Ny</button>
-            <button class="btn danger btn-delete" type="button" id="variantDelete">Slet</button>
+            <button class="secondary" type="button" id="variantClear">Ny</button>
+            <button class="danger" type="button" id="variantDelete">Slet</button>
             <button class="secondary" type="button" id="variantFromLibrary">Fra bibliotek</button>
             <button class="secondary" type="button" id="variantToLibrary">Til bibliotek</button>
           </div>
@@ -7495,11 +7289,11 @@ function renderVariants(section) {
         </label>
         <div id="variantBatchList" class="repeater"></div>
         <div class="btn-row">
-          <button type="button" class="btn secondary" id="variantBatchAdd">Tilføj variant</button>
-          <button type="button" class="btn secondary" id="variantBatchImport">Importér VarSeq CSV</button>
+          <button type="button" class="secondary" id="variantBatchAdd">Tilføj variant</button>
+          <button type="button" class="secondary" id="variantBatchImport">Importér VarSeq CSV</button>
           <input type="file" id="variantBatchFile" accept=".csv,text/csv" hidden>
-          <button type="button" class="btn primary btn-save" id="variantBatchSave">Gem varianter</button>
-          <button type="button" class="btn secondary" id="variantBatchClear">Ryd rækker</button>
+          <button type="button" class="primary" id="variantBatchSave">Gem varianter</button>
+          <button type="button" class="secondary" id="variantBatchClear">Ryd rækker</button>
         </div>
         <div class="form-hint" id="variantBatchMessage" role="status" aria-live="polite"></div>
       </div>
@@ -7559,8 +7353,8 @@ function renderVariants(section) {
       <label class="inline">Allelfrekvens<input type="number" step="0.0001" data-field="af" placeholder="0.125"></label>
       <label class="inline wide">Annoteringer<textarea class="small" data-field="annotations" placeholder="VarSeq-annoteringer og noter"></textarea></label>
       <label class="inline wide">Tolkning<textarea class="small" data-field="interpretation" placeholder="Valgfrit"></textarea></label>
-      <button type="button" class="btn secondary case-choose-library">Vælg fra bibliotek</button>
-      <button type="button" class="btn secondary case-remove-row">Fjern</button>`;
+      <button type="button" class="secondary case-choose-library">Vælg fra bibliotek</button>
+      <button type="button" class="secondary case-remove-row">Fjern</button>`;
     const setValue = (selector, value) => {
       const el = row.querySelector(selector);
       if (!el) return;
@@ -8237,8 +8031,8 @@ function renderVariantLibrary(section) {
           <tbody></tbody>
         </table>
         <div class="table-actions">
-          <button type="button" class="btn secondary" id="libraryExportCsv">Eksportér CSV</button>
-          <button type="button" class="btn secondary" id="libraryImportCsv">Importér CSV</button>
+          <button type="button" class="secondary" id="libraryExportCsv">Eksportér CSV</button>
+          <button type="button" class="secondary" id="libraryImportCsv">Importér CSV</button>
           <input type="file" id="variantLibraryImportInput" accept=".csv,text/csv" hidden>
         </div>
       </div>
@@ -8280,10 +8074,10 @@ function renderVariantLibrary(section) {
           <label>Kurateret af<input name="curated_by"></label>
           <label>Sidst gennemgået<input type="date" name="last_review"></label>
           <div class="btn-row">
-            <button class="btn primary btn-save" type="submit" data-action="save" id="variantLibrarySave">Gem</button>
+            <button class="primary" type="submit" data-action="save" id="variantLibrarySave">Gem</button>
             <button class="secondary" type="submit" data-action="create" id="variantLibrarySaveNew" hidden>Gem som ny</button>
-            <button class="btn secondary btn-new" type="button" id="variantLibraryClear">Ny</button>
-            <button class="btn danger btn-delete" type="button" id="variantLibraryDelete">Slet</button>
+            <button class="secondary" type="button" id="variantLibraryClear">Ny</button>
+            <button class="danger" type="button" id="variantLibraryDelete">Slet</button>
           </div>
         </form>
       </div>
@@ -9052,9 +8846,9 @@ function renderConclusionLibrary(section) {
           <label>Titel<input name="title" required></label>
           <label>Standardtekst<textarea name="body" rows="8" required></textarea></label>
           <div class="btn-row">
-            <button class="btn primary btn-save" type="submit">Gem</button>
-            <button class="btn secondary btn-new" type="button" id="conclusionLibraryClear">Ny</button>
-            <button class="btn danger btn-delete" type="button" id="conclusionLibraryDelete">Slet</button>
+            <button class="primary" type="submit">Gem</button>
+            <button class="secondary" type="button" id="conclusionLibraryClear">Ny</button>
+            <button class="danger" type="button" id="conclusionLibraryDelete">Slet</button>
           </div>
         </form>
         <div data-placeholder-guide="library"></div>
@@ -9201,7 +8995,7 @@ function renderReports(section) {
         </details>
         <table><thead><tr><th class="table-shortcuts"><span class="sr-only">Genveje</span></th><th>ID</th><th>Ordination</th><th>Status</th><th>Oprettet af</th><th>Udstedt</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
-          <button type="button" class="btn secondary" id="reportsExport">Eksportér filtrerede rapporter</button>
+          <button type="button" class="secondary" id="reportsExport">Eksportér filtrerede rapporter</button>
         </div>
       </div>
       <div>
@@ -9227,7 +9021,7 @@ function renderReports(section) {
                   <option value="" selected>Vælg variant</option>
                 </select>
               </div>
-              <button class="btn secondary" type="button" id="reportAddVariant" disabled>Tilføj</button>
+              <button class="secondary" type="button" id="reportAddVariant" disabled>Tilføj</button>
             </div>
           </label>
           <div class="report-variant-list" id="reportVariantList">
@@ -9243,15 +9037,15 @@ function renderReports(section) {
               </select>
             </label>
             <div class="conclusion-library-buttons">
-              <button class="btn secondary" type="button" id="conclusionLibraryInsert">Erstat konklusion</button>
-              <button class="btn secondary" type="button" id="conclusionLibraryAppend">Tilføj til konklusion</button>
+              <button class="secondary" type="button" id="conclusionLibraryInsert">Erstat konklusion</button>
+              <button class="secondary" type="button" id="conclusionLibraryAppend">Tilføj til konklusion</button>
             </div>
           </div>
           <div data-placeholder-guide="report"></div>
           <div class="btn-row">
-            <button class="btn primary btn-save" type="submit">Gem</button>
-            <button class="btn secondary btn-new" type="button" id="reportClear">Ny</button>
-            <button class="btn danger btn-delete" type="button" id="reportDelete">Slet</button>
+            <button class="primary" type="submit">Gem</button>
+            <button class="secondary" type="button" id="reportClear">Ny</button>
+            <button class="danger" type="button" id="reportDelete">Slet</button>
             <button class="secondary" type="button" id="reportPreview">Udskriv/forhåndsvis</button>
             <button class="secondary" type="button" id="reportDownloadPdf">Hent PDF</button>
           </div>
@@ -10992,9 +10786,9 @@ function renderQC(section) {
           <label>Enhed<input name="unit"></label>
           <label>Noter<textarea name="notes"></textarea></label>
           <div class="btn-row">
-            <button class="btn primary btn-save" type="submit">Gem</button>
-            <button class="btn secondary btn-new" type="button" id="qcClear">Ny</button>
-            <button class="btn danger btn-delete" type="button" id="qcDelete">Slet</button>
+            <button class="primary" type="submit">Gem</button>
+            <button class="secondary" type="button" id="qcClear">Ny</button>
+            <button class="danger" type="button" id="qcDelete">Slet</button>
           </div>
         </form>
       </div>
@@ -11524,7 +11318,7 @@ function renderTools(section) {
           </fieldset>
         </div>
         <div class="btn-row">
-          <button type="button" class="btn secondary" id="acmgReset">Nulstil kriterier</button>
+          <button type="button" class="secondary" id="acmgReset">Nulstil kriterier</button>
         </div>
       </form>
       <div class="tool-result" id="acmgResult">Vælg kriterier for at se forslag til klassifikation.</div>
@@ -11580,7 +11374,7 @@ function renderTools(section) {
         </div>
         <p class="tool-note">Felter skjules automatisk for varianttyper, hvor de ikke anvendes. Positioner kan skrives med intronnotation (fx 123+1).</p>
         <div class="btn-row">
-          <button type="button" class="btn secondary" id="hgvsCopy">Kopiér notation</button>
+          <button type="button" class="secondary" id="hgvsCopy">Kopiér notation</button>
         </div>
       </form>
       <div class="tool-result" id="hgvsResult">Udfyld felterne for at få et HGVS-forslag.</div>
@@ -11644,7 +11438,7 @@ function renderTools(section) {
           <label for="distanceEnd">Slutposition<input id="distanceEnd" name="end" placeholder="fx 55277778"></label>
         </div>
         <div class="btn-row">
-          <button type="button" class="btn secondary" id="distanceSwap">Byt positioner</button>
+          <button type="button" class="secondary" id="distanceSwap">Byt positioner</button>
         </div>
       </form>
       <div class="tool-result" id="distanceResult">Indtast positioner for at se resultatet.</div>
@@ -11697,8 +11491,8 @@ function renderTools(section) {
           </label>
         </div>
         <div class="btn-row">
-          <button type="submit" class="btn primary" id="genomeBrowserOpen">Åbn i ny fane</button>
-          <button type="button" class="btn secondary" id="genomeBrowserClear">Ryd</button>
+          <button type="submit" class="primary" id="genomeBrowserOpen">Åbn i ny fane</button>
+          <button type="button" class="secondary" id="genomeBrowserClear">Ryd</button>
         </div>
       </form>
       <div class="tool-result" id="genomeBrowserStatus">Indtast en søgeværdi og vælg browser for at åbne visningen.</div>
@@ -11753,8 +11547,8 @@ function renderTools(section) {
           <span>Brug MEGABLAST for højt lignende DNA-sekvenser (blastn)</span>
         </label>
         <div class="btn-row">
-          <button type="submit" class="btn primary" id="blastSubmit">Kør BLAST (NCBI)</button>
-          <button type="button" class="btn secondary" id="blastClear">Ryd</button>
+          <button type="submit" class="primary" id="blastSubmit">Kør BLAST (NCBI)</button>
+          <button type="button" class="secondary" id="blastClear">Ryd</button>
         </div>
       </form>
       <div class="tool-result" id="blastStatus">Indsæt en sekvens og kør BLAST for at åbne resultatet hos NCBI.</div>
@@ -11795,8 +11589,8 @@ function renderTools(section) {
           </label>
         </div>
         <div class="btn-row">
-          <button type="submit" class="btn primary" id="primerDesign">Design primere</button>
-          <button type="button" class="btn secondary" id="primerClear">Ryd</button>
+          <button type="submit" class="primary" id="primerDesign">Design primere</button>
+          <button type="button" class="secondary" id="primerClear">Ryd</button>
         </div>
       </form>
       <div class="tool-result" id="primerResult">Indsæt en sekvens og angiv evt. målområde for at foreslå primere.</div>
@@ -11818,8 +11612,8 @@ function renderTools(section) {
           <textarea id="gcSequence" name="sequence" rows="4" placeholder="Indsæt sekvens her"></textarea>
         </label>
         <div class="btn-row">
-          <button type="button" class="btn secondary" id="gcUpper">Rens og formater</button>
-          <button type="button" class="btn secondary" id="gcReverse">Reverse komplement</button>
+          <button type="button" class="secondary" id="gcUpper">Rens og formater</button>
+          <button type="button" class="secondary" id="gcReverse">Reverse komplement</button>
         </div>
       </form>
       <div class="tool-result" id="gcResult">Indsæt en sekvens for at beregne GC%.</div>
@@ -12760,8 +12554,8 @@ function renderResponses(section) {
     <h2>Udgående MedCom-svar</h2>
     <label>Vælg ordre<select id="fhirOrderSelect"><option value="">Vælg...</option>${getCached('orders').map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}</select></label>
     <div class="btn-row">
-      <button class="btn primary" id="generateFhir">Generér FHIR-bundle</button>
-      <button class="btn secondary" id="previewFhir">Forhåndsvis</button>
+      <button class="primary" id="generateFhir">Generér FHIR-bundle</button>
+      <button class="secondary" id="previewFhir">Forhåndsvis</button>
     </div>
     <pre id="fhirPreview" style="display:none"></pre>
   </div>`;
@@ -12970,9 +12764,9 @@ function renderUsers(section) {
           <label>Rolle<select name="role" required>${ROLE_OPTIONS.map(opt => `<option value="${opt.value}">${opt.value} – ${opt.description}</option>`).join('')}</select></label>
           <label>Adgangskode (PIN)<input type="password" name="pin" placeholder="Valgfri kode"></label>
           <div class="btn-row">
-            <button class="btn primary btn-save" type="submit">Gem</button>
-            <button class="btn secondary btn-new" type="button" id="userClear">Ny</button>
-            <button class="btn danger btn-delete" type="button" id="userDelete">Slet</button>
+            <button class="primary" type="submit">Gem</button>
+            <button class="secondary" type="button" id="userClear">Ny</button>
+            <button class="danger" type="button" id="userDelete">Slet</button>
           </div>
         </form>
       </div>
@@ -13078,8 +12872,8 @@ function renderDbTab(section) {
     <p>${esc(status)}</p>
     ${memoryWarning}
     <div class="btn-row">
-      <button class="btn secondary" id="bindFile">Knyt/åbn DB-fil...</button>
-      <button class="btn secondary btn-save" id="saveNow">Gem nu</button>
+      <button class="secondary" id="bindFile">Knyt/åbn DB-fil...</button>
+      <button class="secondary" id="saveNow">Gem nu</button>
       <label style="display:flex;align-items:center;gap:0.5rem;">
         <input type="checkbox" id="autosaveToggle" ${state.autosave?'checked':''}> Autogem
       </label>
@@ -13088,11 +12882,11 @@ function renderDbTab(section) {
   <div class="panel">
     <h2>Backup</h2>
     <div class="btn-row">
-      <button class="btn secondary" id="downloadBackup">Hent backup (JSON)</button>
+      <button class="secondary" id="downloadBackup">Hent backup (JSON)</button>
       <label class="secondary" id="restoreLabel" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.4rem 0.8rem;border-radius:0.5rem;cursor:pointer;">Gendan fra backup<input type="file" id="restoreFile" accept="application/json" style="display:none;"></label>
     </div>
     <div class="btn-row">
-      <button class="btn danger" id="resetDataBtn">Backup &amp; ryd data (undtagen brugere)</button>
+      <button class="danger" id="resetDataBtn">Backup &amp; ryd data (undtagen brugere)</button>
     </div>
     <p class="panel-hint">Downloader en fuld backup og nulstiller alle andre data. Kræver skriveadgang.</p>
   </div>`;
@@ -13126,12 +12920,12 @@ function renderAdmin(section) {
   section.innerHTML = `
   <div class="panel">
     <div class="btn-row">
-      <button class="btn primary" id="demoDataBtn">Indlæs demo-data</button>
+      <button class="primary" id="demoDataBtn">Indlæs demo-data</button>
     </div>
     <div class="btn-row">
-      <button class="btn primary" id="downloadSql">Hent glimr.sql</button>
-      <button class="btn secondary" id="showSchema">Vis skema</button>
-      <button class="btn secondary" id="downloadZip">Hent ZIP</button>
+      <button class="primary" id="downloadSql">Hent glimr.sql</button>
+      <button class="secondary" id="showSchema">Vis skema</button>
+      <button class="secondary" id="downloadZip">Hent ZIP</button>
     </div>
     <textarea id="schemaText" style="width:100%;min-height:200px;margin-top:1rem;display:none;"></textarea>
   </div>
@@ -13151,9 +12945,9 @@ function renderAdmin(section) {
           <input type="hidden" name="id">
           <label>Navn<input name="name" required></label>
           <div class="btn-row">
-            <button class="btn primary btn-save" type="submit">Gem</button>
-            <button class="btn secondary btn-new" type="button" id="patientGroupClear">Ny</button>
-            <button class="btn danger btn-delete" type="button" id="patientGroupDelete">Slet</button>
+            <button class="primary" type="submit">Gem</button>
+            <button class="secondary" type="button" id="patientGroupClear">Ny</button>
+            <button class="danger" type="button" id="patientGroupDelete">Slet</button>
           </div>
         </form>
       </div>
@@ -13290,7 +13084,7 @@ function renderTestsTab(section) {
   <div class="panel">
     <h2>Selvtest</h2>
     <div class="btn-row">
-      <button class="btn primary" id="runTestsBtn">Kør selvtest</button>
+      <button class="primary" id="runTestsBtn">Kør selvtest</button>
     </div>
     <table><thead><tr><th>Test</th><th>Status</th><th>Detaljer</th></tr></thead><tbody id="testsBody"></tbody></table>
   </div>`;
