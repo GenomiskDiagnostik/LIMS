@@ -1680,6 +1680,7 @@ const state = {
   pendingSampleId: null,
   pendingSampleShowAll: false,
   pendingReportFilterOrderId: null,
+  pendingReportFilterOrderExact: false,
   pendingReportFilterSampleId: null,
   pendingReportFilterSampleExact: false,
   pendingReportShowAll: false,
@@ -3493,6 +3494,7 @@ function openReportsForOrder(orderId) {
   const numericId = Number(orderId);
   if (!Number.isFinite(numericId)) return;
   state.pendingReportFilterOrderId = numericId;
+  state.pendingReportFilterOrderExact = true;
   state.pendingReportFilterSampleId = null;
   state.pendingReportFilterSampleExact = false;
   state.pendingReportSelectOrderId = numericId;
@@ -3538,6 +3540,7 @@ function openReportsForSample(sampleId) {
   const firstOrderId = firstReport ? Number(firstReport.order_id) : (orderIds.size === 1 ? Array.from(orderIds)[0] : null);
   state.pendingReportFilterSampleId = numericId;
   state.pendingReportFilterSampleExact = true;
+  state.pendingReportFilterOrderExact = false;
   state.pendingReportFilterOrderId = null;
   state.pendingReportSelectOrderId = Number.isFinite(firstOrderId) ? firstOrderId : null;
   state.pendingReportSelectReportId = Number.isFinite(firstReportId) ? firstReportId : null;
@@ -9913,6 +9916,7 @@ function renderReports(section) {
   let pendingFilterSampleId = state.pendingReportFilterSampleId != null ? Number(state.pendingReportFilterSampleId) : null;
   if (!Number.isFinite(pendingFilterSampleId)) pendingFilterSampleId = null;
   let requireExactSample = Boolean(state.pendingReportFilterSampleExact && pendingFilterSampleId != null);
+  let requireExactOrder = Boolean(state.pendingReportFilterOrderExact && pendingFilterOrderId != null);
   const pendingSelectOrderIdRaw = state.pendingReportSelectOrderId != null ? Number(state.pendingReportSelectOrderId) : null;
   let pendingSelectOrderId = Number.isFinite(pendingSelectOrderIdRaw) ? pendingSelectOrderIdRaw : null;
   const pendingSelectReportIdRaw = state.pendingReportSelectReportId != null ? Number(state.pendingReportSelectReportId) : null;
@@ -9981,9 +9985,16 @@ function renderReports(section) {
     const toDate = filters.issued_to ? new Date(filters.issued_to) : null;
     if (toDate) toDate.setHours(23, 59, 59, 999);
     const filterSummary = {...filters};
+    const numericFilterOrder = Number(filters.order || '');
     const numericFilterSample = Number(filters.sample || '');
+    const matchExactOrder = requireExactOrder && filters.order !== '' && Number.isFinite(numericFilterOrder) && numericFilterOrder === pendingFilterOrderId;
     const matchExactSample = requireExactSample && filters.sample !== '' && Number.isFinite(numericFilterSample) && numericFilterSample === pendingFilterSampleId;
     if (term) filterSummary.fritekst = term;
+    if (filters.order) {
+      const orderObj = orderMap.get(Number(filters.order));
+      filterSummary.ordination = orderObj ? `${orderObj.id} (${getOrderDisplayName(orderObj.id) || '–'})` : filters.order;
+    }
+    delete filterSummary.order;
     if (filters.sample) {
       const sampleObj = sampleMap.get(Number(filters.sample));
       filterSummary.prøve = sampleObj ? `${sampleObj.id} (${sampleObj.pmb_number || '–'})` : filters.sample;
@@ -10014,9 +10025,13 @@ function renderReports(section) {
     }).filter(r => {
       if (filters.id && !String(r.id).includes(filters.id)) return false;
       if (filters.order) {
-        const orderIdString = String(r.order_id || '').toLowerCase();
-        const orderName = getOrderDisplayName(r.order_id).toLowerCase();
-        if (!orderIdString.includes(filters.order) && !orderName.includes(filters.order)) return false;
+        if (matchExactOrder) {
+          if (Number(r.order_id) !== pendingFilterOrderId) return false;
+        } else {
+          const orderIdString = String(r.order_id || '').toLowerCase();
+          const orderName = getOrderDisplayName(r.order_id).toLowerCase();
+          if (!orderIdString.includes(filters.order) && !orderName.includes(filters.order)) return false;
+        }
       }
       const order = orderMap.get(Number(r.order_id));
       const sample = order ? sampleMap.get(Number(order.sample_id)) : null;
@@ -10101,6 +10116,7 @@ function renderReports(section) {
     orderSelect.dispatchEvent(new Event('change'));
   }
   state.pendingReportFilterOrderId = null;
+  state.pendingReportFilterOrderExact = false;
   state.pendingReportFilterSampleId = null;
   state.pendingReportFilterSampleExact = false;
   state.pendingReportShowAll = false;
@@ -10108,6 +10124,9 @@ function renderReports(section) {
   state.pendingReportSelectReportId = null;
   search.addEventListener('input', renderRows);
   const handleFilterChange = event => {
+    if (event?.currentTarget === filterInputs.order) {
+      requireExactOrder = false;
+    }
     if (event?.currentTarget === filterInputs.sample) {
       requireExactSample = false;
     }
