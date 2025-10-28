@@ -1493,6 +1493,7 @@ const state = {
   pendingOrderShowAll: false
 };
 const CREATED_BY_STORES = new Set(['patients','samples','orders','patient_groups','variants','qc','reports','conclusion_library']);
+const UPDATED_BY_STORES = new Set(['panels']);
 const ROLE_OPTIONS = [
   {value: 'Observatør', description: 'Kun læseadgang til data', canWrite: false},
   {value: 'Bioinformatiker', description: 'Kan registrere analyser og varianter', canWrite: true},
@@ -1799,7 +1800,7 @@ const DEFAULT_PATIENT_GROUPS = [
 const schemaFields = {
   patients: ['id','mrn','extra_id','family_number','name','gender','birth_date','notes','created_by','created_at','updated_at'],
   samples: ['id','pmb_number','patient_id','sample_type','collected_at','status','notes','created_by','created_at','updated_at'],
-  panels: ['id','name','description','version','created_at','updated_at'],
+  panels: ['id','name','description','version','gene_list','gene_count','created_at','updated_at','updated_by'],
   orders: ['id','patient_id','sample_id','panel_id','analysis_responsible_id','interpreter_id','approver_id','clinician','indication','patient_group_id','hpo_terms','status','urgent','ordered_at','created_by','created_at','updated_at'],
   patient_groups: ['id','name','created_by','created_at','updated_at'],
   variants: ['id','order_id','variant_type','gene','transcript','hgvs_c','hgvs_p','rsid','zygosity','classification','criteria','af','annotations','interpretation','genome_build','chromosome','start','end','copy_number','sv_subtype','size_bp','iscn','description','affected_genes','created_by','created_at','updated_at'],
@@ -1857,6 +1858,7 @@ const tooltipCatalog = {
     'Prøvetype': 'Type af biologisk materiale.',
     'Panel': 'Navn på det analyserede panel.',
     'Version': 'Versionsnummer for panelet. Øges automatisk ved ændringer men kan justeres manuelt.',
+    'Opdateret af': 'Bruger der senest har gemt ændringer på panelet.',
     'Analyseansvarlig': 'Bruger der har det overordnede ansvar for analysen.',
     'Tolker': 'Bruger der tolker de genetiske fund.',
     'Godkender': 'Bruger der godkender ordinationen eller rapporten.',
@@ -1865,6 +1867,8 @@ const tooltipCatalog = {
     'HPO-termer': 'Registrerede HPO-termer knyttet til ordinationen.',
     'Status': 'Aktuel status for posten.',
     'Opdateret': 'Seneste ændringstidspunkt.',
+    'Antal gener': 'Optalt antal gener i panelets genliste.',
+    'Genliste': 'Kommasepareret liste over gener inkluderet i panelet.',
     'Bestilt': 'Tidspunkt for oprettelse af ordinationen.',
     'Opsamlet': 'Dato og tidspunkt for prøveindsamling.',
     'Ordination': 'Reference til ordinationen.',
@@ -1902,7 +1906,7 @@ const tooltipCatalog = {
   search: {
     patientSearch: 'Filtrer patientlisten efter navn, MRN, ID, familienummer eller køn.',
     sampleSearch: 'Filtrer prøver efter ID, PMB-nummer, status eller type.',
-    panelSearch: 'Find paneler efter navn.',
+      panelSearch: 'Find paneler efter navn, version, bruger eller gener.',
     orderSearch: 'Søg efter ordination ud fra status eller ID.',
     variantSearch: 'Søg efter varianter baseret på gen eller HGVS.',
     libSearch: 'Filtrer variantbiblioteket efter gen eller HGVS.',
@@ -1930,7 +1934,8 @@ const tooltipCatalog = {
     },
     panelForm: {
       name: 'Navn på analysepanelet eller assay.',
-      description: 'Beskriv kort panelets indhold og formål.'
+      description: 'Beskriv kort panelets indhold og formål.',
+      gene_list: 'Kommasepareret liste over gener der indgår i panelet. Antallet beregnes automatisk.'
     },
     orderForm: {
       patient_id: 'Vælg patienten ordinationen vedrører.',
@@ -3384,6 +3389,9 @@ async function addRecord(store, record) {
   if (CREATED_BY_STORES.has(store) && !record.created_by) {
     record.created_by = currentUserName();
   }
+  if (UPDATED_BY_STORES.has(store)) {
+    record.updated_by = currentUserName();
+  }
   record.created_at = now;
   record.updated_at = now;
   const tx = state.db.transaction(store, 'readwrite');
@@ -3397,6 +3405,9 @@ async function addRecord(store, record) {
 }
 async function updateRecord(store, record, before) {
   record.updated_at = new Date().toISOString();
+  if (UPDATED_BY_STORES.has(store)) {
+    record.updated_by = currentUserName();
+  }
   const tx = state.db.transaction(store, 'readwrite');
   tx.objectStore(store).put(record);
   await tx.done?.catch(() => {});
@@ -6016,8 +6027,8 @@ function renderPanels(section) {
     <div class="flex">
       <div>
         <label for="panelSearch">Søg</label>
-        <input id="panelSearch" type="search" placeholder="Navn, version eller dato...">
-        <table><thead><tr><th>ID</th><th>Navn</th><th>Version</th><th>Oprettet</th><th>Opdateret</th><th>Beskrivelse</th></tr></thead><tbody></tbody></table>
+        <input id="panelSearch" type="search" placeholder="Navn, version, dato, bruger eller gener...">
+        <table><thead><tr><th>ID</th><th>Navn</th><th>Version</th><th>Oprettet</th><th>Opdateret</th><th>Opdateret af</th><th>Beskrivelse</th><th>Antal gener</th><th>Genliste</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
           <button type="button" class="secondary" id="panelsExport">Eksportér filtrerede paneler</button>
         </div>
@@ -6029,9 +6040,12 @@ function renderPanels(section) {
           <label>Navn<input name="name" required></label>
           <label>Version<input name="version" type="number" min="1" step="1" inputmode="numeric"></label>
           <label>Beskrivelse<textarea name="description"></textarea></label>
+          <label>Genliste<textarea name="gene_list" placeholder="GEN1, GEN2, GEN3"></textarea></label>
           <div class="form-meta">
             <p class="form-hint">Oprettet: <span data-panel-created>–</span></p>
             <p class="form-hint">Senest ændret: <span data-panel-updated>–</span></p>
+            <p class="form-hint">Opdateret af: <span data-panel-updated-by>–</span></p>
+            <p class="form-hint">Antal gener: <span data-panel-gene-count>0</span></p>
           </div>
           <div class="btn-row">
             <button class="primary" type="submit">Gem</button>
@@ -6047,8 +6061,11 @@ function renderPanels(section) {
   const form = section.querySelector('#panelForm');
   const exportButton = section.querySelector('#panelsExport');
   const versionInput = form?.elements?.version || null;
+  const geneListInput = form?.elements?.gene_list || null;
   const createdMeta = section.querySelector('[data-panel-created]');
   const updatedMeta = section.querySelector('[data-panel-updated]');
+  const updatedByMeta = section.querySelector('[data-panel-updated-by]');
+  const geneCountMeta = section.querySelector('[data-panel-gene-count]');
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
@@ -6065,6 +6082,15 @@ function renderPanels(section) {
     const formatted = formatPanelDate(value);
     return formatted || '–';
   };
+  const parseGeneList = value => {
+    if (value == null) return [];
+    return String(value)
+      .split(/[\n;,]/)
+      .map(token => token.trim())
+      .filter(Boolean);
+  };
+  const normaliseGeneList = value => parseGeneList(value).join(', ');
+  const geneCountFromValue = value => parseGeneList(value).length;
   const setVersionTouched = touched => {
     if (!form) return;
     form.dataset.versionTouched = touched ? 'true' : 'false';
@@ -6073,12 +6099,20 @@ function renderPanels(section) {
   const updatePanelMetaDisplay = panel => {
     if (createdMeta) createdMeta.textContent = panel ? displayPanelDate(panel.created_at) : '–';
     if (updatedMeta) updatedMeta.textContent = panel ? displayPanelDate(panel.updated_at) : '–';
+    if (updatedByMeta) updatedByMeta.textContent = panel?.updated_by ? panel.updated_by : '–';
+    if (geneCountMeta) {
+      const count = panel ? (Number.isFinite(Number(panel.gene_count)) ? Number(panel.gene_count) : geneCountFromValue(panel.gene_list)) : 0;
+      geneCountMeta.textContent = count ? String(count) : '0';
+    }
   };
   const prepareFormForPanel = panel => {
     const baseVersion = normaliseVersionNumber(panel?.version);
     setVersionTouched(false);
     if (versionInput) {
       versionInput.value = baseVersion ?? 1;
+    }
+    if (geneListInput) {
+      geneListInput.value = panel?.gene_list ?? '';
     }
     updatePanelMetaDisplay(panel || null);
   };
@@ -6087,10 +6121,19 @@ function renderPanels(section) {
     if (versionInput) {
       versionInput.value = 1;
     }
+    if (geneListInput) {
+      geneListInput.value = '';
+    }
     updatePanelMetaDisplay(null);
   };
   resetPanelFormState();
   versionInput?.addEventListener('input', () => setVersionTouched(true));
+  geneListInput?.addEventListener('input', () => {
+    if (geneCountMeta) {
+      const count = geneCountFromValue(geneListInput.value);
+      geneCountMeta.textContent = count ? String(count) : '0';
+    }
+  });
   let selectedPanelId = null;
   let filteredPanels = list.slice();
   const renderRows = () => {
@@ -6102,7 +6145,10 @@ function renderPanels(section) {
         p.description,
         normaliseVersionNumber(p.version)?.toString() || '',
         formatPanelDate(p.created_at),
-        formatPanelDate(p.updated_at)
+        formatPanelDate(p.updated_at),
+        p.updated_by,
+        geneCountFromValue(p.gene_list).toString(),
+        p.gene_list
       ];
       return values.some(value => (value || '').toString().toLowerCase().includes(term));
     });
@@ -6115,7 +6161,11 @@ function renderPanels(section) {
       const versionDisplay = versionValue != null ? esc(versionValue) : '–';
       const createdDisplay = esc(displayPanelDate(p.created_at));
       const updatedDisplay = esc(displayPanelDate(p.updated_at));
-      return `<tr data-id="${p.id}"${selectedAttr}><td>${p.id}</td><td>${esc(p.name)}</td><td>${versionDisplay}</td><td>${createdDisplay}</td><td>${updatedDisplay}</td><td>${esc(p.description||'')}</td></tr>`;
+      const updatedByDisplay = esc(p.updated_by || '–');
+      const geneCountValue = Number.isFinite(Number(p.gene_count)) ? Number(p.gene_count) : geneCountFromValue(p.gene_list);
+      const geneCountDisplay = geneCountValue ? esc(geneCountValue) : '0';
+      const geneListDisplay = esc(p.gene_list || '');
+      return `<tr data-id="${p.id}"${selectedAttr}><td>${p.id}</td><td>${esc(p.name)}</td><td>${versionDisplay}</td><td>${createdDisplay}</td><td>${updatedDisplay}</td><td>${updatedByDisplay}</td><td>${esc(p.description||'')}</td><td>${geneCountDisplay}</td><td>${geneListDisplay}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
@@ -6133,11 +6183,22 @@ function renderPanels(section) {
       const versionSuffix = versionValue != null ? ` v${versionValue}` : '';
       const created = formatPanelDate(p.created_at);
       const updated = formatPanelDate(p.updated_at);
+      const updatedBy = (p.updated_by ?? '').toString().trim();
+      const genes = parseGeneList(p.gene_list);
+      const geneCount = genes.length;
       const metadataParts = [];
       if (created) metadataParts.push(`oprettet ${created}`);
-      if (updated) metadataParts.push(`ændret ${updated}`);
+      if (updated) {
+        metadataParts.push(`ændret ${updated}${updatedBy ? ` af ${updatedBy}` : ''}`);
+      } else if (updatedBy) {
+        metadataParts.push(`ændret af ${updatedBy}`);
+      }
       const metadata = metadataParts.length ? ` (${metadataParts.join(', ')})` : '';
-      return `${name}${versionSuffix}${metadata}${desc ? `: ${desc}` : ''}`;
+      const detailParts = [];
+      if (desc) detailParts.push(desc);
+      if (geneCount) detailParts.push(`${geneCount} gener: ${genes.join(', ')}`);
+      const details = detailParts.length ? `: ${detailParts.join(' • ')}` : '';
+      return `${name}${versionSuffix}${metadata}${details}`;
     });
     const text = lines.join('\r\n');
     const filename = downloadTextFile(text, 'glimr-paneler.txt');
@@ -6177,7 +6238,21 @@ function renderPanels(section) {
     } else if (!isVersionTouched() || versionNumber == null) {
       versionNumber = 1;
     }
-    const payload = {...data, version: versionNumber};
+    const rawGeneList = formData.get('gene_list');
+    const normalisedGeneListValue = normaliseGeneList(rawGeneList);
+    const geneCountValue = geneCountFromValue(normalisedGeneListValue);
+    if (geneListInput) {
+      geneListInput.value = normalisedGeneListValue;
+    }
+    if (geneCountMeta) {
+      geneCountMeta.textContent = geneCountValue ? String(geneCountValue) : '0';
+    }
+    const payload = {
+      ...data,
+      version: versionNumber,
+      gene_list: normalisedGeneListValue,
+      gene_count: geneCountValue
+    };
     if (hasId) {
       payload.id = id;
       const before = existing || {};
