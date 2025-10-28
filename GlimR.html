@@ -1221,6 +1221,104 @@ button.secondary {
   color: var(--nav-button-color);
   border: 1px solid transparent;
 }
+button.action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border-radius: 0.75rem;
+  padding: 0.55rem 1.1rem;
+  border: 1px solid transparent;
+  box-shadow: 0 6px 14px rgba(24, 111, 175, 0.12);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+button.action-button .icon-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9em;
+  height: 1.9em;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+button.action-button svg {
+  width: 1.35em;
+  height: 1.35em;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+button.action-button .label {
+  display: inline-flex;
+  align-items: center;
+}
+button.action-button:hover,
+button.action-button:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(24, 111, 175, 0.2);
+}
+button.action-button:focus-visible {
+  outline: 3px solid var(--accent-shadow);
+  outline-offset: 2px;
+}
+button.action-button.action-save,
+button.action-button.action-save-new {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #fff;
+  box-shadow: 0 12px 20px var(--accent-shadow);
+}
+button.action-button.action-save-new {
+  background: linear-gradient(135deg, #2a7fbe, var(--accent-strong));
+}
+button.action-button.action-save .icon-slot,
+button.action-button.action-save-new .icon-slot {
+  background: rgba(255, 255, 255, 0.32);
+}
+button.action-button.action-new {
+  background: rgba(24, 111, 175, 0.1);
+  color: var(--accent-strong);
+  border-color: rgba(24, 111, 175, 0.35);
+}
+button.action-button.action-new .icon-slot {
+  background: rgba(24, 111, 175, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(24, 111, 175, 0.35);
+}
+button.action-button.action-delete {
+  background: linear-gradient(135deg, #d24b3c, var(--danger));
+  color: #fff;
+  box-shadow: 0 12px 20px rgba(192, 57, 43, 0.25);
+}
+button.action-button.action-delete .icon-slot {
+  background: rgba(255, 255, 255, 0.26);
+}
+[data-theme="dark"] button.action-button.action-new {
+  background: rgba(56, 189, 248, 0.16);
+  color: #e0f2ff;
+  border-color: rgba(56, 189, 248, 0.45);
+  box-shadow: 0 8px 16px rgba(14, 165, 233, 0.25);
+}
+[data-theme="dark"] button.action-button .icon-slot {
+  background: rgba(148, 163, 184, 0.24);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.38);
+}
+[data-theme="dark"] button.action-button.action-save .icon-slot,
+[data-theme="dark"] button.action-button.action-save-new .icon-slot {
+  background: rgba(226, 232, 240, 0.28);
+}
+[data-theme="dark"] button.action-button.action-new .icon-slot {
+  background: rgba(56, 189, 248, 0.3);
+}
+[data-theme="dark"] button.action-button.action-delete .icon-slot {
+  background: rgba(255, 255, 255, 0.24);
+}
+[data-theme="dark"] button.action-button.action-delete {
+  box-shadow: 0 12px 20px rgba(239, 68, 68, 0.3);
+}
 button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -5777,9 +5875,38 @@ function renderPatients(section) {
           <label>Fødselsdato<span class="label-note" data-patient-age hidden></span><input type="date" name="birth_date"></label>
           <label>Noter<textarea name="notes"></textarea></label>
           <div class="btn-row">
-            <button type="submit" class="primary">Gem</button>
-            <button type="button" id="patientClear" class="secondary">Ny</button>
-            <button type="button" id="patientDelete" class="danger">Slet</button>
+            <button type="submit" class="primary action-button action-save with-icon">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                  <path d="M17 21v-8H7v8" />
+                  <path d="M7 3v5h8" />
+                </svg>
+              </span>
+              <span class="label">Gem</span>
+            </button>
+            <button type="button" id="patientClear" class="secondary action-button action-new with-icon">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <circle cx="12" cy="12" r="7" />
+                  <path d="M12 8.5v7" />
+                  <path d="M8.5 12h7" />
+                </svg>
+              </span>
+              <span class="label">Ny</span>
+            </button>
+            <button type="button" id="patientDelete" class="danger action-button action-delete with-icon">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M4 6h16" />
+                  <path d="M19 6v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                </svg>
+              </span>
+              <span class="label">Slet</span>
+            </button>
           </div>
         </form>
       </div>
@@ -6034,9 +6161,38 @@ function renderSamples(section) {
           <label>Opsamlet<input type="datetime-local" name="collected_at"></label>
           <label>Noter<textarea name="notes"></textarea></label>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="sampleClear">Ny</button>
-            <button class="danger" type="button" id="sampleDelete">Slet</button>
+            <button class="primary action-button action-save with-icon" type="submit">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                  <path d="M17 21v-8H7v8" />
+                  <path d="M7 3v5h8" />
+                </svg>
+              </span>
+              <span class="label">Gem</span>
+            </button>
+            <button class="secondary action-button action-new with-icon" type="button" id="sampleClear">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <circle cx="12" cy="12" r="7" />
+                  <path d="M12 8.5v7" />
+                  <path d="M8.5 12h7" />
+                </svg>
+              </span>
+              <span class="label">Ny</span>
+            </button>
+            <button class="danger action-button action-delete with-icon" type="button" id="sampleDelete">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M4 6h16" />
+                  <path d="M19 6v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                </svg>
+              </span>
+              <span class="label">Slet</span>
+            </button>
           </div>
         </form>
       </div>
@@ -6307,9 +6463,38 @@ function renderPanels(section) {
             <p class="form-hint">Antal gener: <span data-panel-gene-count>0</span></p>
           </div>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="panelClear">Ny</button>
-            <button class="danger" type="button" id="panelDelete">Slet</button>
+            <button class="primary action-button action-save with-icon" type="submit">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                  <path d="M17 21v-8H7v8" />
+                  <path d="M7 3v5h8" />
+                </svg>
+              </span>
+              <span class="label">Gem</span>
+            </button>
+            <button class="secondary action-button action-new with-icon" type="button" id="panelClear">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <circle cx="12" cy="12" r="7" />
+                  <path d="M12 8.5v7" />
+                  <path d="M8.5 12h7" />
+                </svg>
+              </span>
+              <span class="label">Ny</span>
+            </button>
+            <button class="danger action-button action-delete with-icon" type="button" id="panelDelete">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M4 6h16" />
+                  <path d="M19 6v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                </svg>
+              </span>
+              <span class="label">Slet</span>
+            </button>
           </div>
         </form>
       </div>
@@ -6715,9 +6900,38 @@ function renderOrders(section) {
           </div>
           <label>Bestillingstidspunkt<input type="datetime-local" name="ordered_at"></label>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="orderClear">Ny</button>
-            <button class="danger" type="button" id="orderDelete">Slet</button>
+            <button class="primary action-button action-save with-icon" type="submit">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                  <path d="M17 21v-8H7v8" />
+                  <path d="M7 3v5h8" />
+                </svg>
+              </span>
+              <span class="label">Gem</span>
+            </button>
+            <button class="secondary action-button action-new with-icon" type="button" id="orderClear">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <circle cx="12" cy="12" r="7" />
+                  <path d="M12 8.5v7" />
+                  <path d="M8.5 12h7" />
+                </svg>
+              </span>
+              <span class="label">Ny</span>
+            </button>
+            <button class="danger action-button action-delete with-icon" type="button" id="orderDelete">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M4 6h16" />
+                  <path d="M19 6v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                </svg>
+              </span>
+              <span class="label">Slet</span>
+            </button>
           </div>
         </form>
       </div>
@@ -7259,10 +7473,50 @@ function renderVariants(section) {
           <label>Annoteringer<textarea name="annotations" placeholder="Importerede annoteringer fra VarSeq og andre værktøjer."></textarea></label>
           <label>Tolkning<textarea name="interpretation"></textarea></label>
           <div class="btn-row">
-            <button class="primary" type="submit" id="variantSave" data-action="save">Gem</button>
-            <button class="secondary" type="submit" id="variantSaveNew" data-action="create" hidden>Gem som ny</button>
-            <button class="secondary" type="button" id="variantClear">Ny</button>
-            <button class="danger" type="button" id="variantDelete">Slet</button>
+            <button class="primary action-button action-save with-icon" type="submit" id="variantSave" data-action="save">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                  <path d="M17 21v-8H7v8" />
+                  <path d="M7 3v5h8" />
+                </svg>
+              </span>
+              <span class="label">Gem</span>
+            </button>
+            <button class="secondary action-button action-save-new with-icon" type="submit" id="variantSaveNew" data-action="create" hidden>
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                  <path d="M17 21v-8H7v8" />
+                  <path d="M7 3v5h8" />
+                  <path d="M15 14h6" />
+                  <path d="M18 11v6" />
+                </svg>
+              </span>
+              <span class="label">Gem som ny</span>
+            </button>
+            <button class="secondary action-button action-new with-icon" type="button" id="variantClear">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <circle cx="12" cy="12" r="7" />
+                  <path d="M12 8.5v7" />
+                  <path d="M8.5 12h7" />
+                </svg>
+              </span>
+              <span class="label">Ny</span>
+            </button>
+            <button class="danger action-button action-delete with-icon" type="button" id="variantDelete">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M4 6h16" />
+                  <path d="M19 6v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                </svg>
+              </span>
+              <span class="label">Slet</span>
+            </button>
             <button class="secondary" type="button" id="variantFromLibrary">Fra bibliotek</button>
             <button class="secondary" type="button" id="variantToLibrary">Til bibliotek</button>
           </div>
@@ -7303,8 +7557,9 @@ function renderVariants(section) {
   const search = section.querySelector('#variantSearch');
   const form = section.querySelector('#variantForm');
   const saveButton = form.querySelector('#variantSave');
+  const saveButtonLabel = saveButton?.querySelector('.label');
   const saveNewButton = form.querySelector('#variantSaveNew');
-  const defaultSaveLabel = saveButton?.textContent || 'Gem';
+  const defaultSaveLabel = saveButtonLabel?.textContent?.trim() || saveButton?.textContent?.trim() || 'Gem';
   const {updateVariantTypeFields, variantTypeSelect} = setupVariantTypeForm(form);
   const batchList = section.querySelector('#variantBatchList');
   const batchAddBtn = section.querySelector('#variantBatchAdd');
@@ -7581,7 +7836,11 @@ function renderVariants(section) {
     if (!form) return;
     form.dataset.mode = 'edit';
     form.dataset.editingId = id != null ? String(id) : '';
-    if (saveButton) saveButton.textContent = 'Opdater variant';
+    if (saveButtonLabel) {
+      saveButtonLabel.textContent = 'Opdater variant';
+    } else if (saveButton) {
+      saveButton.textContent = 'Opdater variant';
+    }
     if (saveNewButton) saveNewButton.hidden = false;
   };
   const exitEditMode = () => {
@@ -7589,7 +7848,11 @@ function renderVariants(section) {
     form.dataset.mode = 'create';
     form.dataset.editingId = '';
     clearFormIdentifier(form);
-    if (saveButton) saveButton.textContent = defaultSaveLabel;
+    if (saveButtonLabel) {
+      saveButtonLabel.textContent = defaultSaveLabel;
+    } else if (saveButton) {
+      saveButton.textContent = defaultSaveLabel;
+    }
     if (saveNewButton) saveNewButton.hidden = true;
   };
   exitEditMode();
@@ -8074,10 +8337,50 @@ function renderVariantLibrary(section) {
           <label>Kurateret af<input name="curated_by"></label>
           <label>Sidst gennemgået<input type="date" name="last_review"></label>
           <div class="btn-row">
-            <button class="primary" type="submit" data-action="save" id="variantLibrarySave">Gem</button>
-            <button class="secondary" type="submit" data-action="create" id="variantLibrarySaveNew" hidden>Gem som ny</button>
-            <button class="secondary" type="button" id="variantLibraryClear">Ny</button>
-            <button class="danger" type="button" id="variantLibraryDelete">Slet</button>
+            <button class="primary action-button action-save with-icon" type="submit" data-action="save" id="variantLibrarySave">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                  <path d="M17 21v-8H7v8" />
+                  <path d="M7 3v5h8" />
+                </svg>
+              </span>
+              <span class="label">Gem</span>
+            </button>
+            <button class="secondary action-button action-save-new with-icon" type="submit" data-action="create" id="variantLibrarySaveNew" hidden>
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                  <path d="M17 21v-8H7v8" />
+                  <path d="M7 3v5h8" />
+                  <path d="M15 14h6" />
+                  <path d="M18 11v6" />
+                </svg>
+              </span>
+              <span class="label">Gem som ny</span>
+            </button>
+            <button class="secondary action-button action-new with-icon" type="button" id="variantLibraryClear">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <circle cx="12" cy="12" r="7" />
+                  <path d="M12 8.5v7" />
+                  <path d="M8.5 12h7" />
+                </svg>
+              </span>
+              <span class="label">Ny</span>
+            </button>
+            <button class="danger action-button action-delete with-icon" type="button" id="variantLibraryDelete">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M4 6h16" />
+                  <path d="M19 6v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                </svg>
+              </span>
+              <span class="label">Slet</span>
+            </button>
           </div>
         </form>
       </div>
@@ -8087,13 +8390,14 @@ function renderVariantLibrary(section) {
   const search = section.querySelector('#libSearch');
   const form = section.querySelector('#variantLibraryForm');
   const saveButton = section.querySelector('#variantLibrarySave');
+  const saveButtonLabel = saveButton?.querySelector('.label');
   const saveNewButton = section.querySelector('#variantLibrarySaveNew');
   const clearButton = section.querySelector('#variantLibraryClear');
   const deleteButton = section.querySelector('#variantLibraryDelete');
   const exportButton = section.querySelector('#libraryExportCsv');
   const importButton = section.querySelector('#libraryImportCsv');
   const importInput = section.querySelector('#variantLibraryImportInput');
-  const defaultSaveLabel = saveButton?.textContent || 'Gem';
+  const defaultSaveLabel = saveButtonLabel?.textContent?.trim() || saveButton?.textContent?.trim() || 'Gem';
   const {updateVariantTypeFields, variantTypeSelect} = setupVariantTypeForm(form);
   const {
     countMap: variantFrequencyMap,
@@ -8192,7 +8496,11 @@ function renderVariantLibrary(section) {
     if (!form) return;
     form.dataset.mode = 'edit';
     form.dataset.editingId = id != null ? String(id) : '';
-    if (saveButton) saveButton.textContent = 'Opdater bibliotekspost';
+    if (saveButtonLabel) {
+      saveButtonLabel.textContent = 'Opdater bibliotekspost';
+    } else if (saveButton) {
+      saveButton.textContent = 'Opdater bibliotekspost';
+    }
     if (saveNewButton) saveNewButton.hidden = false;
   };
   const exitEditMode = () => {
@@ -8200,7 +8508,11 @@ function renderVariantLibrary(section) {
     form.dataset.mode = 'create';
     form.dataset.editingId = '';
     clearFormIdentifier(form);
-    if (saveButton) saveButton.textContent = defaultSaveLabel;
+    if (saveButtonLabel) {
+      saveButtonLabel.textContent = defaultSaveLabel;
+    } else if (saveButton) {
+      saveButton.textContent = defaultSaveLabel;
+    }
     if (saveNewButton) saveNewButton.hidden = true;
   };
   exitEditMode();
@@ -8846,9 +9158,38 @@ function renderConclusionLibrary(section) {
           <label>Titel<input name="title" required></label>
           <label>Standardtekst<textarea name="body" rows="8" required></textarea></label>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="conclusionLibraryClear">Ny</button>
-            <button class="danger" type="button" id="conclusionLibraryDelete">Slet</button>
+            <button class="primary action-button action-save with-icon" type="submit">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                  <path d="M17 21v-8H7v8" />
+                  <path d="M7 3v5h8" />
+                </svg>
+              </span>
+              <span class="label">Gem</span>
+            </button>
+            <button class="secondary action-button action-new with-icon" type="button" id="conclusionLibraryClear">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <circle cx="12" cy="12" r="7" />
+                  <path d="M12 8.5v7" />
+                  <path d="M8.5 12h7" />
+                </svg>
+              </span>
+              <span class="label">Ny</span>
+            </button>
+            <button class="danger action-button action-delete with-icon" type="button" id="conclusionLibraryDelete">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M4 6h16" />
+                  <path d="M19 6v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                </svg>
+              </span>
+              <span class="label">Slet</span>
+            </button>
           </div>
         </form>
         <div data-placeholder-guide="library"></div>
@@ -9043,9 +9384,38 @@ function renderReports(section) {
           </div>
           <div data-placeholder-guide="report"></div>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="reportClear">Ny</button>
-            <button class="danger" type="button" id="reportDelete">Slet</button>
+            <button class="primary action-button action-save with-icon" type="submit">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                  <path d="M17 21v-8H7v8" />
+                  <path d="M7 3v5h8" />
+                </svg>
+              </span>
+              <span class="label">Gem</span>
+            </button>
+            <button class="secondary action-button action-new with-icon" type="button" id="reportClear">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <circle cx="12" cy="12" r="7" />
+                  <path d="M12 8.5v7" />
+                  <path d="M8.5 12h7" />
+                </svg>
+              </span>
+              <span class="label">Ny</span>
+            </button>
+            <button class="danger action-button action-delete with-icon" type="button" id="reportDelete">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M4 6h16" />
+                  <path d="M19 6v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                </svg>
+              </span>
+              <span class="label">Slet</span>
+            </button>
             <button class="secondary" type="button" id="reportPreview">Udskriv/forhåndsvis</button>
             <button class="secondary" type="button" id="reportDownloadPdf">Hent PDF</button>
           </div>
@@ -10786,9 +11156,38 @@ function renderQC(section) {
           <label>Enhed<input name="unit"></label>
           <label>Noter<textarea name="notes"></textarea></label>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="qcClear">Ny</button>
-            <button class="danger" type="button" id="qcDelete">Slet</button>
+            <button class="primary action-button action-save with-icon" type="submit">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                  <path d="M17 21v-8H7v8" />
+                  <path d="M7 3v5h8" />
+                </svg>
+              </span>
+              <span class="label">Gem</span>
+            </button>
+            <button class="secondary action-button action-new with-icon" type="button" id="qcClear">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <circle cx="12" cy="12" r="7" />
+                  <path d="M12 8.5v7" />
+                  <path d="M8.5 12h7" />
+                </svg>
+              </span>
+              <span class="label">Ny</span>
+            </button>
+            <button class="danger action-button action-delete with-icon" type="button" id="qcDelete">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M4 6h16" />
+                  <path d="M19 6v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                </svg>
+              </span>
+              <span class="label">Slet</span>
+            </button>
           </div>
         </form>
       </div>
@@ -12764,9 +13163,38 @@ function renderUsers(section) {
           <label>Rolle<select name="role" required>${ROLE_OPTIONS.map(opt => `<option value="${opt.value}">${opt.value} – ${opt.description}</option>`).join('')}</select></label>
           <label>Adgangskode (PIN)<input type="password" name="pin" placeholder="Valgfri kode"></label>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="userClear">Ny</button>
-            <button class="danger" type="button" id="userDelete">Slet</button>
+            <button class="primary action-button action-save with-icon" type="submit">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                  <path d="M17 21v-8H7v8" />
+                  <path d="M7 3v5h8" />
+                </svg>
+              </span>
+              <span class="label">Gem</span>
+            </button>
+            <button class="secondary action-button action-new with-icon" type="button" id="userClear">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <circle cx="12" cy="12" r="7" />
+                  <path d="M12 8.5v7" />
+                  <path d="M8.5 12h7" />
+                </svg>
+              </span>
+              <span class="label">Ny</span>
+            </button>
+            <button class="danger action-button action-delete with-icon" type="button" id="userDelete">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M4 6h16" />
+                  <path d="M19 6v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                </svg>
+              </span>
+              <span class="label">Slet</span>
+            </button>
           </div>
         </form>
       </div>
@@ -12945,9 +13373,38 @@ function renderAdmin(section) {
           <input type="hidden" name="id">
           <label>Navn<input name="name" required></label>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="patientGroupClear">Ny</button>
-            <button class="danger" type="button" id="patientGroupDelete">Slet</button>
+            <button class="primary action-button action-save with-icon" type="submit">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                  <path d="M17 21v-8H7v8" />
+                  <path d="M7 3v5h8" />
+                </svg>
+              </span>
+              <span class="label">Gem</span>
+            </button>
+            <button class="secondary action-button action-new with-icon" type="button" id="patientGroupClear">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <circle cx="12" cy="12" r="7" />
+                  <path d="M12 8.5v7" />
+                  <path d="M8.5 12h7" />
+                </svg>
+              </span>
+              <span class="label">Ny</span>
+            </button>
+            <button class="danger action-button action-delete with-icon" type="button" id="patientGroupDelete">
+              <span class="icon-slot" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M4 6h16" />
+                  <path d="M19 6v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                </svg>
+              </span>
+              <span class="label">Slet</span>
+            </button>
           </div>
         </form>
       </div>
