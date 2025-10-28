@@ -4537,6 +4537,8 @@ function renderDashboard(section) {
   });
   const reportsLastMonthCount = reportsLastMonth.length;
   const avgReportsPerWeek = reportsLastMonthCount ? reportsLastMonthCount / weeksCovered : 0;
+  const avgOrdersPerWeekRounded = Math.round(avgOrdersPerWeek);
+  const avgOrdersPerWeekDisplay = `${formatNumberDa(avgOrdersPerWeekRounded)} pr. uge`;
   const netOrdersPerWeek = avgOrdersPerWeek - avgReportsPerWeek;
   const netOrdersPerWeekRounded = Math.round(netOrdersPerWeek);
   const netOrdersPerWeekSign = netOrdersPerWeekRounded > 0 ? '+' : netOrdersPerWeekRounded < 0 ? '-' : '';
@@ -4564,7 +4566,7 @@ function renderDashboard(section) {
     {icon: 'arrows-up-down', label: 'Nettoflow (30 dage)', value: netOrdersDisplay},
     {icon: 'inbox', label: 'Prøver modtaget (7 dage)', value: formatNumberDa(samplesLastWeek)},
     {icon: 'beaker', label: 'Prøver modtaget (30 dage)', value: formatNumberDa(samplesLastMonth)},
-    {icon: 'document-chart-bar', label: 'Gns. ordinationer/uge (30 dage)', value: formatNumberDa(avgOrdersPerWeek, 1)},
+    {icon: 'document-chart-bar', label: 'Gns. ordinationer (30 dage)', value: avgOrdersPerWeekDisplay},
     {icon: 'clipboard-document-check', label: 'Rapporter udstedt (30 dage)', value: formatNumberDa(reportsLastMonthCount)}
   ];
   const statsCardsHtml = statsCards.map(stat => `
