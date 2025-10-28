@@ -1204,22 +1204,159 @@ form textarea {
   width: auto;
   accent-color: var(--accent);
 }
+button.primary,
+button.secondary,
+button.danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-weight: 600;
+  border-radius: 0.75rem;
+  padding: 0.65rem 1.25rem;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.25s ease, color 0.25s ease, box-shadow 0.25s ease,
+    transform 0.18s ease;
+  box-shadow: 0 4px 12px rgba(15, 36, 59, 0.08);
+  letter-spacing: 0.01em;
+}
 button.primary {
   background: var(--accent);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
   color: #fff;
-  border: none;
-  border-radius: 0.5rem;
-  padding: 0.5rem 0.9rem;
-  cursor: pointer;
+  box-shadow: 0 8px 18px var(--accent-shadow);
+  border-color: rgba(255, 255, 255, 0.12);
 }
-button.danger {
-  background: var(--danger);
-  color: #fff;
+button.primary:hover,
+button.primary:focus-visible {
+  background: var(--accent-strong);
+  background: linear-gradient(
+    135deg,
+    var(--accent-strong) 0%,
+    color-mix(in srgb, var(--accent-strong) 85%, white 15%) 100%
+  );
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px var(--accent-shadow);
+  filter: brightness(1.05);
+}
+button.primary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.35), 0 10px 22px var(--accent-shadow);
 }
 button.secondary {
   background: var(--nav-button-bg);
   color: var(--nav-button-color);
-  border: 1px solid transparent;
+  border-color: var(--nav-button-color);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--nav-button-bg) 70%, transparent) 0%,
+    color-mix(in srgb, var(--nav-button-active-bg) 45%, transparent) 100%
+  );
+  border-color: color-mix(in srgb, var(--nav-button-active-bg) 35%, transparent);
+}
+button.secondary:hover,
+button.secondary:focus-visible {
+  color: var(--nav-button-active-color);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(18, 76, 135, 0.15);
+  background: var(--nav-button-active-bg);
+  border-color: var(--nav-button-active-bg);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--nav-button-active-bg) 55%, transparent) 0%,
+    color-mix(in srgb, var(--nav-button-active-bg) 85%, transparent) 100%
+  );
+  border-color: color-mix(in srgb, var(--nav-button-active-bg) 65%, transparent);
+}
+[data-theme="dark"] button.secondary:focus-visible {
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.35), 0 10px 22px rgba(14, 165, 233, 0.2);
+}
+button.secondary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(18, 76, 135, 0.18), 0 10px 22px rgba(18, 76, 135, 0.15);
+}
+[data-theme="dark"] button.secondary {
+  color: var(--nav-button-active-color);
+  box-shadow: 0 8px 18px rgba(14, 165, 233, 0.08);
+}
+button.danger {
+  background: var(--danger);
+  background: linear-gradient(135deg, rgba(192, 57, 43, 0.95), rgba(156, 34, 20, 0.95));
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(192, 57, 43, 0.28);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+button.danger:hover,
+button.danger:focus-visible {
+  background: rgba(192, 57, 43, 0.98);
+  background: linear-gradient(
+    135deg,
+    rgba(204, 63, 49, 0.98),
+    rgba(156, 34, 20, 0.98)
+  );
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgba(192, 57, 43, 0.32);
+  filter: brightness(1.05);
+}
+button.danger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.28), 0 12px 26px rgba(192, 57, 43, 0.32);
+}
+button .icon-slot {
+  width: 1.35rem;
+  height: 1.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  transition: background 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  font-size: 0;
+}
+button.with-icon .icon-slot {
+  flex-shrink: 0;
+}
+button.primary .icon-slot {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+button.primary:hover .icon-slot,
+button.primary:focus-visible .icon-slot {
+  background: rgba(255, 255, 255, 0.26);
+}
+button.secondary .icon-slot {
+  background: rgba(18, 76, 135, 0.08);
+  color: var(--nav-button-color);
+  box-shadow: inset 0 0 0 1px rgba(18, 76, 135, 0.12);
+  background: color-mix(in srgb, var(--nav-button-active-bg) 20%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nav-button-active-bg) 30%, transparent);
+}
+button.secondary:hover .icon-slot,
+button.secondary:focus-visible .icon-slot {
+  color: var(--nav-button-active-color);
+  background: rgba(18, 76, 135, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(18, 76, 135, 0.16);
+  background: color-mix(in srgb, var(--nav-button-active-bg) 35%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nav-button-active-bg) 45%, transparent);
+}
+[data-theme="dark"] button.secondary .icon-slot {
+  background: rgba(14, 165, 233, 0.22);
+  color: var(--nav-button-active-color);
+  box-shadow: inset 0 0 0 1px rgba(11, 17, 32, 0.55);
+  background: color-mix(in srgb, var(--nav-button-active-bg) 28%, transparent);
+}
+button.danger .icon-slot {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+button.danger:hover .icon-slot,
+button.danger:focus-visible .icon-slot {
+  background: rgba(255, 255, 255, 0.28);
+}
+button .icon {
+  width: 1.05rem;
+  height: 1.05rem;
 }
 button:disabled {
   opacity: 0.55;
@@ -1666,6 +1803,38 @@ const iconLibrary = {
     attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
     paths: [
       {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75'}
+    ]
+  },
+  save: {
+    viewBox: '0 0 24 24',
+    paths: [
+      {
+        d: 'M5 3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7.414a2 2 0 0 0-.586-1.414l-3.414-3.414A2 2 0 0 0 15.586 2H5Z',
+        fill: 'currentColor',
+        'fill-rule': 'evenodd',
+        'clip-rule': 'evenodd'
+      },
+      {d: 'M7 3a2 2 0 0 0-2 2v4h10V3H7Z', fill: 'rgba(255,255,255,0.9)'},
+      {d: 'M6 13v6h12v-6H6Z', fill: 'rgba(255,255,255,0.9)'},
+      {d: 'M9 14.5a.75.75 0 0 0 0 1.5h6a.75.75 0 0 0 0-1.5H9Z', fill: 'currentColor'}
+    ]
+  },
+  plus: {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '2.2'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M12 5v14m7-7H5'}
+    ]
+  },
+  trash: {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8'},
+    paths: [
+      {
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
+        d: 'M9.75 3.75 10.5 2h3l.75 1.75M4.5 7h15l-.75 12.75A2.25 2.25 0 0 1 16.512 21H7.488a2.25 2.25 0 0 1-2.238-1.25L4.5 7Zm4.5 4.5v6m6-6v6'
+      }
     ]
   },
   'arrows-up-down': {
@@ -5777,9 +5946,18 @@ function renderPatients(section) {
           <label>Fødselsdato<span class="label-note" data-patient-age hidden></span><input type="date" name="birth_date"></label>
           <label>Noter<textarea name="notes"></textarea></label>
           <div class="btn-row">
-            <button type="submit" class="primary">Gem</button>
-            <button type="button" id="patientClear" class="secondary">Ny</button>
-            <button type="button" id="patientDelete" class="danger">Slet</button>
+            <button type="submit" class="primary with-icon">
+              <span class="icon-slot" data-icon="save"></span>
+              <span>Gem</span>
+            </button>
+            <button type="button" id="patientClear" class="secondary with-icon">
+              <span class="icon-slot" data-icon="plus"></span>
+              <span>Ny</span>
+            </button>
+            <button type="button" id="patientDelete" class="danger with-icon">
+              <span class="icon-slot" data-icon="trash"></span>
+              <span>Slet</span>
+            </button>
           </div>
         </form>
       </div>
@@ -5817,6 +5995,7 @@ function renderPatients(section) {
   let filteredPatients = list.slice();
   let activeFilters = {};
   let selectedPatientId = null;
+  applyIconSlots(section);
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
@@ -6034,9 +6213,18 @@ function renderSamples(section) {
           <label>Opsamlet<input type="datetime-local" name="collected_at"></label>
           <label>Noter<textarea name="notes"></textarea></label>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="sampleClear">Ny</button>
-            <button class="danger" type="button" id="sampleDelete">Slet</button>
+            <button class="primary with-icon" type="submit">
+              <span class="icon-slot" data-icon="save"></span>
+              <span>Gem</span>
+            </button>
+            <button class="secondary with-icon" type="button" id="sampleClear">
+              <span class="icon-slot" data-icon="plus"></span>
+              <span>Ny</span>
+            </button>
+            <button class="danger with-icon" type="button" id="sampleDelete">
+              <span class="icon-slot" data-icon="trash"></span>
+              <span>Slet</span>
+            </button>
           </div>
         </form>
       </div>
@@ -6055,6 +6243,7 @@ function renderSamples(section) {
     collected_to: section.querySelector('[data-filter-samples="collected_to"]')
   };
   const activeToggle = section.querySelector('#samplesActiveOnly');
+  applyIconSlots(section);
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
@@ -6307,9 +6496,18 @@ function renderPanels(section) {
             <p class="form-hint">Antal gener: <span data-panel-gene-count>0</span></p>
           </div>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="panelClear">Ny</button>
-            <button class="danger" type="button" id="panelDelete">Slet</button>
+            <button class="primary with-icon" type="submit">
+              <span class="icon-slot" data-icon="save"></span>
+              <span>Gem</span>
+            </button>
+            <button class="secondary with-icon" type="button" id="panelClear">
+              <span class="icon-slot" data-icon="plus"></span>
+              <span>Ny</span>
+            </button>
+            <button class="danger with-icon" type="button" id="panelDelete">
+              <span class="icon-slot" data-icon="trash"></span>
+              <span>Slet</span>
+            </button>
           </div>
         </form>
       </div>
@@ -6325,6 +6523,7 @@ function renderPanels(section) {
   const updatedMeta = section.querySelector('[data-panel-updated]');
   const updatedByMeta = section.querySelector('[data-panel-updated-by]');
   const geneCountMeta = section.querySelector('[data-panel-gene-count]');
+  applyIconSlots(section);
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
@@ -6715,9 +6914,18 @@ function renderOrders(section) {
           </div>
           <label>Bestillingstidspunkt<input type="datetime-local" name="ordered_at"></label>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="orderClear">Ny</button>
-            <button class="danger" type="button" id="orderDelete">Slet</button>
+            <button class="primary with-icon" type="submit">
+              <span class="icon-slot" data-icon="save"></span>
+              <span>Gem</span>
+            </button>
+            <button class="secondary with-icon" type="button" id="orderClear">
+              <span class="icon-slot" data-icon="plus"></span>
+              <span>Ny</span>
+            </button>
+            <button class="danger with-icon" type="button" id="orderDelete">
+              <span class="icon-slot" data-icon="trash"></span>
+              <span>Slet</span>
+            </button>
           </div>
         </form>
       </div>
@@ -7259,10 +7467,22 @@ function renderVariants(section) {
           <label>Annoteringer<textarea name="annotations" placeholder="Importerede annoteringer fra VarSeq og andre værktøjer."></textarea></label>
           <label>Tolkning<textarea name="interpretation"></textarea></label>
           <div class="btn-row">
-            <button class="primary" type="submit" id="variantSave" data-action="save">Gem</button>
-            <button class="secondary" type="submit" id="variantSaveNew" data-action="create" hidden>Gem som ny</button>
-            <button class="secondary" type="button" id="variantClear">Ny</button>
-            <button class="danger" type="button" id="variantDelete">Slet</button>
+            <button class="primary with-icon" type="submit" id="variantSave" data-action="save">
+              <span class="icon-slot" data-icon="save"></span>
+              <span>Gem</span>
+            </button>
+            <button class="secondary with-icon" type="submit" id="variantSaveNew" data-action="create" hidden>
+              <span class="icon-slot" data-icon="save"></span>
+              <span>Gem som ny</span>
+            </button>
+            <button class="secondary with-icon" type="button" id="variantClear">
+              <span class="icon-slot" data-icon="plus"></span>
+              <span>Ny</span>
+            </button>
+            <button class="danger with-icon" type="button" id="variantDelete">
+              <span class="icon-slot" data-icon="trash"></span>
+              <span>Slet</span>
+            </button>
             <button class="secondary" type="button" id="variantFromLibrary">Fra bibliotek</button>
             <button class="secondary" type="button" id="variantToLibrary">Til bibliotek</button>
           </div>
@@ -7292,7 +7512,10 @@ function renderVariants(section) {
           <button type="button" class="secondary" id="variantBatchAdd">Tilføj variant</button>
           <button type="button" class="secondary" id="variantBatchImport">Importér VarSeq CSV</button>
           <input type="file" id="variantBatchFile" accept=".csv,text/csv" hidden>
-          <button type="button" class="primary" id="variantBatchSave">Gem varianter</button>
+          <button type="button" class="primary with-icon" id="variantBatchSave">
+            <span class="icon-slot" data-icon="save"></span>
+            <span>Gem varianter</span>
+          </button>
           <button type="button" class="secondary" id="variantBatchClear">Ryd rækker</button>
         </div>
         <div class="form-hint" id="variantBatchMessage" role="status" aria-live="polite"></div>
@@ -7314,6 +7537,7 @@ function renderVariants(section) {
   const batchClearBtn = section.querySelector('#variantBatchClear');
   const batchMessage = section.querySelector('#variantBatchMessage');
   const batchOrderSelect = section.querySelector('#variantBatchOrder');
+  applyIconSlots(section);
   const setBatchMessage = (text, tone = 'info') => {
     if (!batchMessage) return;
     batchMessage.textContent = text ?? '';
@@ -8074,10 +8298,22 @@ function renderVariantLibrary(section) {
           <label>Kurateret af<input name="curated_by"></label>
           <label>Sidst gennemgået<input type="date" name="last_review"></label>
           <div class="btn-row">
-            <button class="primary" type="submit" data-action="save" id="variantLibrarySave">Gem</button>
-            <button class="secondary" type="submit" data-action="create" id="variantLibrarySaveNew" hidden>Gem som ny</button>
-            <button class="secondary" type="button" id="variantLibraryClear">Ny</button>
-            <button class="danger" type="button" id="variantLibraryDelete">Slet</button>
+            <button class="primary with-icon" type="submit" data-action="save" id="variantLibrarySave">
+              <span class="icon-slot" data-icon="save"></span>
+              <span>Gem</span>
+            </button>
+            <button class="secondary with-icon" type="submit" data-action="create" id="variantLibrarySaveNew" hidden>
+              <span class="icon-slot" data-icon="save"></span>
+              <span>Gem som ny</span>
+            </button>
+            <button class="secondary with-icon" type="button" id="variantLibraryClear">
+              <span class="icon-slot" data-icon="plus"></span>
+              <span>Ny</span>
+            </button>
+            <button class="danger with-icon" type="button" id="variantLibraryDelete">
+              <span class="icon-slot" data-icon="trash"></span>
+              <span>Slet</span>
+            </button>
           </div>
         </form>
       </div>
@@ -8094,6 +8330,7 @@ function renderVariantLibrary(section) {
   const importButton = section.querySelector('#libraryImportCsv');
   const importInput = section.querySelector('#variantLibraryImportInput');
   const defaultSaveLabel = saveButton?.textContent || 'Gem';
+  applyIconSlots(section);
   const {updateVariantTypeFields, variantTypeSelect} = setupVariantTypeForm(form);
   const {
     countMap: variantFrequencyMap,
@@ -8846,9 +9083,18 @@ function renderConclusionLibrary(section) {
           <label>Titel<input name="title" required></label>
           <label>Standardtekst<textarea name="body" rows="8" required></textarea></label>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="conclusionLibraryClear">Ny</button>
-            <button class="danger" type="button" id="conclusionLibraryDelete">Slet</button>
+            <button class="primary with-icon" type="submit">
+              <span class="icon-slot" data-icon="save"></span>
+              <span>Gem</span>
+            </button>
+            <button class="secondary with-icon" type="button" id="conclusionLibraryClear">
+              <span class="icon-slot" data-icon="plus"></span>
+              <span>Ny</span>
+            </button>
+            <button class="danger with-icon" type="button" id="conclusionLibraryDelete">
+              <span class="icon-slot" data-icon="trash"></span>
+              <span>Slet</span>
+            </button>
           </div>
         </form>
         <div data-placeholder-guide="library"></div>
@@ -8861,6 +9107,7 @@ function renderConclusionLibrary(section) {
   const clearBtn = section.querySelector('#conclusionLibraryClear');
   const deleteBtn = section.querySelector('#conclusionLibraryDelete');
   const placeholderGuideHost = section.querySelector('[data-placeholder-guide="library"]');
+  applyIconSlots(section);
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
@@ -9043,9 +9290,18 @@ function renderReports(section) {
           </div>
           <div data-placeholder-guide="report"></div>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="reportClear">Ny</button>
-            <button class="danger" type="button" id="reportDelete">Slet</button>
+            <button class="primary with-icon" type="submit">
+              <span class="icon-slot" data-icon="save"></span>
+              <span>Gem</span>
+            </button>
+            <button class="secondary with-icon" type="button" id="reportClear">
+              <span class="icon-slot" data-icon="plus"></span>
+              <span>Ny</span>
+            </button>
+            <button class="danger with-icon" type="button" id="reportDelete">
+              <span class="icon-slot" data-icon="trash"></span>
+              <span>Slet</span>
+            </button>
             <button class="secondary" type="button" id="reportPreview">Udskriv/forhåndsvis</button>
             <button class="secondary" type="button" id="reportDownloadPdf">Hent PDF</button>
           </div>
@@ -9068,6 +9324,7 @@ function renderReports(section) {
   const summaryField = form?.elements.summary;
   const conclusionMap = new Map(conclusionLibrary.map(entry => [String(entry.id), entry]));
   const placeholderGuideHost = section.querySelector('[data-placeholder-guide="report"]');
+  applyIconSlots(section);
   let selectedReportVariants = [];
   let currentReportOrderId = null;
   let variantOptionState = [];
@@ -10786,9 +11043,18 @@ function renderQC(section) {
           <label>Enhed<input name="unit"></label>
           <label>Noter<textarea name="notes"></textarea></label>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="qcClear">Ny</button>
-            <button class="danger" type="button" id="qcDelete">Slet</button>
+            <button class="primary with-icon" type="submit">
+              <span class="icon-slot" data-icon="save"></span>
+              <span>Gem</span>
+            </button>
+            <button class="secondary with-icon" type="button" id="qcClear">
+              <span class="icon-slot" data-icon="plus"></span>
+              <span>Ny</span>
+            </button>
+            <button class="danger with-icon" type="button" id="qcDelete">
+              <span class="icon-slot" data-icon="trash"></span>
+              <span>Slet</span>
+            </button>
           </div>
         </form>
       </div>
@@ -10798,6 +11064,7 @@ function renderQC(section) {
   const search = section.querySelector('#qcSearch');
   const form = section.querySelector('#qcForm');
   const activeToggle = section.querySelector('#qcActiveOnly');
+  applyIconSlots(section);
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
@@ -12764,9 +13031,18 @@ function renderUsers(section) {
           <label>Rolle<select name="role" required>${ROLE_OPTIONS.map(opt => `<option value="${opt.value}">${opt.value} – ${opt.description}</option>`).join('')}</select></label>
           <label>Adgangskode (PIN)<input type="password" name="pin" placeholder="Valgfri kode"></label>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="userClear">Ny</button>
-            <button class="danger" type="button" id="userDelete">Slet</button>
+            <button class="primary with-icon" type="submit">
+              <span class="icon-slot" data-icon="save"></span>
+              <span>Gem</span>
+            </button>
+            <button class="secondary with-icon" type="button" id="userClear">
+              <span class="icon-slot" data-icon="plus"></span>
+              <span>Ny</span>
+            </button>
+            <button class="danger with-icon" type="button" id="userDelete">
+              <span class="icon-slot" data-icon="trash"></span>
+              <span>Slet</span>
+            </button>
           </div>
         </form>
       </div>
@@ -12775,6 +13051,7 @@ function renderUsers(section) {
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#userSearch');
   const form = section.querySelector('#userForm');
+  applyIconSlots(section);
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
@@ -12873,7 +13150,10 @@ function renderDbTab(section) {
     ${memoryWarning}
     <div class="btn-row">
       <button class="secondary" id="bindFile">Knyt/åbn DB-fil...</button>
-      <button class="secondary" id="saveNow">Gem nu</button>
+      <button class="secondary with-icon" id="saveNow">
+        <span class="icon-slot" data-icon="save"></span>
+        <span>Gem nu</span>
+      </button>
       <label style="display:flex;align-items:center;gap:0.5rem;">
         <input type="checkbox" id="autosaveToggle" ${state.autosave?'checked':''}> Autogem
       </label>
@@ -12890,6 +13170,7 @@ function renderDbTab(section) {
     </div>
     <p class="panel-hint">Downloader en fuld backup og nulstiller alle andre data. Kræver skriveadgang.</p>
   </div>`;
+  applyIconSlots(section);
   applyButtonTooltips(section);
   applyControlTooltips(section);
   section.querySelector('#bindFile').addEventListener('click', bindDbFile);
@@ -12945,14 +13226,24 @@ function renderAdmin(section) {
           <input type="hidden" name="id">
           <label>Navn<input name="name" required></label>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="patientGroupClear">Ny</button>
-            <button class="danger" type="button" id="patientGroupDelete">Slet</button>
+            <button class="primary with-icon" type="submit">
+              <span class="icon-slot" data-icon="save"></span>
+              <span>Gem</span>
+            </button>
+            <button class="secondary with-icon" type="button" id="patientGroupClear">
+              <span class="icon-slot" data-icon="plus"></span>
+              <span>Ny</span>
+            </button>
+            <button class="danger with-icon" type="button" id="patientGroupDelete">
+              <span class="icon-slot" data-icon="trash"></span>
+              <span>Slet</span>
+            </button>
           </div>
         </form>
       </div>
     </div>
   </div>`;
+  applyIconSlots(section);
   applyButtonTooltips(section);
   applyControlTooltips(section);
   const demoBtn = section.querySelector('#demoDataBtn');
