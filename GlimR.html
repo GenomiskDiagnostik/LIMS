@@ -3927,10 +3927,24 @@ function encodeWindows1252(str) {
   }
   return new Uint8Array(bytes);
 }
+function sanitizeFirstCsvHeaderLabel(label) {
+  if (label == null) return '';
+  const text = String(label);
+  const trimmedUpper = text.trim().toUpperCase();
+  if (trimmedUpper === 'ID') {
+    return 'Id';
+  }
+  return text;
+}
 function downloadCsvFile(rows, columns, baseName, delimiter = ';') {
   if (!Array.isArray(rows)) rows = [];
   const cols = columns.map(col => typeof col === 'string' ? {key: col, label: col} : col);
-  const header = cols.map(col => escapeCsvValue(col.label ?? col.key, delimiter)).join(delimiter);
+  const header = cols.map((col, index) => {
+    const label = index === 0
+      ? sanitizeFirstCsvHeaderLabel(col.label ?? col.key)
+      : (col.label ?? col.key);
+    return escapeCsvValue(label, delimiter);
+  }).join(delimiter);
   const lines = rows.map(row => cols.map(col => {
     const raw = typeof col.value === 'function' ? col.value(row) : row?.[col.key];
     return escapeCsvValue(raw, delimiter);
