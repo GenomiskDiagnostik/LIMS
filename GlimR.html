@@ -1204,6 +1204,10 @@ form textarea {
   width: auto;
   accent-color: var(--accent);
 }
+button {
+  font: inherit;
+}
+
 button.primary {
   background: var(--accent);
   color: #fff;
@@ -1212,18 +1216,153 @@ button.primary {
   padding: 0.5rem 0.9rem;
   cursor: pointer;
 }
-button.danger {
-  background: var(--danger);
-  color: #fff;
-}
+
 button.secondary {
   background: var(--nav-button-bg);
   color: var(--nav-button-color);
   border: 1px solid transparent;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
 }
+
+button.danger {
+  background: var(--danger);
+  color: #fff;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+}
+
 button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+button.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  font-weight: 600;
+  line-height: 1.1;
+  border-radius: 0.65rem;
+  padding: 0.55rem 1.1rem;
+  border: 1px solid transparent;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+button.btn:hover {
+  transform: translateY(-1px);
+}
+
+button.btn:active {
+  transform: translateY(0);
+}
+
+button.btn:focus-visible {
+  outline: 3px solid var(--input-focus);
+  outline-offset: 2px;
+}
+
+button.btn.primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #fff;
+  box-shadow: 0 8px 18px var(--accent-shadow);
+  border: none;
+}
+
+button.btn.primary:hover {
+  background: linear-gradient(135deg, var(--accent-strong), var(--accent));
+}
+
+[data-theme="dark"] button.btn.primary {
+  box-shadow: 0 10px 22px rgba(14, 165, 233, 0.18);
+}
+
+button.btn.secondary {
+  background: rgba(24, 111, 175, 0.08);
+  color: var(--accent-strong);
+  border-color: rgba(24, 111, 175, 0.25);
+  box-shadow: inset 0 0 0 1px rgba(24, 111, 175, 0.08);
+}
+
+button.btn.secondary:hover {
+  background: rgba(24, 111, 175, 0.14);
+}
+
+[data-theme="dark"] button.btn.secondary {
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--accent);
+  border-color: rgba(56, 189, 248, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.2);
+}
+
+[data-theme="dark"] button.btn.secondary:hover {
+  background: rgba(56, 189, 248, 0.22);
+}
+
+button.btn.danger {
+  background: linear-gradient(135deg, var(--danger), #96271d);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(192, 57, 43, 0.25);
+  border: none;
+}
+
+button.btn.danger:hover {
+  background: linear-gradient(135deg, #96271d, var(--danger));
+}
+
+[data-theme="dark"] button.btn.danger {
+  box-shadow: 0 10px 22px rgba(239, 68, 68, 0.3);
+}
+
+button.btn:disabled {
+  opacity: 0.6;
+  box-shadow: none;
+  transform: none;
+}
+
+button.btn-save,
+button.btn-new,
+button.btn-delete {
+  gap: 0.65rem;
+}
+
+button.btn-save::before,
+button.btn-new::before,
+button.btn-delete::before {
+  content: '';
+  width: 1.15em;
+  height: 1.15em;
+  display: inline-block;
+  background: currentColor;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
+  opacity: 0.85;
+}
+
+button.btn-save::before {
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h9l5%205v11a2%202%200%200%201-2%202H7a2%202%200%200%201-2-2V5a2%202%200%200%201%202-2z%22/%3E%3Cpath%20d%3D%22M7%203v5h8%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2216%22%20r%3D%222.25%22/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h9l5%205v11a2%202%200%200%201-2%202H7a2%202%200%200%201-2-2V5a2%202%200%200%201%202-2z%22/%3E%3Cpath%20d%3D%22M7%203v5h8%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2216%22%20r%3D%222.25%22/%3E%3C/svg%3E");
+}
+
+button.btn-new::before {
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%205v14%22/%3E%3Cpath%20d%3D%22M5%2012h14%22/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%205v14%22/%3E%3Cpath%20d%3D%22M5%2012h14%22/%3E%3C/svg%3E");
+}
+
+button.btn-delete::before {
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%207h16%22/%3E%3Cpath%20d%3D%22M10%2011v6%22/%3E%3Cpath%20d%3D%22M14%2011v6%22/%3E%3Cpath%20d%3D%22M5%207l1%2012a2%202%200%200%200%202%202h8a2%202%200%200%200%202-2l1-12%22/%3E%3Cpath%20d%3D%22M9%207V4h6v3%22/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%207h16%22/%3E%3Cpath%20d%3D%22M10%2011v6%22/%3E%3Cpath%20d%3D%22M14%2011v6%22/%3E%3Cpath%20d%3D%22M5%207l1%2012a2%202%200%200%200%202%202h8a2%202%200%200%200%202-2l1-12%22/%3E%3Cpath%20d%3D%22M9%207V4h6v3%22/%3E%3C/svg%3E");
 }
 .badge {
   display: inline-block;
@@ -5777,9 +5916,9 @@ function renderPatients(section) {
           <label>Fødselsdato<span class="label-note" data-patient-age hidden></span><input type="date" name="birth_date"></label>
           <label>Noter<textarea name="notes"></textarea></label>
           <div class="btn-row">
-            <button type="submit" class="primary">Gem</button>
-            <button type="button" id="patientClear" class="secondary">Ny</button>
-            <button type="button" id="patientDelete" class="danger">Slet</button>
+            <button type="submit" class="btn primary btn-save">Gem</button>
+            <button type="button" id="patientClear" class="btn secondary btn-new">Ny</button>
+            <button type="button" id="patientDelete" class="btn danger btn-delete">Slet</button>
           </div>
         </form>
       </div>
@@ -6034,9 +6173,9 @@ function renderSamples(section) {
           <label>Opsamlet<input type="datetime-local" name="collected_at"></label>
           <label>Noter<textarea name="notes"></textarea></label>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="sampleClear">Ny</button>
-            <button class="danger" type="button" id="sampleDelete">Slet</button>
+            <button class="btn primary btn-save" type="submit">Gem</button>
+            <button class="btn secondary btn-new" type="button" id="sampleClear">Ny</button>
+            <button class="btn danger btn-delete" type="button" id="sampleDelete">Slet</button>
           </div>
         </form>
       </div>
@@ -6307,9 +6446,9 @@ function renderPanels(section) {
             <p class="form-hint">Antal gener: <span data-panel-gene-count>0</span></p>
           </div>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="panelClear">Ny</button>
-            <button class="danger" type="button" id="panelDelete">Slet</button>
+            <button class="btn primary btn-save" type="submit">Gem</button>
+            <button class="btn secondary btn-new" type="button" id="panelClear">Ny</button>
+            <button class="btn danger btn-delete" type="button" id="panelDelete">Slet</button>
           </div>
         </form>
       </div>
@@ -6715,9 +6854,9 @@ function renderOrders(section) {
           </div>
           <label>Bestillingstidspunkt<input type="datetime-local" name="ordered_at"></label>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="orderClear">Ny</button>
-            <button class="danger" type="button" id="orderDelete">Slet</button>
+            <button class="btn primary btn-save" type="submit">Gem</button>
+            <button class="btn secondary btn-new" type="button" id="orderClear">Ny</button>
+            <button class="btn danger btn-delete" type="button" id="orderDelete">Slet</button>
           </div>
         </form>
       </div>
@@ -7259,10 +7398,10 @@ function renderVariants(section) {
           <label>Annoteringer<textarea name="annotations" placeholder="Importerede annoteringer fra VarSeq og andre værktøjer."></textarea></label>
           <label>Tolkning<textarea name="interpretation"></textarea></label>
           <div class="btn-row">
-            <button class="primary" type="submit" id="variantSave" data-action="save">Gem</button>
+            <button class="btn primary btn-save" type="submit" id="variantSave" data-action="save">Gem</button>
             <button class="secondary" type="submit" id="variantSaveNew" data-action="create" hidden>Gem som ny</button>
-            <button class="secondary" type="button" id="variantClear">Ny</button>
-            <button class="danger" type="button" id="variantDelete">Slet</button>
+            <button class="btn secondary btn-new" type="button" id="variantClear">Ny</button>
+            <button class="btn danger btn-delete" type="button" id="variantDelete">Slet</button>
             <button class="secondary" type="button" id="variantFromLibrary">Fra bibliotek</button>
             <button class="secondary" type="button" id="variantToLibrary">Til bibliotek</button>
           </div>
@@ -8074,10 +8213,10 @@ function renderVariantLibrary(section) {
           <label>Kurateret af<input name="curated_by"></label>
           <label>Sidst gennemgået<input type="date" name="last_review"></label>
           <div class="btn-row">
-            <button class="primary" type="submit" data-action="save" id="variantLibrarySave">Gem</button>
+            <button class="btn primary btn-save" type="submit" data-action="save" id="variantLibrarySave">Gem</button>
             <button class="secondary" type="submit" data-action="create" id="variantLibrarySaveNew" hidden>Gem som ny</button>
-            <button class="secondary" type="button" id="variantLibraryClear">Ny</button>
-            <button class="danger" type="button" id="variantLibraryDelete">Slet</button>
+            <button class="btn secondary btn-new" type="button" id="variantLibraryClear">Ny</button>
+            <button class="btn danger btn-delete" type="button" id="variantLibraryDelete">Slet</button>
           </div>
         </form>
       </div>
@@ -8846,9 +8985,9 @@ function renderConclusionLibrary(section) {
           <label>Titel<input name="title" required></label>
           <label>Standardtekst<textarea name="body" rows="8" required></textarea></label>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="conclusionLibraryClear">Ny</button>
-            <button class="danger" type="button" id="conclusionLibraryDelete">Slet</button>
+            <button class="btn primary btn-save" type="submit">Gem</button>
+            <button class="btn secondary btn-new" type="button" id="conclusionLibraryClear">Ny</button>
+            <button class="btn danger btn-delete" type="button" id="conclusionLibraryDelete">Slet</button>
           </div>
         </form>
         <div data-placeholder-guide="library"></div>
@@ -9043,9 +9182,9 @@ function renderReports(section) {
           </div>
           <div data-placeholder-guide="report"></div>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="reportClear">Ny</button>
-            <button class="danger" type="button" id="reportDelete">Slet</button>
+            <button class="btn primary btn-save" type="submit">Gem</button>
+            <button class="btn secondary btn-new" type="button" id="reportClear">Ny</button>
+            <button class="btn danger btn-delete" type="button" id="reportDelete">Slet</button>
             <button class="secondary" type="button" id="reportPreview">Udskriv/forhåndsvis</button>
             <button class="secondary" type="button" id="reportDownloadPdf">Hent PDF</button>
           </div>
@@ -10786,9 +10925,9 @@ function renderQC(section) {
           <label>Enhed<input name="unit"></label>
           <label>Noter<textarea name="notes"></textarea></label>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="qcClear">Ny</button>
-            <button class="danger" type="button" id="qcDelete">Slet</button>
+            <button class="btn primary btn-save" type="submit">Gem</button>
+            <button class="btn secondary btn-new" type="button" id="qcClear">Ny</button>
+            <button class="btn danger btn-delete" type="button" id="qcDelete">Slet</button>
           </div>
         </form>
       </div>
@@ -12764,9 +12903,9 @@ function renderUsers(section) {
           <label>Rolle<select name="role" required>${ROLE_OPTIONS.map(opt => `<option value="${opt.value}">${opt.value} – ${opt.description}</option>`).join('')}</select></label>
           <label>Adgangskode (PIN)<input type="password" name="pin" placeholder="Valgfri kode"></label>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="userClear">Ny</button>
-            <button class="danger" type="button" id="userDelete">Slet</button>
+            <button class="btn primary btn-save" type="submit">Gem</button>
+            <button class="btn secondary btn-new" type="button" id="userClear">Ny</button>
+            <button class="btn danger btn-delete" type="button" id="userDelete">Slet</button>
           </div>
         </form>
       </div>
@@ -12945,9 +13084,9 @@ function renderAdmin(section) {
           <input type="hidden" name="id">
           <label>Navn<input name="name" required></label>
           <div class="btn-row">
-            <button class="primary" type="submit">Gem</button>
-            <button class="secondary" type="button" id="patientGroupClear">Ny</button>
-            <button class="danger" type="button" id="patientGroupDelete">Slet</button>
+            <button class="btn primary btn-save" type="submit">Gem</button>
+            <button class="btn secondary btn-new" type="button" id="patientGroupClear">Ny</button>
+            <button class="btn danger btn-delete" type="button" id="patientGroupDelete">Slet</button>
           </div>
         </form>
       </div>
