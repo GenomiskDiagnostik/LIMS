@@ -6090,6 +6090,14 @@ function renderPanels(section) {
       .filter(Boolean);
   };
   const normaliseGeneList = value => parseGeneList(value).join(', ');
+  const geneListPreviewLimit = 80;
+  const formatGeneListPreview = (value, limit = geneListPreviewLimit) => {
+    const text = (value ?? '').toString().trim();
+    if (!text) return '';
+    if (text.length <= limit) return text;
+    const truncated = text.slice(0, Math.max(0, limit - 1)).trimEnd();
+    return `${truncated}…`;
+  };
   const geneCountFromValue = value => parseGeneList(value).length;
   const setVersionTouched = touched => {
     if (!form) return;
@@ -6164,8 +6172,11 @@ function renderPanels(section) {
       const updatedByDisplay = esc(p.updated_by || '–');
       const geneCountValue = Number.isFinite(Number(p.gene_count)) ? Number(p.gene_count) : geneCountFromValue(p.gene_list);
       const geneCountDisplay = geneCountValue ? esc(geneCountValue) : '0';
-      const geneListDisplay = esc(p.gene_list || '');
-      return `<tr data-id="${p.id}"${selectedAttr}><td>${p.id}</td><td>${esc(p.name)}</td><td>${versionDisplay}</td><td>${createdDisplay}</td><td>${updatedDisplay}</td><td>${updatedByDisplay}</td><td>${esc(p.description||'')}</td><td>${geneCountDisplay}</td><td>${geneListDisplay}</td></tr>`;
+      const geneListFull = (p.gene_list ?? '').toString();
+      const geneListPreview = formatGeneListPreview(geneListFull);
+      const geneListDisplay = geneListPreview ? esc(geneListPreview) : '–';
+      const geneListTitle = geneListFull ? ` title="${esc(geneListFull)}"` : '';
+      return `<tr data-id="${p.id}"${selectedAttr}><td>${p.id}</td><td>${esc(p.name)}</td><td>${versionDisplay}</td><td>${createdDisplay}</td><td>${updatedDisplay}</td><td>${updatedByDisplay}</td><td>${esc(p.description||'')}</td><td>${geneCountDisplay}</td><td${geneListTitle}>${geneListDisplay}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
