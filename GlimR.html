@@ -12921,10 +12921,12 @@ function renderTools(section) {
     const hideDone = Boolean(planningHideDoneToggle?.checked);
     const lanes = planningStages.map(stage => {
       const allStageTasks = planningTasks.filter(task => task.stage.id === stage.id);
+      if (!allStageTasks.length) return '';
       const visibleTasks = hideDone ? allStageTasks.filter(task => !task.isDone) : allStageTasks;
+      if (!visibleTasks.length) return '';
       const laneCount = hideDone ? `${visibleTasks.length} af ${allStageTasks.length}` : `${allStageTasks.length}`;
       const cards = visibleTasks.sort(comparePlanningTasks).map(buildPlanningCard).join('');
-      const body = cards || '<p class="planning-empty">Ingen opgaver.</p>';
+      if (!cards) return '';
       return `
         <section class="planning-lane" data-stage="${esc(stage.id)}">
           <header class="planning-lane-header">
@@ -12932,10 +12934,14 @@ function renderTools(section) {
             <div class="planning-lane-count">${laneCount}</div>
             <p class="planning-lane-subtitle">${esc(stage.description)}</p>
           </header>
-          <div class="planning-lane-body">${body}</div>
+          <div class="planning-lane-body">${cards}</div>
         </section>
       `;
-    }).join('');
+    }).filter(Boolean).join('');
+    if (!lanes) {
+      planningBoard.innerHTML = '<p class="planning-empty">Ingen opgaver matcher de valgte filtre.</p>';
+      return;
+    }
     planningBoard.innerHTML = lanes;
   };
 
