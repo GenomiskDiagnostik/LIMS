@@ -568,6 +568,10 @@ section[data-tab].active {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
+  justify-self: start;
+  justify-content: flex-start;
+  align-self: start;
+  text-align: left;
 }
 .planning-checkbox input {
   width: auto;
@@ -11996,7 +12000,7 @@ function renderPlanner(section) {
     const hourMs = 60 * 60 * 1000;
     const dayMs = 24 * hourMs;
     if (absMs < hourMs) {
-      return diffMs >= 0 ? 'Forfalder om < 1 time' : 'Forfaldt for < 1 time siden';
+      return diffMs >= 0 ? 'Forfalder om < 1 time' : 'Forfaldt for under 1 time siden';
     }
     if (absMs < dayMs) {
       const hours = Math.round(absMs / hourMs);
@@ -12287,11 +12291,12 @@ function renderPlanner(section) {
     refreshPlanningStatusText();
   };
 
-  const refreshPlanningData = () => {
+  const refreshPlanningData = async () => {
     if (!currentUserId) {
       updatePlanningUi();
       return;
     }
+    await loadAllStores();
     planState = loadPlanState();
     ensurePlanTasks();
     updatePlanningUi();
@@ -12315,9 +12320,24 @@ function renderPlanner(section) {
 
     planningHideDoneToggle?.addEventListener('change', () => renderPlanningBoard());
 
-    planningRefreshBtn?.addEventListener('click', () => {
-      refreshPlanningData();
-      setStatus('Planen er opdateret.');
+    planningRefreshBtn?.addEventListener('click', async () => {
+      if (!planningRefreshBtn || planningRefreshBtn.disabled) return;
+      if (!currentUserId) {
+        planningRefreshBtn.disabled = true;
+        setStatus('Log ind for at opdatere planen.');
+        return;
+      }
+      planningRefreshBtn.disabled = true;
+      setStatus('Opdaterer plan...');
+      try {
+        await refreshPlanningData();
+        setStatus('Planen er opdateret.');
+      } catch (err) {
+        console.error('Kunne ikke opdatere planen:', err);
+        setStatus('Kunne ikke opdatere planen: ' + (err?.message || err));
+      } finally {
+        if (planningRefreshBtn) planningRefreshBtn.disabled = !currentUserId;
+      }
     });
 
     planningBoard.addEventListener('change', event => {
