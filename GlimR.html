@@ -532,12 +532,14 @@ section[data-tab].active {
 .planning-card-controls input[type="datetime-local"],
 .planning-card-controls textarea {
   width: 100%;
+  max-width: 100%;
   border: 1px solid var(--input-border);
   border-radius: 0.5rem;
   padding: 0.4rem 0.5rem;
   background: var(--input-bg);
   color: inherit;
   font: inherit;
+  box-sizing: border-box;
 }
 .planning-card-controls textarea {
   min-height: 60px;
@@ -12919,24 +12921,28 @@ function renderTools(section) {
       return;
     }
     const hideDone = Boolean(planningHideDoneToggle?.checked);
-    const lanes = planningStages.map(stage => {
+    const lanes = planningStages.reduce((output, stage) => {
       const allStageTasks = planningTasks.filter(task => task.stage.id === stage.id);
+      if (!allStageTasks.length) return output;
       const visibleTasks = hideDone ? allStageTasks.filter(task => !task.isDone) : allStageTasks;
+      if (!visibleTasks.length) return output;
       const laneCount = hideDone ? `${visibleTasks.length} af ${allStageTasks.length}` : `${allStageTasks.length}`;
       const cards = visibleTasks.sort(comparePlanningTasks).map(buildPlanningCard).join('');
-      const body = cards || '<p class="planning-empty">Ingen opgaver.</p>';
-      return `
+      output.push(`
         <section class="planning-lane" data-stage="${esc(stage.id)}">
           <header class="planning-lane-header">
             <div class="planning-stage-title">${esc(stage.label)}</div>
             <div class="planning-lane-count">${laneCount}</div>
             <p class="planning-lane-subtitle">${esc(stage.description)}</p>
           </header>
-          <div class="planning-lane-body">${body}</div>
+          <div class="planning-lane-body">${cards}</div>
         </section>
-      `;
-    }).join('');
-    planningBoard.innerHTML = lanes;
+      `);
+      return output;
+    }, []);
+    planningBoard.innerHTML = lanes.length
+      ? lanes.join('')
+      : '<p class="planning-empty">Alle opgaver i planen er markeret som færdige.</p>';
   };
 
   const updateExportButton = () => {
