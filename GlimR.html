@@ -360,6 +360,222 @@ section[data-tab].active {
   gap: 0.4rem;
   justify-items: stretch;
 }
+.planning-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 0.8rem;
+}
+.planning-summary-intro {
+  font-size: 0.95rem;
+  color: var(--muted-text);
+}
+.planning-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.6rem;
+}
+.planning-summary-item {
+  border: 1px solid var(--panel-border);
+  border-radius: 0.65rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--panel-bg);
+  box-shadow: var(--shadow);
+}
+.planning-summary-value {
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.planning-summary-label {
+  font-size: 0.85rem;
+  color: var(--muted-text);
+}
+.planning-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.8rem;
+}
+.planning-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.planning-status {
+  font-size: 0.85rem;
+  color: var(--muted-text);
+}
+.planning-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.8rem;
+}
+.planning-lane {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 0.75rem;
+  background: var(--panel-bg);
+  box-shadow: var(--shadow);
+  padding: 0.8rem;
+}
+.planning-lane-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.planning-stage-title {
+  font-weight: 600;
+}
+.planning-lane-count {
+  font-size: 0.85rem;
+  color: var(--muted-text);
+}
+.planning-lane-subtitle {
+  font-size: 0.85rem;
+  color: var(--muted-text);
+  margin: 0;
+}
+.planning-lane-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.planning-card {
+  border: 1px solid var(--panel-border);
+  border-radius: 0.65rem;
+  background: rgba(24, 111, 175, 0.02);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.planning-card[data-status="done"] {
+  background: rgba(56, 189, 248, 0.08);
+  border-color: rgba(56, 189, 248, 0.35);
+}
+.planning-card[data-status="in_progress"] {
+  border-color: rgba(24, 111, 175, 0.45);
+}
+.planning-card[data-due="overdue"] {
+  border-color: var(--danger);
+}
+.planning-card[data-due="soon"] {
+  border-color: rgba(245, 158, 11, 0.55);
+}
+.planning-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+.planning-card-title {
+  font-weight: 600;
+}
+.planning-card-meta {
+  font-size: 0.85rem;
+  color: var(--muted-text);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.planning-card-stage {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}
+.planning-stage-badge {
+  background: var(--badge-bg);
+  color: var(--badge-color);
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.planning-card-status-label {
+  font-weight: 600;
+}
+.planning-card-info,
+.planning-card-extra {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+}
+.planning-card-info span {
+  display: block;
+}
+.planning-info-list {
+  margin: 0;
+  padding-left: 1rem;
+  font-size: 0.85rem;
+  color: var(--muted-text);
+}
+.planning-info-list li {
+  margin: 0.1rem 0;
+}
+.planning-card-controls {
+  display: grid;
+  gap: 0.5rem;
+}
+.planning-card-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+}
+.planning-card-controls input[type="datetime-local"],
+.planning-card-controls textarea {
+  width: 100%;
+  border: 1px solid var(--input-border);
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  background: var(--input-bg);
+  color: inherit;
+  font: inherit;
+}
+.planning-card-controls textarea {
+  min-height: 60px;
+  resize: vertical;
+}
+.planning-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.planning-checkbox input {
+  width: auto;
+  accent-color: var(--accent);
+}
+.planning-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.planning-button {
+  font-size: 0.85rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.5rem;
+}
+.planning-empty {
+  font-size: 0.9rem;
+  color: var(--muted-text);
+  font-style: italic;
+}
+[data-theme="dark"] .planning-card {
+  background: rgba(14, 165, 233, 0.06);
+}
+[data-theme="dark"] .planning-card[data-status="done"] {
+  background: rgba(14, 165, 233, 0.12);
+}
+[data-theme="dark"] .planning-summary-item {
+  background: rgba(14, 165, 233, 0.06);
+}
 .tool-criteria {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -3448,9 +3664,35 @@ window.addEventListener('unhandledrejection', event => {
 function currentUserName() {
   return state.currentUser?.name || 'System';
 }
+function ensureTabContainers() {
+  let nav = document.getElementById('tabNav');
+  let main = document.getElementById('tabContent');
+  if (!nav) {
+    nav = document.createElement('nav');
+    nav.id = 'tabNav';
+    const header = document.querySelector('header');
+    if (header && header.parentNode) {
+      header.parentNode.insertBefore(nav, header.nextSibling);
+    } else if (document.body.firstChild) {
+      document.body.insertBefore(nav, document.body.firstChild);
+    } else {
+      document.body.appendChild(nav);
+    }
+  }
+  if (!main) {
+    main = document.createElement('main');
+    main.id = 'tabContent';
+    document.body.appendChild(main);
+  }
+  return {nav, main};
+}
 function initTabs() {
-  const nav = document.getElementById('tabNav');
-  const main = document.getElementById('tabContent');
+  const {nav, main} = ensureTabContainers();
+  if (!nav || !main) {
+    console.error('Kunne ikke initialisere tabvisning: mangler containere.');
+    setStatus('Fejl: Tabvisning kunne ikke initialiseres.');
+    return;
+  }
   nav.innerHTML = '';
   main.innerHTML = '';
   tabs.forEach(tab => {
@@ -9715,7 +9957,7 @@ function renderReports(section) {
     if (detailLines.length) lines.push(detailLines.join(' – '));
     if (variant.annotations) lines.push(`Annoteringer: ${variant.annotations}`);
     if (variant.interpretation) lines.push(`Tolkning: ${variant.interpretation}`);
-    return lines.join('\n');
+    return lines.join('\r\n');
   };
   const buildConclusionPlaceholderMap = () => {
     const map = new Map();
@@ -11827,6 +12069,34 @@ function renderTools(section) {
   `;
   }).join('');
   section.innerHTML = `
+  <details class="panel tool-panel" open>
+    <summary>
+      <div class="tool-summary-text">
+        <span class="tool-title">Arbejdsplanlægger</span>
+        <span class="tool-subtitle">Planlæg QC, analyser, tolkninger, godkendelser og rapporter for dine ordinationer.</span>
+      </div>
+    </summary>
+    <div class="tool-body">
+      <h3>Arbejdsplanlægger</h3>
+      <p>Få et samlet overblik over de opgaver der er knyttet til dine ordinationer og planlæg næste skridt.</p>
+      <div id="planningSummary" class="planning-summary"></div>
+      <div class="planning-controls">
+        <div class="planning-toggles">
+          <label class="list-toggle">
+            <input type="checkbox" id="planningHideDone">
+            Skjul færdige trin
+          </label>
+        </div>
+        <div class="planning-actions">
+          <button type="button" class="secondary planning-button" id="planningRefresh">Opdater</button>
+          <button type="button" class="primary planning-button" id="planningExport" disabled>Eksportér plan til kalender</button>
+        </div>
+      </div>
+      <div class="planning-status" id="planningStatus"></div>
+      <div id="planningBoard" class="planning-board"></div>
+      <p class="tool-note">Planen gemmes lokalt i din browser. Brug kalender-eksporten til at dele planen med Outlook eller Exchange.</p>
+    </div>
+  </details>
   <details class="panel tool-panel">
     <summary>
       <div class="tool-summary-text">
@@ -12155,6 +12425,674 @@ function renderTools(section) {
       <p class="tool-note">Beregningen ignorerer mellemrum og tal. Ambigue baser (fx N, R, Y) medtages i længden.</p>
     </div>
   </details>`;
+
+  const planningBoard = section.querySelector('#planningBoard');
+  const planningSummary = section.querySelector('#planningSummary');
+  const planningHideDoneToggle = section.querySelector('#planningHideDone');
+  const planningExportBtn = section.querySelector('#planningExport');
+  const planningRefreshBtn = section.querySelector('#planningRefresh');
+  const planningStatusText = section.querySelector('#planningStatus');
+
+  const ROLE_LABELS = {
+    analysis_responsible_id: 'Analyseansvarlig',
+    interpreter_id: 'Tolker',
+    approver_id: 'Godkender'
+  };
+
+  const summariseReportStatuses = reports => {
+    if (!Array.isArray(reports) || !reports.length) return 'Ingen rapporter registreret endnu';
+    const counts = new Map();
+    reports.forEach(report => {
+      const status = (report?.status || 'Uden status').trim() || 'Uden status';
+      counts.set(status, (counts.get(status) || 0) + 1);
+    });
+    const summary = Array.from(counts.entries()).map(([status, count]) => `${status} (${count})`).join(', ');
+    return `Rapporter (${reports.length}): ${summary}`;
+  };
+
+  const APPROVED_REPORT_STATUSES = new Set(['godkendt', 'udstedt', 'sendt', 'svaret', 'frigivet', 'released', 'færdig', 'afsluttet']);
+  const PUBLISHED_REPORT_STATUSES = new Set(['udstedt', 'sendt', 'svaret', 'frigivet', 'released']);
+
+  const planningStages = [
+    {
+      id: 'qc',
+      label: 'Kvalitetskontrol',
+      shortLabel: 'QC',
+      description: 'Forbered og registrér QC-målinger.',
+      sampleStatus: 'QC',
+      roleKeys: ['analysis_responsible_id'],
+      actions: [
+        {type: 'open-sample', label: 'Åbn prøve'},
+        {type: 'open-order', label: 'Åbn ordination'}
+      ],
+      computeCompletion: ({sample, context}) => {
+        const sampleId = Number(sample?.id);
+        if (!Number.isFinite(sampleId)) return false;
+        return (context.qcBySample.get(sampleId) || []).length > 0;
+      },
+      buildInfo: ({sample, context}) => {
+        const sampleId = Number(sample?.id);
+        const qcCount = Number.isFinite(sampleId) ? (context.qcBySample.get(sampleId) || []).length : 0;
+        return [qcCount ? `${qcCount} QC-måling${qcCount === 1 ? '' : 'er'} registreret` : 'Ingen QC-målinger registreret endnu'];
+      }
+    },
+    {
+      id: 'analysis',
+      label: 'Analyse',
+      shortLabel: 'Analyse',
+      description: 'Koordinér analysearbejdet og variantregistrering.',
+      sampleStatus: 'Analyse',
+      roleKeys: ['analysis_responsible_id'],
+      actions: [
+        {type: 'open-order', label: 'Åbn ordination'}
+      ],
+      buildInfo: ({context, orderId}) => {
+        const variantCount = (context.variantsByOrder.get(orderId) || []).length;
+        return [variantCount ? `${variantCount} variant${variantCount === 1 ? '' : 'er'} registreret` : 'Ingen varianter registreret endnu'];
+      }
+    },
+    {
+      id: 'interpretation',
+      label: 'Tolkning',
+      shortLabel: 'Tolkning',
+      description: 'Planlæg fortolkning og konklusioner.',
+      sampleStatus: 'Tolkning',
+      roleKeys: ['interpreter_id'],
+      actions: [
+        {type: 'open-order', label: 'Åbn ordination'},
+        {type: 'open-report', label: 'Åbn rapporter'}
+      ],
+      buildInfo: ({context, orderId}) => {
+        const variantCount = (context.variantsByOrder.get(orderId) || []).length;
+        return [variantCount ? `${variantCount} variant${variantCount === 1 ? '' : 'er'} til fortolkning` : 'Ingen varianter klar til fortolkning endnu'];
+      }
+    },
+    {
+      id: 'approval',
+      label: 'Godkendelse',
+      shortLabel: 'Godkendelse',
+      description: 'Følg rapporter der afventer godkendelse.',
+      sampleStatus: 'Godkendelse',
+      roleKeys: ['approver_id'],
+      actions: [
+        {type: 'open-report', label: 'Åbn rapporter'},
+        {type: 'open-order', label: 'Åbn ordination'}
+      ],
+      computeCompletion: ({context, orderId}) => {
+        const reports = context.reportsByOrder.get(orderId) || [];
+        return reports.some(report => APPROVED_REPORT_STATUSES.has((report?.status || '').toLowerCase()));
+      },
+      buildInfo: ({context, orderId}) => {
+        const reports = context.reportsByOrder.get(orderId) || [];
+        if (!reports.length) return ['Ingen rapporter klar til godkendelse endnu'];
+        return [summariseReportStatuses(reports)];
+      }
+    },
+    {
+      id: 'report',
+      label: 'Rapport',
+      shortLabel: 'Rapport',
+      description: 'Planlæg rapportskrivning og udsendelse.',
+      sampleStatus: 'Rapport',
+      roleKeys: ['analysis_responsible_id', 'interpreter_id'],
+      actions: [
+        {type: 'open-report', label: 'Åbn rapporter'},
+        {type: 'open-order', label: 'Åbn ordination'}
+      ],
+      computeCompletion: ({context, orderId}) => {
+        const reports = context.reportsByOrder.get(orderId) || [];
+        return reports.some(report => PUBLISHED_REPORT_STATUSES.has((report?.status || '').toLowerCase()));
+      },
+      buildInfo: ({context, orderId}) => {
+        const reports = context.reportsByOrder.get(orderId) || [];
+        if (!reports.length) return ['Ingen rapportudkast oprettet endnu'];
+        return [summariseReportStatuses(reports)];
+      }
+    }
+  ];
+
+  const STAGE_STATUS_LABELS = {
+    pending: 'Ikke startet',
+    in_progress: 'I gang',
+    done: 'Færdig',
+    blocked: 'Afventer data',
+    unknown: 'Status ukendt'
+  };
+
+  const STAGE_STATUS_DESCRIPTIONS = {
+    pending: 'Trinnet afventer at forrige trin afsluttes eller at prøven opdateres.',
+    in_progress: 'Trinnet er aktivt og kræver opmærksomhed.',
+    done: 'Trinnet er markeret som afsluttet.',
+    blocked: 'Der mangler prøvestatus eller data for at vurdere trinets fremdrift.',
+    unknown: 'Kan ikke fastslå fremdriften for dette trin.'
+  };
+
+  const sampleStatusOrder = new Map(SAMPLE_STATUSES.map((status, index) => [status.toLowerCase(), index]));
+  const dateTimeFormatter = new Intl.DateTimeFormat('da-DK', {dateStyle: 'short', timeStyle: 'short'});
+
+  const currentUser = state.currentUser;
+  const currentUserId = currentUser?.id != null ? String(currentUser.id) : null;
+  const planningStorageKey = currentUserId ? `glimr-plan-${currentUserId}` : null;
+
+  const loadPlanState = () => {
+    if (!planningStorageKey) return {tasks: {}};
+    try {
+      const raw = storage.getItem(planningStorageKey);
+      if (!raw) return {tasks: {}};
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return {tasks: {}};
+      if (!parsed.tasks || typeof parsed.tasks !== 'object') parsed.tasks = {};
+      return parsed;
+    } catch (err) {
+      console.warn('Kunne ikke indlæse planlægning:', err);
+      return {tasks: {}};
+    }
+  };
+
+  let planState = planningStorageKey ? loadPlanState() : {tasks: {}};
+
+  const ensurePlanTasks = () => {
+    if (!planState || typeof planState !== 'object') planState = {tasks: {}};
+    if (!planState.tasks || typeof planState.tasks !== 'object') planState.tasks = {};
+  };
+
+  ensurePlanTasks();
+
+  const persistPlanState = () => {
+    if (!planningStorageKey) return;
+    try {
+      storage.setItem(planningStorageKey, JSON.stringify(planState));
+    } catch (err) {
+      console.warn('Kunne ikke gemme planlægning:', err);
+    }
+  };
+
+  const sanitizeDueValue = value => {
+    if (typeof value !== 'string') return '';
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(trimmed) ? trimmed : '';
+  };
+
+  const sanitizeNoteValue = value => {
+    if (typeof value !== 'string') return '';
+    return value.replace(/\r/g, '').slice(0, 2000);
+  };
+
+  const getPlanSettings = id => {
+    ensurePlanTasks();
+    const entry = planState.tasks?.[id];
+    if (!entry || typeof entry !== 'object') {
+      return {due: '', note: '', done: false};
+    }
+    return {
+      due: sanitizeDueValue(entry.due),
+      note: sanitizeNoteValue(entry.note || ''),
+      done: Boolean(entry.done)
+    };
+  };
+
+  const refreshPlanningStatusText = () => {
+    if (!planningStatusText) return;
+    if (!currentUserId) {
+      planningStatusText.textContent = '';
+      return;
+    }
+    if (planState.updatedAt) {
+      const ts = parseDateTimeValue(planState.updatedAt);
+      if (ts) {
+        planningStatusText.textContent = `Sidst gemt: ${dateTimeFormatter.format(ts)}`;
+        return;
+      }
+    }
+    planningStatusText.textContent = 'Planen er endnu ikke gemt.';
+  };
+
+  const setPlanSettings = (id, updates) => {
+    if (!id) return;
+    ensurePlanTasks();
+    const current = {...(planState.tasks?.[id] || {})};
+    if (updates.due !== undefined) current.due = sanitizeDueValue(updates.due);
+    if (updates.note !== undefined) current.note = sanitizeNoteValue(updates.note);
+    if (updates.done !== undefined) current.done = Boolean(updates.done);
+    const hasData = Boolean(current.due) || Boolean(current.note) || Boolean(current.done);
+    if (hasData) {
+      planState.tasks[id] = current;
+    } else if (planState.tasks[id]) {
+      delete planState.tasks[id];
+    }
+    planState.updatedAt = new Date().toISOString();
+    persistPlanState();
+    refreshPlanningStatusText();
+  };
+
+  const formatRelativeDue = (date, now = new Date()) => {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+    const diffMs = date.getTime() - now.getTime();
+    const absMs = Math.abs(diffMs);
+    const hourMs = 60 * 60 * 1000;
+    const dayMs = 24 * hourMs;
+    if (absMs < hourMs) {
+      return diffMs >= 0 ? 'Forfalder om < 1 time' : 'Forfaldt for < 1 time siden';
+    }
+    if (absMs < dayMs) {
+      const hours = Math.round(absMs / hourMs);
+      const label = hours === 1 ? 'time' : 'timer';
+      return diffMs >= 0 ? `Forfalder om ${hours} ${label}` : `Forfaldt for ${hours} ${label} siden`;
+    }
+    const days = Math.round(absMs / dayMs);
+    const label = days === 1 ? 'dag' : 'dage';
+    return diffMs >= 0 ? `Forfalder om ${days} ${label}` : `Forfaldt for ${days} ${label} siden`;
+  };
+
+  let planningTasks = [];
+
+  const computePlanningTasks = () => {
+    if (!currentUserId) return [];
+    const orders = getCached('orders') || [];
+    if (!orders.length) return [];
+    const patients = getCached('patients') || [];
+    const samples = getCached('samples') || [];
+    const qcRows = getCached('qc') || [];
+    const variantRows = getCached('variants') || [];
+    const reportRows = getCached('reports') || [];
+    const patientMap = new Map(patients.map(p => [Number(p.id), p]));
+    const sampleMap = new Map(samples.map(s => [Number(s.id), s]));
+    const qcBySample = new Map();
+    qcRows.forEach(row => {
+      const sampleId = Number(row.sample_id);
+      if (!Number.isFinite(sampleId)) return;
+      const list = qcBySample.get(sampleId) || [];
+      list.push(row);
+      qcBySample.set(sampleId, list);
+    });
+    const variantsByOrder = new Map();
+    variantRows.forEach(row => {
+      const orderId = Number(row.order_id);
+      if (!Number.isFinite(orderId)) return;
+      const list = variantsByOrder.get(orderId) || [];
+      list.push(row);
+      variantsByOrder.set(orderId, list);
+    });
+    const reportsByOrder = new Map();
+    reportRows.forEach(row => {
+      const orderId = Number(row.order_id);
+      if (!Number.isFinite(orderId)) return;
+      const list = reportsByOrder.get(orderId) || [];
+      list.push(row);
+      reportsByOrder.set(orderId, list);
+    });
+    const context = {qcBySample, variantsByOrder, reportsByOrder};
+    const now = new Date();
+    const results = [];
+    orders.forEach(order => {
+      const orderId = Number(order.id);
+      if (!Number.isFinite(orderId)) return;
+      planningStages.forEach(stage => {
+        const matchedRoles = stage.roleKeys.filter(key => {
+          const value = order?.[key];
+          return value !== undefined && value !== null && String(value) === currentUserId;
+        });
+        if (!matchedRoles.length) return;
+        const sample = sampleMap.get(Number(order.sample_id));
+        const patient = patientMap.get(Number(order.patient_id));
+        const taskId = `${orderId}:${stage.id}`;
+        const planSettings = getPlanSettings(taskId);
+        const dueInputValue = sanitizeDueValue(planSettings.due);
+        const dueDate = dueInputValue ? parseDateTimeValue(dueInputValue) : null;
+        const sampleStatusValue = (sample?.status || '').toLowerCase();
+        const sampleStatusIndex = sampleStatusOrder.get(sampleStatusValue);
+        const stageStatusIndex = stage.sampleStatus ? sampleStatusOrder.get(stage.sampleStatus.toLowerCase()) : undefined;
+        let statusKey = 'unknown';
+        if (!sample) {
+          statusKey = 'blocked';
+        } else if (stageStatusIndex === undefined || stageStatusIndex === -1 || sampleStatusIndex === undefined) {
+          statusKey = 'unknown';
+        } else if (sampleStatusIndex > stageStatusIndex) {
+          statusKey = 'done';
+        } else if (sampleStatusIndex === stageStatusIndex) {
+          statusKey = 'in_progress';
+        } else {
+          statusKey = 'pending';
+        }
+        if (stage.computeCompletion?.({order, sample, context, orderId, sampleStatusIndex})) {
+          statusKey = 'done';
+        }
+        const note = planSettings.note;
+        const planDone = Boolean(planSettings.done);
+        if (planDone && statusKey !== 'done') {
+          statusKey = 'done';
+        }
+        const isDone = statusKey === 'done';
+        const dueState = dueDate ? (dueDate.getTime() < now.getTime() ? 'overdue' : (dueDate.getTime() - now.getTime()) <= 48 * 60 * 60 * 1000 ? 'soon' : 'scheduled') : 'none';
+        const dueRelative = dueDate ? formatRelativeDue(dueDate, now) : '';
+        const info = [];
+        const stageInfo = stage.buildInfo ? stage.buildInfo({order, sample, patient, context, orderId}) : [];
+        if (Array.isArray(stageInfo)) {
+          stageInfo.forEach(item => { if (item) info.push(item); });
+        } else if (stageInfo) {
+          info.push(stageInfo);
+        }
+        if (sample?.sample_type) info.push(`Prøvetype: ${sample.sample_type}`);
+        if (order?.status) info.push(`Ordinationsstatus: ${order.status}`);
+        if (order?.ordered_at) {
+          const orderedText = formatDanishDate(order.ordered_at, true);
+          if (orderedText) info.push(`Bestilt: ${orderedText}`);
+        }
+        const orderName = getOrderDisplayName(orderId) || `Ordination #${orderId}`;
+        const patientName = patient?.name || '';
+        const sampleLabel = sample ? `Prøve ${sample.id}${sample.pmb_number ? ` (${sample.pmb_number})` : ''}` : '';
+        const roleNames = matchedRoles.map(key => ROLE_LABELS[key] || key);
+        const roleLabel = roleNames.length ? `Din rolle: ${roleNames.join(' & ')}` : '';
+        const sampleStatusText = sample?.status || 'Ikke angivet';
+        const priorityHtml = renderOrderPriorityIcons(order);
+        results.push({
+          id: taskId,
+          orderId,
+          stage,
+          orderName,
+          patientName,
+          sampleLabel,
+          roleLabel,
+          statusKey,
+          statusLabel: STAGE_STATUS_LABELS[statusKey] || 'Status ukendt',
+          statusDescription: STAGE_STATUS_DESCRIPTIONS[statusKey] || '',
+          dueInputValue,
+          dueDate,
+          dueDisplay: dueDate ? dateTimeFormatter.format(dueDate) : '',
+          dueRelative,
+          dueState,
+          note,
+          planDone,
+          isDone,
+          sampleStatusText,
+          info,
+          priorityHtml
+        });
+      });
+    });
+    return results;
+  };
+
+  const comparePlanningTasks = (a, b) => {
+    if (a.isDone !== b.isDone) return a.isDone ? 1 : -1;
+    if (a.dueDate && b.dueDate) return a.dueDate - b.dueDate;
+    if (a.dueDate) return -1;
+    if (b.dueDate) return 1;
+    if (a.dueState === 'overdue' && b.dueState !== 'overdue') return -1;
+    if (b.dueState === 'overdue' && a.dueState !== 'overdue') return 1;
+    return a.orderId - b.orderId;
+  };
+
+  const updatePlanningSummary = () => {
+    if (!planningSummary) return;
+    if (!currentUserId) {
+      planningSummary.innerHTML = '<p class="planning-summary-intro">Log ind for at se dine planlagte opgaver.</p>';
+      return;
+    }
+    if (!planningTasks.length) {
+      planningSummary.innerHTML = `<p class="planning-summary-intro"><strong>${esc(currentUser.name || 'Du')}</strong> har ingen planlagte trin knyttet til sine ordinationer endnu.</p>`;
+      return;
+    }
+    const now = new Date();
+    const total = planningTasks.length;
+    const doneCount = planningTasks.filter(task => task.isDone).length;
+    const activeCount = total - doneCount;
+    const overdueCount = planningTasks.filter(task => !task.isDone && task.dueDate && task.dueDate < now).length;
+    const dueSoonCount = planningTasks.filter(task => !task.isDone && task.dueDate && task.dueDate >= now && (task.dueDate.getTime() - now.getTime()) <= 48 * 60 * 60 * 1000).length;
+    const orderCount = new Set(planningTasks.map(task => task.orderId)).size;
+    planningSummary.innerHTML = `
+      <div class="planning-summary-intro"><strong>${esc(currentUser.name || 'Du')}</strong> har ${activeCount} aktive trin fordelt på ${orderCount} ordination${orderCount === 1 ? '' : 'er'}.</div>
+      <div class="planning-summary-grid">
+        <div class="planning-summary-item">
+          <div class="planning-summary-value">${activeCount}</div>
+          <div class="planning-summary-label">Aktive trin</div>
+        </div>
+        <div class="planning-summary-item">
+          <div class="planning-summary-value">${doneCount}</div>
+          <div class="planning-summary-label">Færdige trin</div>
+        </div>
+        <div class="planning-summary-item">
+          <div class="planning-summary-value">${overdueCount}</div>
+          <div class="planning-summary-label">Forfaldne</div>
+        </div>
+        <div class="planning-summary-item">
+          <div class="planning-summary-value">${dueSoonCount}</div>
+          <div class="planning-summary-label">Forfalder &lt; 48 timer</div>
+        </div>
+      </div>
+    `;
+  };
+
+  const buildPlanningCard = task => {
+    const metaParts = [];
+    if (task.patientName) metaParts.push(task.patientName);
+    if (task.sampleLabel) metaParts.push(task.sampleLabel);
+    if (task.roleLabel) metaParts.push(task.roleLabel);
+    const metaHtml = metaParts.length ? `<div class="planning-card-meta">${metaParts.map(part => `<span>${esc(part)}</span>`).join(' • ')}</div>` : '';
+    const dueText = task.dueDate ? `${esc(task.dueDisplay)}${task.dueRelative ? ` (${esc(task.dueRelative)})` : ''}` : 'Ikke planlagt';
+    const infoHtml = task.info.length ? `<ul class="planning-info-list">${task.info.map(item => `<li>${esc(item)}</li>`).join('')}</ul>` : '';
+    const actionsHtml = task.stage.actions?.length ? task.stage.actions.map(action => `<button type="button" class="secondary planning-button" data-action="${esc(action.type)}" data-task-id="${esc(task.id)}">${esc(action.label)}</button>`).join('') : '';
+    return `
+      <article class="planning-card" data-task-id="${esc(task.id)}" data-status="${esc(task.statusKey)}" data-due="${esc(task.dueState)}">
+        <div class="planning-card-header">
+          <div>
+            <div class="planning-card-title">${esc(task.orderName)}</div>
+            ${metaHtml}
+          </div>
+          ${task.priorityHtml || ''}
+        </div>
+        <div class="planning-card-stage" title="${esc(task.statusDescription)}">
+          <span class="planning-stage-badge">${esc(task.stage.shortLabel)}</span>
+          <span class="planning-card-status-label">${esc(task.statusLabel)}</span>
+        </div>
+        <div class="planning-card-info">
+          <span><strong>Prøvestatus:</strong> ${esc(task.sampleStatusText)}</span>
+          <span><strong>Deadline:</strong> ${esc(dueText)}</span>
+        </div>
+        ${infoHtml ? `<div class="planning-card-extra">${infoHtml}</div>` : ''}
+        <div class="planning-card-controls">
+          <label>Deadline
+            <input type="datetime-local" class="planning-due" data-task-id="${esc(task.id)}" value="${esc(task.dueInputValue)}">
+          </label>
+          <label>Noter
+            <textarea class="planning-note" data-task-id="${esc(task.id)}" placeholder="Tilføj dine noter her">${esc(task.note || '')}</textarea>
+          </label>
+          <label class="planning-checkbox">
+            <input type="checkbox" class="planning-done" data-task-id="${esc(task.id)}" ${task.planDone ? 'checked' : ''}>
+            Markér som færdig
+          </label>
+        </div>
+        ${actionsHtml ? `<div class="planning-card-actions">${actionsHtml}</div>` : ''}
+      </article>
+    `;
+  };
+
+  const renderPlanningBoard = () => {
+    if (!planningBoard) return;
+    if (!currentUserId) {
+      planningBoard.innerHTML = '<p class="planning-empty">Log ind for at planlægge dine opgaver.</p>';
+      return;
+    }
+    if (!planningTasks.length) {
+      planningBoard.innerHTML = '<p class="planning-empty">Ingen opgaver er knyttet til dine aktuelle ordinationer.</p>';
+      return;
+    }
+    const hideDone = Boolean(planningHideDoneToggle?.checked);
+    const lanes = planningStages.map(stage => {
+      const allStageTasks = planningTasks.filter(task => task.stage.id === stage.id);
+      if (!allStageTasks.length) return '';
+      const visibleTasks = hideDone ? allStageTasks.filter(task => !task.isDone) : allStageTasks;
+      if (!visibleTasks.length) return '';
+      const laneCount = hideDone ? `${visibleTasks.length} af ${allStageTasks.length}` : `${allStageTasks.length}`;
+      const cards = visibleTasks.sort(comparePlanningTasks).map(buildPlanningCard).join('');
+      if (!cards) return '';
+      return `
+        <section class="planning-lane" data-stage="${esc(stage.id)}">
+          <header class="planning-lane-header">
+            <div class="planning-stage-title">${esc(stage.label)}</div>
+            <div class="planning-lane-count">${laneCount}</div>
+            <p class="planning-lane-subtitle">${esc(stage.description)}</p>
+          </header>
+          <div class="planning-lane-body">${cards}</div>
+        </section>
+      `;
+    }).filter(Boolean).join('');
+    if (!lanes) {
+      planningBoard.innerHTML = '<p class="planning-empty">Ingen opgaver matcher de valgte filtre.</p>';
+      return;
+    }
+    planningBoard.innerHTML = lanes;
+  };
+
+  const updateExportButton = () => {
+    if (!planningExportBtn) return;
+    const hasDue = planningTasks.some(task => task.dueDate);
+    planningExportBtn.disabled = !currentUserId || !hasDue;
+  };
+
+  const updatePlanningUi = () => {
+    if (!planningBoard || !planningSummary) return;
+    planningTasks = computePlanningTasks();
+    if (planningHideDoneToggle) {
+      const hasCompleted = planningTasks.some(task => task.isDone);
+      planningHideDoneToggle.disabled = !currentUserId || !hasCompleted;
+      if (!hasCompleted) planningHideDoneToggle.checked = false;
+    }
+    if (planningRefreshBtn) planningRefreshBtn.disabled = !currentUserId;
+    updatePlanningSummary();
+    renderPlanningBoard();
+    updateExportButton();
+    refreshPlanningStatusText();
+  };
+
+  const refreshPlanningData = () => {
+    if (!currentUserId) {
+      updatePlanningUi();
+      return;
+    }
+    planState = loadPlanState();
+    ensurePlanTasks();
+    updatePlanningUi();
+  };
+
+  const formatIcsDate = date => {
+    const pad = value => String(value).padStart(2, '0');
+    return `${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}T${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}Z`;
+  };
+
+  const escapeIcsText = text => {
+    return text
+      .split('\\').join('\\\\')
+      .replace(/;/g, '\;')
+      .replace(/,/g, '\,')
+      .replace(/\r?\n/g, '\n');
+  };
+
+  if (planningBoard && planningSummary) {
+    updatePlanningUi();
+
+    planningHideDoneToggle?.addEventListener('change', () => renderPlanningBoard());
+
+    planningRefreshBtn?.addEventListener('click', () => {
+      refreshPlanningData();
+      setStatus('Planen er opdateret.');
+    });
+
+    planningBoard.addEventListener('change', event => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      const taskId = target.dataset.taskId;
+      if (!taskId) return;
+      if (target.classList.contains('planning-due')) {
+        setPlanSettings(taskId, {due: target.value});
+        updatePlanningUi();
+      } else if (target.classList.contains('planning-done')) {
+        setPlanSettings(taskId, {done: target.checked});
+        updatePlanningUi();
+      }
+    });
+
+    planningBoard.addEventListener('input', event => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (target.classList.contains('planning-note')) {
+        const taskId = target.dataset.taskId;
+        if (!taskId) return;
+        setPlanSettings(taskId, {note: target.value});
+      }
+    });
+
+    planningBoard.addEventListener('click', event => {
+      const button = event.target instanceof HTMLElement ? event.target.closest('button[data-action]') : null;
+      if (!button) return;
+      const taskId = button.dataset.taskId;
+      if (!taskId) return;
+      const task = planningTasks.find(item => item.id === taskId);
+      if (!task) return;
+      const action = button.dataset.action;
+      if (action === 'open-order') {
+        openOrderDetails(task.orderId, {showAll: true});
+      } else if (action === 'open-sample') {
+        openSamplesForOrder(task.orderId);
+      } else if (action === 'open-report') {
+        openReportsForOrder(task.orderId);
+      }
+    });
+
+    planningExportBtn?.addEventListener('click', () => {
+      if (!currentUserId) {
+        alert('Log ind for at eksportere planen.');
+        return;
+      }
+      const exportTasks = computePlanningTasks().filter(task => task.dueDate);
+      if (!exportTasks.length) {
+        alert('Tilføj mindst én deadline før du eksporterer planen til kalender.');
+        return;
+      }
+      const now = new Date();
+      const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//GlimR//Planner//DA'];
+      exportTasks.forEach(task => {
+        const dueUtc = new Date(task.dueDate.getTime());
+        const summaryParts = [task.stage.label, task.orderName];
+        const summary = escapeIcsText(summaryParts.filter(Boolean).join(' – '));
+        const descriptionParts = [
+          task.patientName ? `Patient: ${task.patientName}` : '',
+          task.sampleLabel ? `Prøve: ${task.sampleLabel}` : '',
+          `Prøvestatus: ${task.sampleStatusText}`,
+          task.roleLabel || '',
+          ...task.info,
+          task.note ? `Noter: ${task.note}` : ''
+        ].filter(Boolean);
+        const description = escapeIcsText(descriptionParts.join('\n'));
+        lines.push('BEGIN:VTODO');
+        lines.push(`UID:${escapeIcsText(task.id)}@glimr.local`);
+        lines.push(`DTSTAMP:${formatIcsDate(now)}`);
+        lines.push(`DUE:${formatIcsDate(dueUtc)}`);
+        lines.push(`SUMMARY:${summary}`);
+        if (description) lines.push(`DESCRIPTION:${description}`);
+        if (task.isDone) {
+          lines.push('STATUS:COMPLETED');
+          lines.push(`COMPLETED:${formatIcsDate(now)}`);
+        } else {
+          lines.push('STATUS:NEEDS-ACTION');
+        }
+        lines.push('CATEGORIES:GlimR');
+        lines.push('END:VTODO');
+      });
+      lines.push('END:VCALENDAR');
+      const blob = new Blob([lines.join('\r\n')], {type: 'text/calendar'});
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `GlimR-plan-${now.toISOString().slice(0, 10)}.ics`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
+      setStatus('Kalenderfil genereret med dine planlagte trin.');
+    });
+  }
 
   applyButtonTooltips(section);
   applyControlTooltips(section);
