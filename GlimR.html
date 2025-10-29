@@ -408,6 +408,25 @@ section[data-tab].active {
   font-size: 0.85rem;
   color: var(--muted-text);
 }
+.planning-guide {
+  margin-top: 1rem;
+  padding: 0.75rem 0.9rem;
+  border-left: 3px solid var(--accent);
+  background: rgba(24, 111, 175, 0.08);
+  border-radius: 0.65rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.planning-guide h4 {
+  margin: 0 0 0.4rem 0;
+  font-size: 1rem;
+}
+.planning-guide ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.3rem;
+}
 .planning-board {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -574,6 +593,10 @@ section[data-tab].active {
 }
 [data-theme="dark"] .planning-card[data-status="done"] {
   background: rgba(14, 165, 233, 0.12);
+}
+[data-theme="dark"] .planning-guide {
+  border-left-color: var(--accent);
+  background: rgba(56, 189, 248, 0.12);
 }
 [data-theme="dark"] .planning-summary-item {
   background: rgba(14, 165, 233, 0.06);
@@ -3736,8 +3759,15 @@ function activateTab(id) {
 function openOrderDetails(orderId, options = {}) {
   const numericId = Number(orderId);
   if (!Number.isFinite(numericId)) return;
+  const showAll = Boolean(options.showAll);
+  const applyFilter = options.filter !== false;
   state.pendingOrderId = numericId;
-  state.pendingOrderShowAll = Boolean(options.showAll);
+  state.pendingOrderShowAll = showAll;
+  if (applyFilter) {
+    state.pendingOrderFilterId = numericId;
+    state.pendingOrderFilterSampleId = null;
+    state.pendingOrderFilterSampleExact = false;
+  }
   activateTab('orders');
 }
 function openSamplesForOrder(orderId) {
@@ -12097,6 +12127,14 @@ function renderTools(section) {
       <div class="planning-status" id="planningStatus"></div>
       <div id="planningBoard" class="planning-board"></div>
       <p class="tool-note">Planen gemmes lokalt i din browser. Brug kalender-eksporten til at dele planen med Outlook eller Exchange.</p>
+      <div class="planning-guide">
+        <h4>Kort vejledning</h4>
+        <ul>
+          <li>En rød ramme viser, at en opgave er forfaldet, mens en gul ramme markerer, at deadline nærmer sig.</li>
+          <li>Tilføj noter og deadlines på hvert kort – opdateringerne gemmes kun i din browser, indtil du rydder dine lokale data.</li>
+          <li>Brug knapperne <em>Åbn ordination</em>, <em>Åbn prøver</em> og <em>Åbn rapporter</em> for at hoppe direkte til filtrerede lister for den valgte ordination.</li>
+        </ul>
+      </div>
     </div>
   </details>
   <details class="panel tool-panel">
