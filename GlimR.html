@@ -3664,35 +3664,9 @@ window.addEventListener('unhandledrejection', event => {
 function currentUserName() {
   return state.currentUser?.name || 'System';
 }
-function ensureTabContainers() {
-  let nav = document.getElementById('tabNav');
-  let main = document.getElementById('tabContent');
-  if (!nav) {
-    nav = document.createElement('nav');
-    nav.id = 'tabNav';
-    const header = document.querySelector('header');
-    if (header && header.parentNode) {
-      header.parentNode.insertBefore(nav, header.nextSibling);
-    } else if (document.body.firstChild) {
-      document.body.insertBefore(nav, document.body.firstChild);
-    } else {
-      document.body.appendChild(nav);
-    }
-  }
-  if (!main) {
-    main = document.createElement('main');
-    main.id = 'tabContent';
-    document.body.appendChild(main);
-  }
-  return {nav, main};
-}
 function initTabs() {
-  const {nav, main} = ensureTabContainers();
-  if (!nav || !main) {
-    console.error('Kunne ikke initialisere tabvisning: mangler containere.');
-    setStatus('Fejl: Tabvisning kunne ikke initialiseres.');
-    return;
-  }
+  const nav = document.getElementById('tabNav');
+  const main = document.getElementById('tabContent');
   nav.innerHTML = '';
   main.innerHTML = '';
   tabs.forEach(tab => {
@@ -12977,7 +12951,7 @@ function renderTools(section) {
 
   const escapeIcsText = text => {
     return text
-      .split('\\').join('\\\\')
+      .replace(/\/g, '\\')
       .replace(/;/g, '\;')
       .replace(/,/g, '\,')
       .replace(/\r?\n/g, '\n');
