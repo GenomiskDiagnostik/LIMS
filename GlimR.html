@@ -1979,6 +1979,7 @@ const classificationMap = {
 };
 const tabs = [
   {id:'dashboard', label:'Overblik'},
+  {id:'planner', label:'Plan'},
   {id:'case_create', label:'Opret'},
   {id:'patients', label:'Patienter'},
   {id:'samples', label:'Prøver'},
@@ -1999,6 +2000,7 @@ const tabs = [
 ];
 const tabIcons = {
   dashboard: 'chart-bar',
+  planner: 'calendar-days',
   case_create: 'folder-plus',
   patients: 'user-circle',
   samples: 'beaker',
@@ -2052,6 +2054,13 @@ const iconLibrary = {
     attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
     paths: [
       {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z'}
+    ]
+  },
+  'calendar-days': {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M6.75 3v2.25m10.5-2.25V5.25M3 8.25h18M4.5 7.5v11.25A2.25 2.25 0 0 0 6.75 21h10.5A2.25 2.25 0 0 0 19.5 18.75V7.5M8.25 12h.008v.008H8.25V12Zm3.75 0h.008v.008H12V12Zm3.75 0h.008v.008H15.75V12Zm-7.5 3.75h.008v.008H8.25V15.75Zm3.75 0h.008v.008H12V15.75Zm3.75 0h.008v.008H15.75V15.75Z'}
     ]
   },
   'chart-bar': {
@@ -2274,6 +2283,7 @@ const schemaFields = {
 const tooltipCatalog = {
   tabs: {
     dashboard: 'Viser nøgletal, seneste ordinationer og seneste revisionshændelser.',
+    planner: 'Planlæg laboratorieopgaver på tværs af ordinationer og roller.',
     case_create: 'Opret patient, prøve, ordination, QC og varianter i ét samlet flow.',
     patients: 'Administrer patientoplysninger og søg i patientlisten.',
     samples: 'Registrer og vedligehold prøver knyttet til patienter.',
@@ -4812,6 +4822,7 @@ function renderTab(id) {
   if (!section) return;
   switch(id) {
     case 'dashboard': return renderDashboard(section);
+    case 'planner': return renderPlanner(section);
     case 'case_create': return renderCreateCase(section);
     case 'patients': return renderPatients(section);
     case 'samples': return renderSamples(section);
@@ -11699,409 +11710,9 @@ function renderQC(section) {
   section.querySelector('#qcClear').addEventListener('click', () => form.reset());
 }
 
-function renderTools(section) {
-  const STRENGTH_DEFINITIONS = {
-    pathogenic: {
-      veryStrong: {label: 'Meget stærk (+8)', summary: 'meget stærk', weight: 8},
-      strong: {label: 'Stærk (+4)', summary: 'stærk', weight: 4},
-      moderate: {label: 'Moderat (+2)', summary: 'moderat', weight: 2},
-      supporting: {label: 'Supporting (+1)', summary: 'supporting', weight: 1}
-    },
-    benign: {
-      standAlone: {label: 'Stand-alone (–8)', summary: 'stand-alone', weight: -8},
-      strong: {label: 'Stærk (–4)', summary: 'stærk', weight: -4},
-      supporting: {label: 'Supporting (–1)', summary: 'supporting', weight: -1}
-    }
-  };
-  const DEFAULT_STRENGTH_ORDER = {
-    pathogenic: ['veryStrong', 'strong', 'moderate', 'supporting'],
-    benign: ['standAlone', 'strong', 'supporting']
-  };
-  const pathogenicCriteria = [
-    {code: 'PVS1', label: 'Loss-of-function variant i gen hvor loss-of-function er kendt sygdomsmekanisme.', defaultStrength: 'veryStrong', strengths: ['veryStrong', 'strong', 'moderate', 'supporting'], description: 'Nedgrader ved usikker LoF-effekt (fx initierende exon, alternativ splejsning).', strengthGuidance: {veryStrong: 'Meget stærk når varianten forventes at udløse nonsense mediated decay eller tydelig truncering i et gen hvor loss-of-function er veletableret sygdomsmekanisme uden kendte undtagelser.', strong: 'Stærk når LoF-effekten er sandsynlig men placeret i sidste exon eller når redundans reducerer forventet fuld tabsfunktion.', moderate: 'Moderat når LoF kun delvist understøttes af modeller eller når alternative transkripter kan bevare funktion.', supporting: 'Supporting når LoF kun indikeres af indirekte data og yderligere bevis er nødvendigt for højere styrke.'}},
-    {code: 'PS1', label: 'Samme aminosyreændring som kendt patogen variant uden ændret nukleotid.', defaultStrength: 'strong', strengths: ['veryStrong', 'strong', 'moderate', 'supporting'], description: 'Overvej styrkejustering når evidens for ækvivalens er begrænset eller stærkere end reference.', strengthGuidance: {veryStrong: 'Meget stærk når ækvivalente aminosyreændringer har omfattende klinisk dokumentation og funktionelle studier der klart viser patogenicitet.', strong: 'Stærk når referencevarianten er kurateret patogen og ækvivalensen er veldokumenteret.', moderate: 'Moderat når referencevarianten kun er sandsynligvis patogen eller dokumentationen for samme mekanisme er begrænset.', supporting: 'Supporting når ligheden primært bygger på in silico vurdering eller enkelte rapporter.'}},
-    {code: 'PS2', label: 'De novo (bekræftet) hos patient med sund(e) forælder(e).', defaultStrength: 'strong', strengths: ['strong', 'moderate', 'supporting'], description: 'Kræver verifikation af forældres status. Nedgrader ved begrænset test eller phenotypematch.', strengthGuidance: {strong: 'Stærk når de novo-status er bekræftet med forældretest og fænotypen er stærkt forenelig.', moderate: 'Moderat når kun en forælder er testet, eller når fænotypen er delvist konsistent.', supporting: 'Supporting når de novo-mistanken bygger på familiesygehistorie uden fuld laboratoriebekræftelse.'}},
-    {code: 'PS3', label: 'Funktionelle studier viser skadelig effekt.', defaultStrength: 'strong', strengths: ['veryStrong', 'strong', 'moderate', 'supporting'], description: 'Justér efter kvalitet og sygdomsrelevans af den funktionelle evidens.', strengthGuidance: {veryStrong: 'Meget stærk når validerede sygdomsrelevante assays reproducerbart demonstrerer alvorligt tab af funktion.', strong: 'Stærk når robuste funktionelle studier viser klar patologisk effekt i passende modeller.', moderate: 'Moderat når assays viser effekt men har begrænsninger i validering eller sygdomsrelevans.', supporting: 'Supporting når data kommer fra explorative modeller eller enkeltstående resultater.'}},
-    {code: 'PS4', label: 'Signifikant øget forekomst i syge kontra kontroller.', defaultStrength: 'strong', strengths: ['veryStrong', 'strong', 'moderate', 'supporting'], description: 'Styrke afhænger af størrelsen på kohorter og statistisk signifikans.', strengthGuidance: {veryStrong: 'Meget stærk ved store uafhængige kohorter med odds ratio over ca. 10 og stringente kontroller.', strong: 'Stærk når case-control-data viser signifikant berigelse med passende korrigering for multiple test.', moderate: 'Moderat når kohorten er mindre eller odds ratio ligger omkring 5 med konsistente data.', supporting: 'Supporting ved begrænset men signifikant berigelse eller meta-analyser med moderate effekter.'}},
-    {code: 'PM1', label: 'Hotspot/domæne uden godartede variationer.', defaultStrength: 'moderate', strengths: ['strong', 'moderate', 'supporting'], description: 'Opjuster ved veletablerede hotspots; nedgrader ved begrænset domænedata.', strengthGuidance: {strong: 'Stærk når varianten sidder i et veldefineret funktionelt hotspot med mange uafhængige patogene fund og fravær af godartede varianter.', moderate: 'Moderat for dokumenteret kritiske domæner med få godartede observationer.', supporting: 'Supporting når domænet antages vigtigt men evidensen for hotspot-status er begrænset.'}},
-    {code: 'PM2', label: 'Fraværende eller ekstremt lav frekvens i kontroller.', defaultStrength: 'moderate', strengths: ['moderate', 'supporting'], description: 'Opdater med populationsdatabaser; nedgrader hvis sparsom dækning eller blandede populationer.', strengthGuidance: {moderate: 'Moderat når varianten er fraværende eller under forventet frekvens i store populationer med tilstrækkelig dækning.', supporting: 'Supporting når populationstallene er små eller når variantens fravær kun vises i enkelte datasæt.'}},
-    {code: 'PM3', label: 'Påvist i trans med patogen variant i recessiv sygdom.', defaultStrength: 'moderate', strengths: ['strong', 'moderate', 'supporting'], description: 'Opjuster ved flere uafhængige observationer; kræver kendt patogen partner-variant.', strengthGuidance: {strong: 'Stærk ved flere uafhængige observationer i trans med velkarakteriserede patogene varianter eller dokumenteret compound heterozygoti.', moderate: 'Moderat når observationen er begrænset til få familier men med sikker fasebestemmelse.', supporting: 'Supporting når fase er antaget i stedet for bevist eller når partner-varianten er sandsynligvis patogen.'}},
-    {code: 'PM4', label: 'Proteinaltering der påvirker læseramme eller stopper protein.', defaultStrength: 'moderate', strengths: ['strong', 'moderate', 'supporting'], description: 'Ekskluderer velkarakteriserede LoF-gen undtagelser; overvej nedgradering ved in-frame ændringer.', strengthGuidance: {strong: 'Stærk når ændringen giver trunkering før kritiske domæner uden forventet NMD-redning.', moderate: 'Moderat for in-frame deletioner/indsættelser eller truncering nær C-terminus hvor effekt er sandsynlig.', supporting: 'Supporting når strukturel påvirkning er usikker men proteinændringen er forenelig med funktionstab.'}},
-    {code: 'PM5', label: 'Ny missense på samme aminosyre som anden patogen variant.', defaultStrength: 'moderate', strengths: ['moderate', 'supporting'], description: 'Forudsætter samme sygdomsmekanisme som den kendte variant; nedgrader hvis evidens er svag.', strengthGuidance: {moderate: 'Moderat når en anden nukleotidændring på samme kodon er velunderbygget patogen og mekanismen deles.', supporting: 'Supporting når referencevarianten kun er sandsynligvis patogen eller når mekanismen kan variere.'}},
-    {code: 'PM6', label: 'De novo (uformelt) uden bekræftede forældre.', defaultStrength: 'moderate', strengths: ['moderate', 'supporting'], description: 'Nedgrader hvis fænotypen er mindre specifik eller forældrestatus er usikker.', strengthGuidance: {moderate: 'Moderat når de novo-status understøttes af kliniske oplysninger men genetisk test af forældre mangler.', supporting: 'Supporting når mistanken om de novo stammer fra familiehistorik eller når kun en forælder er testet.'}},
-    {code: 'PP1', label: 'Segregerer med sygdommen i familien.', defaultStrength: 'supporting', strengths: ['strong', 'moderate', 'supporting'], description: 'Opgrader ved robuste LOD-beregninger; nedgrader ved få informative meioser.', strengthGuidance: {strong: 'Stærk når kombineret LOD-score er over 3 eller når flere uafhængige familier viser overbevisende segregering.', moderate: 'Moderat når LOD-score er mellem cirka 1,5 og 3 eller få men informative meioser foreligger.', supporting: 'Supporting når segregeringen ses i begrænset antal familier uden formel LOD-beregning.'}},
-    {code: 'PP2', label: 'Missense i gen hvor missense er hyppig sygdomsmekanisme.', defaultStrength: 'supporting', strengths: ['moderate', 'supporting'], description: 'Kræver lav forekomst af godartede missense-varianter og LoF-dominans fraværende.', strengthGuidance: {moderate: 'Moderat når genets sygdomsmekanisme stærkt favoriserer missense-varianter og godartede missense er sjældne.', supporting: 'Supporting når data tyder på missense-sårbarhed men referencegrundlaget er begrænset.'}},
-    {code: 'PP3', label: 'In silico-støtte for skadelig effekt.', defaultStrength: 'supporting', strengths: ['moderate', 'supporting'], description: 'Vurder konsistens mellem flere algoritmer; undgå brug når modeller er uenige.', strengthGuidance: {moderate: 'Moderat når flere orthogonale algoritmer og konservationsdata er samstemmende om skadelig effekt.', supporting: 'Supporting når de fleste modeller peger på skade men enkelte kilder er usikre.'}},
-    {code: 'PP4', label: 'Fænotype/specifik sygdom i tråd med genet.', defaultStrength: 'supporting', strengths: ['moderate', 'supporting'], description: 'Kræver høj specificitet i fænotypen; opgrader ved veldefinerede syndromer.', strengthGuidance: {moderate: 'Moderat når patientens fænotype er højt specifik for genet eller når flere tilfælde matcher samme syndrom.', supporting: 'Supporting ved delvis overlap mellem fænotype og kendt spektrum eller når differentialdiagnoser er mulige.'}},
-    {code: 'PP5', label: 'Anført som patogen af velrenommeret kilde.', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Bruges kun når kilden dokumenterer evidens og er uafhængig.', strengthGuidance: {supporting: 'Supporting når en uafhængig klinisk laboratorierapport giver transparent dokumentation for patogenicitet.'}}
-  ];
-  const benignCriteria = [
-    {code: 'BA1', label: 'Allelfrekvens >5 % i kontroller (stand-alone).', effect: 'benign', defaultStrength: 'standAlone', strengths: ['standAlone', 'strong', 'supporting'], description: 'Kræver tilstrækkelig populationsrepræsentation og passende sygdomsprævalens.', strengthGuidance: {standAlone: 'Stand-alone når frekvensen overstiger 5 procent i en velrepræsenteret population og klart er uforenelig med sygdommens forekomst.', strong: 'Stærk når frekvensen ligger over maksimal forventet for sygdommen efter justering for penetrans men under stand-alone tærsklen.', supporting: 'Supporting når frekvensen er højere end forventet men datasættet er lille eller populationsrelevantheden begrænset.'}},
-    {code: 'BS1', label: 'Allelfrekvens større end forventet for lidelsen.', effect: 'benign', defaultStrength: 'strong', strengths: ['strong', 'supporting'], description: 'Justér efter penetrans og genetisk heterogenitet.', strengthGuidance: {strong: 'Stærk når beregnet maksimumsfrekvens klart overskrides i flere populationer med god dækning.', supporting: 'Supporting når frekvensen kun svagt overstiger forventet eller når enkelte populationsdatasæt driver signalet.'}},
-    {code: 'BS2', label: 'Observeret hos sund homozygot/hemizygot.', effect: 'benign', defaultStrength: 'strong', strengths: ['strong', 'supporting'], description: 'Kræver veldokumenteret fænotype og eksklusion af alder-afhængig debut.', strengthGuidance: {strong: 'Stærk når flere voksne uden sygdom er dokumenteret homozygote eller hemizygote med passende klinisk opfølgning.', supporting: 'Supporting når observationen er enkeltstående eller når opfølgningen er begrænset.'}},
-    {code: 'BS3', label: 'Funktionelle studier viser ingen skadelig effekt.', effect: 'benign', defaultStrength: 'strong', strengths: ['strong', 'supporting'], description: 'Vurder assayets robusthed; nedgrader ved begrænset sygdomsrelevans.', strengthGuidance: {strong: 'Stærk når validerede sygdomsrelevante assays konsekvent viser normal funktion.', supporting: 'Supporting når assays er mindre validerede eller når resultaterne kun delvist understøtter normal funktion.'}},
-    {code: 'BS4', label: 'Mangel på segregering med sygdommen.', effect: 'benign', defaultStrength: 'strong', strengths: ['strong', 'supporting'], description: 'Kræver flere informative familier; nedgrader ved mulige fenokopier.', strengthGuidance: {strong: 'Stærk når varianten ikke segregerer i flere informative familier med klare sygdomsdefinitioner.', supporting: 'Supporting når brudt segregering ses i begrænsede familier eller når fenokopier ikke kan udelukkes.'}},
-    {code: 'BP1', label: 'Missense i gen hvor loss-of-function er dominerende mekanisme.', effect: 'benign', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Anvendes når missense sjældent er sygdomsfremkaldende i genet.', strengthGuidance: {supporting: 'Supporting når genets kendte patogene variationer primært er loss-of-function og missense sjældent giver sygdom.'}},
-    {code: 'BP2', label: 'Observeret sammen med patogen variant for dominant sygdom.', effect: 'benign', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Forudsætter sikre fasedata og veldokumenteret patogen partner.', strengthGuidance: {supporting: 'Supporting når varianten findes i trans eller cis med uafhængigt patogen variant i dominant tilstand og patienten er rask.'}},
-    {code: 'BP3', label: 'In-frame indel i repetitiv region uden kendt funktion.', effect: 'benign', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Anvendes når indel ikke forventes at påvirke proteinfunktionen.', strengthGuidance: {supporting: 'Supporting når ændringen ligger i repetitivt motiv uden bevaret funktion og lignende variation er hyppig i raske populationer.'}},
-    {code: 'BP4', label: 'In silico understøtter benign effekt.', effect: 'benign', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Kræver samstemmende modeller for neutral effekt.', strengthGuidance: {supporting: 'Supporting når flere uafhængige algoritmer og konservationsdata peger på neutral eller tolerant effekt.'}},
-    {code: 'BP5', label: 'Variant forklarer alternativ diagnose.', effect: 'benign', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Kræver veldokumenteret alternativ årsag til fænotypen.', strengthGuidance: {supporting: 'Supporting når patientens fænotype forklares af en anden evidensbaseret genetisk diagnose og varianten er i linkage.'}},
-    {code: 'BP6', label: 'Anført som godartet af velrenommeret kilde.', effect: 'benign', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Brug kun når kilde dokumenterer bevis for benignitet.', strengthGuidance: {supporting: 'Supporting når et akkrediteret laboratorie eller database dokumenterer benignitet med sporbar evidens.'}},
-    {code: 'BP7', label: 'Synonym variant uden splice-påvirkning.', effect: 'benign', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Kræver fravær af spliceeffekt i relevante modeller.', strengthGuidance: {supporting: 'Supporting når splice-site analyser og funktionelle data viser uændret splejsning og ingen påvirkning af regulerende elementer.'}}
-  ];
-  const SNP_REFERENCE_BASELINE = 2.05; // Tidligere arrays (~2,05 i nordeuropæiske kohorter)
-  const WGS_TARGET_BASELINE = 1.62;   // WGS-observation: "lige over 1,6" het/hom i nordeuropæiske patienter
-  const WGS_BASELINE_FACTOR = WGS_TARGET_BASELINE / SNP_REFERENCE_BASELINE;
-  const scaleWgsBaseline = baseline => Number((baseline * WGS_BASELINE_FACTOR).toFixed(3));
-  const consanguinityProfiles = [
-    {
-      value: 'generic',
-      label: 'Ukendt/blandet (global baseline)',
-      snpBaseline: 2.0,
-      wgsBaseline: scaleWgsBaseline(2.0),
-      note: 'Generisk baseline; vælg WGS for helgenomdata eller SNP for ældre array-profiler.',
-      defaultSelected: true
-    },
-    {
-      value: 'northern_europe',
-      label: 'Nordeuropæisk/Skandinavisk',
-      snpBaseline: 2.05,
-      wgsBaseline: scaleWgsBaseline(2.05),
-      note: 'Kalibreret til helgenomsekventering; skandinaviske patienter viser het/hom ≈ 1,62 (≈62 % heterozygote).'
-    },
-    {
-      value: 'southern_europe_middle_east',
-      label: 'Sydeuropæisk/Mellemøstlig',
-      snpBaseline: 1.85,
-      wgsBaseline: scaleWgsBaseline(1.85),
-      note: 'Historisk øget beslægtethed med WGS-justeret forventet het/hom omkring 1,4.'
-    },
-    {
-      value: 'south_asia',
-      label: 'Sydasiatisk',
-      snpBaseline: 1.7,
-      wgsBaseline: scaleWgsBaseline(1.7),
-      note: 'Populationsstudier rapporterer lavere heterozygositet; WGS-justeret baseline ~1,3.'
-    },
-    {
-      value: 'east_asia',
-      label: 'Østasiatisk',
-      snpBaseline: 1.95,
-      wgsBaseline: scaleWgsBaseline(1.95),
-      note: 'Store urbaniserede populationer med moderat heterozygositet; WGS-justeret baseline ~1,5.'
-    },
-    {
-      value: 'sub_saharan_africa',
-      label: 'Subsaharisk Afrika',
-      snpBaseline: 2.3,
-      wgsBaseline: scaleWgsBaseline(2.3),
-      note: 'Høj genetisk diversitet; WGS viser het/hom omkring 1,8 for outbred kohorter.'
-    },
-    {
-      value: 'americas',
-      label: 'Latinamerikansk/admixed',
-      snpBaseline: 2.0,
-      wgsBaseline: scaleWgsBaseline(2.0),
-      note: 'Stor variation – baseline sat til WGS-justeret global gennemsnitsværdi (~1,6).'
-    }
-  ];
-  const consanguinityCategories = [
-    {minF: 0.1875, title: 'Forælder-barn eller fulde søskende', detail: 'Typisk F≈25 % (1. grads slægtskab).', pedigree: 'parentChild'},
-    {minF: 0.09375, title: 'Halvsøskende / onkel-niece / tante-nevø', detail: 'Typisk F≈12,5 % (1½. grad).', pedigree: 'avuncular'},
-    {minF: 0.046875, title: 'Fætter/kusine (første)', detail: 'Typisk F≈6,25 % (2. grad).', pedigree: 'firstCousin'},
-    {minF: 0.0234375, title: 'Fætter/kusine én gang fjernet', detail: 'Typisk F≈3,1 % (2½.–3. grad).', pedigree: 'cousinOnceRemoved'},
-    {minF: 0.01171875, title: 'Anden fætter/kusine', detail: 'Typisk F≈1,6 % (3. grad).', pedigree: 'secondCousin'},
-    {minF: 0.005, title: 'Fjern beslægtning (≥3.-4. led)', detail: 'Typisk F≈0,5–1 %.', pedigree: 'distant'}
-  ];
-  const renderPedigreeNode = (x, y, label, note = '', options = {}) => {
-    const width = Number(options.width ?? 44);
-    const height = Number(options.height ?? 26);
-    const xPos = (x - width / 2).toFixed(1);
-    const yPos = (y - height / 2).toFixed(1);
-    const classes = ['pedigree-node'];
-    if (options.proband) classes.push('proband');
-    const nameClasses = ['pedigree-label', 'name'];
-    if (options.proband) nameClasses.push('proband');
-    const labelY = (y + 4).toFixed(1);
-    const noteY = (y + height / 2 + 9).toFixed(1);
-    return `
-      <rect class="${classes.join(' ')}" x="${xPos}" y="${yPos}" width="${width.toFixed(1)}" height="${height.toFixed(1)}" rx="6" ry="6"></rect>
-      <text class="${nameClasses.join(' ')}" x="${x.toFixed(1)}" y="${labelY}">${esc(label)}</text>
-      ${note ? `<text class="pedigree-label" x="${x.toFixed(1)}" y="${noteY}">${esc(note)}</text>` : ''}
-    `;
-  };
-  const renderPedigreeLine = (x1, y1, x2, y2, extraClass = '') => `
-    <line class="pedigree-link${extraClass ? ' ' + extraClass : ''}" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"></line>
-  `;
-  const consanguinityPedigreeTemplates = {
-    parentChild: ({relationText, detailText, inbreedingText}) => {
-      const lines = [
-        renderPedigreeLine(70, 51, 120, 51),
-        renderPedigreeLine(120, 51, 120, 81),
-        renderPedigreeLine(120, 81, 150, 81),
-        renderPedigreeLine(70, 51, 70, 126),
-        renderPedigreeLine(150, 107, 150, 126),
-        renderPedigreeLine(70, 126, 150, 126),
-        renderPedigreeLine(110, 126, 110, 137)
-      ];
-      const nodes = [
-        renderPedigreeNode(70, 38, 'Forælder A', '(ældre generation)'),
-        renderPedigreeNode(150, 94, 'Forælder B', '(barn af A)'),
-        renderPedigreeNode(110, 150, 'Proband', '', {proband: true})
-      ];
-      return {
-        viewBox: '0 0 220 190',
-        title: `Stamtræ – ${relationText}`,
-        desc: 'Illustration af et forælder-barn-forhold; fulde søskende giver tilsvarende F.',
-        content: lines.concat(nodes).join(''),
-        caption: `Proband markeret i blå. Estimeret F ${esc(inbreedingText)} (${esc(detailText)}).`
-      };
-    },
-    avuncular: ({relationText, detailText, inbreedingText}) => {
-      const lines = [
-        renderPedigreeLine(70, 41, 150, 41),
-        renderPedigreeLine(110, 41, 110, 54),
-        renderPedigreeLine(70, 54, 150, 54),
-        renderPedigreeLine(70, 54, 70, 60),
-        renderPedigreeLine(150, 54, 150, 60),
-        renderPedigreeLine(70, 85, 70, 105),
-        renderPedigreeLine(150, 85, 150, 131),
-        renderPedigreeLine(70, 131, 150, 131),
-        renderPedigreeLine(110, 131, 110, 149)
-      ];
-      const nodes = [
-        renderPedigreeNode(70, 28, 'Bedsteforælder', '(fælles)'),
-        renderPedigreeNode(150, 28, 'Bedsteforælder', '(fælles)'),
-        renderPedigreeNode(70, 72, 'Forælder A', '(søskende)'),
-        renderPedigreeNode(150, 72, 'Onkel/tante', '(søskende)'),
-        renderPedigreeNode(70, 118, 'Forælder B', '(barn af A)'),
-        renderPedigreeNode(110, 162, 'Proband', '', {proband: true})
-      ];
-      return {
-        viewBox: '0 0 220 200',
-        title: `Stamtræ – ${relationText}`,
-        desc: 'Skitsen viser et onkel/niece-forhold; halvsøskende følger samme logik.',
-        content: lines.concat(nodes).join(''),
-        caption: `Proband markeret i blå. Estimeret F ${esc(inbreedingText)} (${esc(detailText)}).`
-      };
-    },
-    firstCousin: ({relationText, detailText, inbreedingText}) => {
-      const lines = [
-        renderPedigreeLine(70, 41, 170, 41),
-        renderPedigreeLine(120, 41, 120, 56),
-        renderPedigreeLine(70, 56, 170, 56),
-        renderPedigreeLine(70, 56, 70, 60),
-        renderPedigreeLine(170, 56, 170, 60),
-        renderPedigreeLine(70, 84, 70, 106),
-        renderPedigreeLine(170, 84, 170, 106),
-        renderPedigreeLine(70, 130, 170, 130),
-        renderPedigreeLine(120, 130, 120, 146)
-      ];
-      const nodes = [
-        renderPedigreeNode(70, 28, 'Bedsteforælder', '(fælles)'),
-        renderPedigreeNode(170, 28, 'Bedsteforælder', '(fælles)'),
-        renderPedigreeNode(70, 72, 'Forælder A', '(søskende)'),
-        renderPedigreeNode(170, 72, 'Forælder B', '(søskende)'),
-        renderPedigreeNode(70, 118, 'Forælder 1', '(barn af A)'),
-        renderPedigreeNode(170, 118, 'Forælder 2', '(barn af B)'),
-        renderPedigreeNode(120, 158, 'Proband', '', {proband: true})
-      ];
-      return {
-        viewBox: '0 0 240 200',
-        title: `Stamtræ – ${relationText}`,
-        desc: 'Første fætre/kusiner får et barn – probanden er markeret nederst.',
-        content: lines.concat(nodes).join(''),
-        caption: `Proband markeret i blå. Estimeret F ${esc(inbreedingText)} (${esc(detailText)}).`
-      };
-    },
-    cousinOnceRemoved: ({relationText, detailText, inbreedingText}) => {
-      const lines = [
-        renderPedigreeLine(70, 37, 170, 37),
-        renderPedigreeLine(120, 37, 120, 48),
-        renderPedigreeLine(70, 48, 170, 48),
-        renderPedigreeLine(70, 48, 70, 52),
-        renderPedigreeLine(170, 48, 170, 52),
-        renderPedigreeLine(70, 76, 70, 94),
-        renderPedigreeLine(170, 76, 170, 94),
-        renderPedigreeLine(170, 118, 170, 132),
-        renderPedigreeLine(70, 117, 70, 157),
-        renderPedigreeLine(70, 157, 170, 157),
-        renderPedigreeLine(120, 157, 120, 167)
-      ];
-      const nodes = [
-        renderPedigreeNode(70, 24, 'Bedsteforælder', '(fælles)'),
-        renderPedigreeNode(170, 24, 'Bedsteforælder', '(fælles)'),
-        renderPedigreeNode(70, 64, 'Forælder A', '(søskende)'),
-        renderPedigreeNode(170, 64, 'Forælder B', '(søskende)'),
-        renderPedigreeNode(70, 102, 'Forælder 1', '(barn af A)'),
-        renderPedigreeNode(170, 102, 'Fætter', '(barn af B)'),
-        renderPedigreeNode(170, 140, 'Forælder 2', '(barn af fætter)'),
-        renderPedigreeNode(120, 178, 'Proband', '', {proband: true})
-      ];
-      return {
-        viewBox: '0 0 240 210',
-        title: `Stamtræ – ${relationText}`,
-        desc: 'Et første fætter/kusine-forhold med én generations forskydning.',
-        content: lines.concat(nodes).join(''),
-        caption: `Proband markeret i blå. Estimeret F ${esc(inbreedingText)} (${esc(detailText)}).`
-      };
-    },
-    secondCousin: ({relationText, detailText, inbreedingText}) => {
-      const lines = [
-        renderPedigreeLine(60, 37, 160, 37),
-        renderPedigreeLine(110, 37, 110, 48),
-        renderPedigreeLine(60, 48, 160, 48),
-        renderPedigreeLine(60, 48, 60, 51),
-        renderPedigreeLine(160, 48, 160, 51),
-        renderPedigreeLine(60, 77, 60, 91),
-        renderPedigreeLine(160, 77, 160, 91),
-        renderPedigreeLine(60, 117, 60, 131),
-        renderPedigreeLine(160, 117, 160, 131),
-        renderPedigreeLine(60, 157, 160, 157),
-        renderPedigreeLine(110, 157, 110, 167)
-      ];
-      const nodes = [
-        renderPedigreeNode(60, 24, 'Oldeforælder', '(fælles)'),
-        renderPedigreeNode(160, 24, 'Oldeforælder', '(fælles)'),
-        renderPedigreeNode(60, 64, 'Bedsteforælder A', '(søskende)'),
-        renderPedigreeNode(160, 64, 'Bedsteforælder B', '(søskende)'),
-        renderPedigreeNode(60, 104, 'Forælder A', '(barn af A)'),
-        renderPedigreeNode(160, 104, 'Forælder B', '(barn af B)'),
-        renderPedigreeNode(60, 144, 'Forælder 1', '(barnebarn af A)'),
-        renderPedigreeNode(160, 144, 'Forælder 2', '(barnebarn af B)'),
-        renderPedigreeNode(110, 180, 'Proband', '', {proband: true})
-      ];
-      return {
-        viewBox: '0 0 240 210',
-        title: `Stamtræ – ${relationText}`,
-        desc: 'Andet fætre/kusiner deler oldeforældre; probanden er nederst.',
-        content: lines.concat(nodes).join(''),
-        caption: `Proband markeret i blå. Estimeret F ${esc(inbreedingText)} (${esc(detailText)}).`
-      };
-    },
-    distant: ({relationText, detailText, inbreedingText}) => {
-      const lines = [
-        renderPedigreeLine(110, 34, 110, 58, 'distant'),
-        renderPedigreeLine(80, 58, 140, 58, 'distant'),
-        renderPedigreeLine(80, 58, 80, 92, 'distant'),
-        renderPedigreeLine(140, 58, 170, 92, 'distant'),
-        renderPedigreeLine(80, 118, 110, 140, 'distant'),
-        renderPedigreeLine(170, 118, 170, 128, 'distant')
-      ];
-      const nodes = [
-        renderPedigreeNode(110, 24, 'Fælles forfader'),
-        renderPedigreeNode(80, 104, 'Probandens gren'),
-        renderPedigreeNode(170, 104, 'Fjern gren'),
-        renderPedigreeNode(170, 140, 'Fjern slægtning', '(vejledende)'),
-        renderPedigreeNode(110, 170, 'Proband', '', {proband: true})
-      ];
-      return {
-        viewBox: '0 0 220 200',
-        title: `Stamtræ – ${relationText}`,
-        desc: 'Illustration af fjern beslægtning med delt forfader flere led tilbage.',
-        content: lines.concat(nodes).join(''),
-        caption: `Proband markeret i blå. Estimeret F ${esc(inbreedingText)} (${esc(detailText)}).`
-      };
-    }
-  };
-  const consangOptions = consanguinityProfiles.map(profile => `
-    <option value="${esc(profile.value)}"${profile.defaultSelected ? ' selected' : ''}>${esc(profile.label)}</option>
-  `).join('');
-  const BLAST_PROGRAMS = [
-    {value: 'blastn', label: 'blastn – nukleotid mod nukleotid'},
-    {value: 'blastp', label: 'blastp – protein mod protein'},
-    {value: 'blastx', label: 'blastx – oversæt nukleotid mod protein'},
-    {value: 'tblastn', label: 'tblastn – protein mod oversatte nukleotider'},
-    {value: 'tblastx', label: 'tblastx – oversatte nukleotider mod oversatte nukleotider'}
-  ];
-  const BLAST_DATABASES = {
-    blastn: [
-      {value: 'nt', label: 'nt – NCBI nukleotid-database'},
-      {value: 'refseq_rna', label: 'refseq_rna – RefSeq RNA'},
-      {value: 'refseq_genomic', label: 'refseq_genomic – RefSeq genom'},
-      {value: 'wgs', label: 'wgs – whole genome shotgun contigs'}
-    ],
-    blastp: [
-      {value: 'nr', label: 'nr – NCBI protein'},
-      {value: 'swissprot', label: 'swissprot – Swiss-Prot kurateret'},
-      {value: 'refseq_protein', label: 'refseq_protein – RefSeq protein'}
-    ],
-    blastx: [
-      {value: 'nr', label: 'nr – NCBI protein'},
-      {value: 'swissprot', label: 'swissprot – Swiss-Prot kurateret'},
-      {value: 'refseq_protein', label: 'refseq_protein – RefSeq protein'}
-    ],
-    tblastn: [
-      {value: 'nt', label: 'nt – NCBI nukleotid-database'},
-      {value: 'refseq_rna', label: 'refseq_rna – RefSeq RNA'},
-      {value: 'refseq_genomic', label: 'refseq_genomic – RefSeq genom'}
-    ],
-    tblastx: [
-      {value: 'nt', label: 'nt – NCBI nukleotid-database'},
-      {value: 'refseq_rna', label: 'refseq_rna – RefSeq RNA'}
-    ]
-  };
-  const DEFAULT_BLAST_PROGRAM = 'blastn';
-  const DEFAULT_BLAST_DATABASE = 'nt';
-  const renderBlastDatabaseOptions = (program, selectedValue) => {
-    const items = BLAST_DATABASES[program] || [];
-    if (!items.length) {
-      return '<option value="" disabled>Ingen database tilgængelig</option>';
-    }
-    return items.map((item, index) => {
-      const value = esc(item.value);
-      const label = esc(item.label);
-      const selected = selectedValue ? selectedValue === item.value : index === 0;
-      return `<option value="${value}"${selected ? ' selected' : ''}>${label}</option>`;
-    }).join('');
-  };
-  const blastProgramOptions = BLAST_PROGRAMS.map(item => {
-    const value = esc(item.value);
-    const label = esc(item.label);
-    const selected = item.value === DEFAULT_BLAST_PROGRAM ? ' selected' : '';
-    return `<option value="${value}"${selected}>${label}</option>`;
-  }).join('');
-  const initialBlastDatabaseOptions = renderBlastDatabaseOptions(DEFAULT_BLAST_PROGRAM, DEFAULT_BLAST_DATABASE);
-  const makeCriteriaList = list => list.map(item => {
-    const code = esc(item.code);
-    const label = esc(item.label);
-    const effectRaw = item.effect === 'benign' ? 'benign' : 'pathogenic';
-    const effect = esc(effectRaw);
-    const description = item.description ? ` ${item.description}` : '';
-    const tooltip = esc(`${item.code} – ${item.label}${description}`);
-    const allowedStrengths = Array.isArray(item.strengths) && item.strengths.length
-      ? item.strengths
-      : DEFAULT_STRENGTH_ORDER[effectRaw] || [];
-    const validStrengths = allowedStrengths.filter(strength => STRENGTH_DEFINITIONS[effectRaw]?.[strength]);
-    const fallbackStrength = DEFAULT_STRENGTH_ORDER[effectRaw]?.find(strength => STRENGTH_DEFINITIONS[effectRaw]?.[strength]);
-    const defaultStrength = (item.defaultStrength && STRENGTH_DEFINITIONS[effectRaw]?.[item.defaultStrength])
-      ? item.defaultStrength
-      : (validStrengths[0] || fallbackStrength || 'supporting');
-    const options = (validStrengths.length ? validStrengths : [defaultStrength]).map(strength => {
-      const definition = STRENGTH_DEFINITIONS[effectRaw]?.[strength];
-      if (!definition) return '';
-      const optionLabel = esc(definition.label);
-      const selected = strength === defaultStrength ? ' selected' : '';
-      const guidance = item.strengthGuidance?.[strength];
-      const titleAttr = guidance ? ` title="${esc(guidance)}"` : '';
-      return `<option value="${strength}"${selected}${titleAttr}>${optionLabel}</option>`;
-    }).join('');
-    return `
-    <label class="tool-criteria" title="${tooltip}">
-      <input type="checkbox" class="criterion-toggle" value="${code}" data-effect="${effect}">
-      <span>
-        <span class="criterion-text"><strong>${code}</strong> ${label}</span>
-        <span class="criterion-strength-wrapper">
-          <select class="criterion-strength" data-code="${code}" data-effect="${effect}" data-default-strength="${esc(defaultStrength)}" disabled>
-            ${options}
-          </select>
-        </span>
-      </span>
-    </label>
-  `;
-  }).join('');
+function renderPlanner(section) {
   section.innerHTML = `
-  <details class="panel tool-panel" open>
+<details class="panel tool-panel" open>
     <summary>
       <div class="tool-summary-text">
         <span class="tool-title">Arbejdsplanlægger</span>
@@ -12137,335 +11748,7 @@ function renderTools(section) {
       </div>
     </div>
   </details>
-  <details class="panel tool-panel">
-    <summary>
-      <div class="tool-summary-text">
-        <span class="tool-title">ACMG klassifikationshjælper</span>
-        <span class="tool-subtitle">Forenklet vægtning af ACMG/AMP 2015 med opdaterede pointværdier.</span>
-      </div>
-    </summary>
-    <div class="tool-body">
-      <h3>ACMG klassifikationshjælper</h3>
-      <p>Vælg de kriterier der er opfyldt for varianten. Resultatet bruger en forenklet vægtning af ACMG/AMP 2015 med opdaterede pointværdier.</p>
-      <form id="acmgTool">
-        <div class="tool-columns">
-          <fieldset>
-            <legend>Patogene kriterier</legend>
-            <div class="tool-criteria-list">
-              ${makeCriteriaList(pathogenicCriteria)}
-            </div>
-          </fieldset>
-          <fieldset>
-            <legend>Benigne kriterier</legend>
-            <div class="tool-criteria-list">
-              ${makeCriteriaList(benignCriteria)}
-            </div>
-          </fieldset>
-        </div>
-        <div class="btn-row">
-          <button type="button" class="secondary" id="acmgReset">Nulstil kriterier</button>
-        </div>
-      </form>
-      <div class="tool-result" id="acmgResult">Vælg kriterier for at se forslag til klassifikation.</div>
-      <p class="tool-note">Vurderingen er vejledende og kræver altid manuel gennemgang og dokumentation.</p>
-    </div>
-  </details>
-  <details class="panel tool-panel">
-    <summary>
-      <div class="tool-summary-text">
-        <span class="tool-title">HGVS c. nomenklaturhjælper</span>
-        <span class="tool-subtitle">Byg hurtigt cDNA-notation for substitutioner, deletioner m.m.</span>
-      </div>
-    </summary>
-    <div class="tool-body">
-      <h3>HGVS c. nomenklaturhjælper</h3>
-      <p>Udfyld felterne for at få foreslået et gyldigt HGVS c.-udtryk til simple varianter. Vælg varianttype og angiv de relevante positioner og sekvenser.</p>
-      <form id="hgvsForm">
-        <div class="tool-inline">
-          <label for="hgvsTranscript" title="Angiv referencetranskript (RefSeq, LRG eller tilsvarende).">
-            Referencetranskript
-            <input id="hgvsTranscript" name="transcript" placeholder="fx NM_000546.5">
-          </label>
-          <label for="hgvsType" title="Vælg varianttypen for at vise de relevante felter.">
-            Varianttype
-            <select id="hgvsType" name="type">
-              <option value="substitution">Basiskift (substitution)</option>
-              <option value="deletion">Deletion</option>
-              <option value="insertion">Insertion</option>
-              <option value="duplication">Duplikation</option>
-              <option value="delins">Delins (deletion+insertion)</option>
-            </select>
-          </label>
-        </div>
-        <div class="tool-inline">
-          <label for="hgvsStart" data-hgvs-field="start" title="Startpositionen for ændringen. Brug intronnotation ved behov (fx 123+1).">
-            Position (start)
-            <input id="hgvsStart" name="start" placeholder="fx 215">
-          </label>
-          <label for="hgvsEnd" data-hgvs-field="end" title="Slutpositionen for ændringen. Udelades for enkeltbase-varianter.">
-            Position (slut)
-            <input id="hgvsEnd" name="end" placeholder="fx 217">
-          </label>
-        </div>
-        <div class="tool-inline">
-          <label for="hgvsRef" data-hgvs-field="ref" title="Referencebase(r) eller slettet sekvens, hvis kendt.">
-            Reference/sekvens
-            <input id="hgvsRef" name="ref" placeholder="fx C eller AGT">
-          </label>
-          <label for="hgvsAlt" data-hgvs-field="alt" title="Ændringen, indsatte baser eller erstatningssekvens.">
-            Ændring/indsættelse
-            <input id="hgvsAlt" name="alt" placeholder="fx G eller TTA">
-          </label>
-        </div>
-        <p class="tool-note">Felter skjules automatisk for varianttyper, hvor de ikke anvendes. Positioner kan skrives med intronnotation (fx 123+1).</p>
-        <div class="btn-row">
-          <button type="button" class="secondary" id="hgvsCopy">Kopiér notation</button>
-        </div>
-      </form>
-      <div class="tool-result" id="hgvsResult">Udfyld felterne for at få et HGVS-forslag.</div>
-      <p class="tool-note">Kontroller altid notationen mod HGVS-retningslinjerne og kliniske SOP&apos;er før rapportering.</p>
-    </div>
-  </details>
-  <details class="panel tool-panel">
-    <summary>
-      <div class="tool-summary-text">
-        <span class="tool-title">Konsangvinitetsestimator</span>
-        <span class="tool-subtitle">Oversæt het/hom-forhold til vejledende slægtskab.</span>
-      </div>
-    </summary>
-    <div class="tool-body">
-      <h3>Konsangvinitetsestimator</h3>
-      <p>Angiv prøvens heterozygot/homozygot-forhold og vælg en befolkningsbaseline. Beregningen antager at reduktion i heterozygositet primært skyldes beslægtethed.</p>
-      <form id="consangForm">
-        <div class="tool-inline">
-          <label for="consangRatio" title="Forholdet mellem heterozygote og homozygote varianter (fx 1,80).">
-            Het/hom ratio
-            <input id="consangRatio" name="ratio" inputmode="decimal" placeholder="fx 1,80">
-          </label>
-          <label for="consangEthnicity" title="Baseline anvendt til forventet heterozygositet.">
-            Etnicitet/baggrund
-            <select id="consangEthnicity" name="ethnicity">
-              ${consangOptions}
-            </select>
-          </label>
-        </div>
-        <fieldset class="consang-baseline">
-          <legend>Baseline-type</legend>
-          <label class="radio-option" title="Brug helgenomsekventeringsdata som reference (1,62 i nordiske kohorter).">
-            <input type="radio" name="consangBaseline" value="wgs" checked>
-            <span>WGS-kalibreret (helgenom)</span>
-          </label>
-          <label class="radio-option" title="Brug tidligere SNP-array baseline uden WGS-kalibrering.">
-            <input type="radio" name="consangBaseline" value="snp">
-            <span>SNP-array baseline (ukalibreret)</span>
-          </label>
-        </fieldset>
-      </form>
-      <p class="tool-note" id="consangProfileNote"></p>
-      <div class="tool-result" id="consangResult">Angiv et positivt het/hom-forhold for at få et estimat.</div>
-      <p class="tool-note">Estimatet er vejledende og bør understøttes af andre mål (ROH, IBD, familieoplysninger) før kliniske konklusioner.</p>
-      <figure class="consang-diagram" id="consangDiagram" hidden></figure>
-    </div>
-  </details>
-  <details class="panel tool-panel">
-    <summary>
-      <div class="tool-summary-text">
-        <span class="tool-title">Genomisk afstandsberegner</span>
-        <span class="tool-subtitle">Beregn antal baser mellem to lokationer.</span>
-      </div>
-    </summary>
-    <div class="tool-body">
-      <h3>Genomisk afstandsberegner</h3>
-      <p>Beregn antal baser mellem to lokationer. Indtast fx <code>chr7:55191822</code> og <code>chr7:55277778</code>.</p>
-      <form id="distanceTool">
-        <div class="tool-inline">
-          <label for="distanceStart">Startposition<input id="distanceStart" name="start" placeholder="fx chr7:55191822"></label>
-          <label for="distanceEnd">Slutposition<input id="distanceEnd" name="end" placeholder="fx 55277778"></label>
-        </div>
-        <div class="btn-row">
-          <button type="button" class="secondary" id="distanceSwap">Byt positioner</button>
-        </div>
-      </form>
-      <div class="tool-result" id="distanceResult">Indtast positioner for at se resultatet.</div>
-      <p class="tool-note">Resultatet viser både eksklusiv (end-start) og inklusiv (end-start+1) afstand.</p>
-    </div>
-  </details>
-  <details class="panel tool-panel">
-    <summary>
-      <div class="tool-summary-text">
-        <span class="tool-title">Genome browser opslag</span>
-        <span class="tool-subtitle">Åbn koordinater, gener eller varianter direkte i Ensembl eller UCSC.</span>
-      </div>
-    </summary>
-    <div class="tool-body">
-      <h3>Genome browser opslag</h3>
-      <p>Angiv en position (fx chr1:123456-123789), et gen (fx BRCA1) eller et variant-id (fx rs80357713) og vælg browser og reference.</p>
-      <form id="genomeBrowserForm">
-        <div class="tool-inline">
-          <label for="genomeLookupType">
-            Opslagstype
-            <select id="genomeLookupType" name="lookup_type">
-              <option value="position">Position</option>
-              <option value="gene">Gen</option>
-              <option value="variant">Variant-id</option>
-            </select>
-          </label>
-          <label for="genomeAssembly">
-            Reference
-            <select id="genomeAssembly" name="assembly">
-              <option value="grch38" selected>GRCh38 / hg38</option>
-              <option value="grch37">GRCh37 / hg19</option>
-            </select>
-          </label>
-          <label for="genomeBrowserChoice">
-            Browser
-            <select id="genomeBrowserChoice" name="browser">
-              <option value="ensembl" selected>Ensembl</option>
-              <option value="ucsc">UCSC Genome Browser</option>
-            </select>
-          </label>
-        </div>
-        <label for="genomeLookupValue">
-          Søgeværdi
-          <input id="genomeLookupValue" name="value" placeholder="fx chr7:140453136-140453250 eller BRCA1" autocomplete="off">
-        </label>
-        <div class="tool-inline" data-padding-row>
-          <label for="genomePadding" title="Bruges når kun en enkelt position angives for at definere visningsvinduet omkring positionen.">
-            Visningsvindue (bp)
-            <input type="number" id="genomePadding" name="padding" min="10" max="2000000" value="1000">
-          </label>
-        </div>
-        <div class="btn-row">
-          <button type="submit" class="primary" id="genomeBrowserOpen">Åbn i ny fane</button>
-          <button type="button" class="secondary" id="genomeBrowserClear">Ryd</button>
-        </div>
-      </form>
-      <div class="tool-result" id="genomeBrowserStatus">Indtast en søgeværdi og vælg browser for at åbne visningen.</div>
-      <p class="tool-note">Positioner udvides automatisk med et vindue omkring koordinatet, hvis der ikke angives et interval.</p>
-    </div>
-  </details>
-  <details class="panel tool-panel">
-    <summary>
-      <div class="tool-summary-text">
-        <span class="tool-title">Sekvens BLAST</span>
-        <span class="tool-subtitle">Send sekvenser til NCBI BLAST i en ny fane.</span>
-      </div>
-    </summary>
-    <div class="tool-body">
-      <h3>Sekvens BLAST</h3>
-      <p>Indsæt en DNA- eller proteinsekvens og vælg program og database. Forespørgslen sendes til NCBI BLAST i en ny browserfane.</p>
-      <form id="blastForm">
-        <div class="tool-inline">
-          <label for="blastProgram">
-            Program
-            <select id="blastProgram" name="program">
-              ${blastProgramOptions}
-            </select>
-          </label>
-          <label for="blastDatabase">
-            Database
-            <select id="blastDatabase" name="database">
-              ${initialBlastDatabaseOptions}
-            </select>
-          </label>
-          <label for="blastExpect">
-            E-værdi (valgfri)
-            <input id="blastExpect" name="expect" placeholder="fx 1e-5">
-          </label>
-        </div>
-        <div class="tool-inline">
-          <label for="blastTitle">
-            Sekvenstitel (valgfri)
-            <input id="blastTitle" name="title" placeholder="fx Patient123_variant">
-          </label>
-          <label for="blastOrganism">
-            Organisme-filter (valgfri)
-            <input id="blastOrganism" name="organism" placeholder="fx Homo sapiens [taxid:9606]">
-          </label>
-        </div>
-        <label for="blastQuery">
-          Sekvens
-          <textarea id="blastQuery" name="query" rows="6" placeholder="Indsæt DNA- eller proteinsekvens (FASTA eller rå tekst)"></textarea>
-        </label>
-        <label class="list-toggle" id="blastMegablastRow">
-          <input type="checkbox" id="blastMegablast" name="megablast" checked>
-          <span>Brug MEGABLAST for højt lignende DNA-sekvenser (blastn)</span>
-        </label>
-        <div class="btn-row">
-          <button type="submit" class="primary" id="blastSubmit">Kør BLAST (NCBI)</button>
-          <button type="button" class="secondary" id="blastClear">Ryd</button>
-        </div>
-      </form>
-      <div class="tool-result" id="blastStatus">Indsæt en sekvens og kør BLAST for at åbne resultatet hos NCBI.</div>
-      <p class="tool-note">Sekvensen sendes direkte til NCBI BLAST via en ny fane og gemmes ikke i GlimR.</p>
-    </div>
-  </details>
-  <details class="panel tool-panel">
-    <summary>
-      <div class="tool-summary-text">
-        <span class="tool-title">Primerdesign</span>
-        <span class="tool-subtitle">Foreslå primerpar ud fra sekvens, målområde og ønsket Tm.</span>
-      </div>
-    </summary>
-    <div class="tool-body">
-      <h3>Primerdesign</h3>
-      <p>Angiv en sekvens og evt. målområde for at få et forslag til forward og reverse primer baseret på simple heuristikker.</p>
-      <form id="primerTool">
-        <label for="primerSequence">Sekvens
-          <textarea id="primerSequence" name="sequence" rows="4" placeholder="Indsæt målsekvens (DNA) her"></textarea>
-        </label>
-        <div class="tool-inline">
-          <label for="primerStart">Amplicon-start (1-baseret)
-            <input type="number" id="primerStart" name="start" min="1" placeholder="fx 120">
-          </label>
-          <label for="primerEnd">Amplicon-slut (1-baseret)
-            <input type="number" id="primerEnd" name="end" min="1" placeholder="fx 420">
-          </label>
-        </div>
-        <div class="tool-inline">
-          <label for="primerMinLen">Minimum primerlængde
-            <input type="number" id="primerMinLen" name="min_len" min="10" max="60" value="18">
-          </label>
-          <label for="primerMaxLen">Maksimum primerlængde
-            <input type="number" id="primerMaxLen" name="max_len" min="10" max="60" value="24">
-          </label>
-          <label for="primerTargetTm">Ønsket Tm (°C)
-            <input type="number" step="0.1" id="primerTargetTm" name="target_tm" min="30" max="80" value="60">
-          </label>
-        </div>
-        <div class="btn-row">
-          <button type="submit" class="primary" id="primerDesign">Design primere</button>
-          <button type="button" class="secondary" id="primerClear">Ryd</button>
-        </div>
-      </form>
-      <div class="tool-result" id="primerResult">Indsæt en sekvens og angiv evt. målområde for at foreslå primere.</div>
-      <p class="tool-note">Primere beregnes med simple regler (Wallace-Tm og GC-clamp) og kræver laboratoriel validering før brug.</p>
-    </div>
-  </details>
-  <details class="panel tool-panel">
-    <summary>
-      <div class="tool-summary-text">
-        <span class="tool-title">GC- og sekvensværktøj</span>
-        <span class="tool-subtitle">Analyser sekvensen for GC-indhold og reverse komplement.</span>
-      </div>
-    </summary>
-    <div class="tool-body">
-      <h3>GC- og sekvensværktøj</h3>
-      <p>Analyser en DNA/RNA-sekvens for længde, GC-indhold og generér reverse komplement.</p>
-      <form id="gcTool">
-        <label for="gcSequence">Sekvens
-          <textarea id="gcSequence" name="sequence" rows="4" placeholder="Indsæt sekvens her"></textarea>
-        </label>
-        <div class="btn-row">
-          <button type="button" class="secondary" id="gcUpper">Rens og formater</button>
-          <button type="button" class="secondary" id="gcReverse">Reverse komplement</button>
-        </div>
-      </form>
-      <div class="tool-result" id="gcResult">Indsæt en sekvens for at beregne GC%.</div>
-      <p class="tool-note">Beregningen ignorerer mellemrum og tal. Ambigue baser (fx N, R, Y) medtages i længden.</p>
-    </div>
-  </details>`;
-
+  `;
   const planningBoard = section.querySelector('#planningBoard');
   const planningSummary = section.querySelector('#planningSummary');
   const planningHideDoneToggle = section.querySelector('#planningHideDone');
@@ -12713,7 +11996,7 @@ function renderTools(section) {
     const hourMs = 60 * 60 * 1000;
     const dayMs = 24 * hourMs;
     if (absMs < hourMs) {
-      return diffMs >= 0 ? 'Forfalder om < 1 time' : 'Forfaldt for < 1 time siden';
+      return diffMs >= 0 ? 'Forfalder om < 1 time' : 'Forfaldt for under 1 time siden';
     }
     if (absMs < dayMs) {
       const hours = Math.round(absMs / hourMs);
@@ -13131,6 +12414,742 @@ function renderTools(section) {
       setStatus('Kalenderfil genereret med dine planlagte trin.');
     });
   }
+  applyButtonTooltips(section);
+  applyControlTooltips(section);
+}
+
+function renderTools(section) {
+  const STRENGTH_DEFINITIONS = {
+    pathogenic: {
+      veryStrong: {label: 'Meget stærk (+8)', summary: 'meget stærk', weight: 8},
+      strong: {label: 'Stærk (+4)', summary: 'stærk', weight: 4},
+      moderate: {label: 'Moderat (+2)', summary: 'moderat', weight: 2},
+      supporting: {label: 'Supporting (+1)', summary: 'supporting', weight: 1}
+    },
+    benign: {
+      standAlone: {label: 'Stand-alone (–8)', summary: 'stand-alone', weight: -8},
+      strong: {label: 'Stærk (–4)', summary: 'stærk', weight: -4},
+      supporting: {label: 'Supporting (–1)', summary: 'supporting', weight: -1}
+    }
+  };
+  const DEFAULT_STRENGTH_ORDER = {
+    pathogenic: ['veryStrong', 'strong', 'moderate', 'supporting'],
+    benign: ['standAlone', 'strong', 'supporting']
+  };
+  const pathogenicCriteria = [
+    {code: 'PVS1', label: 'Loss-of-function variant i gen hvor loss-of-function er kendt sygdomsmekanisme.', defaultStrength: 'veryStrong', strengths: ['veryStrong', 'strong', 'moderate', 'supporting'], description: 'Nedgrader ved usikker LoF-effekt (fx initierende exon, alternativ splejsning).', strengthGuidance: {veryStrong: 'Meget stærk når varianten forventes at udløse nonsense mediated decay eller tydelig truncering i et gen hvor loss-of-function er veletableret sygdomsmekanisme uden kendte undtagelser.', strong: 'Stærk når LoF-effekten er sandsynlig men placeret i sidste exon eller når redundans reducerer forventet fuld tabsfunktion.', moderate: 'Moderat når LoF kun delvist understøttes af modeller eller når alternative transkripter kan bevare funktion.', supporting: 'Supporting når LoF kun indikeres af indirekte data og yderligere bevis er nødvendigt for højere styrke.'}},
+    {code: 'PS1', label: 'Samme aminosyreændring som kendt patogen variant uden ændret nukleotid.', defaultStrength: 'strong', strengths: ['veryStrong', 'strong', 'moderate', 'supporting'], description: 'Overvej styrkejustering når evidens for ækvivalens er begrænset eller stærkere end reference.', strengthGuidance: {veryStrong: 'Meget stærk når ækvivalente aminosyreændringer har omfattende klinisk dokumentation og funktionelle studier der klart viser patogenicitet.', strong: 'Stærk når referencevarianten er kurateret patogen og ækvivalensen er veldokumenteret.', moderate: 'Moderat når referencevarianten kun er sandsynligvis patogen eller dokumentationen for samme mekanisme er begrænset.', supporting: 'Supporting når ligheden primært bygger på in silico vurdering eller enkelte rapporter.'}},
+    {code: 'PS2', label: 'De novo (bekræftet) hos patient med sund(e) forælder(e).', defaultStrength: 'strong', strengths: ['strong', 'moderate', 'supporting'], description: 'Kræver verifikation af forældres status. Nedgrader ved begrænset test eller phenotypematch.', strengthGuidance: {strong: 'Stærk når de novo-status er bekræftet med forældretest og fænotypen er stærkt forenelig.', moderate: 'Moderat når kun en forælder er testet, eller når fænotypen er delvist konsistent.', supporting: 'Supporting når de novo-mistanken bygger på familiesygehistorie uden fuld laboratoriebekræftelse.'}},
+    {code: 'PS3', label: 'Funktionelle studier viser skadelig effekt.', defaultStrength: 'strong', strengths: ['veryStrong', 'strong', 'moderate', 'supporting'], description: 'Justér efter kvalitet og sygdomsrelevans af den funktionelle evidens.', strengthGuidance: {veryStrong: 'Meget stærk når validerede sygdomsrelevante assays reproducerbart demonstrerer alvorligt tab af funktion.', strong: 'Stærk når robuste funktionelle studier viser klar patologisk effekt i passende modeller.', moderate: 'Moderat når assays viser effekt men har begrænsninger i validering eller sygdomsrelevans.', supporting: 'Supporting når data kommer fra explorative modeller eller enkeltstående resultater.'}},
+    {code: 'PS4', label: 'Signifikant øget forekomst i syge kontra kontroller.', defaultStrength: 'strong', strengths: ['veryStrong', 'strong', 'moderate', 'supporting'], description: 'Styrke afhænger af størrelsen på kohorter og statistisk signifikans.', strengthGuidance: {veryStrong: 'Meget stærk ved store uafhængige kohorter med odds ratio over ca. 10 og stringente kontroller.', strong: 'Stærk når case-control-data viser signifikant berigelse med passende korrigering for multiple test.', moderate: 'Moderat når kohorten er mindre eller odds ratio ligger omkring 5 med konsistente data.', supporting: 'Supporting ved begrænset men signifikant berigelse eller meta-analyser med moderate effekter.'}},
+    {code: 'PM1', label: 'Hotspot/domæne uden godartede variationer.', defaultStrength: 'moderate', strengths: ['strong', 'moderate', 'supporting'], description: 'Opjuster ved veletablerede hotspots; nedgrader ved begrænset domænedata.', strengthGuidance: {strong: 'Stærk når varianten sidder i et veldefineret funktionelt hotspot med mange uafhængige patogene fund og fravær af godartede varianter.', moderate: 'Moderat for dokumenteret kritiske domæner med få godartede observationer.', supporting: 'Supporting når domænet antages vigtigt men evidensen for hotspot-status er begrænset.'}},
+    {code: 'PM2', label: 'Fraværende eller ekstremt lav frekvens i kontroller.', defaultStrength: 'moderate', strengths: ['moderate', 'supporting'], description: 'Opdater med populationsdatabaser; nedgrader hvis sparsom dækning eller blandede populationer.', strengthGuidance: {moderate: 'Moderat når varianten er fraværende eller under forventet frekvens i store populationer med tilstrækkelig dækning.', supporting: 'Supporting når populationstallene er små eller når variantens fravær kun vises i enkelte datasæt.'}},
+    {code: 'PM3', label: 'Påvist i trans med patogen variant i recessiv sygdom.', defaultStrength: 'moderate', strengths: ['strong', 'moderate', 'supporting'], description: 'Opjuster ved flere uafhængige observationer; kræver kendt patogen partner-variant.', strengthGuidance: {strong: 'Stærk ved flere uafhængige observationer i trans med velkarakteriserede patogene varianter eller dokumenteret compound heterozygoti.', moderate: 'Moderat når observationen er begrænset til få familier men med sikker fasebestemmelse.', supporting: 'Supporting når fase er antaget i stedet for bevist eller når partner-varianten er sandsynligvis patogen.'}},
+    {code: 'PM4', label: 'Proteinaltering der påvirker læseramme eller stopper protein.', defaultStrength: 'moderate', strengths: ['strong', 'moderate', 'supporting'], description: 'Ekskluderer velkarakteriserede LoF-gen undtagelser; overvej nedgradering ved in-frame ændringer.', strengthGuidance: {strong: 'Stærk når ændringen giver trunkering før kritiske domæner uden forventet NMD-redning.', moderate: 'Moderat for in-frame deletioner/indsættelser eller truncering nær C-terminus hvor effekt er sandsynlig.', supporting: 'Supporting når strukturel påvirkning er usikker men proteinændringen er forenelig med funktionstab.'}},
+    {code: 'PM5', label: 'Ny missense på samme aminosyre som anden patogen variant.', defaultStrength: 'moderate', strengths: ['moderate', 'supporting'], description: 'Forudsætter samme sygdomsmekanisme som den kendte variant; nedgrader hvis evidens er svag.', strengthGuidance: {moderate: 'Moderat når en anden nukleotidændring på samme kodon er velunderbygget patogen og mekanismen deles.', supporting: 'Supporting når referencevarianten kun er sandsynligvis patogen eller når mekanismen kan variere.'}},
+    {code: 'PM6', label: 'De novo (uformelt) uden bekræftede forældre.', defaultStrength: 'moderate', strengths: ['moderate', 'supporting'], description: 'Nedgrader hvis fænotypen er mindre specifik eller forældrestatus er usikker.', strengthGuidance: {moderate: 'Moderat når de novo-status understøttes af kliniske oplysninger men genetisk test af forældre mangler.', supporting: 'Supporting når mistanken om de novo stammer fra familiehistorik eller når kun en forælder er testet.'}},
+    {code: 'PP1', label: 'Segregerer med sygdommen i familien.', defaultStrength: 'supporting', strengths: ['strong', 'moderate', 'supporting'], description: 'Opgrader ved robuste LOD-beregninger; nedgrader ved få informative meioser.', strengthGuidance: {strong: 'Stærk når kombineret LOD-score er over 3 eller når flere uafhængige familier viser overbevisende segregering.', moderate: 'Moderat når LOD-score er mellem cirka 1,5 og 3 eller få men informative meioser foreligger.', supporting: 'Supporting når segregeringen ses i begrænset antal familier uden formel LOD-beregning.'}},
+    {code: 'PP2', label: 'Missense i gen hvor missense er hyppig sygdomsmekanisme.', defaultStrength: 'supporting', strengths: ['moderate', 'supporting'], description: 'Kræver lav forekomst af godartede missense-varianter og LoF-dominans fraværende.', strengthGuidance: {moderate: 'Moderat når genets sygdomsmekanisme stærkt favoriserer missense-varianter og godartede missense er sjældne.', supporting: 'Supporting når data tyder på missense-sårbarhed men referencegrundlaget er begrænset.'}},
+    {code: 'PP3', label: 'In silico-støtte for skadelig effekt.', defaultStrength: 'supporting', strengths: ['moderate', 'supporting'], description: 'Vurder konsistens mellem flere algoritmer; undgå brug når modeller er uenige.', strengthGuidance: {moderate: 'Moderat når flere orthogonale algoritmer og konservationsdata er samstemmende om skadelig effekt.', supporting: 'Supporting når de fleste modeller peger på skade men enkelte kilder er usikre.'}},
+    {code: 'PP4', label: 'Fænotype/specifik sygdom i tråd med genet.', defaultStrength: 'supporting', strengths: ['moderate', 'supporting'], description: 'Kræver høj specificitet i fænotypen; opgrader ved veldefinerede syndromer.', strengthGuidance: {moderate: 'Moderat når patientens fænotype er højt specifik for genet eller når flere tilfælde matcher samme syndrom.', supporting: 'Supporting ved delvis overlap mellem fænotype og kendt spektrum eller når differentialdiagnoser er mulige.'}},
+    {code: 'PP5', label: 'Anført som patogen af velrenommeret kilde.', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Bruges kun når kilden dokumenterer evidens og er uafhængig.', strengthGuidance: {supporting: 'Supporting når en uafhængig klinisk laboratorierapport giver transparent dokumentation for patogenicitet.'}}
+  ];
+  const benignCriteria = [
+    {code: 'BA1', label: 'Allelfrekvens >5 % i kontroller (stand-alone).', effect: 'benign', defaultStrength: 'standAlone', strengths: ['standAlone', 'strong', 'supporting'], description: 'Kræver tilstrækkelig populationsrepræsentation og passende sygdomsprævalens.', strengthGuidance: {standAlone: 'Stand-alone når frekvensen overstiger 5 procent i en velrepræsenteret population og klart er uforenelig med sygdommens forekomst.', strong: 'Stærk når frekvensen ligger over maksimal forventet for sygdommen efter justering for penetrans men under stand-alone tærsklen.', supporting: 'Supporting når frekvensen er højere end forventet men datasættet er lille eller populationsrelevantheden begrænset.'}},
+    {code: 'BS1', label: 'Allelfrekvens større end forventet for lidelsen.', effect: 'benign', defaultStrength: 'strong', strengths: ['strong', 'supporting'], description: 'Justér efter penetrans og genetisk heterogenitet.', strengthGuidance: {strong: 'Stærk når beregnet maksimumsfrekvens klart overskrides i flere populationer med god dækning.', supporting: 'Supporting når frekvensen kun svagt overstiger forventet eller når enkelte populationsdatasæt driver signalet.'}},
+    {code: 'BS2', label: 'Observeret hos sund homozygot/hemizygot.', effect: 'benign', defaultStrength: 'strong', strengths: ['strong', 'supporting'], description: 'Kræver veldokumenteret fænotype og eksklusion af alder-afhængig debut.', strengthGuidance: {strong: 'Stærk når flere voksne uden sygdom er dokumenteret homozygote eller hemizygote med passende klinisk opfølgning.', supporting: 'Supporting når observationen er enkeltstående eller når opfølgningen er begrænset.'}},
+    {code: 'BS3', label: 'Funktionelle studier viser ingen skadelig effekt.', effect: 'benign', defaultStrength: 'strong', strengths: ['strong', 'supporting'], description: 'Vurder assayets robusthed; nedgrader ved begrænset sygdomsrelevans.', strengthGuidance: {strong: 'Stærk når validerede sygdomsrelevante assays konsekvent viser normal funktion.', supporting: 'Supporting når assays er mindre validerede eller når resultaterne kun delvist understøtter normal funktion.'}},
+    {code: 'BS4', label: 'Mangel på segregering med sygdommen.', effect: 'benign', defaultStrength: 'strong', strengths: ['strong', 'supporting'], description: 'Kræver flere informative familier; nedgrader ved mulige fenokopier.', strengthGuidance: {strong: 'Stærk når varianten ikke segregerer i flere informative familier med klare sygdomsdefinitioner.', supporting: 'Supporting når brudt segregering ses i begrænsede familier eller når fenokopier ikke kan udelukkes.'}},
+    {code: 'BP1', label: 'Missense i gen hvor loss-of-function er dominerende mekanisme.', effect: 'benign', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Anvendes når missense sjældent er sygdomsfremkaldende i genet.', strengthGuidance: {supporting: 'Supporting når genets kendte patogene variationer primært er loss-of-function og missense sjældent giver sygdom.'}},
+    {code: 'BP2', label: 'Observeret sammen med patogen variant for dominant sygdom.', effect: 'benign', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Forudsætter sikre fasedata og veldokumenteret patogen partner.', strengthGuidance: {supporting: 'Supporting når varianten findes i trans eller cis med uafhængigt patogen variant i dominant tilstand og patienten er rask.'}},
+    {code: 'BP3', label: 'In-frame indel i repetitiv region uden kendt funktion.', effect: 'benign', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Anvendes når indel ikke forventes at påvirke proteinfunktionen.', strengthGuidance: {supporting: 'Supporting når ændringen ligger i repetitivt motiv uden bevaret funktion og lignende variation er hyppig i raske populationer.'}},
+    {code: 'BP4', label: 'In silico understøtter benign effekt.', effect: 'benign', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Kræver samstemmende modeller for neutral effekt.', strengthGuidance: {supporting: 'Supporting når flere uafhængige algoritmer og konservationsdata peger på neutral eller tolerant effekt.'}},
+    {code: 'BP5', label: 'Variant forklarer alternativ diagnose.', effect: 'benign', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Kræver veldokumenteret alternativ årsag til fænotypen.', strengthGuidance: {supporting: 'Supporting når patientens fænotype forklares af en anden evidensbaseret genetisk diagnose og varianten er i linkage.'}},
+    {code: 'BP6', label: 'Anført som godartet af velrenommeret kilde.', effect: 'benign', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Brug kun når kilde dokumenterer bevis for benignitet.', strengthGuidance: {supporting: 'Supporting når et akkrediteret laboratorie eller database dokumenterer benignitet med sporbar evidens.'}},
+    {code: 'BP7', label: 'Synonym variant uden splice-påvirkning.', effect: 'benign', defaultStrength: 'supporting', strengths: ['supporting'], description: 'Kræver fravær af spliceeffekt i relevante modeller.', strengthGuidance: {supporting: 'Supporting når splice-site analyser og funktionelle data viser uændret splejsning og ingen påvirkning af regulerende elementer.'}}
+  ];
+  const SNP_REFERENCE_BASELINE = 2.05; // Tidligere arrays (~2,05 i nordeuropæiske kohorter)
+  const WGS_TARGET_BASELINE = 1.62;   // WGS-observation: "lige over 1,6" het/hom i nordeuropæiske patienter
+  const WGS_BASELINE_FACTOR = WGS_TARGET_BASELINE / SNP_REFERENCE_BASELINE;
+  const scaleWgsBaseline = baseline => Number((baseline * WGS_BASELINE_FACTOR).toFixed(3));
+  const consanguinityProfiles = [
+    {
+      value: 'generic',
+      label: 'Ukendt/blandet (global baseline)',
+      snpBaseline: 2.0,
+      wgsBaseline: scaleWgsBaseline(2.0),
+      note: 'Generisk baseline; vælg WGS for helgenomdata eller SNP for ældre array-profiler.',
+      defaultSelected: true
+    },
+    {
+      value: 'northern_europe',
+      label: 'Nordeuropæisk/Skandinavisk',
+      snpBaseline: 2.05,
+      wgsBaseline: scaleWgsBaseline(2.05),
+      note: 'Kalibreret til helgenomsekventering; skandinaviske patienter viser het/hom ≈ 1,62 (≈62 % heterozygote).'
+    },
+    {
+      value: 'southern_europe_middle_east',
+      label: 'Sydeuropæisk/Mellemøstlig',
+      snpBaseline: 1.85,
+      wgsBaseline: scaleWgsBaseline(1.85),
+      note: 'Historisk øget beslægtethed med WGS-justeret forventet het/hom omkring 1,4.'
+    },
+    {
+      value: 'south_asia',
+      label: 'Sydasiatisk',
+      snpBaseline: 1.7,
+      wgsBaseline: scaleWgsBaseline(1.7),
+      note: 'Populationsstudier rapporterer lavere heterozygositet; WGS-justeret baseline ~1,3.'
+    },
+    {
+      value: 'east_asia',
+      label: 'Østasiatisk',
+      snpBaseline: 1.95,
+      wgsBaseline: scaleWgsBaseline(1.95),
+      note: 'Store urbaniserede populationer med moderat heterozygositet; WGS-justeret baseline ~1,5.'
+    },
+    {
+      value: 'sub_saharan_africa',
+      label: 'Subsaharisk Afrika',
+      snpBaseline: 2.3,
+      wgsBaseline: scaleWgsBaseline(2.3),
+      note: 'Høj genetisk diversitet; WGS viser het/hom omkring 1,8 for outbred kohorter.'
+    },
+    {
+      value: 'americas',
+      label: 'Latinamerikansk/admixed',
+      snpBaseline: 2.0,
+      wgsBaseline: scaleWgsBaseline(2.0),
+      note: 'Stor variation – baseline sat til WGS-justeret global gennemsnitsværdi (~1,6).'
+    }
+  ];
+  const consanguinityCategories = [
+    {minF: 0.1875, title: 'Forælder-barn eller fulde søskende', detail: 'Typisk F≈25 % (1. grads slægtskab).', pedigree: 'parentChild'},
+    {minF: 0.09375, title: 'Halvsøskende / onkel-niece / tante-nevø', detail: 'Typisk F≈12,5 % (1½. grad).', pedigree: 'avuncular'},
+    {minF: 0.046875, title: 'Fætter/kusine (første)', detail: 'Typisk F≈6,25 % (2. grad).', pedigree: 'firstCousin'},
+    {minF: 0.0234375, title: 'Fætter/kusine én gang fjernet', detail: 'Typisk F≈3,1 % (2½.–3. grad).', pedigree: 'cousinOnceRemoved'},
+    {minF: 0.01171875, title: 'Anden fætter/kusine', detail: 'Typisk F≈1,6 % (3. grad).', pedigree: 'secondCousin'},
+    {minF: 0.005, title: 'Fjern beslægtning (≥3.-4. led)', detail: 'Typisk F≈0,5–1 %.', pedigree: 'distant'}
+  ];
+  const renderPedigreeNode = (x, y, label, note = '', options = {}) => {
+    const width = Number(options.width ?? 44);
+    const height = Number(options.height ?? 26);
+    const xPos = (x - width / 2).toFixed(1);
+    const yPos = (y - height / 2).toFixed(1);
+    const classes = ['pedigree-node'];
+    if (options.proband) classes.push('proband');
+    const nameClasses = ['pedigree-label', 'name'];
+    if (options.proband) nameClasses.push('proband');
+    const labelY = (y + 4).toFixed(1);
+    const noteY = (y + height / 2 + 9).toFixed(1);
+    return `
+      <rect class="${classes.join(' ')}" x="${xPos}" y="${yPos}" width="${width.toFixed(1)}" height="${height.toFixed(1)}" rx="6" ry="6"></rect>
+      <text class="${nameClasses.join(' ')}" x="${x.toFixed(1)}" y="${labelY}">${esc(label)}</text>
+      ${note ? `<text class="pedigree-label" x="${x.toFixed(1)}" y="${noteY}">${esc(note)}</text>` : ''}
+    `;
+  };
+  const renderPedigreeLine = (x1, y1, x2, y2, extraClass = '') => `
+    <line class="pedigree-link${extraClass ? ' ' + extraClass : ''}" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"></line>
+  `;
+  const consanguinityPedigreeTemplates = {
+    parentChild: ({relationText, detailText, inbreedingText}) => {
+      const lines = [
+        renderPedigreeLine(70, 51, 120, 51),
+        renderPedigreeLine(120, 51, 120, 81),
+        renderPedigreeLine(120, 81, 150, 81),
+        renderPedigreeLine(70, 51, 70, 126),
+        renderPedigreeLine(150, 107, 150, 126),
+        renderPedigreeLine(70, 126, 150, 126),
+        renderPedigreeLine(110, 126, 110, 137)
+      ];
+      const nodes = [
+        renderPedigreeNode(70, 38, 'Forælder A', '(ældre generation)'),
+        renderPedigreeNode(150, 94, 'Forælder B', '(barn af A)'),
+        renderPedigreeNode(110, 150, 'Proband', '', {proband: true})
+      ];
+      return {
+        viewBox: '0 0 220 190',
+        title: `Stamtræ – ${relationText}`,
+        desc: 'Illustration af et forælder-barn-forhold; fulde søskende giver tilsvarende F.',
+        content: lines.concat(nodes).join(''),
+        caption: `Proband markeret i blå. Estimeret F ${esc(inbreedingText)} (${esc(detailText)}).`
+      };
+    },
+    avuncular: ({relationText, detailText, inbreedingText}) => {
+      const lines = [
+        renderPedigreeLine(70, 41, 150, 41),
+        renderPedigreeLine(110, 41, 110, 54),
+        renderPedigreeLine(70, 54, 150, 54),
+        renderPedigreeLine(70, 54, 70, 60),
+        renderPedigreeLine(150, 54, 150, 60),
+        renderPedigreeLine(70, 85, 70, 105),
+        renderPedigreeLine(150, 85, 150, 131),
+        renderPedigreeLine(70, 131, 150, 131),
+        renderPedigreeLine(110, 131, 110, 149)
+      ];
+      const nodes = [
+        renderPedigreeNode(70, 28, 'Bedsteforælder', '(fælles)'),
+        renderPedigreeNode(150, 28, 'Bedsteforælder', '(fælles)'),
+        renderPedigreeNode(70, 72, 'Forælder A', '(søskende)'),
+        renderPedigreeNode(150, 72, 'Onkel/tante', '(søskende)'),
+        renderPedigreeNode(70, 118, 'Forælder B', '(barn af A)'),
+        renderPedigreeNode(110, 162, 'Proband', '', {proband: true})
+      ];
+      return {
+        viewBox: '0 0 220 200',
+        title: `Stamtræ – ${relationText}`,
+        desc: 'Skitsen viser et onkel/niece-forhold; halvsøskende følger samme logik.',
+        content: lines.concat(nodes).join(''),
+        caption: `Proband markeret i blå. Estimeret F ${esc(inbreedingText)} (${esc(detailText)}).`
+      };
+    },
+    firstCousin: ({relationText, detailText, inbreedingText}) => {
+      const lines = [
+        renderPedigreeLine(70, 41, 170, 41),
+        renderPedigreeLine(120, 41, 120, 56),
+        renderPedigreeLine(70, 56, 170, 56),
+        renderPedigreeLine(70, 56, 70, 60),
+        renderPedigreeLine(170, 56, 170, 60),
+        renderPedigreeLine(70, 84, 70, 106),
+        renderPedigreeLine(170, 84, 170, 106),
+        renderPedigreeLine(70, 130, 170, 130),
+        renderPedigreeLine(120, 130, 120, 146)
+      ];
+      const nodes = [
+        renderPedigreeNode(70, 28, 'Bedsteforælder', '(fælles)'),
+        renderPedigreeNode(170, 28, 'Bedsteforælder', '(fælles)'),
+        renderPedigreeNode(70, 72, 'Forælder A', '(søskende)'),
+        renderPedigreeNode(170, 72, 'Forælder B', '(søskende)'),
+        renderPedigreeNode(70, 118, 'Forælder 1', '(barn af A)'),
+        renderPedigreeNode(170, 118, 'Forælder 2', '(barn af B)'),
+        renderPedigreeNode(120, 158, 'Proband', '', {proband: true})
+      ];
+      return {
+        viewBox: '0 0 240 200',
+        title: `Stamtræ – ${relationText}`,
+        desc: 'Første fætre/kusiner får et barn – probanden er markeret nederst.',
+        content: lines.concat(nodes).join(''),
+        caption: `Proband markeret i blå. Estimeret F ${esc(inbreedingText)} (${esc(detailText)}).`
+      };
+    },
+    cousinOnceRemoved: ({relationText, detailText, inbreedingText}) => {
+      const lines = [
+        renderPedigreeLine(70, 37, 170, 37),
+        renderPedigreeLine(120, 37, 120, 48),
+        renderPedigreeLine(70, 48, 170, 48),
+        renderPedigreeLine(70, 48, 70, 52),
+        renderPedigreeLine(170, 48, 170, 52),
+        renderPedigreeLine(70, 76, 70, 94),
+        renderPedigreeLine(170, 76, 170, 94),
+        renderPedigreeLine(170, 118, 170, 132),
+        renderPedigreeLine(70, 117, 70, 157),
+        renderPedigreeLine(70, 157, 170, 157),
+        renderPedigreeLine(120, 157, 120, 167)
+      ];
+      const nodes = [
+        renderPedigreeNode(70, 24, 'Bedsteforælder', '(fælles)'),
+        renderPedigreeNode(170, 24, 'Bedsteforælder', '(fælles)'),
+        renderPedigreeNode(70, 64, 'Forælder A', '(søskende)'),
+        renderPedigreeNode(170, 64, 'Forælder B', '(søskende)'),
+        renderPedigreeNode(70, 102, 'Forælder 1', '(barn af A)'),
+        renderPedigreeNode(170, 102, 'Fætter', '(barn af B)'),
+        renderPedigreeNode(170, 140, 'Forælder 2', '(barn af fætter)'),
+        renderPedigreeNode(120, 178, 'Proband', '', {proband: true})
+      ];
+      return {
+        viewBox: '0 0 240 210',
+        title: `Stamtræ – ${relationText}`,
+        desc: 'Et første fætter/kusine-forhold med én generations forskydning.',
+        content: lines.concat(nodes).join(''),
+        caption: `Proband markeret i blå. Estimeret F ${esc(inbreedingText)} (${esc(detailText)}).`
+      };
+    },
+    secondCousin: ({relationText, detailText, inbreedingText}) => {
+      const lines = [
+        renderPedigreeLine(60, 37, 160, 37),
+        renderPedigreeLine(110, 37, 110, 48),
+        renderPedigreeLine(60, 48, 160, 48),
+        renderPedigreeLine(60, 48, 60, 51),
+        renderPedigreeLine(160, 48, 160, 51),
+        renderPedigreeLine(60, 77, 60, 91),
+        renderPedigreeLine(160, 77, 160, 91),
+        renderPedigreeLine(60, 117, 60, 131),
+        renderPedigreeLine(160, 117, 160, 131),
+        renderPedigreeLine(60, 157, 160, 157),
+        renderPedigreeLine(110, 157, 110, 167)
+      ];
+      const nodes = [
+        renderPedigreeNode(60, 24, 'Oldeforælder', '(fælles)'),
+        renderPedigreeNode(160, 24, 'Oldeforælder', '(fælles)'),
+        renderPedigreeNode(60, 64, 'Bedsteforælder A', '(søskende)'),
+        renderPedigreeNode(160, 64, 'Bedsteforælder B', '(søskende)'),
+        renderPedigreeNode(60, 104, 'Forælder A', '(barn af A)'),
+        renderPedigreeNode(160, 104, 'Forælder B', '(barn af B)'),
+        renderPedigreeNode(60, 144, 'Forælder 1', '(barnebarn af A)'),
+        renderPedigreeNode(160, 144, 'Forælder 2', '(barnebarn af B)'),
+        renderPedigreeNode(110, 180, 'Proband', '', {proband: true})
+      ];
+      return {
+        viewBox: '0 0 240 210',
+        title: `Stamtræ – ${relationText}`,
+        desc: 'Andet fætre/kusiner deler oldeforældre; probanden er nederst.',
+        content: lines.concat(nodes).join(''),
+        caption: `Proband markeret i blå. Estimeret F ${esc(inbreedingText)} (${esc(detailText)}).`
+      };
+    },
+    distant: ({relationText, detailText, inbreedingText}) => {
+      const lines = [
+        renderPedigreeLine(110, 34, 110, 58, 'distant'),
+        renderPedigreeLine(80, 58, 140, 58, 'distant'),
+        renderPedigreeLine(80, 58, 80, 92, 'distant'),
+        renderPedigreeLine(140, 58, 170, 92, 'distant'),
+        renderPedigreeLine(80, 118, 110, 140, 'distant'),
+        renderPedigreeLine(170, 118, 170, 128, 'distant')
+      ];
+      const nodes = [
+        renderPedigreeNode(110, 24, 'Fælles forfader'),
+        renderPedigreeNode(80, 104, 'Probandens gren'),
+        renderPedigreeNode(170, 104, 'Fjern gren'),
+        renderPedigreeNode(170, 140, 'Fjern slægtning', '(vejledende)'),
+        renderPedigreeNode(110, 170, 'Proband', '', {proband: true})
+      ];
+      return {
+        viewBox: '0 0 220 200',
+        title: `Stamtræ – ${relationText}`,
+        desc: 'Illustration af fjern beslægtning med delt forfader flere led tilbage.',
+        content: lines.concat(nodes).join(''),
+        caption: `Proband markeret i blå. Estimeret F ${esc(inbreedingText)} (${esc(detailText)}).`
+      };
+    }
+  };
+  const consangOptions = consanguinityProfiles.map(profile => `
+    <option value="${esc(profile.value)}"${profile.defaultSelected ? ' selected' : ''}>${esc(profile.label)}</option>
+  `).join('');
+  const BLAST_PROGRAMS = [
+    {value: 'blastn', label: 'blastn – nukleotid mod nukleotid'},
+    {value: 'blastp', label: 'blastp – protein mod protein'},
+    {value: 'blastx', label: 'blastx – oversæt nukleotid mod protein'},
+    {value: 'tblastn', label: 'tblastn – protein mod oversatte nukleotider'},
+    {value: 'tblastx', label: 'tblastx – oversatte nukleotider mod oversatte nukleotider'}
+  ];
+  const BLAST_DATABASES = {
+    blastn: [
+      {value: 'nt', label: 'nt – NCBI nukleotid-database'},
+      {value: 'refseq_rna', label: 'refseq_rna – RefSeq RNA'},
+      {value: 'refseq_genomic', label: 'refseq_genomic – RefSeq genom'},
+      {value: 'wgs', label: 'wgs – whole genome shotgun contigs'}
+    ],
+    blastp: [
+      {value: 'nr', label: 'nr – NCBI protein'},
+      {value: 'swissprot', label: 'swissprot – Swiss-Prot kurateret'},
+      {value: 'refseq_protein', label: 'refseq_protein – RefSeq protein'}
+    ],
+    blastx: [
+      {value: 'nr', label: 'nr – NCBI protein'},
+      {value: 'swissprot', label: 'swissprot – Swiss-Prot kurateret'},
+      {value: 'refseq_protein', label: 'refseq_protein – RefSeq protein'}
+    ],
+    tblastn: [
+      {value: 'nt', label: 'nt – NCBI nukleotid-database'},
+      {value: 'refseq_rna', label: 'refseq_rna – RefSeq RNA'},
+      {value: 'refseq_genomic', label: 'refseq_genomic – RefSeq genom'}
+    ],
+    tblastx: [
+      {value: 'nt', label: 'nt – NCBI nukleotid-database'},
+      {value: 'refseq_rna', label: 'refseq_rna – RefSeq RNA'}
+    ]
+  };
+  const DEFAULT_BLAST_PROGRAM = 'blastn';
+  const DEFAULT_BLAST_DATABASE = 'nt';
+  const renderBlastDatabaseOptions = (program, selectedValue) => {
+    const items = BLAST_DATABASES[program] || [];
+    if (!items.length) {
+      return '<option value="" disabled>Ingen database tilgængelig</option>';
+    }
+    return items.map((item, index) => {
+      const value = esc(item.value);
+      const label = esc(item.label);
+      const selected = selectedValue ? selectedValue === item.value : index === 0;
+      return `<option value="${value}"${selected ? ' selected' : ''}>${label}</option>`;
+    }).join('');
+  };
+  const blastProgramOptions = BLAST_PROGRAMS.map(item => {
+    const value = esc(item.value);
+    const label = esc(item.label);
+    const selected = item.value === DEFAULT_BLAST_PROGRAM ? ' selected' : '';
+    return `<option value="${value}"${selected}>${label}</option>`;
+  }).join('');
+  const initialBlastDatabaseOptions = renderBlastDatabaseOptions(DEFAULT_BLAST_PROGRAM, DEFAULT_BLAST_DATABASE);
+  const makeCriteriaList = list => list.map(item => {
+    const code = esc(item.code);
+    const label = esc(item.label);
+    const effectRaw = item.effect === 'benign' ? 'benign' : 'pathogenic';
+    const effect = esc(effectRaw);
+    const description = item.description ? ` ${item.description}` : '';
+    const tooltip = esc(`${item.code} – ${item.label}${description}`);
+    const allowedStrengths = Array.isArray(item.strengths) && item.strengths.length
+      ? item.strengths
+      : DEFAULT_STRENGTH_ORDER[effectRaw] || [];
+    const validStrengths = allowedStrengths.filter(strength => STRENGTH_DEFINITIONS[effectRaw]?.[strength]);
+    const fallbackStrength = DEFAULT_STRENGTH_ORDER[effectRaw]?.find(strength => STRENGTH_DEFINITIONS[effectRaw]?.[strength]);
+    const defaultStrength = (item.defaultStrength && STRENGTH_DEFINITIONS[effectRaw]?.[item.defaultStrength])
+      ? item.defaultStrength
+      : (validStrengths[0] || fallbackStrength || 'supporting');
+    const options = (validStrengths.length ? validStrengths : [defaultStrength]).map(strength => {
+      const definition = STRENGTH_DEFINITIONS[effectRaw]?.[strength];
+      if (!definition) return '';
+      const optionLabel = esc(definition.label);
+      const selected = strength === defaultStrength ? ' selected' : '';
+      const guidance = item.strengthGuidance?.[strength];
+      const titleAttr = guidance ? ` title="${esc(guidance)}"` : '';
+      return `<option value="${strength}"${selected}${titleAttr}>${optionLabel}</option>`;
+    }).join('');
+    return `
+    <label class="tool-criteria" title="${tooltip}">
+      <input type="checkbox" class="criterion-toggle" value="${code}" data-effect="${effect}">
+      <span>
+        <span class="criterion-text"><strong>${code}</strong> ${label}</span>
+        <span class="criterion-strength-wrapper">
+          <select class="criterion-strength" data-code="${code}" data-effect="${effect}" data-default-strength="${esc(defaultStrength)}" disabled>
+            ${options}
+          </select>
+        </span>
+      </span>
+    </label>
+  `;
+  }).join('');
+  section.innerHTML = `
+    <details class="panel tool-panel">
+    <summary>
+      <div class="tool-summary-text">
+        <span class="tool-title">ACMG klassifikationshjælper</span>
+        <span class="tool-subtitle">Forenklet vægtning af ACMG/AMP 2015 med opdaterede pointværdier.</span>
+      </div>
+    </summary>
+    <div class="tool-body">
+      <h3>ACMG klassifikationshjælper</h3>
+      <p>Vælg de kriterier der er opfyldt for varianten. Resultatet bruger en forenklet vægtning af ACMG/AMP 2015 med opdaterede pointværdier.</p>
+      <form id="acmgTool">
+        <div class="tool-columns">
+          <fieldset>
+            <legend>Patogene kriterier</legend>
+            <div class="tool-criteria-list">
+              ${makeCriteriaList(pathogenicCriteria)}
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Benigne kriterier</legend>
+            <div class="tool-criteria-list">
+              ${makeCriteriaList(benignCriteria)}
+            </div>
+          </fieldset>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="secondary" id="acmgReset">Nulstil kriterier</button>
+        </div>
+      </form>
+      <div class="tool-result" id="acmgResult">Vælg kriterier for at se forslag til klassifikation.</div>
+      <p class="tool-note">Vurderingen er vejledende og kræver altid manuel gennemgang og dokumentation.</p>
+    </div>
+  </details>
+  <details class="panel tool-panel">
+    <summary>
+      <div class="tool-summary-text">
+        <span class="tool-title">HGVS c. nomenklaturhjælper</span>
+        <span class="tool-subtitle">Byg hurtigt cDNA-notation for substitutioner, deletioner m.m.</span>
+      </div>
+    </summary>
+    <div class="tool-body">
+      <h3>HGVS c. nomenklaturhjælper</h3>
+      <p>Udfyld felterne for at få foreslået et gyldigt HGVS c.-udtryk til simple varianter. Vælg varianttype og angiv de relevante positioner og sekvenser.</p>
+      <form id="hgvsForm">
+        <div class="tool-inline">
+          <label for="hgvsTranscript" title="Angiv referencetranskript (RefSeq, LRG eller tilsvarende).">
+            Referencetranskript
+            <input id="hgvsTranscript" name="transcript" placeholder="fx NM_000546.5">
+          </label>
+          <label for="hgvsType" title="Vælg varianttypen for at vise de relevante felter.">
+            Varianttype
+            <select id="hgvsType" name="type">
+              <option value="substitution">Basiskift (substitution)</option>
+              <option value="deletion">Deletion</option>
+              <option value="insertion">Insertion</option>
+              <option value="duplication">Duplikation</option>
+              <option value="delins">Delins (deletion+insertion)</option>
+            </select>
+          </label>
+        </div>
+        <div class="tool-inline">
+          <label for="hgvsStart" data-hgvs-field="start" title="Startpositionen for ændringen. Brug intronnotation ved behov (fx 123+1).">
+            Position (start)
+            <input id="hgvsStart" name="start" placeholder="fx 215">
+          </label>
+          <label for="hgvsEnd" data-hgvs-field="end" title="Slutpositionen for ændringen. Udelades for enkeltbase-varianter.">
+            Position (slut)
+            <input id="hgvsEnd" name="end" placeholder="fx 217">
+          </label>
+        </div>
+        <div class="tool-inline">
+          <label for="hgvsRef" data-hgvs-field="ref" title="Referencebase(r) eller slettet sekvens, hvis kendt.">
+            Reference/sekvens
+            <input id="hgvsRef" name="ref" placeholder="fx C eller AGT">
+          </label>
+          <label for="hgvsAlt" data-hgvs-field="alt" title="Ændringen, indsatte baser eller erstatningssekvens.">
+            Ændring/indsættelse
+            <input id="hgvsAlt" name="alt" placeholder="fx G eller TTA">
+          </label>
+        </div>
+        <p class="tool-note">Felter skjules automatisk for varianttyper, hvor de ikke anvendes. Positioner kan skrives med intronnotation (fx 123+1).</p>
+        <div class="btn-row">
+          <button type="button" class="secondary" id="hgvsCopy">Kopiér notation</button>
+        </div>
+      </form>
+      <div class="tool-result" id="hgvsResult">Udfyld felterne for at få et HGVS-forslag.</div>
+      <p class="tool-note">Kontroller altid notationen mod HGVS-retningslinjerne og kliniske SOP&apos;er før rapportering.</p>
+    </div>
+  </details>
+  <details class="panel tool-panel">
+    <summary>
+      <div class="tool-summary-text">
+        <span class="tool-title">Konsangvinitetsestimator</span>
+        <span class="tool-subtitle">Oversæt het/hom-forhold til vejledende slægtskab.</span>
+      </div>
+    </summary>
+    <div class="tool-body">
+      <h3>Konsangvinitetsestimator</h3>
+      <p>Angiv prøvens heterozygot/homozygot-forhold og vælg en befolkningsbaseline. Beregningen antager at reduktion i heterozygositet primært skyldes beslægtethed.</p>
+      <form id="consangForm">
+        <div class="tool-inline">
+          <label for="consangRatio" title="Forholdet mellem heterozygote og homozygote varianter (fx 1,80).">
+            Het/hom ratio
+            <input id="consangRatio" name="ratio" inputmode="decimal" placeholder="fx 1,80">
+          </label>
+          <label for="consangEthnicity" title="Baseline anvendt til forventet heterozygositet.">
+            Etnicitet/baggrund
+            <select id="consangEthnicity" name="ethnicity">
+              ${consangOptions}
+            </select>
+          </label>
+        </div>
+        <fieldset class="consang-baseline">
+          <legend>Baseline-type</legend>
+          <label class="radio-option" title="Brug helgenomsekventeringsdata som reference (1,62 i nordiske kohorter).">
+            <input type="radio" name="consangBaseline" value="wgs" checked>
+            <span>WGS-kalibreret (helgenom)</span>
+          </label>
+          <label class="radio-option" title="Brug tidligere SNP-array baseline uden WGS-kalibrering.">
+            <input type="radio" name="consangBaseline" value="snp">
+            <span>SNP-array baseline (ukalibreret)</span>
+          </label>
+        </fieldset>
+      </form>
+      <p class="tool-note" id="consangProfileNote"></p>
+      <div class="tool-result" id="consangResult">Angiv et positivt het/hom-forhold for at få et estimat.</div>
+      <p class="tool-note">Estimatet er vejledende og bør understøttes af andre mål (ROH, IBD, familieoplysninger) før kliniske konklusioner.</p>
+      <figure class="consang-diagram" id="consangDiagram" hidden></figure>
+    </div>
+  </details>
+  <details class="panel tool-panel">
+    <summary>
+      <div class="tool-summary-text">
+        <span class="tool-title">Genomisk afstandsberegner</span>
+        <span class="tool-subtitle">Beregn antal baser mellem to lokationer.</span>
+      </div>
+    </summary>
+    <div class="tool-body">
+      <h3>Genomisk afstandsberegner</h3>
+      <p>Beregn antal baser mellem to lokationer. Indtast fx <code>chr7:55191822</code> og <code>chr7:55277778</code>.</p>
+      <form id="distanceTool">
+        <div class="tool-inline">
+          <label for="distanceStart">Startposition<input id="distanceStart" name="start" placeholder="fx chr7:55191822"></label>
+          <label for="distanceEnd">Slutposition<input id="distanceEnd" name="end" placeholder="fx 55277778"></label>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="secondary" id="distanceSwap">Byt positioner</button>
+        </div>
+      </form>
+      <div class="tool-result" id="distanceResult">Indtast positioner for at se resultatet.</div>
+      <p class="tool-note">Resultatet viser både eksklusiv (end-start) og inklusiv (end-start+1) afstand.</p>
+    </div>
+  </details>
+  <details class="panel tool-panel">
+    <summary>
+      <div class="tool-summary-text">
+        <span class="tool-title">Genome browser opslag</span>
+        <span class="tool-subtitle">Åbn koordinater, gener eller varianter direkte i Ensembl eller UCSC.</span>
+      </div>
+    </summary>
+    <div class="tool-body">
+      <h3>Genome browser opslag</h3>
+      <p>Angiv en position (fx chr1:123456-123789), et gen (fx BRCA1) eller et variant-id (fx rs80357713) og vælg browser og reference.</p>
+      <form id="genomeBrowserForm">
+        <div class="tool-inline">
+          <label for="genomeLookupType">
+            Opslagstype
+            <select id="genomeLookupType" name="lookup_type">
+              <option value="position">Position</option>
+              <option value="gene">Gen</option>
+              <option value="variant">Variant-id</option>
+            </select>
+          </label>
+          <label for="genomeAssembly">
+            Reference
+            <select id="genomeAssembly" name="assembly">
+              <option value="grch38" selected>GRCh38 / hg38</option>
+              <option value="grch37">GRCh37 / hg19</option>
+            </select>
+          </label>
+          <label for="genomeBrowserChoice">
+            Browser
+            <select id="genomeBrowserChoice" name="browser">
+              <option value="ensembl" selected>Ensembl</option>
+              <option value="ucsc">UCSC Genome Browser</option>
+            </select>
+          </label>
+        </div>
+        <label for="genomeLookupValue">
+          Søgeværdi
+          <input id="genomeLookupValue" name="value" placeholder="fx chr7:140453136-140453250 eller BRCA1" autocomplete="off">
+        </label>
+        <div class="tool-inline" data-padding-row>
+          <label for="genomePadding" title="Bruges når kun en enkelt position angives for at definere visningsvinduet omkring positionen.">
+            Visningsvindue (bp)
+            <input type="number" id="genomePadding" name="padding" min="10" max="2000000" value="1000">
+          </label>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="primary" id="genomeBrowserOpen">Åbn i ny fane</button>
+          <button type="button" class="secondary" id="genomeBrowserClear">Ryd</button>
+        </div>
+      </form>
+      <div class="tool-result" id="genomeBrowserStatus">Indtast en søgeværdi og vælg browser for at åbne visningen.</div>
+      <p class="tool-note">Positioner udvides automatisk med et vindue omkring koordinatet, hvis der ikke angives et interval.</p>
+    </div>
+  </details>
+  <details class="panel tool-panel">
+    <summary>
+      <div class="tool-summary-text">
+        <span class="tool-title">Sekvens BLAST</span>
+        <span class="tool-subtitle">Send sekvenser til NCBI BLAST i en ny fane.</span>
+      </div>
+    </summary>
+    <div class="tool-body">
+      <h3>Sekvens BLAST</h3>
+      <p>Indsæt en DNA- eller proteinsekvens og vælg program og database. Forespørgslen sendes til NCBI BLAST i en ny browserfane.</p>
+      <form id="blastForm">
+        <div class="tool-inline">
+          <label for="blastProgram">
+            Program
+            <select id="blastProgram" name="program">
+              ${blastProgramOptions}
+            </select>
+          </label>
+          <label for="blastDatabase">
+            Database
+            <select id="blastDatabase" name="database">
+              ${initialBlastDatabaseOptions}
+            </select>
+          </label>
+          <label for="blastExpect">
+            E-værdi (valgfri)
+            <input id="blastExpect" name="expect" placeholder="fx 1e-5">
+          </label>
+        </div>
+        <div class="tool-inline">
+          <label for="blastTitle">
+            Sekvenstitel (valgfri)
+            <input id="blastTitle" name="title" placeholder="fx Patient123_variant">
+          </label>
+          <label for="blastOrganism">
+            Organisme-filter (valgfri)
+            <input id="blastOrganism" name="organism" placeholder="fx Homo sapiens [taxid:9606]">
+          </label>
+        </div>
+        <label for="blastQuery">
+          Sekvens
+          <textarea id="blastQuery" name="query" rows="6" placeholder="Indsæt DNA- eller proteinsekvens (FASTA eller rå tekst)"></textarea>
+        </label>
+        <label class="list-toggle" id="blastMegablastRow">
+          <input type="checkbox" id="blastMegablast" name="megablast" checked>
+          <span>Brug MEGABLAST for højt lignende DNA-sekvenser (blastn)</span>
+        </label>
+        <div class="btn-row">
+          <button type="submit" class="primary" id="blastSubmit">Kør BLAST (NCBI)</button>
+          <button type="button" class="secondary" id="blastClear">Ryd</button>
+        </div>
+      </form>
+      <div class="tool-result" id="blastStatus">Indsæt en sekvens og kør BLAST for at åbne resultatet hos NCBI.</div>
+      <p class="tool-note">Sekvensen sendes direkte til NCBI BLAST via en ny fane og gemmes ikke i GlimR.</p>
+    </div>
+  </details>
+  <details class="panel tool-panel">
+    <summary>
+      <div class="tool-summary-text">
+        <span class="tool-title">Primerdesign</span>
+        <span class="tool-subtitle">Foreslå primerpar ud fra sekvens, målområde og ønsket Tm.</span>
+      </div>
+    </summary>
+    <div class="tool-body">
+      <h3>Primerdesign</h3>
+      <p>Angiv en sekvens og evt. målområde for at få et forslag til forward og reverse primer baseret på simple heuristikker.</p>
+      <form id="primerTool">
+        <label for="primerSequence">Sekvens
+          <textarea id="primerSequence" name="sequence" rows="4" placeholder="Indsæt målsekvens (DNA) her"></textarea>
+        </label>
+        <div class="tool-inline">
+          <label for="primerStart">Amplicon-start (1-baseret)
+            <input type="number" id="primerStart" name="start" min="1" placeholder="fx 120">
+          </label>
+          <label for="primerEnd">Amplicon-slut (1-baseret)
+            <input type="number" id="primerEnd" name="end" min="1" placeholder="fx 420">
+          </label>
+        </div>
+        <div class="tool-inline">
+          <label for="primerMinLen">Minimum primerlængde
+            <input type="number" id="primerMinLen" name="min_len" min="10" max="60" value="18">
+          </label>
+          <label for="primerMaxLen">Maksimum primerlængde
+            <input type="number" id="primerMaxLen" name="max_len" min="10" max="60" value="24">
+          </label>
+          <label for="primerTargetTm">Ønsket Tm (°C)
+            <input type="number" step="0.1" id="primerTargetTm" name="target_tm" min="30" max="80" value="60">
+          </label>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="primary" id="primerDesign">Design primere</button>
+          <button type="button" class="secondary" id="primerClear">Ryd</button>
+        </div>
+      </form>
+      <div class="tool-result" id="primerResult">Indsæt en sekvens og angiv evt. målområde for at foreslå primere.</div>
+      <p class="tool-note">Primere beregnes med simple regler (Wallace-Tm og GC-clamp) og kræver laboratoriel validering før brug.</p>
+    </div>
+  </details>
+  <details class="panel tool-panel">
+    <summary>
+      <div class="tool-summary-text">
+        <span class="tool-title">GC- og sekvensværktøj</span>
+        <span class="tool-subtitle">Analyser sekvensen for GC-indhold og reverse komplement.</span>
+      </div>
+    </summary>
+    <div class="tool-body">
+      <h3>GC- og sekvensværktøj</h3>
+      <p>Analyser en DNA/RNA-sekvens for længde, GC-indhold og generér reverse komplement.</p>
+      <form id="gcTool">
+        <label for="gcSequence">Sekvens
+          <textarea id="gcSequence" name="sequence" rows="4" placeholder="Indsæt sekvens her"></textarea>
+        </label>
+        <div class="btn-row">
+          <button type="button" class="secondary" id="gcUpper">Rens og formater</button>
+          <button type="button" class="secondary" id="gcReverse">Reverse komplement</button>
+        </div>
+      </form>
+      <div class="tool-result" id="gcResult">Indsæt en sekvens for at beregne GC%.</div>
+      <p class="tool-note">Beregningen ignorerer mellemrum og tal. Ambigue baser (fx N, R, Y) medtages i længden.</p>
+    </div>
+  </details>`;
+
+
 
   applyButtonTooltips(section);
   applyControlTooltips(section);
