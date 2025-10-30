@@ -1683,6 +1683,38 @@ button:disabled {
   color: #fff;
   box-shadow: 0 0 0 3px var(--accent-shadow);
 }
+.variant-lookup-buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.variant-lookup-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.45rem;
+  height: 1.45rem;
+  min-width: 1.45rem;
+  min-height: 1.45rem;
+  border-radius: 999px;
+  background: var(--badge-bg);
+  color: var(--accent-strong);
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid currentColor;
+  line-height: 1;
+  font-size: 0.7rem;
+  transition: color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+.variant-lookup-button:hover,
+.variant-lookup-button:focus-visible {
+  background: var(--accent-strong);
+  color: #fff;
+  box-shadow: 0 0 0 3px var(--accent-shadow);
+}
+.variant-lookup-button:focus-visible {
+  outline: none;
+}
 input[type="search"] {
   border-radius: 1rem;
 }
@@ -2955,6 +2987,223 @@ function formatRsIdCell(rsid) {
     return `<a class="rsid-badge" href="${url}" target="_blank" rel="noopener noreferrer" title="Åbn dbSNP-opslag for ${label}" aria-label="Åbn dbSNP-opslag for ${label}">${label}</a>`;
   }
   return esc(normalized);
+}
+
+function mapGenomeBuildToHg(value) {
+  if (!value) return '';
+  const normalized = String(value).trim().toLowerCase();
+  if (!normalized) return '';
+  if (/(^|\b)(grch38|hg38|38)(\b|$)/.test(normalized)) return 'hg38';
+  if (/(^|\b)(grch37|hg19|37)(\b|$)/.test(normalized)) return 'hg19';
+  if (/(^|\b)(grch36|hg18|36)(\b|$)/.test(normalized)) return 'hg18';
+  return '';
+}
+
+function ensureChromosomePrefix(value) {
+  if (!value) return '';
+  const trimmed = String(value).trim();
+  if (!trimmed) return '';
+  const stripped = trimmed.replace(/^chr\s*/i, '').replace(/\s+/g, '');
+  if (!stripped) return '';
+  return `chr${stripped.toUpperCase()}`;
+}
+
+function parseHgvsRefAlt(hgvs) {
+  const result = {ref: '', alt: '', type: ''};
+  if (!hgvs) return result;
+  const value = String(hgvs);
+  const substitution = value.match(/c\.[^>]*([ACGTN]+)>([ACGTN]+)/i);
+  if (substitution) {
+    result.ref = substitution[1].toUpperCase();
+    result.alt = substitution[2].toUpperCase();
+    result.type = 'SNV';
+    return result;
+  }
+  const delins = value.match(/delins([ACGTN]+)/i);
+  if (delins) {
+    result.alt = delins[1].toUpperCase();
+    result.type = 'DELINS';
+  }
+  const deletion = value.match(/del([ACGTN]*)/i);
+  if (deletion) {
+    result.ref = (deletion[1] || '').toUpperCase();
+    result.type = 'DEL';
+  }
+  const duplication = value.match(/dup([ACGTN]*)/i);
+  if (duplication) {
+    result.alt = (duplication[1] || '').toUpperCase();
+    result.type = 'DUP';
+  }
+  const insertion = value.match(/ins([ACGTN]+)/i);
+  if (insertion) {
+    result.alt = insertion[1].toUpperCase();
+    result.type = result.type || 'INS';
+  }
+  return result;
+}
+
+function extractPrimaryGeneName(value) {
+  if (!value) return '';
+  const raw = String(value).trim();
+  if (!raw) return '';
+  const first = raw.split(/[;,\/]/)[0].trim();
+  return first || raw;
+}
+
+function extractVariantGenomicInfo(variant) {
+  const info = {chromosome: '', start: '', end: '', ref: '', alt: '', genome: '', typeHint: ''};
+  if (!variant) return info;
+  info.genome = mapGenomeBuildToHg(variant.genome_build || variant.genomeBuild || variant.genome || variant.reference || '');
+  const rawPosition = variant.genomic_position || variant.genomicPosition || variant.position || variant.genomicpos || '';
+  if (rawPosition) {
+    const normalized = String(rawPosition).trim().replace(/[:,]/g, '-');
+    const tokens = normalized.split(/-+/).map(token => token.trim()).filter(Boolean);
+    if (tokens.length) {
+      const first = tokens.shift();
+      if (/^chr/i.test(first) || /^[0-9XYM]+$/i.test(first)) {
+        info.chromosome = ensureChromosomePrefix(first);
+      } else {
+        tokens.unshift(first);
+      }
+    }
+    tokens.forEach(token => {
+      const lower = token.toLowerCase();
+      if (/^hg\d+$/.test(lower)) {
+        if (!info.genome) info.genome = lower;
+        return;
+      }
+      if (/^\d+$/.test(token)) {
+        if (!info.start) {
+          info.start = token;
+        } else if (!info.end) {
+          info.end = token;
+        }
+        return;
+      }
+      const upper = token.toUpperCase();
+      if (/^[ACGTN]+$/.test(upper)) {
+        if (!info.ref) {
+          info.ref = upper;
+        } else if (!info.alt) {
+          info.alt = upper;
+        }
+        return;
+      }
+      if (/^[A-Z]+$/.test(upper) && !info.typeHint) {
+        info.typeHint = upper;
+      }
+    });
+  }
+  if (!info.chromosome && variant.chromosome) {
+    info.chromosome = ensureChromosomePrefix(variant.chromosome);
+  }
+  if (!info.start && variant.start != null && variant.start !== '') {
+    info.start = String(variant.start).trim();
+  }
+  if (!info.end && variant.end != null && variant.end !== '') {
+    info.end = String(variant.end).trim();
+  }
+  if (!info.ref || !info.alt) {
+    const hgvsInfo = parseHgvsRefAlt(variant.hgvs_c || '');
+    if (!info.ref && hgvsInfo.ref) info.ref = hgvsInfo.ref;
+    if (!info.alt && hgvsInfo.alt) info.alt = hgvsInfo.alt;
+    if (!info.typeHint && hgvsInfo.type && hgvsInfo.type !== 'SNV') {
+      info.typeHint = hgvsInfo.type.toUpperCase();
+    }
+  }
+  return info;
+}
+
+function determineFranklinSvType(variant, fallbackType = '') {
+  const candidates = [
+    fallbackType,
+    variant?.sv_subtype,
+    variant?.variant_subtype,
+    variant?.variant_type,
+    variant?.copy_number,
+    variant?.description
+  ]
+    .map(value => (value == null ? '' : String(value).toLowerCase()))
+    .filter(Boolean);
+  if (!candidates.length) {
+    return fallbackType ? String(fallbackType).toUpperCase() : '';
+  }
+  const text = candidates.join(' ');
+  if (/\b(del|deletion|loss|copy loss)\b/.test(text) || /\bx0\b/.test(text) || /\bx1\b/.test(text)) return 'DEL';
+  if (/\b(dup|duplication|gain|copy gain)\b/.test(text) || /\bamp(lification)?\b/.test(text) || /\bx3\b/.test(text) || /\bx4\b/.test(text)) return 'DUP';
+  if (/\b(ins|insertion)\b/.test(text)) return 'INS';
+  if (/\b(delins)\b/.test(text)) return 'DELINS';
+  if (/\b(inv|inversion)\b/.test(text)) return 'INV';
+  if (/\b(trans|bnd|translocation)\b/.test(text)) return 'BND';
+  if (/\bfusion\b/.test(text)) return 'FUS';
+  return fallbackType ? String(fallbackType).toUpperCase() : '';
+}
+
+function buildFranklinUrl(variant, info = extractVariantGenomicInfo(variant)) {
+  if (!variant || !info) return '';
+  const hgvsInfo = parseHgvsRefAlt(variant.hgvs_c || '');
+  const genomeSuffix = info.genome ? `-${info.genome}` : '';
+  const type = normalizeVariantType(variant.variant_type);
+  const ref = info.ref || hgvsInfo.ref;
+  const alt = info.alt || hgvsInfo.alt;
+  if (type === 'snv' && info.chromosome && info.start && ref && alt) {
+    const path = `${info.chromosome}-${info.start}-${ref}-${alt}${genomeSuffix}`;
+    return `https://franklin.genoox.com/clinical-db/variant/snp/${encodeURIComponent(path)}`;
+  }
+  const franklinType = determineFranklinSvType(variant, info.typeHint || (hgvsInfo.type && hgvsInfo.type !== 'SNV' ? hgvsInfo.type : ''));
+  if (info.chromosome && info.start && franklinType) {
+    const end = info.end || info.start;
+    const base = `${info.chromosome}-${info.start}${end ? `-${end}` : ''}-${franklinType}${genomeSuffix}`;
+    return `https://franklin.genoox.com/clinical-db/variant/sv/${encodeURIComponent(base)}`;
+  }
+  return '';
+}
+
+function buildGenccUrl(variant) {
+  const gene = extractPrimaryGeneName(variant?.gene || '');
+  if (!gene) return '';
+  return `https://search.thegencc.org/genes?title=${encodeURIComponent(gene)}`;
+}
+
+function buildUcscUrl(variant, info = extractVariantGenomicInfo(variant)) {
+  if (!variant || !info) return '';
+  const genome = info.genome && /^(hg19|hg38)$/i.test(info.genome) ? info.genome.toLowerCase() : '';
+  if (!genome) return '';
+  const chromosome = info.chromosome || ensureChromosomePrefix(variant.chromosome || '');
+  const start = info.start;
+  if (!chromosome || !start) return '';
+  const end = info.end || start;
+  const region = `${chromosome}:${start}-${end}`;
+  return `https://genome.ucsc.edu/cgi-bin/hgTracks?db=${genome}&position=${encodeURIComponent(region)}`;
+}
+
+function formatVariantLookupCell(variant) {
+  if (!variant) return '';
+  const info = extractVariantGenomicInfo(variant);
+  const franklinUrl = buildFranklinUrl(variant, info);
+  const genccUrl = buildGenccUrl(variant);
+  const ucscUrl = buildUcscUrl(variant, info);
+  const title = formatVariantTitle(variant) || variant.gene || variant.hgvs_c || 'varianten';
+  const labels = [];
+  if (franklinUrl) {
+    labels.push({label: 'F', url: franklinUrl, title: `Åbn Franklin (Genoox) for ${title}`});
+  }
+  if (genccUrl) {
+    const gene = extractPrimaryGeneName(variant.gene || '');
+    labels.push({label: 'C', url: genccUrl, title: gene ? `Slå ${gene} op i GenCC` : 'Åbn GenCC'});
+  }
+  if (ucscUrl) {
+    const genomeLabel = info.genome ? info.genome.toUpperCase() : '';
+    const regionParts = [];
+    if (info.chromosome && info.start) {
+      regionParts.push(`${info.chromosome}:${info.start}${info.end ? `-${info.end}` : ''}`);
+    }
+    const detail = [genomeLabel, regionParts.join('')].filter(Boolean).join(' ');
+    const titleText = detail ? `Åbn UCSC Genome Browser (${detail})` : 'Åbn UCSC Genome Browser';
+    labels.push({label: 'U', url: ucscUrl, title: titleText});
+  }
+  if (!labels.length) return '';
+  return `<span class="variant-lookup-buttons">${labels.map(link => `<a class="variant-lookup-button" href="${link.url}" target="_blank" rel="noopener noreferrer" title="${esc(link.title)}" aria-label="${esc(link.title)}">${link.label}</a>`).join('')}</span>`;
 }
 
 function normalizeStructureTypeValue(value) {
@@ -7959,7 +8208,7 @@ function renderVariants(section) {
             <label>Kromosom<input type="search" data-filter-variants="chromosome" placeholder="Chr/arm"></label>
           </div>
         </details>
-        <table><thead><tr><th>ID</th><th>Ordination</th><th>Variant</th><th>rsID</th><th>Type</th><th>Klasse</th><th>Kriterier</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
+        <table><thead><tr><th>ID</th><th>Ordination</th><th>Variant</th><th>rsID</th><th>Opslag</th><th>Type</th><th>Klasse</th><th>Kriterier</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
           <button type="button" class="secondary" id="variantsExport">Eksportér filtrerede varianter</button>
         </div>
@@ -8500,7 +8749,8 @@ function renderVariants(section) {
       const typeLabel = getVariantTypeLabel(v.variant_type);
       const orderName = getOrderDisplayName(v.order_id);
       const orderTitle = v.order_id != null ? ` title="Ordination #${v.order_id}"` : '';
-      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td${orderTitle}>${esc(orderName)}</td><td>${esc(title)}</td><td>${formatRsIdCell(v.rsid)}</td><td>${esc(typeLabel)}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(createdBy)}</td></tr>`;
+      const lookupCell = formatVariantLookupCell(v);
+      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td${orderTitle}>${esc(orderName)}</td><td>${esc(title)}</td><td>${formatRsIdCell(v.rsid)}</td><td>${lookupCell}</td><td>${esc(typeLabel)}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
