@@ -1207,6 +1207,18 @@ button.icon-button:disabled {
   flex: 0 0 auto;
   padding: 0.25rem;
 }
+
+@media (max-width: 1200px) {
+  .table-actions-cell {
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0.35rem 0.3rem;
+  }
+
+  .table-actions-cell button.icon-button {
+    width: 100%;
+  }
+}
 label.checkbox-field {
   display: inline-flex;
   align-items: center;
