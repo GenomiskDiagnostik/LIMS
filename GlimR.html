@@ -1140,13 +1140,21 @@ tbody tr[data-order-id]:hover {
   border: 0;
 }
 .table-shortcuts {
-  width: 3.25rem;
+  width: 3.2rem;
 }
 .table-actions-cell {
+  padding: 0.45rem 0.3rem;
+  vertical-align: middle;
+}
+
+.table-actions {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
-  padding-right: 0.4rem;
+  justify-content: center;
+  flex-wrap: nowrap;
+  align-content: center;
+  gap: 0.2rem;
+  width: 100%;
 }
 button.icon-button {
   border: none;
@@ -1200,8 +1208,24 @@ button.icon-button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
-.table-actions-cell button.icon-button {
+.table-actions-cell .table-actions button.icon-button {
   flex: 0 0 auto;
+  padding: 0.25rem;
+}
+
+@media (max-width: 720px) {
+  .table-actions {
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .table-actions-cell {
+    padding: 0.45rem 0.35rem;
+  }
+
+  .table-actions-cell .table-actions button.icon-button {
+    width: auto;
+  }
 }
 label.checkbox-field {
   display: inline-flex;
@@ -1231,6 +1255,21 @@ td.truncate-cell {
 }
 .truncate-text--wide {
   max-width: clamp(16rem, 55vw, 36rem);
+}
+.orders-table col.col-shortcuts {
+  width: 3.6rem;
+}
+.orders-table col.col-panel {
+  width: clamp(12rem, 30vw, 22rem);
+}
+.orders-table col.col-hpo {
+  width: clamp(9rem, 24vw, 16rem);
+}
+.orders-table td:nth-child(5) .truncate-text {
+  max-width: clamp(12rem, 30vw, 22rem);
+}
+.orders-table td:nth-child(11) .truncate-text {
+  max-width: clamp(9rem, 24vw, 16rem);
 }
 form label {
   display: block;
@@ -6691,7 +6730,7 @@ function renderSamples(section) {
         : 'Ingen rapporter er knyttet til denne prøve endnu.';
       const orderDisabledAttr = hasOrders ? '' : ' disabled';
       const reportDisabledAttr = hasReports ? '' : ' disabled';
-      const shortcutsCell = `<td class="table-actions-cell"><button type="button" class="icon-button" data-sample-action="orders" data-sample-id="${s.id}" data-tooltip="${esc(orderTip)}"${orderDisabledAttr}><span class="icon-slot" data-icon="clipboard-document-list"></span></button><button type="button" class="icon-button" data-sample-action="reports" data-sample-id="${s.id}" data-tooltip="${esc(reportTip)}"${reportDisabledAttr}><span class="icon-slot" data-icon="document-chart-bar"></span></button></td>`;
+      const shortcutsCell = `<td class="table-actions-cell"><div class="table-actions"><button type="button" class="icon-button" data-sample-action="orders" data-sample-id="${s.id}" data-tooltip="${esc(orderTip)}"${orderDisabledAttr}><span class="icon-slot" data-icon="clipboard-document-list"></span></button><button type="button" class="icon-button" data-sample-action="reports" data-sample-id="${s.id}" data-tooltip="${esc(reportTip)}"${reportDisabledAttr}><span class="icon-slot" data-icon="document-chart-bar"></span></button></div></td>`;
       return `<tr data-id="${s.id}"${selectedAttr}>${shortcutsCell}<td>${s.id}</td><td>${esc(s.pmb_number||'')}</td><td>${esc(getName('patients', Number(s.patient_id)))}</td><td>${esc(s.sample_type)}</td><td>${esc(s.status||'')}</td><td>${collectedCell}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     applyIconSlots(tbody);
@@ -7210,7 +7249,24 @@ function renderOrders(section) {
             <label>Bestilt til<input type="date" data-filter-orders="ordered_to"></label>
           </div>
         </details>
-        <table><thead><tr><th class="table-shortcuts"><span class="sr-only">Genveje</span></th><th>ID</th><th>Patient</th><th>Prøve</th><th>Panel</th><th>Analyseansvarlig</th><th>Tolker</th><th>Godkender</th><th>Patientgruppe</th><th>Indikation</th><th>HPO-termer</th><th>Status</th><th>Oprettet af</th><th>Bestilt</th></tr></thead><tbody></tbody></table>
+        <table class="orders-table">
+          <colgroup>
+            <col class="col-shortcuts">
+            <col>
+            <col>
+            <col>
+            <col class="col-panel">
+            <col>
+            <col>
+            <col>
+            <col>
+            <col>
+            <col class="col-hpo">
+            <col>
+            <col>
+            <col>
+          </colgroup>
+          <thead><tr><th class="table-shortcuts"><span class="sr-only">Genveje</span></th><th>ID</th><th>Patient</th><th>Prøve</th><th>Panel</th><th>Analyseansvarlig</th><th>Tolker</th><th>Godkender</th><th>Patientgruppe</th><th>Indikation</th><th>HPO-termer</th><th>Status</th><th>Oprettet af</th><th>Bestilt</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
           <button type="button" class="secondary" id="ordersExport">Eksportér filtrerede ordinationer</button>
         </div>
@@ -7549,6 +7605,7 @@ function renderOrders(section) {
     }
     tbody.innerHTML = filteredOrders.map(o => {
       const sample = sampleMap.get(Number(o.sample_id));
+      const panel = panelMap.get(Number(o.panel_id));
       const statusDisplay = sample?.status || o.status || '';
       const createdBy = determineCreatedBy('orders', o);
       const orderedAt = formatDanishDate(o.ordered_at);
@@ -7560,6 +7617,10 @@ function renderOrders(section) {
       const indicationDisplay = truncateForListDisplay(indicationFull, 160);
       const indicationAttr = indicationFull ? ` class="truncate-cell" data-full-text="${esc(indicationFull)}"` : ' class="truncate-cell"';
       const indicationCell = indicationDisplay ? `<span class="truncate-text truncate-text--wide">${esc(indicationDisplay)}</span>` : '';
+      const panelName = getName('panels', Number(o.panel_id));
+      const panelFull = panel?.name || panelName;
+      const panelAttr = panelFull ? ` class="truncate-cell" data-full-text="${esc(panelFull)}"` : ' class="truncate-cell"';
+      const panelCell = panelName ? `<span class="truncate-text">${esc(panelName)}</span>` : '';
       const patientGroupName = getPatientGroupName(o.patient_group_id);
       const patientGroupDisplay = truncateForListDisplay(patientGroupName, 120);
       const patientGroupAttr = patientGroupName ? ` class="truncate-cell" data-full-text="${esc(patientGroupName)}"` : ' class="truncate-cell"';
@@ -7583,8 +7644,8 @@ function renderOrders(section) {
         : 'Ingen rapporter er knyttet til denne ordination endnu.';
       const sampleButtonDisabledAttr = hasSample ? '' : ' disabled';
       const reportButtonDisabledAttr = hasReports ? '' : ' disabled';
-      const shortcutsCell = `<td class="table-actions-cell"><button type="button" class="icon-button" data-order-action="samples" data-order-id="${o.id}" data-tooltip="${esc(sampleTip)}"${sampleButtonDisabledAttr}><span class="icon-slot" data-icon="beaker"></span></button><button type="button" class="icon-button" data-order-action="reports" data-order-id="${o.id}" data-tooltip="${esc(reportTip)}"${reportButtonDisabledAttr}><span class="icon-slot" data-icon="document-chart-bar"></span></button></td>`;
-      return `<tr data-id="${o.id}"${selectedAttr}${priorityAttr}>${shortcutsCell}<td>${priorityIcons}<span class="order-id">${esc(o.id)}</span></td><td>${esc(getName('patients', Number(o.patient_id)))}</td><td>${esc(getName('samples', Number(o.sample_id)))}</td><td>${esc(getName('panels', Number(o.panel_id)))}</td><td>${esc(userName(o.analysis_responsible_id))}</td><td>${esc(userName(o.interpreter_id))}</td><td>${esc(userName(o.approver_id))}</td><td${patientGroupAttr}>${patientGroupCell}</td><td${indicationAttr}>${indicationCell}</td><td${hpoAttr}>${hpoCell}</td><td>${esc(statusDisplay)}</td><td>${esc(createdBy)}</td><td>${orderedCell}</td></tr>`;
+      const shortcutsCell = `<td class="table-actions-cell"><div class="table-actions"><button type="button" class="icon-button" data-order-action="samples" data-order-id="${o.id}" data-tooltip="${esc(sampleTip)}"${sampleButtonDisabledAttr}><span class="icon-slot" data-icon="beaker"></span></button><button type="button" class="icon-button" data-order-action="reports" data-order-id="${o.id}" data-tooltip="${esc(reportTip)}"${reportButtonDisabledAttr}><span class="icon-slot" data-icon="document-chart-bar"></span></button></div></td>`;
+      return `<tr data-id="${o.id}"${selectedAttr}${priorityAttr}>${shortcutsCell}<td>${priorityIcons}<span class="order-id">${esc(o.id)}</span></td><td>${esc(getName('patients', Number(o.patient_id)))}</td><td>${esc(getName('samples', Number(o.sample_id)))}</td><td${panelAttr}>${panelCell}</td><td>${esc(userName(o.analysis_responsible_id))}</td><td>${esc(userName(o.interpreter_id))}</td><td>${esc(userName(o.approver_id))}</td><td${patientGroupAttr}>${patientGroupCell}</td><td${indicationAttr}>${indicationCell}</td><td${hpoAttr}>${hpoCell}</td><td>${esc(statusDisplay)}</td><td>${esc(createdBy)}</td><td>${orderedCell}</td></tr>`;
     }).join('');
     applyIconSlots(tbody);
     tbody.querySelectorAll('button[data-order-action]').forEach(btn => {
@@ -10405,7 +10466,7 @@ function renderReports(section) {
         : 'Rapportens ordination er ikke knyttet til en prøve.';
       const orderButtonDisabledAttr = hasOrder ? '' : ' disabled';
       const sampleButtonDisabledAttr = hasSample ? '' : ' disabled';
-      const shortcutsCell = `<td class="table-actions-cell"><button type="button" class="icon-button" data-report-action="orders" data-report-id="${r.id}" data-tooltip="${esc(orderTip)}"${orderButtonDisabledAttr}><span class="icon-slot" data-icon="clipboard-document-list"></span></button><button type="button" class="icon-button" data-report-action="samples" data-report-id="${r.id}" data-tooltip="${esc(sampleTip)}"${sampleButtonDisabledAttr}><span class="icon-slot" data-icon="beaker"></span></button></td>`;
+      const shortcutsCell = `<td class="table-actions-cell"><div class="table-actions"><button type="button" class="icon-button" data-report-action="orders" data-report-id="${r.id}" data-tooltip="${esc(orderTip)}"${orderButtonDisabledAttr}><span class="icon-slot" data-icon="clipboard-document-list"></span></button><button type="button" class="icon-button" data-report-action="samples" data-report-id="${r.id}" data-tooltip="${esc(sampleTip)}"${sampleButtonDisabledAttr}><span class="icon-slot" data-icon="beaker"></span></button></div></td>`;
       return `<tr data-id="${r.id}"${selectedAttr}>${shortcutsCell}<td>${r.id}</td><td${orderTitle}>${esc(orderName)}</td><td>${esc(displayStatus)}${sampleStatusBadge}</td><td>${esc(createdBy)}</td><td>${esc(issuedAt)}</td></tr>`;
     }).join('');
     applyIconSlots(tbody);
