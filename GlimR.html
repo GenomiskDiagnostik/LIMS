@@ -1255,6 +1255,9 @@ td.truncate-cell {
 .truncate-text--wide {
   max-width: clamp(16rem, 55vw, 36rem);
 }
+.truncate-text--order-indication {
+  max-width: clamp(10rem, 28vw, 18rem);
+}
 .orders-table col.col-shortcuts {
   width: 2.75rem;
 }
@@ -1263,6 +1266,9 @@ td.truncate-cell {
 }
 .orders-table col.col-panel {
   width: clamp(12rem, 30vw, 22rem);
+}
+.orders-table col.col-indication {
+  width: clamp(10rem, 28vw, 18rem);
 }
 .orders-table col.col-hpo {
   width: clamp(9rem, 24vw, 16rem);
@@ -7265,7 +7271,7 @@ function renderOrders(section) {
             <col>
             <col>
             <col>
-            <col>
+            <col class="col-indication">
             <col class="col-hpo">
             <col>
             <col>
@@ -7621,7 +7627,7 @@ function renderOrders(section) {
       const indicationFull = formatIndicationForList(o.indication);
       const indicationDisplay = truncateForListDisplay(indicationFull, 160);
       const indicationAttr = indicationFull ? ` class="truncate-cell" data-full-text="${esc(indicationFull)}"` : ' class="truncate-cell"';
-      const indicationCell = indicationDisplay ? `<span class="truncate-text truncate-text--wide">${esc(indicationDisplay)}</span>` : '';
+      const indicationCell = indicationDisplay ? `<span class="truncate-text truncate-text--order-indication">${esc(indicationDisplay)}</span>` : '';
       const panelName = getName('panels', Number(o.panel_id));
       const panelFull = panel?.name || panelName;
       const panelAttr = panelFull ? ` class="truncate-cell" data-full-text="${esc(panelFull)}"` : ' class="truncate-cell"';
