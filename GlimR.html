@@ -1143,13 +1143,18 @@ tbody tr[data-order-id]:hover {
   width: 3.6rem;
 }
 .table-actions-cell {
+  padding: 0.45rem 0.3rem;
+  vertical-align: middle;
+}
+
+.table-actions {
   display: flex;
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
   align-content: center;
   gap: 0.25rem;
-  padding: 0.45rem 0.3rem;
+  width: 100%;
 }
 button.icon-button {
   border: none;
@@ -1203,19 +1208,22 @@ button.icon-button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
-.table-actions-cell button.icon-button {
+.table-actions-cell .table-actions button.icon-button {
   flex: 0 0 auto;
   padding: 0.35rem;
 }
 
 @media (max-width: 900px) {
-  .table-actions-cell {
+  .table-actions {
     flex-direction: column;
     gap: 0.3rem;
+  }
+
+  .table-actions-cell {
     padding: 0.45rem 0.35rem;
   }
 
-  .table-actions-cell button.icon-button {
+  .table-actions-cell .table-actions button.icon-button {
     width: 100%;
   }
 }
@@ -6722,7 +6730,7 @@ function renderSamples(section) {
         : 'Ingen rapporter er knyttet til denne prøve endnu.';
       const orderDisabledAttr = hasOrders ? '' : ' disabled';
       const reportDisabledAttr = hasReports ? '' : ' disabled';
-      const shortcutsCell = `<td class="table-actions-cell"><button type="button" class="icon-button" data-sample-action="orders" data-sample-id="${s.id}" data-tooltip="${esc(orderTip)}"${orderDisabledAttr}><span class="icon-slot" data-icon="clipboard-document-list"></span></button><button type="button" class="icon-button" data-sample-action="reports" data-sample-id="${s.id}" data-tooltip="${esc(reportTip)}"${reportDisabledAttr}><span class="icon-slot" data-icon="document-chart-bar"></span></button></td>`;
+      const shortcutsCell = `<td class="table-actions-cell"><div class="table-actions"><button type="button" class="icon-button" data-sample-action="orders" data-sample-id="${s.id}" data-tooltip="${esc(orderTip)}"${orderDisabledAttr}><span class="icon-slot" data-icon="clipboard-document-list"></span></button><button type="button" class="icon-button" data-sample-action="reports" data-sample-id="${s.id}" data-tooltip="${esc(reportTip)}"${reportDisabledAttr}><span class="icon-slot" data-icon="document-chart-bar"></span></button></div></td>`;
       return `<tr data-id="${s.id}"${selectedAttr}>${shortcutsCell}<td>${s.id}</td><td>${esc(s.pmb_number||'')}</td><td>${esc(getName('patients', Number(s.patient_id)))}</td><td>${esc(s.sample_type)}</td><td>${esc(s.status||'')}</td><td>${collectedCell}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     applyIconSlots(tbody);
@@ -7636,7 +7644,7 @@ function renderOrders(section) {
         : 'Ingen rapporter er knyttet til denne ordination endnu.';
       const sampleButtonDisabledAttr = hasSample ? '' : ' disabled';
       const reportButtonDisabledAttr = hasReports ? '' : ' disabled';
-      const shortcutsCell = `<td class="table-actions-cell"><button type="button" class="icon-button" data-order-action="samples" data-order-id="${o.id}" data-tooltip="${esc(sampleTip)}"${sampleButtonDisabledAttr}><span class="icon-slot" data-icon="beaker"></span></button><button type="button" class="icon-button" data-order-action="reports" data-order-id="${o.id}" data-tooltip="${esc(reportTip)}"${reportButtonDisabledAttr}><span class="icon-slot" data-icon="document-chart-bar"></span></button></td>`;
+      const shortcutsCell = `<td class="table-actions-cell"><div class="table-actions"><button type="button" class="icon-button" data-order-action="samples" data-order-id="${o.id}" data-tooltip="${esc(sampleTip)}"${sampleButtonDisabledAttr}><span class="icon-slot" data-icon="beaker"></span></button><button type="button" class="icon-button" data-order-action="reports" data-order-id="${o.id}" data-tooltip="${esc(reportTip)}"${reportButtonDisabledAttr}><span class="icon-slot" data-icon="document-chart-bar"></span></button></div></td>`;
       return `<tr data-id="${o.id}"${selectedAttr}${priorityAttr}>${shortcutsCell}<td>${priorityIcons}<span class="order-id">${esc(o.id)}</span></td><td>${esc(getName('patients', Number(o.patient_id)))}</td><td>${esc(getName('samples', Number(o.sample_id)))}</td><td${panelAttr}>${panelCell}</td><td>${esc(userName(o.analysis_responsible_id))}</td><td>${esc(userName(o.interpreter_id))}</td><td>${esc(userName(o.approver_id))}</td><td${patientGroupAttr}>${patientGroupCell}</td><td${indicationAttr}>${indicationCell}</td><td${hpoAttr}>${hpoCell}</td><td>${esc(statusDisplay)}</td><td>${esc(createdBy)}</td><td>${orderedCell}</td></tr>`;
     }).join('');
     applyIconSlots(tbody);
@@ -10458,7 +10466,7 @@ function renderReports(section) {
         : 'Rapportens ordination er ikke knyttet til en prøve.';
       const orderButtonDisabledAttr = hasOrder ? '' : ' disabled';
       const sampleButtonDisabledAttr = hasSample ? '' : ' disabled';
-      const shortcutsCell = `<td class="table-actions-cell"><button type="button" class="icon-button" data-report-action="orders" data-report-id="${r.id}" data-tooltip="${esc(orderTip)}"${orderButtonDisabledAttr}><span class="icon-slot" data-icon="clipboard-document-list"></span></button><button type="button" class="icon-button" data-report-action="samples" data-report-id="${r.id}" data-tooltip="${esc(sampleTip)}"${sampleButtonDisabledAttr}><span class="icon-slot" data-icon="beaker"></span></button></td>`;
+      const shortcutsCell = `<td class="table-actions-cell"><div class="table-actions"><button type="button" class="icon-button" data-report-action="orders" data-report-id="${r.id}" data-tooltip="${esc(orderTip)}"${orderButtonDisabledAttr}><span class="icon-slot" data-icon="clipboard-document-list"></span></button><button type="button" class="icon-button" data-report-action="samples" data-report-id="${r.id}" data-tooltip="${esc(sampleTip)}"${sampleButtonDisabledAttr}><span class="icon-slot" data-icon="beaker"></span></button></div></td>`;
       return `<tr data-id="${r.id}"${selectedAttr}>${shortcutsCell}<td>${r.id}</td><td${orderTitle}>${esc(orderName)}</td><td>${esc(displayStatus)}${sampleStatusBadge}</td><td>${esc(createdBy)}</td><td>${esc(issuedAt)}</td></tr>`;
     }).join('');
     applyIconSlots(tbody);
