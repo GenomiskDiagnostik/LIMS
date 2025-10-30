@@ -1154,6 +1154,58 @@ tbody tr[data-order-id]:hover {
   align-content: center;
   gap: 0.25rem;
 }
+
+.variant-lookup-cell {
+  text-align: center;
+}
+
+.variant-lookup-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  min-height: 1.75rem;
+}
+
+.variant-lookup-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6rem;
+  height: 1.6rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-decoration: none;
+  background: rgba(24, 111, 175, 0.12);
+  color: var(--accent-strong);
+  border: 1px solid transparent;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.variant-lookup-button:hover {
+  background: rgba(24, 111, 175, 0.18);
+  color: var(--accent-strong);
+  border-color: rgba(24, 111, 175, 0.25);
+}
+
+.variant-lookup-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+[data-theme="dark"] .variant-lookup-button {
+  background: rgba(56, 189, 248, 0.16);
+  color: var(--accent);
+}
+
+[data-theme="dark"] .variant-lookup-button:hover {
+  background: rgba(56, 189, 248, 0.22);
+  color: var(--accent);
+  border-color: rgba(56, 189, 248, 0.35);
+}
 button.icon-button {
   border: none;
   background: transparent;
@@ -3076,6 +3128,114 @@ function formatVariantGenomicRange(variant) {
   if (start && end) return `${chromosome}:${start}-${end}`;
   if (start) return `${chromosome}:${start}`;
   return String(chromosome);
+}
+
+function parseGenomicCoordinate(value) {
+  if (value == null) return null;
+  const cleaned = String(value).trim().replace(/[\s,]/g, '');
+  if (!cleaned) return null;
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function resolveUcscDatabase(genomeBuild) {
+  const lower = (genomeBuild || '').toString().trim().toLowerCase();
+  if (!lower) return 'hg38';
+  if (lower.includes('19') || lower.includes('grch37')) return 'hg19';
+  if (lower.includes('18') || lower.includes('grch36')) return 'hg18';
+  if (lower.includes('17') || lower.includes('grch35')) return 'hg17';
+  if (lower.includes('16') || lower.includes('grch34')) return 'hg16';
+  if (lower.includes('15') || lower.includes('grch33')) return 'hg15';
+  if (lower.includes('38') || lower.includes('grch38')) return 'hg38';
+  if (lower.includes('39') || lower.includes('grch39')) return 'hg38';
+  if (lower.includes('hg38')) return 'hg38';
+  if (lower.includes('hg19')) return 'hg19';
+  if (lower.includes('hg18')) return 'hg18';
+  return 'hg38';
+}
+
+function buildUcscLookup(variant) {
+  const chromosomeRaw = variant.chromosome || variant.chrom;
+  if (!chromosomeRaw) return null;
+  const chromString = String(chromosomeRaw).trim().replace(/^chr/i, '');
+  const chromUpper = chromString.toUpperCase();
+  const chromMatch = chromUpper.match(/^((?:\d+)|X|Y|M|MT)/);
+  const chromosome = chromMatch ? chromMatch[1] : chromUpper;
+  if (!chromosome) return null;
+  const startRaw = variant.start || variant.position_start || variant.begin;
+  const endRaw = variant.end || variant.position_end || variant.finish;
+  const start = parseGenomicCoordinate(startRaw);
+  const endValue = parseGenomicCoordinate(endRaw);
+  if (start == null) return null;
+  let regionStart = start;
+  let regionEnd = endValue != null ? endValue : start;
+  if (regionEnd < regionStart) {
+    [regionStart, regionEnd] = [regionEnd, regionStart];
+  }
+  const padding = Math.max(Math.round((regionEnd - regionStart) * 0.05), 20);
+  const paddedStart = Math.max(1, regionStart - padding);
+  const paddedEnd = regionEnd + padding;
+  const db = resolveUcscDatabase(variant.genome_build || variant.genome);
+  const position = `chr${chromosome}:${paddedStart}-${paddedEnd}`;
+  const url = `https://genome.ucsc.edu/cgi-bin/hgTracks?db=${encodeURIComponent(db)}&position=${encodeURIComponent(position)}`;
+  return {url, position};
+}
+
+function buildVariantLookupButtons(variant) {
+  if (!variant) return '';
+  const lookups = [];
+  const gene = (variant.gene || variant.region || '').trim();
+  const rsid = normalizeRsId(variant.rsid || variant.rs_id);
+  const hgvsC = (variant.hgvs_c || '').trim();
+  const hgvsP = (variant.hgvs_p || '').trim();
+  const variantDescriptor = rsid || hgvsC || hgvsP;
+  const franklinQuery = variantDescriptor || (gene && (hgvsC || hgvsP) ? `${gene} ${hgvsC || hgvsP}` : gene) || '';
+  if (franklinQuery) {
+    const url = `https://franklin.genoox.com/clinical-db/search?q=${encodeURIComponent(franklinQuery)}`;
+    const description = variantDescriptor || gene || 'varianten';
+    lookups.push({
+      label: 'F',
+      href: url,
+      title: `Slå ${description} op i Franklin by Genoox`,
+      aria: `Åbn Franklin by Genoox for ${description}`
+    });
+  }
+  const hgmdParts = [];
+  if (gene) hgmdParts.push(gene);
+  if (hgvsC) hgmdParts.push(hgvsC);
+  if (!hgvsC && hgvsP) hgmdParts.push(hgvsP);
+  if (!hgvsC && !hgvsP && rsid) hgmdParts.push(rsid);
+  const hgmdQuery = hgmdParts.join(' ').trim() || variantDescriptor || gene;
+  if (hgmdQuery) {
+    const url = `https://my.qiagendigitalinsights.com/bbp/view/hgmd/pro/search?search=${encodeURIComponent(hgmdQuery)}`;
+    const description = hgmdQuery;
+    lookups.push({
+      label: 'H',
+      href: url,
+      title: `Slå ${description} op i HGMD Pro`,
+      aria: `Åbn HGMD Pro for ${description}`
+    });
+  }
+  if (gene) {
+    const url = `https://search.thegencc.org/genes?search=${encodeURIComponent(gene)}`;
+    lookups.push({
+      label: 'C',
+      href: url,
+      title: `Slå ${gene} op i GenCC`,
+      aria: `Åbn GenCC for ${gene}`
+    });
+  }
+  const ucsc = buildUcscLookup(variant);
+  if (ucsc) {
+    lookups.push({
+      label: 'U',
+      href: ucsc.url,
+      title: `Åbn UCSC Genome Browser ved ${ucsc.position}`,
+      aria: `Åbn UCSC Genome Browser ved ${ucsc.position}`
+    });
+  }
+  if (!lookups.length) return '';
+  return `<div class="variant-lookup-actions">${lookups.map(link => `<a class="variant-lookup-button" href="${link.href}" target="_blank" rel="noopener noreferrer" title="${esc(link.title)}" aria-label="${esc(link.aria)}">${esc(link.label)}</a>`).join('')}</div>`;
 }
 
 function formatVariantCopyNumber(variant) {
@@ -7911,7 +8071,7 @@ function renderVariants(section) {
             <label>Kromosom<input type="search" data-filter-variants="chromosome" placeholder="Chr/arm"></label>
           </div>
         </details>
-        <table><thead><tr><th>ID</th><th>Ordination</th><th>Variant</th><th>rsID</th><th>Type</th><th>Klasse</th><th>Kriterier</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
+        <table><thead><tr><th>ID</th><th>Ordination</th><th>Variant</th><th>rsID</th><th>Opslag</th><th>Type</th><th>Klasse</th><th>Kriterier</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
           <button type="button" class="secondary" id="variantsExport">Eksportér filtrerede varianter</button>
         </div>
@@ -8439,7 +8599,8 @@ function renderVariants(section) {
       const typeLabel = getVariantTypeLabel(v.variant_type);
       const orderName = getOrderDisplayName(v.order_id);
       const orderTitle = v.order_id != null ? ` title="Ordination #${v.order_id}"` : '';
-      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td${orderTitle}>${esc(orderName)}</td><td>${esc(title)}</td><td>${formatRsIdCell(v.rsid)}</td><td>${esc(typeLabel)}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(createdBy)}</td></tr>`;
+      const lookupButtons = buildVariantLookupButtons(v);
+      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td${orderTitle}>${esc(orderName)}</td><td>${esc(title)}</td><td>${formatRsIdCell(v.rsid)}</td><td class="variant-lookup-cell">${lookupButtons}</td><td>${esc(typeLabel)}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
