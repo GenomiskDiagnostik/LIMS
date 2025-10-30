@@ -1683,46 +1683,6 @@ button:disabled {
   color: #fff;
   box-shadow: 0 0 0 3px var(--accent-shadow);
 }
-.variant-lookup-links {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-.variant-lookup-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.6rem;
-  height: 1.6rem;
-  border-radius: 0.35rem;
-  border: 1px solid var(--table-row-border);
-  background: var(--panel-bg);
-  color: var(--accent-strong);
-  font-weight: 600;
-  font-size: 0.75rem;
-  line-height: 1;
-  text-decoration: none;
-  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-}
-.variant-lookup-button:hover,
-.variant-lookup-button:focus {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-shadow);
-}
-.variant-lookup-button:focus-visible {
-  outline: none;
-}
-[data-theme="dark"] .variant-lookup-button {
-  background: rgba(148, 163, 184, 0.12);
-  border-color: var(--table-row-border);
-  color: var(--accent);
-}
-[data-theme="dark"] .variant-lookup-button:hover,
-[data-theme="dark"] .variant-lookup-button:focus {
-  color: #0b1120;
-}
 input[type="search"] {
   border-radius: 1rem;
 }
@@ -2995,218 +2955,6 @@ function formatRsIdCell(rsid) {
     return `<a class="rsid-badge" href="${url}" target="_blank" rel="noopener noreferrer" title="Åbn dbSNP-opslag for ${label}" aria-label="Åbn dbSNP-opslag for ${label}">${label}</a>`;
   }
   return esc(normalized);
-}
-
-function normalizeGenomeAssemblyValue(value) {
-  if (!value) return '';
-  const normalized = String(value).trim().toLowerCase();
-  if (!normalized) return '';
-  const compact = normalized.replace(/[^a-z0-9]/g, '');
-  if (compact.includes('hg38') || compact.includes('grch38') || compact.includes('build38') || compact.endsWith('38')) {
-    return 'hg38';
-  }
-  if (compact.includes('hg19') || compact.includes('grch37') || compact.includes('build37') || compact.endsWith('37')) {
-    return 'hg19';
-  }
-  if (compact.includes('hg18') || compact.includes('grch36') || compact.includes('build36') || compact.endsWith('36')) {
-    return 'hg18';
-  }
-  return '';
-}
-
-function inferGenomeAssemblyCode(variant) {
-  if (!variant) return '';
-  const candidates = [
-    variant.genome_build,
-    variant.genomeBuild,
-    variant.reference_genome,
-    variant.referenceGenome,
-    variant.reference,
-    variant.genome,
-    variant.assembly
-  ];
-  for (const candidate of candidates) {
-    const code = normalizeGenomeAssemblyValue(candidate);
-    if (code) return code;
-  }
-  return '';
-}
-
-function parseCoordinateNumber(value) {
-  if (value === null || value === undefined || value === '') return null;
-  const str = String(value).trim();
-  if (!str) return null;
-  const normalized = str.replace(/,/g, '');
-  const num = Number(normalized);
-  if (!Number.isFinite(num)) return null;
-  return Math.trunc(num);
-}
-
-function normalizeChromosomeForUrl(value) {
-  if (!value) return '';
-  const str = String(value).trim();
-  if (!str) return '';
-  const match = str.match(/^(?:chr)?\s*([0-9]{1,2}|x|y|mt|m)/i);
-  if (match) {
-    let chrom = match[1].toUpperCase();
-    if (chrom === 'M') chrom = 'MT';
-    return chrom === 'MT' ? 'chrM' : `chr${chrom}`;
-  }
-  if (/^chr/i.test(str)) {
-    return str.replace(/\s+/g, '').replace(/^chr/i, 'chr');
-  }
-  return '';
-}
-
-function parseGenomicPositionString(value) {
-  if (!value) return null;
-  const trimmed = String(value).trim();
-  if (!trimmed) return null;
-  const normalized = trimmed.replace(/,/g, '').replace(/\s+/g, '');
-  const match = normalized.match(/^(chr)?([A-Za-z0-9]+?)[-:](\d+)(?:[-:](\d+))?$/);
-  if (!match) return null;
-  const chromRaw = `${match[1] || ''}${match[2]}`;
-  const chromosome = normalizeChromosomeForUrl(chromRaw);
-  if (!chromosome) return null;
-  const start = Math.trunc(Number(match[3]));
-  const end = Math.trunc(Number(match[4] || match[3]));
-  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
-  return {chromosome, start, end};
-}
-
-function extractVariantCoordinates(variant) {
-  if (!variant) return null;
-  const chromosomeCandidate = normalizeChromosomeForUrl(variant.chromosome || variant.chrom);
-  const startCandidate = parseCoordinateNumber(variant.start || variant.begin || variant.position_start);
-  const endCandidate = parseCoordinateNumber(variant.end || variant.finish || variant.position_end);
-  const positionString = variant.genomic_position
-    || variant.genomicPosition
-    || variant.position
-    || variant.pos
-    || variant.genomicpos;
-  const parsedPosition = parseGenomicPositionString(positionString);
-  const chromosome = chromosomeCandidate || parsedPosition?.chromosome || '';
-  let start = startCandidate != null ? startCandidate : parsedPosition?.start;
-  let end = endCandidate != null ? endCandidate : parsedPosition?.end;
-  if (!chromosome || start == null) return null;
-  if (end == null) end = start;
-  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
-  if (end < start) {
-    const swap = start;
-    start = end;
-    end = swap;
-  }
-  return {chromosome, start, end};
-}
-
-function parseHgvsSubstitution(hgvs) {
-  if (!hgvs) return null;
-  const normalized = String(hgvs).toUpperCase();
-  const match = normalized.match(/c\.[^>]*([ACGT])>([ACGT])/);
-  if (!match) return null;
-  return {ref: match[1], alt: match[2]};
-}
-
-function determineFranklinSvCode(variant) {
-  const subtype = normalizeStructureTypeValue(variant?.sv_subtype || variant?.structural_type || variant?.variant_subtype || '');
-  const subtypeMap = {
-    deletion: 'DEL',
-    copy_loss: 'DEL',
-    segmental_loss: 'DEL',
-    mosaic_loss: 'DEL',
-    whole_arm_loss: 'DEL',
-    duplication: 'DUP',
-    copy_gain: 'DUP',
-    segmental_gain: 'DUP',
-    mosaic_gain: 'DUP',
-    whole_arm_gain: 'DUP',
-    tandem_duplication: 'DUP',
-    amplification: 'AMP',
-    insertion: 'INS',
-    inversion: 'INV',
-    translocation: 'TRA'
-  };
-  if (subtype && subtypeMap[subtype]) {
-    return subtypeMap[subtype];
-  }
-  const hgvs = String(variant?.hgvs_c || '').toLowerCase();
-  if (!hgvs) return '';
-  if (hgvs.includes('delins')) return 'DELINS';
-  if (hgvs.includes('dup')) return 'DUP';
-  if (hgvs.includes('del')) return 'DEL';
-  if (hgvs.includes('ins')) return 'INS';
-  if (hgvs.includes('inv')) return 'INV';
-  return '';
-}
-
-function buildFranklinUrl(variant, coords, assembly) {
-  if (!variant || !coords || !coords.chromosome || !coords.start) return '';
-  const genomeSuffix = assembly ? `-${assembly}` : '';
-  const type = normalizeVariantType(variant.variant_type);
-  const substitution = parseHgvsSubstitution(variant.hgvs_c || '');
-  if (substitution && type === 'snv') {
-    const {ref, alt} = substitution;
-    if (ref && alt) {
-      return `https://franklin.genoox.com/clinical-db/variant/snp/${coords.chromosome}-${coords.start}-${ref}-${alt}${genomeSuffix}`;
-    }
-  }
-  const svCode = determineFranklinSvCode(variant);
-  if (!svCode) return '';
-  const end = coords.end || coords.start;
-  return `https://franklin.genoox.com/clinical-db/variant/sv/${coords.chromosome}-${coords.start}-${end}-${svCode}${genomeSuffix}`;
-}
-
-function buildGenccUrl(variant) {
-  const gene = String(variant?.gene || '').trim();
-  if (!gene) return '';
-  return `https://search.thegencc.org/genes?title=${encodeURIComponent(gene)}`;
-}
-
-function buildUcscUrl(coords, assembly) {
-  if (!coords || !coords.chromosome || !coords.start) return '';
-  const db = assembly || 'hg38';
-  const end = coords.end || coords.start;
-  return `https://genome.ucsc.edu/cgi-bin/hgTracks?db=${encodeURIComponent(db)}&position=${coords.chromosome}:${coords.start}-${end}`;
-}
-
-function createVariantLookupButton(letter, url, title) {
-  if (!url) return '';
-  return `<a class="variant-lookup-button" href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="${esc(title)}" aria-label="${esc(title)}">${esc(letter)}</a>`;
-}
-
-function renderVariantLookupButtons(variant) {
-  if (!variant) return '';
-  const coords = extractVariantCoordinates(variant);
-  const assembly = inferGenomeAssemblyCode(variant);
-  const franklinUrl = buildFranklinUrl(variant, coords, assembly);
-  const genccUrl = buildGenccUrl(variant);
-  const ucscUrl = buildUcscUrl(coords, assembly);
-  const variantTitle = formatVariantTitle(variant);
-  const links = [];
-  if (franklinUrl) {
-    const franklinTitle = variantTitle
-      ? `Slå ${variantTitle} op i Franklin by Genoox`
-      : 'Slå varianten op i Franklin by Genoox';
-    links.push(createVariantLookupButton('F', franklinUrl, franklinTitle));
-  }
-  if (genccUrl) {
-    const gene = String(variant?.gene || '').trim();
-    const genccTitle = gene ? `Slå ${gene} op i GenCC` : 'Slå genet op i GenCC';
-    links.push(createVariantLookupButton('C', genccUrl, genccTitle));
-  }
-  if (ucscUrl) {
-    let regionLabel = 'varianten';
-    if (coords) {
-      const samePosition = coords.start === coords.end;
-      regionLabel = samePosition
-        ? `${coords.chromosome}:${coords.start}`
-        : `${coords.chromosome}:${coords.start}-${coords.end}`;
-    }
-    const ucscTitle = `Åbn UCSC Genome Browser for ${regionLabel}`;
-    links.push(createVariantLookupButton('U', ucscUrl, ucscTitle));
-  }
-  if (!links.length) return '';
-  return `<div class="variant-lookup-links">${links.join('')}</div>`;
 }
 
 function normalizeStructureTypeValue(value) {
@@ -8211,7 +7959,7 @@ function renderVariants(section) {
             <label>Kromosom<input type="search" data-filter-variants="chromosome" placeholder="Chr/arm"></label>
           </div>
         </details>
-        <table><thead><tr><th>ID</th><th>Ordination</th><th>Variant</th><th>rsID</th><th>Opslag</th><th>Type</th><th>Klasse</th><th>Kriterier</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
+        <table><thead><tr><th>ID</th><th>Ordination</th><th>Variant</th><th>rsID</th><th>Type</th><th>Klasse</th><th>Kriterier</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
           <button type="button" class="secondary" id="variantsExport">Eksportér filtrerede varianter</button>
         </div>
@@ -8752,8 +8500,7 @@ function renderVariants(section) {
       const typeLabel = getVariantTypeLabel(v.variant_type);
       const orderName = getOrderDisplayName(v.order_id);
       const orderTitle = v.order_id != null ? ` title="Ordination #${v.order_id}"` : '';
-      const lookupCell = renderVariantLookupButtons(v);
-      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td${orderTitle}>${esc(orderName)}</td><td>${esc(title)}</td><td>${formatRsIdCell(v.rsid)}</td><td>${lookupCell}</td><td>${esc(typeLabel)}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(createdBy)}</td></tr>`;
+      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td${orderTitle}>${esc(orderName)}</td><td>${esc(title)}</td><td>${formatRsIdCell(v.rsid)}</td><td>${esc(typeLabel)}</td><td>${esc(v.classification||'')}</td><td>${esc(v.criteria||'')}</td><td>${esc(createdBy)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
   };
