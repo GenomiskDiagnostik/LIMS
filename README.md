@@ -2,6 +2,8 @@
 
 GlimR is a self-contained, browser-based LIMS for genetic diagnostics. The entire application lives in a single HTML file, runs offline on IndexedDB, and can optionally write to a local JSON file through the File System Access API for easy backup and sharing. 【F:GlimR.html†L3911-L3993】【F:GlimR.html†L4139-L4162】
 
+<img width="1179" height="1156" alt="Skærmbillede 2025-10-30 1056562" src="https://github.com/user-attachments/assets/107638c6-f161-4aba-b6d8-fd441eb5d2a7" />
+
 ## Overview
 - **Full client application in one file** – no build or server dependencies; open `GlimR.html` directly in any modern Chromium-based browser (Chrome, Edge, Arc). Startup initializes the database, rebuilds caches, and presents the dashboard. 【F:GlimR.html†L15224-L15236】
 - **Local persistence** – data is stored in IndexedDB. If the browser blocks IndexedDB, GlimR falls back to temporary in-memory storage and shows a clear warning. 【F:GlimR.html†L3911-L3993】【F:GlimR.html†L14500-L14508】
@@ -48,6 +50,12 @@ GlimR relies on IndexedDB, modern ES2020 JavaScript, and the File System Access 
 This project is distributed under the MIT License. See `LICENSE` for details.
 
 ---
+
+
+
+
+
+
 
 ## Dansk beskrivelse
 
