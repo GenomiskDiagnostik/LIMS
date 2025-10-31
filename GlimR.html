@@ -1548,6 +1548,21 @@ button.secondary {
   color: var(--nav-button-color);
   border: 1px solid transparent;
 }
+button.text-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent-strong);
+  font-weight: 600;
+  cursor: pointer;
+}
+button.text-link:hover {
+  text-decoration: underline;
+}
+button.text-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 button.action-button {
   display: inline-flex;
   align-items: center;
@@ -2084,8 +2099,7 @@ const tabs = [
   {id:'users', label:'Brugere'},
   {id:'audit', label:'Revision'},
   {id:'db', label:'Database & Backup'},
-  {id:'admin', label:'Administration'},
-  {id:'tests', label:'Selvtest'}
+  {id:'admin', label:'Administration'}
 ];
 const tabIcons = {
   dashboard: 'chart-bar',
@@ -2105,8 +2119,7 @@ const tabIcons = {
   users: 'user-group',
   audit: 'clock',
   db: 'circle-stack',
-  admin: 'shield-check',
-  tests: 'clipboard-document-list'
+  admin: 'shield-check'
 };
 const ICON_NS = 'http://www.w3.org/2000/svg';
 const iconLibrary = {
@@ -2435,9 +2448,8 @@ const tooltipCatalog = {
     tools: 'Åbn værktøjskassen med beregnere og hjælpeværktøjer til variantfortolkning.',
     users: 'Administrer GlimR-brugere og roller.',
     audit: 'Gennemgå revisionsloggen for alle ændringer.',
-    db: 'Håndter lokal databasefil, backup og autogem.',
-    admin: 'Tilgå administrative værktøjer, SQL og ZIP-eksport.',
-    tests: 'Kør indbyggede selvtests og se resultater.'
+    db: 'Håndter lokal databasefil, backup, eksport og autogem.',
+    admin: 'Tilgå administrative værktøjer, selvtest og patientgrupper.'
   },
   metrics: {
     'Patienter': 'Antal registrerede patienter i databasen.',
@@ -2754,7 +2766,7 @@ const tooltipCatalog = {
     fhirPreview: 'JSON-visning af den genererede FHIR-bundle.',
     reportVariantSelect: 'Vælg blandt ordinationens registrerede varianter.',
     reportVariantList: 'Varianter der er føjet til rapportens fund.',
-    restoreLabel: 'Gendan databasen fra en tidligere JSON-backup.',
+    restoreBackup: 'Gendan databasen fra en tidligere JSON-backup.',
     schemaText: 'Viser MySQL-skema og INSERT-statements til reference.',
     patientsFilterPanel: 'Åbn avancerede filtre for at søge præcist i patientlisten.',
     samplesFilterPanel: 'Finfiltrér prøver efter patient, status og indsamlingstid.',
@@ -4946,9 +4958,10 @@ async function backupAndResetData() {
       state.db.close();
       state.db = null;
     }
-    if (IDB) {
+    const idbFactory = (typeof indexedDB !== 'undefined') ? indexedDB : (typeof window !== 'undefined' ? window.indexedDB : null);
+    if (idbFactory) {
       await new Promise((resolve, reject) => {
-        const req = IDB.deleteDatabase(DB_NAME);
+        const req = idbFactory.deleteDatabase(DB_NAME);
         req.onsuccess = () => resolve();
         req.onerror = () => reject(req.error);
         req.onblocked = () => {
@@ -5604,7 +5617,6 @@ function renderTab(id) {
     case 'audit': return renderAudit(section);
     case 'db': return renderDbTab(section);
     case 'admin': return renderAdmin(section);
-    case 'tests': return renderTestsTab(section);
     default:
       section.innerHTML = '<p>Ingen data.</p>';
   }
@@ -15387,15 +15399,22 @@ function renderDbTab(section) {
     </div>
   </div>
   <div class="panel">
-    <h2>Backup</h2>
+    <h2>Backup og eksport</h2>
     <div class="btn-row">
-      <button class="secondary" id="downloadBackup">Hent backup (JSON)</button>
-      <label class="secondary" id="restoreLabel" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.4rem 0.8rem;border-radius:0.5rem;cursor:pointer;">Gendan fra backup<input type="file" id="restoreFile" accept="application/json" style="display:none;"></label>
+      <button class="secondary" id="downloadBackup">Udfør backup (json)</button>
+      <button class="secondary" type="button" id="restoreBackup">Gendan fra backup (json)</button>
+      <input type="file" id="restoreFile" accept="application/json" hidden>
+    </div>
+    <div class="btn-row">
+      <button class="text-link" type="button" id="downloadSql">Hent glimr.sql</button>
+      <button class="secondary" id="showSchema">Vis skema</button>
+      <button class="secondary" id="downloadZip">Hent ZIP</button>
     </div>
     <div class="btn-row">
       <button class="danger" id="resetDataBtn">Backup &amp; ryd data (undtagen brugere)</button>
     </div>
-    <p class="panel-hint">Downloader en fuld backup og nulstiller alle andre data. Kræver skriveadgang.</p>
+    <textarea id="schemaText" style="width:100%;min-height:200px;margin-top:1rem;display:none;"></textarea>
+    <p class="panel-hint">Opret eller gendan backups, hent SQL-dump eller download et komplet ZIP-arkiv med GlimR.</p>
   </div>`;
   applyButtonTooltips(section);
   applyControlTooltips(section);
@@ -15406,7 +15425,10 @@ function renderDbTab(section) {
     setStatus('Autogemning ' + (state.autosave ? 'aktiveret' : 'deaktiveret'));
   });
   section.querySelector('#downloadBackup').addEventListener('click', downloadBackup);
-  section.querySelector('#restoreFile').addEventListener('change', async e => {
+  const restoreInput = section.querySelector('#restoreFile');
+  const restoreBtn = section.querySelector('#restoreBackup');
+  restoreBtn?.addEventListener('click', () => restoreInput?.click());
+  restoreInput?.addEventListener('change', async e => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
@@ -15422,19 +15444,42 @@ function renderDbTab(section) {
   if (resetBtn) {
     resetBtn.addEventListener('click', backupAndResetData);
   }
+  section.querySelector('#downloadSql').addEventListener('click', async () => {
+    const sql = await generateSqlDump();
+    const blob = new Blob([sql], {type:'text/sql'});
+    const url = URL.createObjectURL(blob);
+    const filename = withDateStamp('glimr.sql');
+    triggerDownload(url, filename);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setStatus(`MySQL-dump downloadet som ${filename}.`);
+  });
+  section.querySelector('#showSchema').addEventListener('click', async () => {
+    const sql = await generateSqlDump();
+    const textarea = section.querySelector('#schemaText');
+    if (!textarea) return;
+    textarea.value = sql;
+    textarea.style.display = 'block';
+  });
+  section.querySelector('#downloadZip').addEventListener('click', async () => {
+    const files = await buildZipFiles();
+    const zipBytes = createZip(files);
+    const blob = new Blob([zipBytes], {type:'application/zip'});
+    const url = URL.createObjectURL(blob);
+    const filename = withDateStamp('glimr.zip');
+    triggerDownload(url, filename);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setStatus(`ZIP-arkiv downloadet som ${filename}.`);
+  });
 }
 function renderAdmin(section) {
   section.innerHTML = `
   <div class="panel">
+    <h2>Selvtest</h2>
+    <table><thead><tr><th>Test</th><th>Status</th><th>Detaljer</th></tr></thead><tbody id="testsBody"></tbody></table>
     <div class="btn-row">
+      <button class="primary" id="runTestsBtn">Kør selvtest</button>
       <button class="primary" id="demoDataBtn">Indlæs demo-data</button>
     </div>
-    <div class="btn-row">
-      <button class="primary" id="downloadSql">Hent glimr.sql</button>
-      <button class="secondary" id="showSchema">Vis skema</button>
-      <button class="secondary" id="downloadZip">Hent ZIP</button>
-    </div>
-    <textarea id="schemaText" style="width:100%;min-height:200px;margin-top:1rem;display:none;"></textarea>
   </div>
   <div class="panel">
     <div class="flex">
@@ -15516,6 +15561,14 @@ function renderAdmin(section) {
   </div>`;
   applyButtonTooltips(section);
   applyControlTooltips(section);
+  annotateHeaders(section);
+  const testsBody = section.querySelector('#testsBody');
+  if (testsBody) {
+    testsBody.innerHTML = state.testResults.length
+      ? state.testResults.map(([name, pass, detail]) => `<tr><td>${esc(name)}</td><td>${pass ? 'OK' : 'FEJL'}</td><td>${esc(detail||'')}</td></tr>`).join('')
+      : '<tr><td colspan="3">Ingen tests kørt endnu.</td></tr>';
+  }
+  annotateTableCells(section);
   const demoBtn = section.querySelector('#demoDataBtn');
   if (demoBtn) {
     demoBtn.addEventListener('click', () => {
@@ -15523,31 +15576,8 @@ function renderAdmin(section) {
       loadDemoData();
     });
   }
-  section.querySelector('#downloadSql').addEventListener('click', async () => {
-    const sql = await generateSqlDump();
-    const blob = new Blob([sql], {type:'text/sql'});
-    const url = URL.createObjectURL(blob);
-    const filename = withDateStamp('glimr.sql');
-    triggerDownload(url, filename);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setStatus(`MySQL-dump downloadet som ${filename}.`);
-  });
-  section.querySelector('#showSchema').addEventListener('click', async () => {
-    const sql = await generateSqlDump();
-    const textarea = section.querySelector('#schemaText');
-    textarea.value = sql;
-    textarea.style.display = 'block';
-  });
-  section.querySelector('#downloadZip').addEventListener('click', async () => {
-    const files = await buildZipFiles();
-    const zipBytes = createZip(files);
-    const blob = new Blob([zipBytes], {type:'application/zip'});
-    const url = URL.createObjectURL(blob);
-    const filename = withDateStamp('glimr.zip');
-    triggerDownload(url, filename);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setStatus(`ZIP-arkiv downloadet som ${filename}.`);
-  });
+  const testsBtn = section.querySelector('#runTestsBtn');
+  testsBtn?.addEventListener('click', runTests);
   const groupTableBody = section.querySelector('[data-patient-group-table] tbody');
   const groupSearch = section.querySelector('#patientGroupSearch');
   const groupForm = section.querySelector('#patientGroupForm');
@@ -15795,37 +15825,11 @@ function renderAdmin(section) {
     }
   });
 }
-function renderTestsTab(section) {
-  section.innerHTML = `
-  <div class="panel">
-    <h2>Selvtest</h2>
-    <div class="btn-row">
-      <button class="primary" id="runTestsBtn">Kør selvtest</button>
-    </div>
-    <table><thead><tr><th>Test</th><th>Status</th><th>Detaljer</th></tr></thead><tbody id="testsBody"></tbody></table>
-  </div>`;
-  const tbody = section.querySelector('#testsBody');
-  if (tbody) {
-    tbody.innerHTML = state.testResults.length
-      ? state.testResults.map(([name, pass, detail]) => `<tr><td>${esc(name)}</td><td>${pass ? 'OK' : 'FEJL'}</td><td>${esc(detail||'')}</td></tr>`).join('')
-      : '<tr><td colspan="3">Ingen tests kørt endnu.</td></tr>';
-  }
-  annotateHeaders(section);
-  annotateTableCells(section);
-  applyButtonTooltips(section);
-  applyControlTooltips(section);
-  const testsBtn = section.querySelector('#runTestsBtn');
-  if (testsBtn) {
-    testsBtn.addEventListener('click', () => {
-      runTests();
-    });
-  }
-}
 async function runTests() {
   if (!ensureWrite('patients')) return;
-  let section = document.querySelector('section[data-tab="tests"]');
+  let section = document.querySelector('section[data-tab="admin"]');
   if (!section) {
-    activateTab('tests');
+    activateTab('admin');
     return setTimeout(runTests, 200);
   }
   setStatus('Kører selvtest...');
@@ -15872,8 +15876,8 @@ async function runTests() {
     state.testResults = results;
     await replaceAllData(snapshot);
     renderAll();
-    section = document.querySelector('section[data-tab="tests"]');
-    if (section) renderTestsTab(section);
+    section = document.querySelector('section[data-tab="admin"]');
+    if (section) renderAdmin(section);
     setStatus('Selvtest gennemført. Data gendannet til udgangspunktet.');
   }
 }
