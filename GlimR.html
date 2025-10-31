@@ -13069,6 +13069,7 @@ function renderPlanner(section) {
         <div class="planning-actions">
           <button type="button" class="secondary planning-button" id="planningRefresh">Opdater</button>
           <button type="button" class="primary planning-button" id="planningExport" disabled>Eksportér plan til kalender</button>
+          <button type="button" class="secondary planning-button" id="planningExportCsv" disabled>Eksportér plan til CSV</button>
         </div>
       </div>
       <div class="planning-status" id="planningStatus"></div>
@@ -13089,6 +13090,7 @@ function renderPlanner(section) {
   const planningSummary = section.querySelector('#planningSummary');
   const planningHideDoneToggle = section.querySelector('#planningHideDone');
   const planningExportBtn = section.querySelector('#planningExport');
+  const planningExportCsvBtn = section.querySelector('#planningExportCsv');
   const planningRefreshBtn = section.querySelector('#planningRefresh');
   const planningStatusText = section.querySelector('#planningStatus');
 
@@ -13228,6 +13230,22 @@ function renderPlanner(section) {
 
   const sampleStatusOrder = new Map(SAMPLE_STATUSES.map((status, index) => [status.toLowerCase(), index]));
   const dateTimeFormatter = new Intl.DateTimeFormat('da-DK', {dateStyle: 'short', timeStyle: 'short'});
+  const planningCsvColumns = [
+    {label: 'Opgave-id', value: task => task.id},
+    {label: 'Ordination', value: task => task.orderName},
+    {label: 'Trin', value: task => task.stage?.label || ''},
+    {label: 'Patient', value: task => task.patientName || ''},
+    {label: 'Patient MRN', value: task => task.patientMrn || ''},
+    {label: 'Prøve', value: task => task.sampleLabel || ''},
+    {label: 'Rolle', value: task => task.roleLabel || ''},
+    {label: 'Prøvestatus', value: task => task.sampleStatusText || ''},
+    {label: 'Status', value: task => task.statusLabel || ''},
+    {label: 'Deadline', value: task => task.dueDisplay || ''},
+    {label: 'Deadline relativ', value: task => task.dueRelative || ''},
+    {label: 'Færdig', value: task => task.isDone ? 'Ja' : 'Nej'},
+    {label: 'Noter', value: task => task.note || ''},
+    {label: 'Ekstra info', value: task => Array.isArray(task.info) ? task.info.join(' | ') : ''}
+  ];
 
   const currentUser = state.currentUser;
   const currentUserId = currentUser?.id != null ? String(currentUser.id) : null;
@@ -13501,6 +13519,7 @@ function renderPlanner(section) {
         }
         const orderName = getOrderDisplayName(orderId) || `Ordination #${orderId}`;
         const patientName = patient?.name || '';
+        const patientMrn = patient?.mrn || '';
         const sampleLabel = sample ? `Prøve ${sample.id}${sample.pmb_number ? ` (${sample.pmb_number})` : ''}` : '';
         const roleNames = matchedRoles.map(key => ROLE_LABELS[key] || key);
         const roleLabel = roleNames.length ? `Din rolle: ${roleNames.join(' & ')}` : '';
@@ -13512,6 +13531,7 @@ function renderPlanner(section) {
           stage,
           orderName,
           patientName,
+          patientMrn,
           sampleLabel,
           roleLabel,
           statusKey,
@@ -13593,6 +13613,12 @@ function renderPlanner(section) {
     const dueText = task.dueDate ? `${esc(task.dueDisplay)}${task.dueRelative ? ` (${esc(task.dueRelative)})` : ''}` : 'Ikke planlagt';
     const infoHtml = task.info.length ? `<ul class="planning-info-list">${task.info.map(item => `<li>${esc(item)}</li>`).join('')}</ul>` : '';
     const actionsHtml = task.stage.actions?.length ? task.stage.actions.map(action => `<button type="button" class="secondary planning-button" data-action="${esc(action.type)}" data-task-id="${esc(task.id)}">${esc(action.label)}</button>`).join('') : '';
+    const exportHtml = `
+      <div class="planning-card-actions planning-card-export-actions">
+        <button type="button" class="secondary planning-button" data-export="calendar" data-task-id="${esc(task.id)}">Eksportér opgave til kalender</button>
+        <button type="button" class="secondary planning-button" data-export="csv" data-task-id="${esc(task.id)}">Eksportér opgave til CSV</button>
+      </div>
+    `;
     return `
       <article class="planning-card" data-task-id="${esc(task.id)}" data-status="${esc(task.statusKey)}" data-due="${esc(task.dueState)}">
         <div class="planning-card-header">
@@ -13624,6 +13650,7 @@ function renderPlanner(section) {
           </label>
         </div>
         ${actionsHtml ? `<div class="planning-card-actions">${actionsHtml}</div>` : ''}
+        ${exportHtml}
       </article>
     `;
   };
@@ -13663,10 +13690,15 @@ function renderPlanner(section) {
       : '<p class="planning-empty">Alle opgaver i planen er markeret som færdige.</p>';
   };
 
-  const updateExportButton = () => {
-    if (!planningExportBtn) return;
+  const updateExportButtons = () => {
     const hasDue = planningTasks.some(task => task.dueDate);
-    planningExportBtn.disabled = !currentUserId || !hasDue;
+    if (planningExportBtn) {
+      planningExportBtn.disabled = !currentUserId || !hasDue;
+    }
+    if (planningExportCsvBtn) {
+      const hasTasks = planningTasks.length > 0;
+      planningExportCsvBtn.disabled = !currentUserId || !hasTasks;
+    }
   };
 
   const updatePlanningUi = () => {
@@ -13680,7 +13712,7 @@ function renderPlanner(section) {
     if (planningRefreshBtn) planningRefreshBtn.disabled = !currentUserId;
     updatePlanningSummary();
     renderPlanningBoard();
-    updateExportButton();
+    updateExportButtons();
     refreshPlanningStatusText();
   };
 
@@ -13713,6 +13745,77 @@ function renderPlanner(section) {
       .replace(/;/g, '\;')
       .replace(/,/g, '\,')
       .replace(/\r?\n/g, '\n');
+  };
+
+  const buildPlanningIcsText = (tasks, generatedAt = new Date()) => {
+    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//GlimR//Planner//DA'];
+    tasks.forEach(task => {
+      if (!task || !task.dueDate) return;
+      const dueUtc = new Date(task.dueDate.getTime());
+      const summaryParts = [task.stage?.label, task.orderName].filter(Boolean);
+      const summary = escapeIcsText(summaryParts.join(' – '));
+      const descriptionParts = [
+        task.patientName ? `Patient: ${task.patientName}` : '',
+        task.sampleLabel ? `Prøve: ${task.sampleLabel}` : '',
+        `Prøvestatus: ${task.sampleStatusText}`,
+        task.roleLabel || '',
+        ...(Array.isArray(task.info) ? task.info : []),
+        task.note ? `Noter: ${task.note}` : ''
+      ].filter(Boolean);
+      const description = escapeIcsText(descriptionParts.join('\n'));
+      lines.push('BEGIN:VTODO');
+      lines.push(`UID:${escapeIcsText(task.id)}@glimr.local`);
+      lines.push(`DTSTAMP:${formatIcsDate(generatedAt)}`);
+      lines.push(`DUE:${formatIcsDate(dueUtc)}`);
+      lines.push(`SUMMARY:${summary}`);
+      if (description) lines.push(`DESCRIPTION:${description}`);
+      if (task.isDone) {
+        lines.push('STATUS:COMPLETED');
+        lines.push(`COMPLETED:${formatIcsDate(generatedAt)}`);
+      } else {
+        lines.push('STATUS:NEEDS-ACTION');
+      }
+      lines.push('CATEGORIES:GlimR');
+      lines.push('END:VTODO');
+    });
+    lines.push('END:VCALENDAR');
+    return lines.join('\r\n');
+  };
+
+  const downloadPlanningIcs = (tasks, filename, generatedAt = new Date()) => {
+    const icsText = buildPlanningIcsText(tasks, generatedAt);
+    const blob = new Blob([icsText], {type: 'text/calendar'});
+    const url = URL.createObjectURL(blob);
+    triggerDownload(url, filename);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return filename;
+  };
+
+  const downloadPlanningCsv = (tasks, filename, delimiter = ';') => {
+    const cols = planningCsvColumns;
+    const header = cols.map((col, index) => {
+      const label = col.label ?? col.key ?? '';
+      const displayLabel = index === 0 ? sanitizeFirstCsvHeaderLabel(label) : label;
+      return escapeCsvValue(displayLabel, delimiter);
+    }).join(delimiter);
+    const lines = tasks.map(task => cols.map(col => {
+      const raw = typeof col.value === 'function' ? col.value(task) : task?.[col.key];
+      return escapeCsvValue(raw, delimiter);
+    }).join(delimiter));
+    const csv = [header, ...lines].join('\r\n');
+    const encoded = encodeWindows1252(csv);
+    const blob = new Blob([encoded], {type: 'text/csv;charset=windows-1252;'});
+    const url = URL.createObjectURL(blob);
+    triggerDownload(url, filename);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return filename;
+  };
+
+  const buildTaskDocumentationCsvFilename = (task, userName, generatedAt = new Date()) => {
+    const mrnPart = sanitizeFilenameComponent(task?.patientMrn || task?.patientName || 'ukendt');
+    const userPart = sanitizeFilenameComponent(userName || 'ukendt');
+    const datePart = generatedAt.toISOString().slice(0, 10);
+    return `Dokumentation_${mrnPart}_${userPart}_${datePart}.csv`;
   };
 
   if (planningBoard && planningSummary) {
@@ -13765,13 +13868,45 @@ function renderPlanner(section) {
     });
 
     planningBoard.addEventListener('click', event => {
-      const button = event.target instanceof HTMLElement ? event.target.closest('button[data-action]') : null;
-      if (!button) return;
-      const taskId = button.dataset.taskId;
+      if (!(event.target instanceof HTMLElement)) return;
+      const exportButton = event.target.closest('button[data-export]');
+      if (exportButton) {
+        if (!currentUserId) {
+          alert('Log ind for at eksportere opgaver.');
+          return;
+        }
+        const taskId = exportButton.dataset.taskId;
+        if (!taskId) return;
+        const tasksSnapshot = computePlanningTasks();
+        const task = tasksSnapshot.find(item => item.id === taskId);
+        if (!task) return;
+        const exportType = exportButton.dataset.export;
+        if (exportType === 'calendar') {
+          if (!task.dueDate) {
+            alert('Tilføj en deadline før du eksporterer opgaven til kalender.');
+            return;
+          }
+          const generatedAt = new Date();
+          const orderPart = sanitizeFilenameComponent(task.orderName || 'opgave');
+          const stagePart = sanitizeFilenameComponent(task.stage?.shortLabel || task.stage?.id || 'trin');
+          const filename = `GlimR-opgave-${orderPart}-${stagePart}-${generatedAt.toISOString().slice(0, 10)}.ics`;
+          downloadPlanningIcs([task], filename, generatedAt);
+          setStatus('Kalenderfil genereret for den valgte opgave.');
+        } else if (exportType === 'csv') {
+          const generatedAt = new Date();
+          const filename = buildTaskDocumentationCsvFilename(task, currentUser?.name || '', generatedAt);
+          downloadPlanningCsv([task], filename);
+          setStatus(`CSV genereret for den valgte opgave (${filename}).`);
+        }
+        return;
+      }
+      const actionButton = event.target.closest('button[data-action]');
+      if (!actionButton) return;
+      const taskId = actionButton.dataset.taskId;
       if (!taskId) return;
       const task = planningTasks.find(item => item.id === taskId);
       if (!task) return;
-      const action = button.dataset.action;
+      const action = actionButton.dataset.action;
       if (action === 'open-order') {
         openOrderDetails(task.orderId, {showAll: true});
       } else if (action === 'open-sample') {
@@ -13791,47 +13926,26 @@ function renderPlanner(section) {
         alert('Tilføj mindst én deadline før du eksporterer planen til kalender.');
         return;
       }
-      const now = new Date();
-      const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//GlimR//Planner//DA'];
-      exportTasks.forEach(task => {
-        const dueUtc = new Date(task.dueDate.getTime());
-        const summaryParts = [task.stage.label, task.orderName];
-        const summary = escapeIcsText(summaryParts.filter(Boolean).join(' – '));
-        const descriptionParts = [
-          task.patientName ? `Patient: ${task.patientName}` : '',
-          task.sampleLabel ? `Prøve: ${task.sampleLabel}` : '',
-          `Prøvestatus: ${task.sampleStatusText}`,
-          task.roleLabel || '',
-          ...task.info,
-          task.note ? `Noter: ${task.note}` : ''
-        ].filter(Boolean);
-        const description = escapeIcsText(descriptionParts.join('\n'));
-        lines.push('BEGIN:VTODO');
-        lines.push(`UID:${escapeIcsText(task.id)}@glimr.local`);
-        lines.push(`DTSTAMP:${formatIcsDate(now)}`);
-        lines.push(`DUE:${formatIcsDate(dueUtc)}`);
-        lines.push(`SUMMARY:${summary}`);
-        if (description) lines.push(`DESCRIPTION:${description}`);
-        if (task.isDone) {
-          lines.push('STATUS:COMPLETED');
-          lines.push(`COMPLETED:${formatIcsDate(now)}`);
-        } else {
-          lines.push('STATUS:NEEDS-ACTION');
-        }
-        lines.push('CATEGORIES:GlimR');
-        lines.push('END:VTODO');
-      });
-      lines.push('END:VCALENDAR');
-      const blob = new Blob([lines.join('\r\n')], {type: 'text/calendar'});
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `GlimR-plan-${now.toISOString().slice(0, 10)}.ics`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      URL.revokeObjectURL(url);
-      setStatus('Kalenderfil genereret med dine planlagte trin.');
+      const generatedAt = new Date();
+      const filename = `GlimR-plan-${generatedAt.toISOString().slice(0, 10)}.ics`;
+      downloadPlanningIcs(exportTasks, filename, generatedAt);
+      setStatus(`Kalenderfil genereret med dine planlagte trin (${filename}).`);
+    });
+
+    planningExportCsvBtn?.addEventListener('click', () => {
+      if (!currentUserId) {
+        alert('Log ind for at eksportere planen.');
+        return;
+      }
+      const exportTasks = computePlanningTasks();
+      if (!exportTasks.length) {
+        alert('Ingen opgaver at eksportere.');
+        return;
+      }
+      const generatedAt = new Date();
+      const filename = `glimr-plan-${generatedAt.toISOString().slice(0, 10)}.csv`;
+      downloadPlanningCsv(exportTasks, filename);
+      setStatus(`CSV genereret med dine planlagte trin (${filename}).`);
     });
   }
   applyButtonTooltips(section);
