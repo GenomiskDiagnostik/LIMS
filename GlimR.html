@@ -1979,8 +1979,8 @@ pre {
 (() => {
 'use strict';
 const DB_NAME = 'glims';
-const DB_VER = 7;
-const STORES = ['patients','samples','orders','patient_groups','panels','variants','qc','reports','users','audit','variant_library','responses','conclusion_library'];
+const DB_VER = 8;
+const STORES = ['patients','samples','orders','patient_groups','panels','variants','qc','qc_presets','reports','users','audit','variant_library','responses','conclusion_library'];
 const storage = (() => {
   try {
     const testKey = '__glimr_storage_test__';
@@ -2032,7 +2032,7 @@ const state = {
   pendingReportSelectOrderId: null,
   pendingReportSelectReportId: null
 };
-const CREATED_BY_STORES = new Set(['patients','samples','orders','patient_groups','variants','qc','reports','conclusion_library']);
+const CREATED_BY_STORES = new Set(['patients','samples','orders','patient_groups','variants','qc','qc_presets','reports','conclusion_library']);
 const UPDATED_BY_STORES = new Set(['panels']);
 const ROLE_OPTIONS = [
   {value: 'Observatør', description: 'Kun læseadgang til data', canWrite: false},
@@ -2354,6 +2354,53 @@ const DEFAULT_PATIENT_GROUPS = [
   'Svære arvelige hudsygdomme',
   'Udbredt og uhelbredelig kræft'
 ];
+const DEFAULT_QC_METRICS = ['DNA konc.','Dækningsgrad 10X','Gns. dækning'];
+const DEFAULT_QC_UNITS = ['ng','ug','%','X'];
+
+function sortQcPresets(list) {
+  return list
+    .filter(item => item && item.value != null)
+    .slice()
+    .sort((a, b) => {
+      const orderA = Number.isFinite(Number(a.sort_order)) ? Number(a.sort_order) : Number.MAX_SAFE_INTEGER;
+      const orderB = Number.isFinite(Number(b.sort_order)) ? Number(b.sort_order) : Number.MAX_SAFE_INTEGER;
+      if (orderA !== orderB) return orderA - orderB;
+      const valueA = String(a.value || '');
+      const valueB = String(b.value || '');
+      return valueA.localeCompare(valueB, 'da');
+    });
+}
+
+function getQcPresetValues(kind) {
+  const presets = getCached('qc_presets') || [];
+  const filtered = sortQcPresets(presets.filter(item => item && item.kind === kind));
+  if (filtered.length) {
+    return filtered.map(item => String(item.value ?? '')).filter(value => value.trim() !== '');
+  }
+  return (kind === 'metric' ? DEFAULT_QC_METRICS : DEFAULT_QC_UNITS).slice();
+}
+
+function buildQcPresetOptions(kind, currentValue, blankLabel) {
+  const values = getQcPresetValues(kind);
+  const normalised = new Set();
+  const current = (currentValue ?? '').toString();
+  const options = [];
+  const blankSelected = current.trim() === '';
+  options.push(`<option value=""${blankSelected ? ' selected' : ''}>${esc(blankLabel)}</option>`);
+  for (const value of values) {
+    const trimmed = value.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (normalised.has(key)) continue;
+    normalised.add(key);
+    const selected = !blankSelected && trimmed === current ? ' selected' : '';
+    options.push(`<option value="${esc(trimmed)}"${selected}>${esc(trimmed)}</option>`);
+  }
+  if (!blankSelected && current && !normalised.has(current.toLowerCase())) {
+    options.push(`<option value="${esc(current)}" selected>${esc(current)}</option>`);
+  }
+  return options.join('');
+}
 const schemaFields = {
   patients: ['id','mrn','extra_id','family_number','name','gender','birth_date','notes','created_by','created_at','updated_at'],
   samples: ['id','pmb_number','patient_id','sample_type','collected_at','status','notes','created_by','created_at','updated_at'],
@@ -2362,6 +2409,7 @@ const schemaFields = {
   patient_groups: ['id','name','created_by','created_at','updated_at'],
   variants: ['id','order_id','variant_type','gene','transcript','hgvs_c','hgvs_p','rsid','zygosity','classification','criteria','af','annotations','interpretation','genomic_position','genome_build','chromosome','start','end','copy_number','sv_subtype','size_bp','iscn','description','affected_genes','created_by','created_at','updated_at'],
   qc: ['id','sample_id','metric','value','unit','notes','created_by','created_at','updated_at'],
+  qc_presets: ['id','kind','value','sort_order','created_by','created_at','updated_at'],
   reports: ['id','order_id','findings','variant_ids','variant_details','summary','status','issued_at','created_by','created_at','updated_at'],
   users: ['id','name','email','role','pin','created_at','updated_at'],
   audit: ['id','ts','user','action','entity','entity_id','before','after','created_at','updated_at'],
@@ -4550,6 +4598,10 @@ function openDb() {
       if (!variantsStore.indexNames.contains('order_id')) variantsStore.createIndex('order_id','order_id');
       const qcStore = withTimestamps(ensureStore('qc',{keyPath:'id',autoIncrement:true}));
       if (!qcStore.indexNames.contains('sample_id')) qcStore.createIndex('sample_id','sample_id');
+      const qcPresetStore = withTimestamps(ensureStore('qc_presets',{keyPath:'id',autoIncrement:true}));
+      if (!qcPresetStore.indexNames.contains('kind')) {
+        try { qcPresetStore.createIndex('kind','kind',{unique:false}); } catch (e) {}
+      }
       const reportsStore = withTimestamps(ensureStore('reports',{keyPath:'id',autoIncrement:true}));
       if (!reportsStore.indexNames.contains('order_id')) reportsStore.createIndex('order_id','order_id');
       withTimestamps(ensureStore('users',{keyPath:'id',autoIncrement:true}));
@@ -6180,10 +6232,12 @@ function renderCreateCase(section) {
     if (!qcList) return;
     const row = document.createElement('div');
     row.className = 'case-row qc-row';
+    const metricOptions = buildQcPresetOptions('metric', values.metric, 'Vælg måling');
+    const unitOptions = buildQcPresetOptions('unit', values.unit, 'Vælg enhed');
     row.innerHTML = `
-      <label class="inline">Måling<input type="text" data-field="metric" placeholder="DNA-koncentration"></label>
+      <label class="inline">Måling<select data-field="metric">${metricOptions}</select></label>
       <label class="inline">Værdi<input type="number" step="0.0001" data-field="value" placeholder="42.0"></label>
-      <label class="inline">Enhed<input type="text" data-field="unit" placeholder="ng/µl"></label>
+      <label class="inline">Enhed<select data-field="unit">${unitOptions}</select></label>
       <label class="inline wide">Noter<input type="text" data-field="notes" placeholder="Valgfrit"></label>
       <button type="button" class="secondary case-remove-row">Fjern</button>`;
     const metricInput = row.querySelector('[data-field="metric"]');
@@ -6783,6 +6837,22 @@ async function ensureDefaultPatientGroups() {
     await addRecord('patient_groups', {name});
   }
   await loadStore('patient_groups');
+}
+
+async function ensureDefaultQcPresets() {
+  const existing = getCached('qc_presets');
+  if (existing && existing.length) return;
+  for (const [kind, values] of [
+    ['metric', DEFAULT_QC_METRICS],
+    ['unit', DEFAULT_QC_UNITS]
+  ]) {
+    for (const [index, value] of values.entries()) {
+      const trimmed = String(value ?? '').trim();
+      if (!trimmed) continue;
+      await addRecord('qc_presets', {kind, value: trimmed, sort_order: index});
+    }
+  }
+  await loadStore('qc_presets');
 }
 function creationKey(entity, id) {
   if (!entity || id === undefined || id === null) return null;
@@ -12356,9 +12426,9 @@ function renderQC(section) {
               </select>
             </div>
           </label>
-          <label>Måling<input name="metric" required></label>
+          <label>Måling<select name="metric" required data-allow-legacy-option>${buildQcPresetOptions('metric', null, 'Vælg måling')}</select></label>
           <label>Værdi<input name="value" type="number" step="0.0001" required></label>
-          <label>Enhed<input name="unit"></label>
+          <label>Enhed<select name="unit" data-allow-legacy-option>${buildQcPresetOptions('unit', null, 'Vælg enhed')}</select></label>
           <label>Noter<textarea name="notes"></textarea></label>
           <div class="btn-row">
             <button class="primary action-button action-save with-icon" type="submit">
@@ -15346,6 +15416,31 @@ function renderAdmin(section) {
         </form>
       </div>
     </div>
+  </div>
+  <div class="panel">
+    <h2>Forvalg til kvalitetskontrol</h2>
+    <p class="form-hint">Administrer dropdownværdier for QC-målinger og enheder.</p>
+    <div class="flex qc-preset-manager">
+      <div class="preset-column" data-qc-preset="metric">
+        <h3>Målinger</h3>
+        <div class="qc-preset-list" data-qc-preset-list="metric"></div>
+        <div class="inline-group">
+          <input type="text" data-qc-preset-input="metric" placeholder="Tilføj måling">
+          <button type="button" class="secondary" data-qc-preset-add="metric">Tilføj</button>
+        </div>
+      </div>
+      <div class="preset-column" data-qc-preset="unit">
+        <h3>Enheder</h3>
+        <div class="qc-preset-list" data-qc-preset-list="unit"></div>
+        <div class="inline-group">
+          <input type="text" data-qc-preset-input="unit" placeholder="Tilføj enhed">
+          <button type="button" class="secondary" data-qc-preset-add="unit">Tilføj</button>
+        </div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="secondary" id="qcPresetsRestore">Gendan standardværdier</button>
+    </div>
   </div>`;
   applyButtonTooltips(section);
   applyControlTooltips(section);
@@ -15471,6 +15566,161 @@ function renderAdmin(section) {
     await loadStore('patient_groups');
     renderTab('admin');
     refreshDependentTabs();
+  });
+
+  const presetLists = {
+    metric: section.querySelector('[data-qc-preset-list="metric"]'),
+    unit: section.querySelector('[data-qc-preset-list="unit"]')
+  };
+  const presetInputs = {
+    metric: section.querySelector('[data-qc-preset-input="metric"]'),
+    unit: section.querySelector('[data-qc-preset-input="unit"]')
+  };
+  const presetAddButtons = {
+    metric: section.querySelector('[data-qc-preset-add="metric"]'),
+    unit: section.querySelector('[data-qc-preset-add="unit"]')
+  };
+
+  const getPresetRecords = kind => sortQcPresets((getCached('qc_presets') || []).filter(item => item && item.kind === kind));
+  const refreshPresetConsumers = () => {
+    ['case_create','qc'].forEach(id => {
+      const target = document.querySelector(`section[data-tab="${id}"]`);
+      if (target && target.classList.contains('active')) {
+        renderTab(id);
+      }
+    });
+  };
+  const hasDuplicatePreset = (kind, value, excludeId = null) => {
+    const normalised = value.trim().toLowerCase();
+    return (getCached('qc_presets') || []).some(item => {
+      if (!item || item.kind !== kind) return false;
+      if (excludeId != null && Number(item.id) === Number(excludeId)) return false;
+      return String(item.value ?? '').trim().toLowerCase() === normalised;
+    });
+  };
+  const renderPresetList = kind => {
+    const container = presetLists[kind];
+    if (!container) return;
+    container.innerHTML = '';
+    const presets = getPresetRecords(kind);
+    if (!presets.length) {
+      const empty = document.createElement('p');
+      empty.className = 'form-hint';
+      empty.textContent = 'Ingen forvalg endnu.';
+      container.appendChild(empty);
+      return;
+    }
+    presets.forEach(preset => {
+      const row = document.createElement('div');
+      row.className = 'inline-group qc-preset-row';
+      row.dataset.id = preset.id;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = String(preset.value ?? '');
+      input.placeholder = kind === 'metric' ? 'Måling' : 'Enhed';
+      input.addEventListener('change', async () => {
+        const trimmed = input.value.trim();
+        if (!trimmed) {
+          alert('Værdien må ikke være tom.');
+          input.value = String(preset.value ?? '');
+          input.focus();
+          return;
+        }
+        if (!ensureWrite('qc_presets')) {
+          input.value = String(preset.value ?? '');
+          return;
+        }
+        if (hasDuplicatePreset(kind, trimmed, preset.id)) {
+          alert('Værdien findes allerede i listen.');
+          input.value = String(preset.value ?? '');
+          input.select();
+          return;
+        }
+        const before = {...preset};
+        const updated = {...preset, value: trimmed};
+        try {
+          await updateRecord('qc_presets', updated, before);
+          setStatus(`${kind === 'metric' ? 'Måling' : 'Enhed'} opdateret.`);
+          renderPresetList(kind);
+          refreshPresetConsumers();
+        } catch (err) {
+          console.error(err);
+          alert('Kunne ikke opdatere værdien: ' + err.message);
+          input.value = String(before.value ?? '');
+        }
+      });
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'secondary';
+      deleteBtn.textContent = 'Fjern';
+      deleteBtn.addEventListener('click', async () => {
+        if (!ensureWrite('qc_presets')) return;
+        if (!confirm('Fjern denne forvalgsværdi?')) return;
+        await deleteRecord('qc_presets', Number(preset.id));
+        setStatus(`${kind === 'metric' ? 'Måling' : 'Enhed'} fjernet fra forvalgene.`);
+        renderPresetList(kind);
+        refreshPresetConsumers();
+      });
+      row.appendChild(input);
+      row.appendChild(deleteBtn);
+      container.appendChild(row);
+    });
+  };
+  const addPreset = async kind => {
+    const input = presetInputs[kind];
+    if (!input) return;
+    const trimmed = input.value.trim();
+    if (!trimmed) {
+      alert(kind === 'metric' ? 'Angiv en måling der skal tilføjes.' : 'Angiv en enhed der skal tilføjes.');
+      input.focus();
+      return;
+    }
+    if (!ensureWrite('qc_presets')) return;
+    if (hasDuplicatePreset(kind, trimmed)) {
+      alert('Værdien findes allerede i listen.');
+      input.select();
+      return;
+    }
+    const presets = getPresetRecords(kind);
+    const last = presets[presets.length - 1];
+    const nextOrder = last && Number.isFinite(Number(last.sort_order)) ? Number(last.sort_order) + 1 : presets.length;
+    await addRecord('qc_presets', {kind, value: trimmed, sort_order: nextOrder});
+    input.value = '';
+    setStatus(`${kind === 'metric' ? 'Måling' : 'Enhed'} tilføjet til forvalgene.`);
+    renderPresetList(kind);
+    refreshPresetConsumers();
+  };
+  ['metric','unit'].forEach(kind => {
+    renderPresetList(kind);
+    const button = presetAddButtons[kind];
+    const input = presetInputs[kind];
+    button?.addEventListener('click', () => addPreset(kind));
+    input?.addEventListener('keydown', evt => {
+      if (evt.key === 'Enter') {
+        evt.preventDefault();
+        addPreset(kind);
+      }
+    });
+  });
+  const restoreBtn = section.querySelector('#qcPresetsRestore');
+  restoreBtn?.addEventListener('click', async () => {
+    if (!ensureWrite('qc_presets')) return;
+    if (!confirm('Gendan standardværdier for QC-målinger og enheder?')) return;
+    try {
+      if (state.db) {
+        const tx = state.db.transaction('qc_presets', 'readwrite');
+        tx.objectStore('qc_presets').clear();
+        await tx.done?.catch(() => {});
+      }
+      state.cache.set('qc_presets', []);
+      await ensureDefaultQcPresets();
+      setStatus('Standardværdier for kvalitetskontrol gendannet.');
+      ['metric','unit'].forEach(renderPresetList);
+      refreshPresetConsumers();
+    } catch (err) {
+      console.error(err);
+      alert('Kunne ikke gendanne standardværdier: ' + err.message);
+    }
   });
 }
 function renderTestsTab(section) {
@@ -15768,6 +16018,15 @@ CREATE TABLE IF NOT EXISTS \`qc_metrics\` (
   \`updated_at\` DATETIME,
   CONSTRAINT fk_qc_sample FOREIGN KEY (sample_id) REFERENCES samples(id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS \`qc_presets\` (
+  \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+  \`kind\` VARCHAR(32),
+  \`value\` VARCHAR(255),
+  \`sort_order\` INT,
+  \`created_by\` VARCHAR(255),
+  \`created_at\` DATETIME,
+  \`updated_at\` DATETIME
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE IF NOT EXISTS \`variants\` (
   \`id\` INT AUTO_INCREMENT PRIMARY KEY,
   \`order_id\` INT,
@@ -15846,6 +16105,7 @@ CREATE TABLE IF NOT EXISTS \`audit_log\` (
     orders: 'orders',
     reports: 'reports',
     qc: 'qc_metrics',
+    qc_presets: 'qc_presets',
     variants: 'variants',
     variant_library: 'variant_library',
     conclusion_library: 'conclusion_library',
@@ -15961,6 +16221,7 @@ async function init() {
     setStatus(state.usingMemoryDb ? 'Database åben (midlertidig hukommelse)' : 'Database åben');
     await loadAllStores();
     await ensureDefaultPatientGroups();
+    await ensureDefaultQcPresets();
     await ensureCreationMetadata();
     hookUi();
     restoreUserSession();
