@@ -2004,8 +2004,12 @@ pre {
 (() => {
 'use strict';
 const DB_NAME = 'glims';
-const DB_VER = 9;
+const DB_VER = 10;
 const STORES = ['patients','samples','orders','patient_groups','panels','variants','qc','qc_presets','reports','users','audit','variant_library','responses','conclusion_library','planner'];
+const SETTINGS_STORE = 'settings';
+const BOUND_HANDLE_SETTING_KEY = 'boundFileHandle';
+const BOUND_HANDLE_NAME_KEY = 'glimr-bound-handle-name';
+const AUTOSAVE_STORAGE_KEY = 'glimr-autosave';
 const storage = (() => {
   try {
     const testKey = '__glimr_storage_test__';
@@ -2034,7 +2038,7 @@ const state = {
   cache: new Map(),
   creationLookup: new Map(),
   boundHandle: null,
-  autosave: false,
+  autosave: storage.getItem(AUTOSAVE_STORAGE_KEY) === '1',
   autosaveTimer: null,
   currentTab: 'dashboard',
   currentUser: null,
@@ -4635,6 +4639,7 @@ function openDb() {
       if (!plannerStore.indexNames.contains('user_id')) {
         try { plannerStore.createIndex('user_id','user_id',{unique:true}); } catch (e) {}
       }
+      ensureStore(SETTINGS_STORE, {keyPath:'key'});
     };
     req.onblocked = () => {
       finish(() => {
@@ -4669,6 +4674,116 @@ function requestToPromise(req) {
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
+}
+
+function transactionToPromise(tx) {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
+async function setSetting(key, value) {
+  if (!state.db) return;
+  try {
+    const tx = state.db.transaction(SETTINGS_STORE, 'readwrite');
+    tx.objectStore(SETTINGS_STORE).put({key, value});
+    await transactionToPromise(tx);
+  } catch (err) {
+    console.warn('Kunne ikke gemme indstilling', key, err);
+    throw err;
+  }
+}
+
+async function getSetting(key) {
+  if (!state.db) return undefined;
+  try {
+    const tx = state.db.transaction(SETTINGS_STORE, 'readonly');
+    const store = tx.objectStore(SETTINGS_STORE);
+    const req = store.get(key);
+    const result = await requestToPromise(req);
+    await transactionToPromise(tx).catch(() => {});
+    return result?.value;
+  } catch (err) {
+    console.warn('Kunne ikke læse indstilling', key, err);
+    return undefined;
+  }
+}
+
+async function deleteSetting(key) {
+  if (!state.db) return;
+  try {
+    const tx = state.db.transaction(SETTINGS_STORE, 'readwrite');
+    tx.objectStore(SETTINGS_STORE).delete(key);
+    await transactionToPromise(tx);
+  } catch (err) {
+    console.warn('Kunne ikke slette indstilling', key, err);
+  }
+}
+
+async function persistBoundHandle(handle) {
+  state.boundHandle = handle;
+  if (handle && handle.name) {
+    storage.setItem(BOUND_HANDLE_NAME_KEY, handle.name);
+  } else if (typeof storage.removeItem === 'function') {
+    storage.removeItem(BOUND_HANDLE_NAME_KEY);
+  }
+  try {
+    await setSetting(BOUND_HANDLE_SETTING_KEY, handle ?? null);
+  } catch (err) {
+    console.warn('Kunne ikke gemme filbinding', err);
+    setStatus('Fil tilknyttet, men browseren kan ikke huske forbindelsen automatisk.');
+  }
+  renderDbTab();
+}
+
+async function clearBoundHandle() {
+  state.boundHandle = null;
+  if (typeof storage.removeItem === 'function') {
+    storage.removeItem(BOUND_HANDLE_NAME_KEY);
+  }
+  try {
+    await deleteSetting(BOUND_HANDLE_SETTING_KEY);
+  } catch (err) {
+    console.warn('Kunne ikke rydde filbinding', err);
+  }
+  renderDbTab();
+}
+
+async function restoreBoundHandle() {
+  if (!state.db) return;
+  try {
+    const handle = await getSetting(BOUND_HANDLE_SETTING_KEY);
+    if (handle) {
+      state.boundHandle = handle;
+    } else {
+      const remembered = storage.getItem(BOUND_HANDLE_NAME_KEY);
+      if (remembered) {
+        setStatus(`Filbinding kræver ny godkendelse: ${remembered}`);
+      }
+    }
+  } catch (err) {
+    console.warn('Kunne ikke gendanne filbinding', err);
+  }
+}
+
+async function ensureBoundHandlePermission(interactive = false) {
+  if (!state.boundHandle || typeof state.boundHandle.queryPermission !== 'function') {
+    return Boolean(state.boundHandle);
+  }
+  try {
+    let status = await state.boundHandle.queryPermission({mode: 'readwrite'});
+    if (status === 'granted') return true;
+    if (status === 'prompt' && interactive && typeof state.boundHandle.requestPermission === 'function') {
+      status = await state.boundHandle.requestPermission({mode: 'readwrite'});
+      return status === 'granted';
+    }
+    return status === 'granted';
+  } catch (err) {
+    console.warn('Tilladelsestjek for fil mislykkedes', err);
+    return false;
+  }
 }
 async function loadStore(name) {
   const tx = state.db.transaction(name, 'readonly');
@@ -4869,7 +4984,8 @@ function scheduleAutosave() {
   if (!state.autosave || !state.boundHandle) return;
   if (state.autosaveTimer) clearTimeout(state.autosaveTimer);
   state.autosaveTimer = setTimeout(() => {
-    saveBoundFile().catch(err => console.error(err));
+    state.autosaveTimer = null;
+    saveBoundFile({reason: 'auto'}).catch(err => console.error(err));
   }, 1200);
 }
 async function exportData() {
@@ -4879,20 +4995,45 @@ async function exportData() {
   }
   return data;
 }
-async function saveBoundFile() {
+async function saveBoundFile({interactive = false, reason = 'auto'} = {}) {
   if (!state.boundHandle) {
     setStatus('Ingen fil tilknyttet.');
     return;
   }
-  const writable = await state.boundHandle.createWritable();
-  const data = await exportData();
-  await writable.write(JSON.stringify(data, null, 2));
-  await writable.close();
-  setStatus('Autogemt kl. ' + new Date().toLocaleTimeString());
+  const hasPermission = await ensureBoundHandlePermission(interactive);
+  if (!hasPermission) {
+    const message = interactive ? 'Adgang til filen blev ikke givet.' : 'Autogemning sprang over: mangler filadgang.';
+    setStatus(message);
+    if (interactive) {
+      throw new Error(message);
+    }
+    return;
+  }
+  try {
+    const writable = await state.boundHandle.createWritable({keepExistingData: false});
+    const data = await exportData();
+    await writable.write(JSON.stringify(data, null, 2));
+    await writable.close();
+    const timestamp = new Date().toLocaleTimeString();
+    if (reason === 'manual') {
+      setStatus('Data gemt til fil kl. ' + timestamp);
+    } else {
+      setStatus('Autogemt kl. ' + timestamp);
+    }
+  } catch (err) {
+    console.error('Fejl ved skrivning til fil', err);
+    setStatus('Kunne ikke gemme: ' + (err?.message || err));
+    if (err?.name === 'NotFoundError') {
+      await clearBoundHandle();
+    }
+    if (interactive) {
+      throw err;
+    }
+  }
 }
 async function manualSave() {
   try {
-    await saveBoundFile();
+    await saveBoundFile({interactive: true, reason: 'manual'});
   } catch (err) {
     console.error(err);
     alert('Kunne ikke gemme: ' + err.message);
@@ -4901,8 +5042,15 @@ async function manualSave() {
 async function bindDbFile() {
   try {
     const [handle] = await window.showOpenFilePicker({multiple:false, types:[{description:'GlimR-data', accept:{'application/json':['.json']}}]});
-    state.boundHandle = handle;
+    await persistBoundHandle(handle);
     setStatus('Fil tilknyttet: ' + handle.name);
+    if (navigator.storage?.persist) {
+      try { await navigator.storage.persist(); } catch (err) { console.warn('Kunne ikke anmode om vedvarende lager', err); }
+    }
+    const granted = await ensureBoundHandlePermission(true);
+    if (!granted) {
+      setStatus('Fil tilknyttet, men skrivning kræver godkendelse.');
+    }
     const file = await handle.getFile();
     if (file.size > 0) {
       const text = await file.text();
@@ -4920,7 +5068,9 @@ async function bindDbFile() {
       alert('Filtilknytning fejlede: ' + err.message);
     }
   }
-  renderDbTab();
+  if (state.autosave && state.boundHandle) {
+    scheduleAutosave();
+  }
 }
 async function replaceAllData(data) {
   const timestamp = new Date().toISOString();
@@ -15390,7 +15540,10 @@ function renderAudit(section) {
 
 function renderDbTab(section) {
   section = section || document.querySelector('section[data-tab="db"]');
-  const status = state.boundHandle ? `Tilknyttet fil: ${state.boundHandle.name}` : 'Ingen fil tilknyttet';
+  const rememberedName = storage.getItem(BOUND_HANDLE_NAME_KEY);
+  const status = state.boundHandle
+    ? `Tilknyttet fil: ${state.boundHandle.name}`
+    : (rememberedName ? `Tidligere fil: ${rememberedName} (kræver ny godkendelse)` : 'Ingen fil tilknyttet');
   const memoryWarning = state.usingMemoryDb
     ? '<p class="panel-hint warning">Browseren blokerer for IndexedDB. Data gemmes kun midlertidigt i denne session.</p>'
     : '';
@@ -15432,7 +15585,14 @@ function renderDbTab(section) {
   section.querySelector('#saveNow').addEventListener('click', manualSave);
   section.querySelector('#autosaveToggle').addEventListener('change', e => {
     state.autosave = e.target.checked;
+    storage.setItem(AUTOSAVE_STORAGE_KEY, state.autosave ? '1' : '0');
     setStatus('Autogemning ' + (state.autosave ? 'aktiveret' : 'deaktiveret'));
+    if (state.autosave && state.boundHandle) {
+      scheduleAutosave();
+    } else if (!state.autosave && state.autosaveTimer) {
+      clearTimeout(state.autosaveTimer);
+      state.autosaveTimer = null;
+    }
   });
   section.querySelector('#downloadBackup').addEventListener('click', downloadBackup);
   const restoreInput = section.querySelector('#restoreFile');
@@ -16313,9 +16473,13 @@ async function init() {
     await ensureDefaultPatientGroups();
     await ensureDefaultQcPresets();
     await ensureCreationMetadata();
+    await restoreBoundHandle();
     hookUi();
     restoreUserSession();
     renderAll();
+    if (state.autosave && state.boundHandle) {
+      scheduleAutosave();
+    }
     activateTab('dashboard');
   } catch (err) {
     console.error(err);
