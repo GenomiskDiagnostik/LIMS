@@ -1979,8 +1979,8 @@ pre {
 (() => {
 'use strict';
 const DB_NAME = 'glims';
-const DB_VER = 8;
-const STORES = ['patients','samples','orders','patient_groups','panels','variants','qc','qc_presets','reports','users','audit','variant_library','responses','conclusion_library'];
+const DB_VER = 9;
+const STORES = ['patients','samples','orders','patient_groups','panels','variants','qc','qc_presets','reports','users','audit','variant_library','responses','conclusion_library','planner'];
 const storage = (() => {
   try {
     const testKey = '__glimr_storage_test__';
@@ -4609,6 +4609,10 @@ function openDb() {
       withTimestamps(ensureStore('variant_library',{keyPath:'id',autoIncrement:true}));
       withTimestamps(ensureStore('responses',{keyPath:'id',autoIncrement:true}));
       withTimestamps(ensureStore('conclusion_library',{keyPath:'id',autoIncrement:true}));
+      const plannerStore = withTimestamps(ensureStore('planner',{keyPath:'id'}));
+      if (!plannerStore.indexNames.contains('user_id')) {
+        try { plannerStore.createIndex('user_id','user_id',{unique:true}); } catch (e) {}
+      }
     };
     req.onblocked = () => {
       finish(() => {
@@ -12751,40 +12755,101 @@ function renderPlanner(section) {
 
   const currentUser = state.currentUser;
   const currentUserId = currentUser?.id != null ? String(currentUser.id) : null;
-  const planningStorageKey = currentUserId ? `glimr-plan-${currentUserId}` : null;
+  const legacyPlanningStorageKey = currentUserId ? `glimr-plan-${currentUserId}` : null;
+  let planStateSource = 'none';
 
-  const loadPlanState = () => {
-    if (!planningStorageKey) return {tasks: {}};
+  const loadLegacyPlanState = () => {
+    if (!legacyPlanningStorageKey) return null;
     try {
-      const raw = storage.getItem(planningStorageKey);
-      if (!raw) return {tasks: {}};
+      const raw = storage.getItem(legacyPlanningStorageKey);
+      if (!raw) return null;
       const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object') return {tasks: {}};
+      if (!parsed || typeof parsed !== 'object') return null;
       if (!parsed.tasks || typeof parsed.tasks !== 'object') parsed.tasks = {};
+      if (!parsed.createdAt && parsed.created_at) parsed.createdAt = parsed.created_at;
+      if (!parsed.updatedAt && parsed.updated_at) parsed.updatedAt = parsed.updated_at;
       return parsed;
     } catch (err) {
-      console.warn('Kunne ikke indlæse planlægning:', err);
-      return {tasks: {}};
+      console.warn('Kunne ikke indlæse planlægning fra lokalt lager:', err);
+      return null;
     }
   };
 
-  let planState = planningStorageKey ? loadPlanState() : {tasks: {}};
+  const loadPlanState = () => {
+    if (!currentUserId) {
+      planStateSource = 'none';
+      return {tasks: {}};
+    }
+    const plannerRows = getCached('planner') || [];
+    const entry = plannerRows.find(row => String(row.id) === currentUserId);
+    if (entry && typeof entry === 'object') {
+      planStateSource = 'db';
+      const tasks = entry.tasks && typeof entry.tasks === 'object' ? {...entry.tasks} : {};
+      const createdAt = entry.created_at || entry.createdAt || null;
+      const updatedAt = entry.updated_at || entry.updatedAt || null;
+      return {tasks, createdAt, updatedAt};
+    }
+    const legacy = loadLegacyPlanState();
+    if (legacy) {
+      planStateSource = 'legacy';
+      return legacy;
+    }
+    planStateSource = 'new';
+    return {tasks: {}};
+  };
+
+  let planState = loadPlanState();
 
   const ensurePlanTasks = () => {
     if (!planState || typeof planState !== 'object') planState = {tasks: {}};
     if (!planState.tasks || typeof planState.tasks !== 'object') planState.tasks = {};
+    if (!planState.createdAt) {
+      planState.createdAt = planState.updatedAt || new Date().toISOString();
+    }
+    if (planState.updatedAt === undefined) {
+      planState.updatedAt = null;
+    }
   };
 
   ensurePlanTasks();
 
-  const persistPlanState = () => {
-    if (!planningStorageKey) return;
-    try {
-      storage.setItem(planningStorageKey, JSON.stringify(planState));
-    } catch (err) {
-      console.warn('Kunne ikke gemme planlægning:', err);
+  async function persistPlanState() {
+    if (!currentUserId) return;
+    ensurePlanTasks();
+    const createdAt = planState.createdAt || planState.updatedAt || new Date().toISOString();
+    const updatedAt = planState.updatedAt || new Date().toISOString();
+    planState.createdAt = createdAt;
+    planState.updatedAt = updatedAt;
+    if (state.db) {
+      try {
+        const tx = state.db.transaction('planner','readwrite');
+        const store = tx.objectStore('planner');
+        store.put({
+          id: currentUserId,
+          user_id: currentUserId,
+          tasks: planState.tasks,
+          created_at: createdAt,
+          updated_at: updatedAt
+        });
+        await tx.done?.catch(() => {});
+        await loadStore('planner');
+        planStateSource = 'db';
+      } catch (err) {
+        console.warn('Kunne ikke gemme planlægning i database:', err);
+      }
     }
-  };
+    if (legacyPlanningStorageKey) {
+      try {
+        storage.setItem(legacyPlanningStorageKey, JSON.stringify(planState));
+      } catch (err) {
+        console.warn('Kunne ikke gemme planlægning i lokal storage:', err);
+      }
+    }
+  }
+
+  if (planStateSource === 'legacy') {
+    persistPlanState().catch(err => console.warn('Kunne ikke migrere planlægning til database:', err));
+  }
 
   const sanitizeDueValue = value => {
     if (typeof value !== 'string') return '';
@@ -12841,7 +12906,7 @@ function renderPlanner(section) {
       delete planState.tasks[id];
     }
     planState.updatedAt = new Date().toISOString();
-    persistPlanState();
+    persistPlanState().catch(err => console.warn('Kunne ikke gemme planlægning:', err));
     refreshPlanningStatusText();
   };
 
@@ -13151,6 +13216,13 @@ function renderPlanner(section) {
     await loadAllStores();
     planState = loadPlanState();
     ensurePlanTasks();
+    if (planStateSource === 'legacy') {
+      try {
+        await persistPlanState();
+      } catch (err) {
+        console.warn('Kunne ikke migrere planlægning til database:', err);
+      }
+    }
     updatePlanningUi();
   };
 
