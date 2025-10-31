@@ -940,6 +940,9 @@ section[data-tab].active {
 .panel h2 {
   margin-top: 0;
 }
+.panel .panel-title-left {
+  text-align: left;
+}
 .dashboard-metrics {
   display: grid;
   gap: 1rem;
@@ -1336,7 +1339,7 @@ form textarea {
   flex-wrap: wrap;
 }
 .panel.single-action-panel .btn-row {
-  justify-content: flex-end;
+  justify-content: flex-start;
   margin-top: 0;
 }
 .panel.single-action-panel .btn-row button {
@@ -15410,10 +15413,10 @@ function renderDbTab(section) {
     <div class="btn-row">
       <button class="secondary" id="downloadBackup">Udfør backup (json)</button>
       <button class="secondary" type="button" id="restoreBackup">Gendan fra backup (json)</button>
-      <button class="secondary" type="button" id="downloadSql">Hent glimr.sql</button>
       <input type="file" id="restoreFile" accept="application/json" hidden>
     </div>
     <div class="btn-row">
+      <button class="secondary" type="button" id="downloadSql">Hent glimr.sql</button>
       <button class="secondary" id="showSchema">Vis skema</button>
       <button class="secondary" id="downloadZip">Hent ZIP</button>
     </div>
@@ -15491,7 +15494,7 @@ function renderAdmin(section) {
         </table>
       </div>
       <div>
-        <h2>Patientgruppe</h2>
+        <h2 class="panel-title-left">Patientgruppe</h2>
         <form id="patientGroupForm">
           <input type="hidden" name="id">
           <label>Navn<input name="name" required></label>
