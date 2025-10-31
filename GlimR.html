@@ -1047,6 +1047,84 @@ section[data-tab].active {
 .flex > * {
   flex: 1 1 280px;
 }
+.variant-hotspot {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--panel-border);
+}
+.variant-hotspot__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem 1rem;
+  margin-bottom: 0.75rem;
+}
+.variant-hotspot__header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+.variant-hotspot__summary {
+  color: var(--muted-text);
+  font-size: 0.85rem;
+}
+.variant-hotspot__chart {
+  position: relative;
+  width: 100%;
+  min-height: 220px;
+}
+.variant-hotspot__chart svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.variant-hotspot__empty {
+  text-align: center;
+  color: var(--muted-text);
+  font-size: 0.95rem;
+  padding: 1.5rem 0.5rem;
+}
+.variant-hotspot__caption {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--muted-text);
+}
+.variant-hotspot__legend-label {
+  fill: var(--muted-text);
+  font-size: 0.75rem;
+}
+.variant-hotspot__track {
+  fill: rgba(24, 111, 175, 0.1);
+}
+.variant-hotspot__bars rect {
+  shape-rendering: crispEdges;
+}
+.variant-hotspot__chromosome {
+  fill: var(--muted-text);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.variant-hotspot__axis text {
+  fill: var(--muted-text);
+  font-size: 0.7rem;
+}
+.variant-hotspot__axis line,
+.variant-hotspot__axis path {
+  stroke: var(--panel-border);
+}
+[data-theme="dark"] .variant-hotspot {
+  border-color: var(--panel-border);
+}
+[data-theme="dark"] .variant-hotspot__axis line,
+[data-theme="dark"] .variant-hotspot__axis path {
+  stroke: var(--panel-border);
+}
+[data-theme="dark"] .variant-hotspot__track {
+  fill: rgba(56, 189, 248, 0.14);
+}
+[data-theme="dark"] .variant-hotspot__chart svg {
+  color: var(--text);
+}
 table {
   width: 100%;
   border-collapse: collapse;
@@ -1959,6 +2037,7 @@ pre {
   }
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 </head>
 <body>
 <header>
@@ -9965,7 +10044,15 @@ function renderVariantLibrary(section) {
     return (a.id || 0) - (b.id || 0);
   });
   section.innerHTML = `
-  <div class="panel">
+  <div class="panel variant-library-panel">
+    <div class="variant-hotspot">
+      <div class="variant-hotspot__header">
+        <h2>Genomiske hotspots</h2>
+        <span class="variant-hotspot__summary" data-hotspot-summary></span>
+      </div>
+      <div id="variantHotspotChart" class="variant-hotspot__chart" role="img" aria-live="polite" aria-label="Hotspot over varianter fordelt på kromosomer"></div>
+      <p class="variant-hotspot__caption" data-hotspot-caption>Hotspot-oversigten viser fordelingen af viste varianter langs hvert kromosom.</p>
+    </div>
     <div class="flex">
       <div>
         <label for="libSearch">Søg</label>
@@ -10115,6 +10202,9 @@ function renderVariantLibrary(section) {
   const exportButton = section.querySelector('#libraryExportCsv');
   const importButton = section.querySelector('#libraryImportCsv');
   const importInput = section.querySelector('#variantLibraryImportInput');
+  const hotspotChartContainer = section.querySelector('#variantHotspotChart');
+  const hotspotSummary = section.querySelector('[data-hotspot-summary]');
+  const hotspotCaption = section.querySelector('[data-hotspot-caption]');
   const defaultSaveLabel = saveButtonLabel?.textContent?.trim() || saveButton?.textContent?.trim() || 'Gem';
   const {updateVariantTypeFields, variantTypeSelect} = setupVariantTypeForm(form);
   const {
@@ -10145,6 +10235,274 @@ function renderVariantLibrary(section) {
     if (ratio >= 0.1) return 'Sjælden';
     if (ratio >= 0.05) return 'Meget sjælden';
     return 'Ultra sjælden';
+  };
+  const updateHotspotSummary = text => {
+    if (hotspotSummary) {
+      hotspotSummary.textContent = text || '';
+    }
+  };
+  const updateHotspotCaption = text => {
+    if (hotspotCaption) {
+      hotspotCaption.textContent = text || '';
+    }
+  };
+  const updateHotspotChart = variants => {
+    if (!hotspotChartContainer) return;
+    const variantList = Array.isArray(variants) ? variants : [];
+    const totalVariants = variantList.length;
+    if (typeof d3 === 'undefined') {
+      hotspotChartContainer.innerHTML = '<p class="variant-hotspot__empty">D3.js kunne ikke indlæses – hotspot-grafen er ikke tilgængelig.</p>';
+      hotspotChartContainer.dataset.chartEmpty = 'true';
+      if (totalVariants) {
+        updateHotspotSummary(`${totalVariants} variant${totalVariants === 1 ? '' : 'er'} i alt`);
+      } else {
+        updateHotspotSummary('Ingen varianter');
+      }
+      updateHotspotCaption('Indlæs D3.js for at se den genomiske hotspots-visualisering.');
+      return;
+    }
+    const parsed = variantList.map(variant => {
+      const coordinates = parseVariantCoordinates(variant);
+      const chromosome = normalizeChromosomeValue(coordinates.chromosome || variant.chromosome || variant.chrom);
+      if (!chromosome) return null;
+      const start = Number.parseInt(coordinates.start, 10);
+      const end = Number.parseInt(coordinates.end, 10);
+      let position = Number.isFinite(start) ? start : Number.isFinite(end) ? end : NaN;
+      if (Number.isFinite(start) && Number.isFinite(end)) {
+        position = Math.round((start + end) / 2);
+      }
+      if (!Number.isFinite(position) || position <= 0) {
+        const rawPosition = variant.genomic_position || variant.genomicPosition || variant.position || '';
+        const match = String(rawPosition).match(/[-:](\d+)/);
+        if (match) {
+          position = Number.parseInt(match[1], 10);
+        }
+      }
+      if (!Number.isFinite(position) || position <= 0) return null;
+      return {chromosome, position};
+    }).filter(Boolean);
+    const coordinatesCount = parsed.length;
+    const missingCount = totalVariants - coordinatesCount;
+    if (!coordinatesCount) {
+      hotspotChartContainer.innerHTML = '<p class="variant-hotspot__empty">Ingen varianter med genomiske koordinater i det aktuelle udvalg.</p>';
+      hotspotChartContainer.dataset.chartEmpty = 'true';
+      if (totalVariants > 0) {
+        const missingLabel = missingCount > 0
+          ? ` (${missingCount} uden koordinater)`
+          : ' (ingen koordinater)';
+        updateHotspotSummary(`${totalVariants} variant${totalVariants === 1 ? '' : 'er'}${missingLabel}`);
+        updateHotspotCaption('Hotspot-oversigten kræver genomiske koordinater for at blive vist.');
+      } else {
+        updateHotspotSummary('Ingen varianter');
+        updateHotspotCaption('Ingen poster opfylder den aktuelle filtrering.');
+      }
+      return;
+    }
+    hotspotChartContainer.dataset.chartEmpty = 'false';
+    hotspotChartContainer.innerHTML = '';
+    const grouped = d3.groups(parsed, d => d.chromosome);
+    const CHROMOSOME_ORDER = ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','X','Y','MT'];
+    const CHROMOSOME_LENGTHS = {
+      '1': 248956422,
+      '2': 242193529,
+      '3': 198295559,
+      '4': 190214555,
+      '5': 181538259,
+      '6': 170805979,
+      '7': 159345973,
+      '8': 145138636,
+      '9': 138394717,
+      '10': 133797422,
+      '11': 135086622,
+      '12': 133275309,
+      '13': 114364328,
+      '14': 107043718,
+      '15': 101991189,
+      '16': 90338345,
+      '17': 83257441,
+      '18': 80373285,
+      '19': 58617616,
+      '20': 64444167,
+      '21': 46709983,
+      '22': 50818468,
+      'X': 156040895,
+      'Y': 57227415,
+      'MT': 16569
+    };
+    const compareChromosomes = (a, b) => {
+      const indexA = CHROMOSOME_ORDER.indexOf(a);
+      const indexB = CHROMOSOME_ORDER.indexOf(b);
+      if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+      if (indexA !== -1) return -1;
+      if (indexB !== -1) return 1;
+      return a.localeCompare(b, 'da');
+    };
+    const rows = grouped.map(([chromosome, data]) => {
+      const maxPosition = d3.max(data, d => d.position) || 1;
+      const canonicalLength = CHROMOSOME_LENGTHS[chromosome] || maxPosition;
+      const chromLength = Math.max(canonicalLength, maxPosition);
+      const thresholds = Math.min(60, Math.max(12, Math.round(Math.sqrt(data.length))));
+      const histogram = d3.bin()
+        .domain([0, chromLength])
+        .thresholds(thresholds)(data.map(d => d.position));
+      return {chromosome, chromLength, histogram, data};
+    }).sort((a, b) => compareChromosomes(a.chromosome, b.chromosome));
+    const maxBinCount = d3.max(rows, row => d3.max(row.histogram, bin => bin.length)) || 1;
+    const containerWidth = hotspotChartContainer.clientWidth || 960;
+    const width = Math.max(containerWidth, 720);
+    const margin = {top: 24, right: 32, bottom: 64, left: 96};
+    const bandHeight = 22;
+    const axisOffset = bandHeight + 18;
+    const rowHeight = axisOffset + 24;
+    const innerWidth = width - margin.left - margin.right;
+    const height = margin.top + margin.bottom + rowHeight * rows.length;
+    const svg = d3.select(hotspotChartContainer)
+      .append('svg')
+      .attr('class', 'variant-hotspot__svg')
+      .attr('viewBox', `0 0 ${width} ${height}`)
+      .attr('preserveAspectRatio', 'xMidYMid meet');
+    const chartGroup = svg.append('g')
+      .attr('transform', `translate(${margin.left}, ${margin.top})`);
+    const colorScale = d3.scaleSequential(d3.interpolateYlOrRd)
+      .domain([0, maxBinCount || 1]);
+    const formatPosition = value => {
+      if (!Number.isFinite(value) || value <= 0) return '0 bp';
+      if (value >= 1e6) {
+        const mb = value / 1e6;
+        return `${mb.toFixed(mb >= 100 ? 0 : mb >= 10 ? 1 : 2)} Mb`;
+      }
+      if (value >= 1e3) {
+        const kb = value / 1e3;
+        return `${kb.toFixed(kb >= 100 ? 0 : kb >= 10 ? 1 : 2)} kb`;
+      }
+      return `${Math.round(value)} bp`;
+    };
+    rows.forEach((row, index) => {
+      const rowGroup = chartGroup.append('g')
+        .attr('transform', `translate(0, ${index * rowHeight})`);
+      const xScale = d3.scaleLinear()
+        .domain([0, row.chromLength])
+        .range([0, innerWidth]);
+      rowGroup.append('rect')
+        .attr('class', 'variant-hotspot__track')
+        .attr('x', 0)
+        .attr('y', 0)
+        .attr('width', innerWidth)
+        .attr('height', bandHeight)
+        .attr('rx', 6)
+        .attr('ry', 6);
+      const barsGroup = rowGroup.append('g')
+        .attr('class', 'variant-hotspot__bars');
+      barsGroup.selectAll('rect')
+        .data(row.histogram)
+        .join('rect')
+        .attr('x', d => xScale(Math.max(0, d.x0 || 0)))
+        .attr('y', 0)
+        .attr('width', d => {
+          const widthValue = xScale(Math.max(0, d.x1 || d.x0 || 0)) - xScale(Math.max(0, d.x0 || 0));
+          return Math.max(1, widthValue);
+        })
+        .attr('height', bandHeight)
+        .attr('rx', 2)
+        .attr('ry', 2)
+        .attr('fill', d => colorScale(d.length))
+        .attr('opacity', d => (d.length ? 0.95 : 0.4))
+        .append('title')
+        .text(d => {
+          const count = d.length;
+          const startValue = Math.max(0, d.x0 || 0);
+          const endValue = Math.max(startValue, d.x1 || d.x0 || 0);
+          const rangeLabel = startValue === endValue
+            ? formatPosition(startValue)
+            : `${formatPosition(startValue)} – ${formatPosition(endValue)}`;
+          const percentage = coordinatesCount ? (count / coordinatesCount) * 100 : 0;
+          const percentageLabel = Number.isFinite(percentage) && percentage > 0
+            ? ` (${percentage.toFixed(percentage >= 10 ? 0 : 1)}%)`
+            : '';
+          if (!count) {
+            return `Ingen registreringer på kromosom ${row.chromosome} i intervallet ${rangeLabel}.`;
+          }
+          return `${count} variant${count === 1 ? '' : 'er'} på kromosom ${row.chromosome} i intervallet ${rangeLabel}${percentageLabel}.`;
+        });
+      rowGroup.append('text')
+        .attr('class', 'variant-hotspot__chromosome')
+        .attr('x', -12)
+        .attr('y', bandHeight / 2)
+        .attr('dy', '0.35em')
+        .attr('text-anchor', 'end')
+        .text(`Chr ${row.chromosome}`);
+      const tickCount = Math.min(6, Math.max(2, Math.round(innerWidth / 160)));
+      rowGroup.append('g')
+        .attr('class', 'variant-hotspot__axis')
+        .attr('transform', `translate(0, ${axisOffset})`)
+        .call(d3.axisBottom(xScale)
+          .ticks(tickCount)
+          .tickFormat(value => formatPosition(value)))
+        .call(g => g.selectAll('text').attr('dy', '0.95em'))
+        .call(g => g.selectAll('line').attr('opacity', 0.35))
+        .call(g => g.select('.domain').attr('opacity', 0.35));
+    });
+    const defs = svg.append('defs');
+    const gradientId = 'variant-hotspot-gradient';
+    const gradient = defs.append('linearGradient')
+      .attr('id', gradientId)
+      .attr('x1', '0%')
+      .attr('x2', '100%')
+      .attr('y1', '0%')
+      .attr('y2', '0%');
+    gradient.append('stop')
+      .attr('offset', '0%')
+      .attr('stop-color', colorScale(0));
+    gradient.append('stop')
+      .attr('offset', '100%')
+      .attr('stop-color', colorScale(maxBinCount));
+    const legendWidth = Math.min(220, innerWidth);
+    const legendHeight = 12;
+    const legendGroup = svg.append('g')
+      .attr('transform', `translate(${margin.left}, ${height - margin.bottom + 20})`);
+    legendGroup.append('text')
+      .attr('class', 'variant-hotspot__legend-label')
+      .attr('x', 0)
+      .attr('y', -6)
+      .text('Registreringer pr. segment');
+    legendGroup.append('rect')
+      .attr('width', legendWidth)
+      .attr('height', legendHeight)
+      .attr('rx', 6)
+      .attr('ry', 6)
+      .attr('fill', `url(#${gradientId})`);
+    legendGroup.append('text')
+      .attr('class', 'variant-hotspot__legend-label')
+      .attr('x', 0)
+      .attr('y', legendHeight + 12)
+      .text('0');
+    legendGroup.append('text')
+      .attr('class', 'variant-hotspot__legend-label')
+      .attr('x', legendWidth)
+      .attr('y', legendHeight + 12)
+      .attr('text-anchor', 'end')
+      .text(String(maxBinCount));
+    legendGroup.append('text')
+      .attr('class', 'variant-hotspot__legend-label')
+      .attr('x', legendWidth / 2)
+      .attr('y', legendHeight + 12)
+      .attr('text-anchor', 'middle')
+      .text('Flere varianter →');
+    const summaryParts = [`${coordinatesCount} variant${coordinatesCount === 1 ? '' : 'er'} med koordinater`];
+    if (missingCount > 0) {
+      summaryParts.push(`(${missingCount} uden koordinater)`);
+    }
+    updateHotspotSummary(summaryParts.join(' '));
+    const captionDetails = [`Farveintensiteten afspejler antallet af viste varianter i hvert kromosomsegment.`];
+    if (maxBinCount > 1) {
+      captionDetails.push(`Det travleste segment indeholder ${maxBinCount} registreringer.`);
+    } else {
+      captionDetails.push('Alle viste segmenter rummer højst én registrering.');
+    }
+    if (missingCount > 0) {
+      captionDetails.push(`${missingCount} variant${missingCount === 1 ? '' : 'er'} mangler koordinater og indgår derfor ikke.`);
+    }
+    updateHotspotCaption(captionDetails.join(' '));
   };
   const csvColumns = [
     {key: 'id', label: 'ID'},
@@ -10346,6 +10704,7 @@ function renderVariantLibrary(section) {
     if (!filteredLibrary.length) {
       tbody.innerHTML = `<tr><td colspan="16">Ingen poster matcher filtreringen.</td></tr>`;
       annotateTableCells(section);
+      updateHotspotChart(filteredLibrary);
       return;
     }
     tbody.innerHTML = filteredLibrary.map(v => {
@@ -10375,6 +10734,7 @@ function renderVariantLibrary(section) {
       return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td>${esc(title)}</td><td>${esc(typeLabel)}</td><td>${esc(genomic)}</td><td>${esc(v.hgvs_c || '')}</td><td>${esc(v.hgvs_p || '')}</td><td>${formatRsIdCell(v.rsid)}</td><td>${esc(v.classification || '')}</td><td title="${esc(frequencyTitle)}">${esc(frequencyLabel)}</td><td title="${esc(frequencyCategoryTitle)}">${esc(frequencyCategory)}</td><td>${esc(v.criteria || '')}</td><td>${esc(v.iscn || '')}</td><td>${esc(v.condition || '')}</td><td>${esc(v.inheritance || '')}</td><td>${esc(v.curated_by || '')}</td><td>${esc(lastReview)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
+    updateHotspotChart(filteredLibrary);
   };
   renderRows();
   search?.addEventListener('input', renderRows);
