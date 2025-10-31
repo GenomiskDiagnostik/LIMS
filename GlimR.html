@@ -8211,8 +8211,9 @@ function renderOrders(section) {
       const panel = panelMap.get(Number(o.panel_id));
       const statusDisplay = sample?.status || o.status || '';
       const createdBy = determineCreatedBy('orders', o);
-      const orderedAt = formatDanishDate(o.ordered_at);
-      const orderedMeta = formatDaysSince(o.ordered_at);
+      const orderedDate = parseDateTimeValue(o.ordered_at);
+      const orderedAt = orderedDate ? formatDanishDate(orderedDate, false) : '';
+      const orderedMeta = formatDaysSince(orderedDate);
       const orderedCell = orderedAt
         ? `${esc(orderedAt)}${orderedMeta ? ` <span class="table-meta">(${esc(orderedMeta)})</span>` : ''}`
         : '';
