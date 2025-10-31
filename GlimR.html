@@ -2040,6 +2040,8 @@ const state = {
   boundHandle: null,
   autosave: storage.getItem(AUTOSAVE_STORAGE_KEY) === '1',
   autosaveTimer: null,
+  lastSyncedData: null,
+  reloadFromFilePromise: null,
   currentTab: 'dashboard',
   currentUser: null,
   theme: storage.getItem('glimr-theme') || 'light',
@@ -4459,7 +4461,7 @@ function initTabs() {
     main.appendChild(section);
   });
 }
-function activateTab(id) {
+async function activateTab(id) {
   state.currentTab = id;
   document.querySelectorAll('nav button').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === id);
@@ -4467,6 +4469,13 @@ function activateTab(id) {
   document.querySelectorAll('section[data-tab]').forEach(sec => {
     sec.classList.toggle('active', sec.dataset.tab === id);
   });
+  if (state.boundHandle) {
+    try {
+      await reloadBoundFileData({silent: true, refreshUi: false});
+    } catch (err) {
+      console.warn('Kunne ikke genindlæse data ved navigation', err);
+    }
+  }
   renderTab(id);
 }
 
@@ -4749,6 +4758,7 @@ async function clearBoundHandle() {
     console.warn('Kunne ikke rydde filbinding', err);
   }
   renderDbTab();
+  await captureSyncedSnapshot();
 }
 
 async function restoreBoundHandle() {
@@ -4995,9 +5005,227 @@ async function exportData() {
   }
   return data;
 }
+
+function deepClone(value) {
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(item => deepClone(item));
+  }
+  const clone = {};
+  for (const key of Object.keys(value)) {
+    clone[key] = deepClone(value[key]);
+  }
+  return clone;
+}
+
+function normaliseForComparison(value) {
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(item => normaliseForComparison(item));
+  }
+  const result = {};
+  const keys = Object.keys(value).sort();
+  for (const key of keys) {
+    result[key] = normaliseForComparison(value[key]);
+  }
+  return result;
+}
+
+function recordsEqual(a, b) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return JSON.stringify(normaliseForComparison(a)) === JSON.stringify(normaliseForComparison(b));
+}
+
+function mapRecordsById(list) {
+  const map = new Map();
+  if (!Array.isArray(list)) return map;
+  for (const item of list) {
+    if (!item || typeof item !== 'object') continue;
+    const id = item.id;
+    if (id === undefined || id === null) continue;
+    map.set(String(id), item);
+  }
+  return map;
+}
+
+function computeLocalChanges(previousData, currentData) {
+  const changes = {
+    upserts: new Map(),
+    deletions: new Map(),
+    hasChanges: false
+  };
+  const previous = previousData && typeof previousData === 'object' ? previousData : {};
+  const current = currentData && typeof currentData === 'object' ? currentData : {};
+  for (const store of STORES) {
+    const prevList = Array.isArray(previous[store]) ? previous[store] : [];
+    const currList = Array.isArray(current[store]) ? current[store] : [];
+    const prevMap = mapRecordsById(prevList);
+    const currMap = mapRecordsById(currList);
+    const storeUpserts = [];
+    const storeDeletes = [];
+    for (const [id, record] of currMap.entries()) {
+      const prevRecord = prevMap.get(id);
+      if (!prevRecord) {
+        storeUpserts.push({record, previous: null});
+        continue;
+      }
+      if (!recordsEqual(prevRecord, record)) {
+        storeUpserts.push({record, previous: prevRecord});
+      }
+    }
+    for (const [id, prevRecord] of prevMap.entries()) {
+      if (!currMap.has(id)) {
+        storeDeletes.push({id, previous: prevRecord});
+      }
+    }
+    if (storeUpserts.length) {
+      changes.upserts.set(store, storeUpserts);
+      changes.hasChanges = true;
+    }
+    if (storeDeletes.length) {
+      changes.deletions.set(store, storeDeletes);
+      changes.hasChanges = true;
+    }
+  }
+  return changes;
+}
+
+function toTimestamp(record) {
+  if (!record || typeof record !== 'object') return null;
+  const candidates = ['updated_at', 'updatedAt', 'ts', 'timestamp'];
+  for (const key of candidates) {
+    const value = record[key];
+    if (!value) continue;
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function shouldApplyLocalChange(localRecord, remoteRecord, previousRecord) {
+  if (!remoteRecord) return true;
+  const localTs = toTimestamp(localRecord);
+  const remoteTs = toTimestamp(remoteRecord);
+  if (localTs == null && remoteTs == null) {
+    return !recordsEqual(remoteRecord, localRecord);
+  }
+  if (localTs == null) return false;
+  if (remoteTs == null) return true;
+  if (remoteTs > localTs) {
+    if (previousRecord) {
+      const prevTs = toTimestamp(previousRecord);
+      if (prevTs != null && prevTs === remoteTs && prevTs === localTs) {
+        return !recordsEqual(remoteRecord, localRecord);
+      }
+    }
+    return false;
+  }
+  return true;
+}
+
+function mergeRemoteData(remoteData, changes) {
+  const merged = remoteData && typeof remoteData === 'object' ? deepClone(remoteData) : {};
+  let appliedChanges = 0;
+  let skippedConflicts = 0;
+  for (const store of STORES) {
+    const remoteList = Array.isArray(merged[store]) ? merged[store].map(item => deepClone(item)) : [];
+    const deletions = changes.deletions.get(store) || [];
+    const upserts = changes.upserts.get(store) || [];
+    if (!deletions.length && !upserts.length) {
+      if (!(store in merged)) {
+        merged[store] = remoteList;
+      }
+      continue;
+    }
+    const deletionSet = new Set(deletions.map(entry => String(entry.id)));
+    const retained = [];
+    const indexById = new Map();
+    for (const item of remoteList) {
+      const id = item && item.id != null ? String(item.id) : null;
+      if (id && deletionSet.has(id)) {
+        appliedChanges++;
+        continue;
+      }
+      if (id) {
+        indexById.set(id, retained.length);
+      }
+      retained.push(item);
+    }
+    for (const entry of upserts) {
+      if (!entry || !entry.record) continue;
+      const record = entry.record;
+      if (record.id == null) continue;
+      const key = String(record.id);
+      const clone = deepClone(record);
+      if (indexById.has(key)) {
+        const idx = indexById.get(key);
+        const remoteRecord = retained[idx];
+        if (shouldApplyLocalChange(clone, remoteRecord, entry.previous)) {
+          retained[idx] = clone;
+          appliedChanges++;
+        } else {
+          skippedConflicts++;
+        }
+      } else {
+        indexById.set(key, retained.length);
+        retained.push(clone);
+        appliedChanges++;
+      }
+    }
+    merged[store] = retained;
+  }
+  return {merged, appliedChanges, skippedConflicts};
+}
+
+async function readBoundFileData() {
+  if (!state.boundHandle) return {};
+  try {
+    const file = await state.boundHandle.getFile();
+    if (!file) return {};
+    if (file.size === 0) return {};
+    const text = await file.text();
+    if (!text.trim()) return {};
+    const data = JSON.parse(text);
+    return data && typeof data === 'object' ? data : {};
+  } catch (err) {
+    console.warn('Kunne ikke læse data fra fil', err);
+    throw err;
+  }
+}
+
+async function captureSyncedSnapshot() {
+  try {
+    const snapshot = await exportData();
+    state.lastSyncedData = deepClone(snapshot);
+  } catch (err) {
+    console.warn('Kunne ikke opdatere synkroniseringssnapshot', err);
+  }
+}
 async function saveBoundFile({interactive = false, reason = 'auto'} = {}) {
   if (!state.boundHandle) {
     setStatus('Ingen fil tilknyttet.');
+    return;
+  }
+  if (state.reloadFromFilePromise) {
+    try {
+      await state.reloadFromFilePromise;
+    } catch (err) {
+      console.warn('Gemning fortsætter trods fejl i igangværende genindlæsning', err);
+    }
+  }
+  const localData = await exportData();
+  const changes = computeLocalChanges(state.lastSyncedData, localData);
+  if (!changes.hasChanges) {
+    const message = reason === 'manual'
+      ? 'Ingen ændringer at gemme. Henter seneste data fra fil.'
+      : 'Autogem sprang over: ingen lokale ændringer.';
+    setStatus(message);
+    await reloadBoundFileData({silent: true, refreshUi: true});
     return;
   }
   const hasPermission = await ensureBoundHandlePermission(interactive);
@@ -5009,17 +5237,45 @@ async function saveBoundFile({interactive = false, reason = 'auto'} = {}) {
     }
     return;
   }
+  let remoteData = {};
+  try {
+    remoteData = await readBoundFileData();
+  } catch (err) {
+    const message = 'Kunne ikke læse eksisterende data fra filen: ' + (err?.message || err);
+    console.error(message);
+    setStatus(message);
+    if (interactive) {
+      throw err;
+    }
+    return;
+  }
+  const {merged, appliedChanges, skippedConflicts} = mergeRemoteData(remoteData, changes);
+  if (!appliedChanges) {
+    if (skippedConflicts) {
+      const message = 'Ændringer kunne ikke gemmes fordi filen har nyere data.';
+      setStatus(message);
+      await reloadBoundFileData({silent: true, refreshUi: true});
+      if (interactive) {
+        throw new Error(message);
+      }
+      return;
+    }
+    setStatus('Ingen nye ændringer at skrive til fil.');
+    await reloadBoundFileData({silent: true, refreshUi: true});
+    return;
+  }
   try {
     const writable = await state.boundHandle.createWritable({keepExistingData: false});
-    const data = await exportData();
-    await writable.write(JSON.stringify(data, null, 2));
+    await writable.write(JSON.stringify(merged, null, 2));
     await writable.close();
     const timestamp = new Date().toLocaleTimeString();
-    if (reason === 'manual') {
-      setStatus('Data gemt til fil kl. ' + timestamp);
-    } else {
-      setStatus('Autogemt kl. ' + timestamp);
+    let message = reason === 'manual'
+      ? 'Data gemt til fil kl. ' + timestamp
+      : 'Autogemt kl. ' + timestamp;
+    if (skippedConflicts) {
+      message += ` (${skippedConflicts} ændring${skippedConflicts === 1 ? '' : 'er'} afvist pga. nyere filversion)`;
     }
+    setStatus(message);
   } catch (err) {
     console.error('Fejl ved skrivning til fil', err);
     setStatus('Kunne ikke gemme: ' + (err?.message || err));
@@ -5029,7 +5285,9 @@ async function saveBoundFile({interactive = false, reason = 'auto'} = {}) {
     if (interactive) {
       throw err;
     }
+    return;
   }
+  await reloadBoundFileData({silent: true, refreshUi: true});
 }
 async function manualSave() {
   try {
@@ -5038,6 +5296,40 @@ async function manualSave() {
     console.error(err);
     alert('Kunne ikke gemme: ' + err.message);
   }
+}
+
+async function reloadBoundFileData({silent = false, refreshUi = false} = {}) {
+  if (!state.boundHandle) return false;
+  if (state.reloadFromFilePromise) {
+    try {
+      return await state.reloadFromFilePromise;
+    } catch (err) {
+      return false;
+    }
+  }
+  const performReload = (async () => {
+    try {
+      const data = await readBoundFileData();
+      await replaceAllData(data, {markSynced: true});
+      if (refreshUi) {
+        renderAll();
+      }
+      if (!silent) {
+        setStatus('Data genindlæst fra fil.');
+      }
+      return true;
+    } catch (err) {
+      console.error('Fejl ved genindlæsning af data fra fil', err);
+      if (!silent) {
+        setStatus('Kunne ikke genindlæse data fra fil: ' + (err?.message || err));
+      }
+      return false;
+    } finally {
+      state.reloadFromFilePromise = null;
+    }
+  })();
+  state.reloadFromFilePromise = performReload;
+  return performReload;
 }
 async function bindDbFile() {
   try {
@@ -5056,7 +5348,7 @@ async function bindDbFile() {
       const text = await file.text();
       try {
         const data = JSON.parse(text);
-        await importData(data, true);
+        await importData(data, {skipConfirm: true, markSynced: true});
       } catch (err) {
         console.error(err);
         alert('Kunne ikke læse filen: ' + err.message);
@@ -5072,7 +5364,8 @@ async function bindDbFile() {
     scheduleAutosave();
   }
 }
-async function replaceAllData(data) {
+async function replaceAllData(data, options = {}) {
+  const markSynced = Boolean(options.markSynced);
   const timestamp = new Date().toISOString();
   for (const store of STORES) {
     const tx = state.db.transaction(store, 'readwrite');
@@ -5088,15 +5381,26 @@ async function replaceAllData(data) {
     await tx.done?.catch(() => {});
   }
   await loadAllStores();
+  if (markSynced) {
+    await captureSyncedSnapshot();
+  }
 }
-async function importData(data, skipConfirm=false) {
+async function importData(data, options = {}) {
+  let skipConfirm = false;
+  let markSynced = false;
+  if (typeof options === 'boolean') {
+    skipConfirm = options;
+  } else if (options && typeof options === 'object') {
+    skipConfirm = Boolean(options.skipConfirm);
+    markSynced = Boolean(options.markSynced);
+  }
   if (!currentCanWrite()) {
     alert('Import kræver login med skrivetilladelse.');
     return;
   }
   const proceed = skipConfirm || confirm('Dette vil overskrive eksisterende data. Fortsæt?');
   if (!proceed) return;
-  await replaceAllData(data);
+  await replaceAllData(data, {markSynced});
   setStatus('Data indlæst.');
   renderAll();
 }
@@ -16048,7 +16352,7 @@ async function runTests() {
     results.push(['Testfejl', false, err.message]);
   } finally {
     state.testResults = results;
-    await replaceAllData(snapshot);
+    await replaceAllData(snapshot, {markSynced: true});
     renderAll();
     section = document.querySelector('section[data-tab="admin"]');
     if (section) renderAdmin(section);
@@ -16473,9 +16777,13 @@ async function init() {
     await ensureDefaultPatientGroups();
     await ensureDefaultQcPresets();
     await ensureCreationMetadata();
+    await captureSyncedSnapshot();
     await restoreBoundHandle();
     hookUi();
     restoreUserSession();
+    if (state.boundHandle) {
+      await reloadBoundFileData({silent: true, refreshUi: false});
+    }
     renderAll();
     if (state.autosave && state.boundHandle) {
       scheduleAutosave();
