@@ -10560,6 +10560,7 @@ function renderReports(section) {
             <div class="conclusion-library-buttons">
               <button class="secondary" type="button" id="conclusionLibraryInsert">Erstat konklusion</button>
               <button class="secondary" type="button" id="conclusionLibraryAppend">Tilføj til konklusion</button>
+              <button class="secondary" type="button" id="conclusionPlaceholderApply">Anvend pladsholdere</button>
             </div>
           </div>
           <div data-placeholder-guide="report"></div>
@@ -10615,6 +10616,7 @@ function renderReports(section) {
   const conclusionSelect = form?.querySelector('#conclusionLibrarySelect');
   const conclusionInsertBtn = form?.querySelector('#conclusionLibraryInsert');
   const conclusionAppendBtn = form?.querySelector('#conclusionLibraryAppend');
+  const conclusionPlaceholderBtn = form?.querySelector('#conclusionPlaceholderApply');
   const summaryField = form?.elements.summary;
   const conclusionMap = new Map(conclusionLibrary.map(entry => [String(entry.id), entry]));
   const placeholderGuideHost = section.querySelector('[data-placeholder-guide="report"]');
@@ -10954,6 +10956,13 @@ function renderReports(section) {
   conclusionSelect?.addEventListener('change', updateConclusionButtons);
   conclusionInsertBtn?.addEventListener('click', () => applyConclusionText('replace'));
   conclusionAppendBtn?.addEventListener('click', () => applyConclusionText('append'));
+  conclusionPlaceholderBtn?.addEventListener('click', () => {
+    if (!summaryField) return;
+    const resolved = resolveConclusionTemplate(summaryField.value || '');
+    summaryField.value = resolved;
+    summaryField.dispatchEvent(new Event('input', {bubbles: false}));
+    summaryField.focus();
+  });
   if (variantAddButton) {
     variantAddButton.addEventListener('click', () => {
       if (!variantSelect) return;
