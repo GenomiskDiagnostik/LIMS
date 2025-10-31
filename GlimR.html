@@ -4946,9 +4946,10 @@ async function backupAndResetData() {
       state.db.close();
       state.db = null;
     }
-    if (IDB) {
+    const idbFactory = (typeof indexedDB !== 'undefined') ? indexedDB : (typeof window !== 'undefined' ? window.indexedDB : null);
+    if (idbFactory) {
       await new Promise((resolve, reject) => {
-        const req = IDB.deleteDatabase(DB_NAME);
+        const req = idbFactory.deleteDatabase(DB_NAME);
         req.onsuccess = () => resolve();
         req.onerror = () => reject(req.error);
         req.onblocked = () => {
