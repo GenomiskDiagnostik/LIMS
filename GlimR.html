@@ -1052,13 +1052,22 @@ section[data-tab].active {
   padding-bottom: 1.25rem;
   border-bottom: 1px solid var(--panel-border);
 }
+.variant-hotspot[data-collapsed="true"] .variant-hotspot__body {
+  display: none;
+}
 .variant-hotspot__header {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.6rem 1rem;
   margin-bottom: 0.75rem;
+}
+.variant-hotspot__title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
 }
 .variant-hotspot__header h2 {
   margin: 0;
@@ -1067,6 +1076,33 @@ section[data-tab].active {
 .variant-hotspot__summary {
   color: var(--muted-text);
   font-size: 0.85rem;
+}
+.variant-hotspot__toggle {
+  background: var(--nav-button-bg);
+  color: var(--nav-button-color);
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(18, 76, 135, 0.12);
+  transition: background 0.2s ease, color 0.2s ease, border 0.2s ease, box-shadow 0.2s ease;
+}
+.variant-hotspot__toggle:hover,
+.variant-hotspot__toggle:focus-visible {
+  background: var(--nav-button-active-bg);
+  color: var(--nav-button-active-color);
+  border-color: var(--nav-button-active-bg);
+  box-shadow: 0 4px 10px rgba(18, 76, 135, 0.2);
+}
+.variant-hotspot__toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.variant-hotspot__body {
+  display: flex;
+  flex-direction: column;
 }
 .variant-hotspot__chart {
   position: relative;
@@ -10045,13 +10081,18 @@ function renderVariantLibrary(section) {
   });
   section.innerHTML = `
   <div class="panel variant-library-panel">
-    <div class="variant-hotspot">
+    <div class="variant-hotspot" data-collapsed="true">
       <div class="variant-hotspot__header">
-        <h2>Genomiske hotspots</h2>
-        <span class="variant-hotspot__summary" data-hotspot-summary></span>
+        <div class="variant-hotspot__title">
+          <h2>Genomiske hotspots</h2>
+          <span class="variant-hotspot__summary" data-hotspot-summary></span>
+        </div>
+        <button type="button" class="variant-hotspot__toggle" data-hotspot-toggle aria-expanded="false" aria-controls="variantHotspotContent">Vis hotspots</button>
       </div>
-      <div id="variantHotspotChart" class="variant-hotspot__chart" role="img" aria-live="polite" aria-label="Hotspot over varianter fordelt på kromosomer"></div>
-      <p class="variant-hotspot__caption" data-hotspot-caption>Hotspot-oversigten viser fordelingen af viste varianter langs hvert kromosom.</p>
+      <div id="variantHotspotContent" class="variant-hotspot__body" data-hotspot-content hidden>
+        <div id="variantHotspotChart" class="variant-hotspot__chart" role="img" aria-live="polite" aria-label="Hotspot over varianter fordelt på kromosomer"></div>
+        <p class="variant-hotspot__caption" data-hotspot-caption>Hotspot-oversigten viser fordelingen af viste varianter langs hvert kromosom.</p>
+      </div>
     </div>
     <div class="flex">
       <div>
@@ -10544,6 +10585,33 @@ function renderVariantLibrary(section) {
   applyFormTooltips(form);
   let filteredLibrary = list.slice();
   let selectedId = null;
+  const hotspotWrapper = section.querySelector('.variant-hotspot');
+  const hotspotToggle = section.querySelector('[data-hotspot-toggle]');
+  const hotspotContent = section.querySelector('[data-hotspot-content]');
+  const setHotspotCollapsed = collapsed => {
+    if (hotspotWrapper) {
+      hotspotWrapper.dataset.collapsed = collapsed ? 'true' : 'false';
+    }
+    if (hotspotContent) {
+      hotspotContent.hidden = collapsed;
+    }
+    if (hotspotToggle) {
+      hotspotToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      hotspotToggle.textContent = collapsed ? 'Vis hotspots' : 'Skjul hotspots';
+      hotspotToggle.title = collapsed
+        ? 'Vis hotspots-visualiseringen'
+        : 'Skjul hotspots-visualiseringen';
+    }
+  };
+  setHotspotCollapsed(true);
+  hotspotToggle?.addEventListener('click', () => {
+    const collapsed = hotspotWrapper?.dataset.collapsed !== 'false';
+    const nextCollapsed = !collapsed;
+    setHotspotCollapsed(nextCollapsed);
+    if (!nextCollapsed) {
+      requestAnimationFrame(() => updateHotspotChart(filteredLibrary));
+    }
+  });
   const filterInputs = {
     gene: section.querySelector('[data-filter-library="gene"]'),
     transcript: section.querySelector('[data-filter-library="transcript"]'),
