@@ -2525,7 +2525,7 @@ const tooltipCatalog = {
       zygosity: 'Zygositetsstatus (fx heterozygot).',
       classification: 'ACMG-klassifikation 1 (godartet) – 5 (patogen).',
       criteria: 'Anfør anvendte ACMG- eller CNV-kriterier, adskilt af komma.',
-      af: 'Allelfrekvens eller observationsfrekvens.',
+      af: 'VAF (Variant Allele Frequency) eller observationsfrekvens.',
       annotations: 'Supplerende annoteringer fra eksterne værktøjer såsom VarSeq.',
       interpretation: 'Klinisk tolkning og evidens for varianten.',
       genome_build: 'Angiv reference-genom (fx GRCh38) for CNV/SV.',
@@ -4892,7 +4892,7 @@ const CSV_LABEL_OVERRIDES = {
   hgvs_c: 'HGVS c.',
   hgvs_p: 'HGVS p.',
   rsid: 'rsID',
-  af: 'Allelfrekvens',
+  af: 'VAF',
   genome_build: 'Genom reference',
   sv_subtype: 'Strukturtype (kode)',
   size_bp: 'Størrelse (bp)',
@@ -6162,7 +6162,7 @@ function renderCreateCase(section) {
       <label class="inline wide">Beskrivelse<textarea class="small" data-field="description" placeholder="Fri tekst"></textarea></label>
       <label class="inline">ACMG<select data-field="classification">${classificationOptions}</select></label>
       <label class="inline">Kriterier<input type="text" data-field="criteria" placeholder="PM1,PP3"></label>
-      <label class="inline">Allelfrekvens<input type="number" step="0.0001" data-field="af" placeholder="0.125"></label>
+      <label class="inline">VAF<input type="number" step="0.0001" data-field="af" placeholder="0,500"></label>
       <label class="inline wide">Annoteringer<textarea class="small" data-field="annotations" placeholder="VarSeq-annoteringer og noter"></textarea></label>
       <label class="inline wide">Tolkning<textarea class="small" data-field="interpretation" placeholder="Kort tolkning"></textarea></label>
       <button type="button" class="secondary case-choose-library">Vælg fra bibliotek</button>
@@ -6590,7 +6590,7 @@ function renderCreateCase(section) {
         if (afRaw) {
           const afNumber = Number(afRaw);
           if (!Number.isFinite(afNumber)) {
-            setMessage('Allelfrekvens skal være et tal.', 'error');
+            setMessage('VAF skal være et tal.', 'error');
             row.querySelector('[data-field="af"]')?.focus();
             disableButtons(false);
             submitting = false;
@@ -8548,7 +8548,7 @@ function renderVariants(section) {
           </div>
           <label>ACMG-klasse<select name="classification" required><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></label>
           <label>Kriterier<input name="criteria" placeholder="PM1,PP3..."></label>
-          <label>Allelfrekvens<input name="af" type="number" step="0.0001"></label>
+          <label>VAF<input name="af" type="number" step="0.0001" placeholder="0,500"></label>
           <label>Annoteringer<textarea name="annotations" placeholder="Importerede annoteringer fra VarSeq og andre værktøjer."></textarea></label>
           <label>Tolkning<textarea name="interpretation"></textarea></label>
           <div class="btn-row">
@@ -8685,7 +8685,7 @@ function renderVariants(section) {
       <label class="inline wide">Beskrivelse<textarea class="small" data-field="description" placeholder="Fri tekst"></textarea></label>
       <label class="inline">ACMG<select data-field="classification">${classificationOptions}</select></label>
       <label class="inline">Kriterier<input type="text" data-field="criteria" placeholder="PM1,PP3"></label>
-      <label class="inline">Allelfrekvens<input type="number" step="0.0001" data-field="af" placeholder="0.125"></label>
+      <label class="inline">VAF<input type="number" step="0.0001" data-field="af" placeholder="0,500"></label>
       <label class="inline wide">Annoteringer<textarea class="small" data-field="annotations" placeholder="VarSeq-annoteringer og noter"></textarea></label>
       <label class="inline wide">Tolkning<textarea class="small" data-field="interpretation" placeholder="Valgfrit"></textarea></label>
       <button type="button" class="secondary case-choose-library">Vælg fra bibliotek</button>
@@ -8893,7 +8893,7 @@ function renderVariants(section) {
       if (afRaw) {
         const afNumber = Number(afRaw);
         if (!Number.isFinite(afNumber)) {
-          const err = new Error(`Allelfrekvens skal være et tal i række ${idx + 1}.`);
+          const err = new Error(`VAF skal være et tal i række ${idx + 1}.`);
           err.focus = row.querySelector('[data-field="af"]');
           throw err;
         }
@@ -9066,7 +9066,7 @@ function renderVariants(section) {
       return classificationMap?.[key]?.display || '';
     }},
     {key:'criteria', label:'Kriterier'},
-    {key:'af', label:'Allelfrekvens'},
+    {key:'af', label:'VAF'},
     {key:'genomic_position', label:'Genomisk position'},
     {key:'genome_build', label:'Genom reference'},
     {key:'chromosome', label:'Kromosom'},
