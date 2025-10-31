@@ -1548,6 +1548,21 @@ button.secondary {
   color: var(--nav-button-color);
   border: 1px solid transparent;
 }
+button.text-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent-strong);
+  font-weight: 600;
+  cursor: pointer;
+}
+button.text-link:hover {
+  text-decoration: underline;
+}
+button.text-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 button.action-button {
   display: inline-flex;
   align-items: center;
@@ -15386,12 +15401,12 @@ function renderDbTab(section) {
   <div class="panel">
     <h2>Backup og eksport</h2>
     <div class="btn-row">
-      <button class="secondary" id="downloadBackup">Udfør backup</button>
-      <button class="secondary" type="button" id="restoreBackup">Gendan fra backup</button>
+      <button class="secondary" id="downloadBackup">Udfør backup (json)</button>
+      <button class="secondary" type="button" id="restoreBackup">Gendan fra backup (json)</button>
       <input type="file" id="restoreFile" accept="application/json" hidden>
     </div>
     <div class="btn-row">
-      <button class="primary" id="downloadSql">Hent glimr.sql</button>
+      <button class="text-link" type="button" id="downloadSql">Hent glimr.sql</button>
       <button class="secondary" id="showSchema">Vis skema</button>
       <button class="secondary" id="downloadZip">Hent ZIP</button>
     </div>
@@ -15459,17 +15474,12 @@ function renderDbTab(section) {
 function renderAdmin(section) {
   section.innerHTML = `
   <div class="panel">
-    <h2>Administrative værktøjer</h2>
+    <h2>Selvtest</h2>
+    <table><thead><tr><th>Test</th><th>Status</th><th>Detaljer</th></tr></thead><tbody id="testsBody"></tbody></table>
     <div class="btn-row">
+      <button class="primary" id="runTestsBtn">Kør selvtest</button>
       <button class="primary" id="demoDataBtn">Indlæs demo-data</button>
     </div>
-  </div>
-  <div class="panel">
-    <h2>Selvtest</h2>
-    <div class="btn-row">
-      <button class="secondary" id="runTestsBtn">Kør selvtest</button>
-    </div>
-    <table><thead><tr><th>Test</th><th>Status</th><th>Detaljer</th></tr></thead><tbody id="testsBody"></tbody></table>
   </div>
   <div class="panel">
     <div class="flex">
