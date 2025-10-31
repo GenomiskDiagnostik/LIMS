@@ -4619,6 +4619,76 @@ function findById(store, id) {
   return getCached(store).find(item => item.id === id);
 }
 
+function getLatestFamilyNumber() {
+  let bestFamily = '';
+  let bestTime = null;
+  let bestId = null;
+  for (const patient of getCached('patients')) {
+    if (!patient) continue;
+    const family = (patient.family_number || '').trim();
+    if (!family) continue;
+    const parsedTime = Date.parse(patient.created_at);
+    const time = Number.isFinite(parsedTime) ? parsedTime : null;
+    const numericId = Number(patient.id);
+    const id = Number.isFinite(numericId) ? numericId : null;
+    if (!bestFamily) {
+      bestFamily = family;
+      bestTime = time;
+      bestId = id;
+      continue;
+    }
+    if (time != null) {
+      if (bestTime == null || time > bestTime) {
+        bestFamily = family;
+        bestTime = time;
+        bestId = id;
+        continue;
+      }
+      if (bestTime != null && time === bestTime) {
+        const candidateId = id ?? -Infinity;
+        const currentId = bestId ?? -Infinity;
+        if (candidateId > currentId) {
+          bestFamily = family;
+          bestTime = time;
+          bestId = id;
+          continue;
+        }
+        if (candidateId === currentId && family.localeCompare(bestFamily, 'da') > 0) {
+          bestFamily = family;
+          bestTime = time;
+          bestId = id;
+        }
+      }
+      continue;
+    }
+    if (bestTime != null) {
+      continue;
+    }
+    const candidateId = id ?? -Infinity;
+    const currentId = bestId ?? -Infinity;
+    if (candidateId > currentId) {
+      bestFamily = family;
+      bestTime = time;
+      bestId = id;
+      continue;
+    }
+    if (candidateId === currentId && family.localeCompare(bestFamily, 'da') > 0) {
+      bestFamily = family;
+      bestTime = time;
+      bestId = id;
+    }
+  }
+  return bestFamily;
+}
+
+function getFamilyNumberPlaceholder() {
+  const latest = getLatestFamilyNumber().trim();
+  if (latest) {
+    return latest.startsWith('Fx') ? latest : `Fx ${latest}`;
+  }
+  return 'Fx FAM-001';
+}
+
 const orderDisplayNameCache = new Map();
 function clearOrderDisplayNameCache() {
   orderDisplayNameCache.clear();
@@ -5873,6 +5943,7 @@ function renderCreateCase(section) {
     .concat(families.map(num => `<option value="${esc(num)}">${esc(num)}</option>`))
     .concat('<option value="__custom__">Tilføj nyt familienummer…</option>')
     .join('');
+  const familyPlaceholder = getFamilyNumberPlaceholder();
   const panelOptions = panels.length
     ? panels.map(p => `<option value="${p.id}">${esc(p.name || `Panel #${p.id}`)}</option>`).join('')
     : '<option value="" disabled>Ingen paneler tilgængelige</option>';
@@ -5903,7 +5974,7 @@ function renderCreateCase(section) {
                 <select data-family-select>
                   ${familySelectOptions}
                 </select>
-                <input name="patient_family" data-family-input placeholder="Fx FAM-001">
+                <input name="patient_family" data-family-input placeholder="${esc(familyPlaceholder)}">
               </div>
             </label>
           </div>
@@ -6870,6 +6941,7 @@ function renderPatients(section) {
     .concat(existingFamilyNumbers.map(num => `<option value="${esc(num)}">${esc(num)}</option>`))
     .concat('<option value="__custom__">Tilføj nyt familienummer…</option>')
     .join('');
+  const familyPlaceholder = getFamilyNumberPlaceholder();
   section.innerHTML = `
   <div class="panel">
     <div class="flex">
@@ -6882,7 +6954,7 @@ function renderPatients(section) {
             <label>ID<input type="search" data-filter-patients="id" placeholder="Fx 152"></label>
             <label>MRN<input type="search" data-filter-patients="mrn" placeholder="MRN eller CPR"></label>
             <label>ID<input type="search" data-filter-patients="extra" placeholder="Fx lokalt ID"></label>
-            <label>Familienummer<input type="search" data-filter-patients="family" placeholder="Fx FAM-001"></label>
+            <label>Familienummer<input type="search" data-filter-patients="family" placeholder="${esc(familyPlaceholder)}"></label>
             <label>Navn<input type="search" data-filter-patients="name" placeholder="Patientnavn"></label>
             <label>Køn<select data-filter-patients="gender"><option value="">Alle</option><option value="male">Mand</option><option value="female">Kvinde</option><option value="other">Andet</option></select></label>
             <label>Fødselsår<input type="search" data-filter-patients="birth" placeholder="ÅÅÅÅ"></label>
@@ -6905,7 +6977,7 @@ function renderPatients(section) {
               <select data-family-select>
                 ${familySelectOptions}
               </select>
-              <input name="family_number" data-family-input placeholder="Fx FAM-001">
+              <input name="family_number" data-family-input placeholder="${esc(familyPlaceholder)}">
             </div>
           </label>
           <label>Navn<input name="name" required></label>
