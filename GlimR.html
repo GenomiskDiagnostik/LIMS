@@ -1363,14 +1363,23 @@ section[data-tab].active {
   fill-opacity: 0.9;
 }
 .variant-hotspot__band-overlay {
-  fill: transparent;
+  fill: rgba(15, 23, 42, 0.001);
   pointer-events: all;
   cursor: help;
+  transition: fill 0.12s ease;
 }
 .variant-hotspot__band-overlay:hover,
 .variant-hotspot__band-overlay:focus-visible,
 .variant-hotspot__band-overlay.is-hovered {
-  fill: rgba(24, 111, 175, 0.12);
+  fill: rgba(24, 111, 175, 0.16);
+}
+[data-theme="dark"] .variant-hotspot__band-overlay {
+  fill: rgba(226, 232, 240, 0.0025);
+}
+[data-theme="dark"] .variant-hotspot__band-overlay:hover,
+[data-theme="dark"] .variant-hotspot__band-overlay:focus-visible,
+[data-theme="dark"] .variant-hotspot__band-overlay.is-hovered {
+  fill: rgba(56, 189, 248, 0.22);
 }
 .variant-hotspot__bars rect {
   shape-rendering: crispEdges;
@@ -10944,9 +10953,9 @@ function renderVariantLibrary(section) {
       const fallbackLength = FALLBACK_CHROMOSOME_LENGTHS[chromosome] || maxPosition;
       const canonicalLength = cytobandLength || fallbackLength;
       const chromLength = Math.max(canonicalLength, maxPosition);
-      const densityTarget = Math.round(Math.sqrt(data.length) * 1.6);
-      const spanTarget = chromLength > 0 ? Math.round(chromLength / 4000000) : 0;
-      const thresholds = Math.min(140, Math.max(18, densityTarget, spanTarget));
+      const densityTarget = Math.round(Math.sqrt(data.length) * 2.4);
+      const spanTarget = chromLength > 0 ? Math.round(chromLength / 600000) : 0;
+      const thresholds = Math.min(MAX_BASE_THRESHOLD, Math.max(MIN_BIN_THRESHOLD, densityTarget, spanTarget));
       const histogram = d3.bin()
         .domain([0, chromLength])
         .thresholds(thresholds)(data.map(d => d.position));
@@ -11018,6 +11027,40 @@ function renderVariantLibrary(section) {
           const widthValue = scale(end) - scale(start);
           return Math.max(1, widthValue);
         });
+    };
+    const MIN_BIN_THRESHOLD = 24;
+    const MAX_BASE_THRESHOLD = 5000;
+    const MAX_DYNAMIC_THRESHOLD = 50000;
+    const ZOOM_BIN_EXPONENT = 2;
+    const updateBarTitles = (selection, row) => {
+      selection.each(function(d) {
+        const node = d3.select(this);
+        node.selectAll('title')
+          .data([d])
+          .join('title')
+          .text(bin => {
+            const count = bin.length;
+            const startValue = Math.max(0, bin.x0 || 0);
+            const endValue = Math.max(startValue, bin.x1 || bin.x0 || 0);
+            const rangeLabel = startValue === endValue
+              ? formatPosition(startValue)
+              : `${formatPosition(startValue)} – ${formatPosition(endValue)}`;
+            const percentage = coordinatesCount ? (count / coordinatesCount) * 100 : 0;
+            const percentageLabel = Number.isFinite(percentage) && percentage > 0
+              ? ` (${percentage.toFixed(percentage >= 10 ? 0 : 1)}%)`
+              : '';
+            if (!count) {
+              return `Ingen SNV/indels på kromosom ${row.chromosome} i intervallet ${rangeLabel}.`;
+            }
+            return `${count} SNV/indel${count === 1 ? '' : 'er'} på kromosom ${row.chromosome} i intervallet ${rangeLabel}${percentageLabel}.`;
+          });
+      });
+    };
+    const computeAdaptiveThresholds = (baseThresholds, zoomLevel) => {
+      const base = Number.isFinite(baseThresholds) && baseThresholds > 0 ? baseThresholds : MIN_BIN_THRESHOLD;
+      const scale = Math.pow(Math.max(1, zoomLevel), ZOOM_BIN_EXPONENT);
+      const next = Math.round(base * scale);
+      return Math.min(MAX_DYNAMIC_THRESHOLD, Math.max(MIN_BIN_THRESHOLD, next));
     };
     rowStates = [];
     activeBandState = null;
@@ -11109,73 +11152,46 @@ function renderVariantLibrary(section) {
       bandOverlays.selectAll('title').remove();
       bandOverlays.append('title')
         .text(describeBand);
-      bandOverlays
-        .on('mouseenter', (event, d) => {
-          setActiveBand(rowState, d);
-          showBandTooltip(event, d, row);
-        })
-        .on('mousemove', event => {
-          updateTooltipPosition(event);
-        })
-        .on('mouseleave', () => {
-          hideTooltip();
-        })
-        .on('touchstart', (event, d) => {
-          setActiveBand(rowState, d);
-          showBandTooltip(event, d, row);
-        })
-        .on('touchmove', event => {
-          updateTooltipPosition(event);
-        })
-        .on('touchend', () => {
-          hideTooltip();
-        })
-        .on('touchcancel', () => {
-          hideTooltip();
-        });
+      let rowState;
       const barsGroup = rowGroup.append('g')
         .attr('class', 'variant-hotspot__bars')
         .attr('clip-path', `url(#${clipId})`);
-      const bars = barsGroup.selectAll('rect')
-        .data(row.histogram)
-        .join(
-          enter => enter.append('rect')
-            .attr('y', 0)
-            .attr('height', bandHeight)
-            .attr('rx', 2)
-            .attr('ry', 2)
+      const refreshBars = (bins, {scale = baseScale, animate = false} = {}) => {
+        const barSelection = barsGroup.selectAll('rect')
+          .data(bins, bin => `${Math.round(bin.x0 || 0)}-${Math.round(bin.x1 || 0)}`);
+        barSelection.exit().remove();
+        const barEnter = barSelection.enter().append('rect')
+          .attr('y', 0)
+          .attr('height', bandHeight)
+          .attr('rx', 2)
+          .attr('ry', 2);
+        if (animate) {
+          barEnter
             .attr('fill', d => colorScale(d.length))
             .attr('opacity', 0)
             .call(enter => enter.transition().duration(600).delay((_, i) => i * 18)
-              .attr('opacity', d => (d.length ? 0.95 : 0.4))),
-          update => update
-            .attr('y', 0)
-            .attr('height', bandHeight)
-            .attr('rx', 2)
-            .attr('ry', 2)
+              .attr('opacity', d => (d.length ? 0.95 : 0.4)));
+        } else {
+          barEnter
             .attr('fill', d => colorScale(d.length))
-            .attr('opacity', d => (d.length ? 0.95 : 0.4)),
-          exit => exit.remove()
-        );
-      applyScaleToBars(bars, baseScale);
-      bars.selectAll('title').remove();
-      bars.append('title')
-        .text(d => {
-          const count = d.length;
-          const startValue = Math.max(0, d.x0 || 0);
-          const endValue = Math.max(startValue, d.x1 || d.x0 || 0);
-          const rangeLabel = startValue === endValue
-            ? formatPosition(startValue)
-            : `${formatPosition(startValue)} – ${formatPosition(endValue)}`;
-          const percentage = coordinatesCount ? (count / coordinatesCount) * 100 : 0;
-          const percentageLabel = Number.isFinite(percentage) && percentage > 0
-            ? ` (${percentage.toFixed(percentage >= 10 ? 0 : 1)}%)`
-            : '';
-          if (!count) {
-            return `Ingen SNV/indels på kromosom ${row.chromosome} i intervallet ${rangeLabel}.`;
-          }
-          return `${count} SNV/indel${count === 1 ? '' : 'er'} på kromosom ${row.chromosome} i intervallet ${rangeLabel}${percentageLabel}.`;
-        });
+            .attr('opacity', d => (d.length ? 0.95 : 0.4));
+        }
+        const merged = barEnter.merge(barSelection)
+          .attr('y', 0)
+          .attr('height', bandHeight)
+          .attr('rx', 2)
+          .attr('ry', 2)
+          .attr('fill', d => colorScale(d.length))
+          .attr('opacity', d => (d.length ? 0.95 : 0.4));
+        updateBarTitles(merged, row);
+        applyScaleToBars(merged, scale);
+        if (rowState) {
+          rowState.histogram = bins;
+          rowState.bars = merged;
+        }
+        return merged;
+      };
+      const bars = refreshBars(row.histogram, {animate: true});
       rowGroup.append('text')
         .attr('class', 'variant-hotspot__chromosome')
         .attr('x', -12)
@@ -11191,8 +11207,9 @@ function renderVariantLibrary(section) {
         .ticks(tickCount)
         .tickFormat(value => formatPosition(value)));
       styleAxis(axisGroup);
-      const rowState = {
+      rowState = {
         baseScale,
+        refreshBars,
         bars,
         bands: bandRects,
         bandOverlays,
@@ -11200,8 +11217,36 @@ function renderVariantLibrary(section) {
         row,
         yOffset: index * rowHeight,
         axisGroup,
-        tickCount
+        tickCount,
+        baseThresholds: thresholds,
+        currentThresholds: thresholds,
+        dataPositions: row.data.map(d => d.position),
+        histogram: row.histogram
       };
+      bandOverlays
+        .on('mouseenter', (event, d) => {
+          setActiveBand(rowState, d);
+          showBandTooltip(event, d, rowState.row);
+        })
+        .on('mousemove', event => {
+          updateTooltipPosition(event);
+        })
+        .on('mouseleave', () => {
+          hideTooltip();
+        })
+        .on('touchstart', (event, d) => {
+          setActiveBand(rowState, d);
+          showBandTooltip(event, d, rowState.row);
+        })
+        .on('touchmove', event => {
+          updateTooltipPosition(event);
+        })
+        .on('touchend', () => {
+          hideTooltip();
+        })
+        .on('touchcancel', () => {
+          hideTooltip();
+        });
       rowStates.push(rowState);
     });
     const formatZoomLevel = value => {
@@ -11288,21 +11333,49 @@ function renderVariantLibrary(section) {
       })
       .on('zoom', event => {
         currentTransform = event.transform;
+        let dynamicMax = 0;
+        const zoomLevel = currentTransform.k;
         rowStates.forEach(state => {
           const scaled = event.transform.rescaleX(state.baseScale);
-          applyScaleToBars(state.bars, scaled);
+          const targetThresholds = computeAdaptiveThresholds(state.baseThresholds, zoomLevel);
+          if (targetThresholds !== state.currentThresholds) {
+            const binGenerator = d3.bin()
+              .domain([0, state.row.chromLength])
+              .thresholds(targetThresholds);
+            const sourceData = Array.isArray(state.dataPositions) ? state.dataPositions : [];
+            const newHistogram = binGenerator(sourceData);
+            state.currentThresholds = targetThresholds;
+            if (typeof state.refreshBars === 'function') {
+              state.refreshBars(newHistogram, {scale: scaled});
+            }
+          } else if (state.bars) {
+            applyScaleToBars(state.bars, scaled);
+          }
           if (state.bands) {
             applyScaleToBars(state.bands, scaled);
           }
           if (state.bandOverlays) {
             applyScaleToBars(state.bandOverlays, scaled);
           }
-          const scaledTickCount = Math.min(12, Math.max(2, Math.round(state.tickCount * event.transform.k)));
+          const scaledTickCount = Math.min(12, Math.max(2, Math.round(state.tickCount * zoomLevel)));
           state.axisGroup.call(d3.axisBottom(scaled)
             .ticks(scaledTickCount)
             .tickFormat(value => formatPosition(value)));
           styleAxis(state.axisGroup);
+          const stateMax = d3.max(state.histogram || [], bin => bin.length) || 0;
+          if (stateMax > dynamicMax) {
+            dynamicMax = stateMax;
+          }
         });
+        updateColorScaleDomain(dynamicMax || 1);
+        rowStates.forEach(state => {
+          if (state.bars) {
+            state.bars
+              .attr('fill', d => colorScale(d.length))
+              .attr('opacity', d => (d.length ? 0.95 : 0.4));
+          }
+        });
+        refreshCaptionMax();
         updateZoomIndicator();
         if (event.sourceEvent && event.sourceEvent.type === 'wheel') {
           hideTooltip();
@@ -11366,10 +11439,10 @@ function renderVariantLibrary(section) {
       .attr('x2', '100%')
       .attr('y1', '0%')
       .attr('y2', '0%');
-    gradient.append('stop')
+    const gradientStart = gradient.append('stop')
       .attr('offset', '0%')
       .attr('stop-color', colorScale(0));
-    gradient.append('stop')
+    const gradientEnd = gradient.append('stop')
       .attr('offset', '100%')
       .attr('stop-color', colorScale(maxBinCount));
     const legendWidth = Math.min(220, innerWidth);
@@ -11392,7 +11465,7 @@ function renderVariantLibrary(section) {
       .attr('x', 0)
       .attr('y', legendHeight + 12)
       .text('0');
-    legendGroup.append('text')
+    const legendMaxLabel = legendGroup.append('text')
       .attr('class', 'variant-hotspot__legend-label')
       .attr('x', legendWidth)
       .attr('y', legendHeight + 12)
@@ -11404,6 +11477,16 @@ function renderVariantLibrary(section) {
       .attr('y', legendHeight + 12)
       .attr('text-anchor', 'middle')
       .text('Flere SNV/indels →');
+    let currentMaxBinCount = Math.max(1, maxBinCount);
+    const updateColorScaleDomain = newMax => {
+      const safeMax = Math.max(1, newMax);
+      currentMaxBinCount = safeMax;
+      colorScale.domain([0, safeMax]);
+      gradientStart.attr('stop-color', colorScale(0));
+      gradientEnd.attr('stop-color', colorScale(safeMax));
+      const displayMax = Math.max(0, Math.round(newMax));
+      legendMaxLabel.text(String(displayMax));
+    };
     const summaryParts = [`${coordinatesCount} SNV/indel${coordinatesCount === 1 ? '' : 'er'} i ${buildLabel}`];
     if (missingCount > 0) {
       summaryParts.push(`(${missingCount} uden koordinater)`);
@@ -11415,13 +11498,19 @@ function renderVariantLibrary(section) {
       summaryParts.push(`(${excludedCount} andre varianttyper udeladt)`);
     }
     updateHotspotSummary(summaryParts.join(' '));
-    const captionDetails = [
+    let captionDetails = [
       `Vist mod ${buildLabel}, hvor farveintensiteten afspejler antallet af SNV/indels i hvert kromosomsegment.`,
-      maxBinCount > 1
-        ? `Det travleste segment indeholder ${maxBinCount} registrering${maxBinCount === 1 ? '' : 'er'}.`
+      currentMaxBinCount > 1
+        ? `Det travleste segment indeholder ${currentMaxBinCount} registrering${currentMaxBinCount === 1 ? '' : 'er'}.`
         : 'Alle viste segmenter rummer højst én registrering.',
       'Cytobåndene markerer de navngivne p/q-segmenter for den valgte reference – hold markøren over båndene for detaljer.'
     ];
+    const refreshCaptionMax = () => {
+      captionDetails[1] = currentMaxBinCount > 1
+        ? `Det travleste segment indeholder ${currentMaxBinCount} registrering${currentMaxBinCount === 1 ? '' : 'er'}.`
+        : 'Alle viste segmenter rummer højst én registrering.';
+      updateHotspotCaption(captionDetails.join(' '));
+    };
     if (missingCount > 0) {
       captionDetails.push(`${missingCount} SNV/indel${missingCount === 1 ? '' : 'er'} mangler koordinater og indgår derfor ikke.`);
     }
@@ -11432,7 +11521,7 @@ function renderVariantLibrary(section) {
       captionDetails.push(`${excludedCount} variant${excludedCount === 1 ? '' : 'er'} af andre typer vises ikke i hotspot-grafen.`);
     }
     captionDetails.push('Zoom med scrollhjulet eller ved at trække for at undersøge kromosomerne. Dobbeltklik eller brug “Nulstil zoom” for at vende tilbage til udgangspunktet.');
-    updateHotspotCaption(captionDetails.join(' '));
+    refreshCaptionMax();
   };
   const csvColumns = [
     {key: 'id', label: 'ID'},
