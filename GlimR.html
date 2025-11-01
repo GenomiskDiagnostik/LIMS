@@ -436,22 +436,6 @@ section[data-tab].active {
   gap: 0.6rem;
   margin-bottom: 0.8rem;
 }
-.planning-missing-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  align-items: flex-end;
-}
-.planning-missing-controls label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.85rem;
-  color: var(--muted-text);
-}
-.planning-missing-controls select {
-  font-size: 0.9rem;
-}
 .planning-missing-totals {
   display: flex;
   flex-wrap: wrap;
@@ -521,10 +505,6 @@ section[data-tab].active {
 }
 .planning-missing-missing {
   font-weight: 600;
-}
-.planning-missing-actions {
-  display: flex;
-  justify-content: flex-end;
 }
 .planning-missing-priority {
   display: inline-flex;
@@ -13631,15 +13611,7 @@ function renderPlanner(section) {
     </summary>
     <div class="tool-body">
       <div class="planning-missing-intro">
-        <p>Følg op på ordinationer, der mangler ansvarlige roller, så opgaverne hurtigt kan fordeles.</p>
-        <div class="planning-missing-controls">
-          <label>Sortering
-            <select id="planningMissingSort">
-              <option value="role" selected>Efter manglende rolle</option>
-              <option value="order">Efter ordination</option>
-            </select>
-          </label>
-        </div>
+        <p>Følg op på ordinationer, der mangler ansvarlige roller, så opgaverne hurtigt kan fordeles. Klik på en række for at åbne ordinationen i Ordinationer.</p>
         <div class="planning-missing-totals" id="planningMissingTotals"></div>
       </div>
       <div id="planningMissingList"></div>
@@ -13656,7 +13628,6 @@ function renderPlanner(section) {
   const planningMissingSummary = section.querySelector('#planningMissingSummary');
   const planningMissingTotals = section.querySelector('#planningMissingTotals');
   const planningMissingList = section.querySelector('#planningMissingList');
-  const planningMissingSort = section.querySelector('#planningMissingSort');
 
   const ROLE_LABELS = {
     analysis_responsible_id: 'Analyseansvarlig',
@@ -14187,11 +14158,9 @@ function renderPlanner(section) {
       planningMissingSummary.textContent = 'Log ind for at se manglende roller.';
       planningMissingTotals.innerHTML = '';
       planningMissingList.innerHTML = '<p class="planning-missing-empty">Log ind for at se hvilke ordinationer der mangler analyseansvarlig, tolk eller godkender.</p>';
-      if (planningMissingSort) planningMissingSort.disabled = true;
       return;
     }
     const assignments = computeMissingAssignments();
-    if (planningMissingSort) planningMissingSort.disabled = assignments.length === 0;
     const totals = ROLE_ORDER.map(key => ({
       key,
       label: ROLE_LABELS[key] || key,
@@ -14215,22 +14184,25 @@ function renderPlanner(section) {
       .map(item => `<span><strong>${esc(item.label)}:</strong> ${esc(String(item.count))}</span>`)
       .join('');
     planningMissingTotals.innerHTML = totalsHtml || '<span>Ingen mangler registreret.</span>';
-    const sortValue = planningMissingSort?.value || 'role';
     const collator = new Intl.Collator('da', {sensitivity: 'base'});
-    const sorted = assignments.slice().sort((a, b) => {
-      if (sortValue === 'order') {
-        const nameCompare = collator.compare(a.orderName, b.orderName);
-        if (nameCompare !== 0) return nameCompare;
-        return a.orderId - b.orderId;
+    const getPrimaryRoleIndex = entry => {
+      if (!entry || !Array.isArray(entry.missingKeys) || !entry.missingKeys.length) {
+        return ROLE_ORDER.length;
       }
-      const roleA = a.missingKeys[0] || '';
-      const roleB = b.missingKeys[0] || '';
-      const idxA = ROLE_ORDER.indexOf(roleA);
-      const idxB = ROLE_ORDER.indexOf(roleB);
+      let index = ROLE_ORDER.length;
+      entry.missingKeys.forEach(key => {
+        const roleIndex = ROLE_ORDER.indexOf(key);
+        if (roleIndex !== -1 && roleIndex < index) {
+          index = roleIndex;
+        }
+      });
+      return index;
+    };
+    const sorted = assignments.slice().sort((a, b) => {
+      const idxA = getPrimaryRoleIndex(a);
+      const idxB = getPrimaryRoleIndex(b);
       if (idxA !== idxB) {
-        const normalisedA = idxA === -1 ? ROLE_ORDER.length : idxA;
-        const normalisedB = idxB === -1 ? ROLE_ORDER.length : idxB;
-        return normalisedA - normalisedB;
+        return idxA - idxB;
       }
       if (Number.isFinite(a.orderedTimestamp) && Number.isFinite(b.orderedTimestamp) && a.orderedTimestamp !== b.orderedTimestamp) {
         return a.orderedTimestamp - b.orderedTimestamp;
@@ -14262,13 +14234,12 @@ function renderPlanner(section) {
           <td class="planning-missing-missing">${missingText}</td>
           <td>${statusText}</td>
           <td>${orderedText}</td>
-          <td class="planning-missing-actions"><button type="button" class="secondary planning-button" data-open-order="${esc(entry.orderId)}">Åbn i Ordinationer</button></td>
         </tr>`;
     }).join('');
     planningMissingList.innerHTML = `
       <table class="planning-missing-table">
         <thead>
-          <tr><th>Ordination</th><th>Mangler</th><th>Status</th><th>Bestilt</th><th>Handling</th></tr>
+          <tr><th>Ordination</th><th>Mangler</th><th>Status</th><th>Bestilt</th></tr>
         </thead>
         <tbody>${rowsHtml}
         </tbody>
@@ -15615,18 +15586,9 @@ function renderTools(section) {
           alert('Kunne ikke kopiere til udklipsholderen.');
       }
     });
-
-    planningMissingSort?.addEventListener('change', () => renderMissingAssignments());
-
     planningMissingList?.addEventListener('click', event => {
       const target = event.target;
       if (!(target instanceof HTMLElement)) return;
-      const button = target.closest('button[data-open-order]');
-      if (button) {
-        const orderId = button.dataset.openOrder;
-        if (orderId) openOrderDetails(orderId, {showAll: true});
-        return;
-      }
       const row = target.closest('tr[data-order-id]');
       if (row) {
         const orderId = row.getAttribute('data-order-id');
