@@ -1290,7 +1290,19 @@ section[data-tab].active {
   font-size: 0.75rem;
 }
 .variant-hotspot__track {
-  fill: rgba(24, 111, 175, 0.1);
+  fill: rgba(24, 111, 175, 0.08);
+}
+.variant-hotspot__bands {
+  pointer-events: none;
+}
+.variant-hotspot__band {
+  fill: rgba(24, 111, 175, 0.16);
+}
+.variant-hotspot__band--q {
+  fill: rgba(24, 111, 175, 0.05);
+}
+.variant-hotspot__band--whole {
+  fill: rgba(24, 111, 175, 0.12);
 }
 .variant-hotspot__bars rect {
   shape-rendering: crispEdges;
@@ -1316,7 +1328,16 @@ section[data-tab].active {
   stroke: var(--panel-border);
 }
 [data-theme="dark"] .variant-hotspot__track {
-  fill: rgba(56, 189, 248, 0.14);
+  fill: rgba(56, 189, 248, 0.16);
+}
+[data-theme="dark"] .variant-hotspot__band {
+  fill: rgba(56, 189, 248, 0.26);
+}
+[data-theme="dark"] .variant-hotspot__band--q {
+  fill: rgba(56, 189, 248, 0.12);
+}
+[data-theme="dark"] .variant-hotspot__band--whole {
+  fill: rgba(56, 189, 248, 0.2);
 }
 [data-theme="dark"] .variant-hotspot__chart svg {
   color: var(--text);
@@ -10591,6 +10612,33 @@ function renderVariantLibrary(section) {
       'Y': 57227415,
       'MT': 16569
     };
+    const CHROMOSOME_CENTROMERES = {
+      '1': 123400000,
+      '2': 93900000,
+      '3': 90900000,
+      '4': 50000000,
+      '5': 48750000,
+      '6': 60550000,
+      '7': 60100000,
+      '8': 45200000,
+      '9': 43850000,
+      '10': 39800000,
+      '11': 53400000,
+      '12': 35500000,
+      '13': 17700000,
+      '14': 17150000,
+      '15': 19000000,
+      '16': 36850000,
+      '17': 25050000,
+      '18': 18450000,
+      '19': 26150000,
+      '20': 28050000,
+      '21': 11950000,
+      '22': 15550000,
+      'X': 60950000,
+      'Y': 10450000,
+      'MT': 0
+    };
     const compareChromosomes = (a, b) => {
       const indexA = CHROMOSOME_ORDER.indexOf(a);
       const indexB = CHROMOSOME_ORDER.indexOf(b);
@@ -10612,10 +10660,11 @@ function renderVariantLibrary(section) {
     const maxBinCount = d3.max(rows, row => d3.max(row.histogram, bin => bin.length)) || 1;
     const containerWidth = hotspotChartContainer.clientWidth || 960;
     const width = Math.max(containerWidth, 720);
-    const margin = {top: 24, right: 32, bottom: 72, left: 104};
-    const bandHeight = 22;
-    const axisOffset = bandHeight + 36;
-    const rowHeight = axisOffset + 36;
+    const margin = {top: 28, right: 40, bottom: 88, left: 120};
+    const bandHeight = 24;
+    const axisOffset = bandHeight + 14;
+    const rowSpacing = 60;
+    const rowHeight = axisOffset + rowSpacing;
     const chartHeight = Math.max(rowHeight, rowHeight * rows.length);
     const innerWidth = width - margin.left - margin.right;
     const height = margin.top + margin.bottom + chartHeight;
@@ -10642,7 +10691,7 @@ function renderVariantLibrary(section) {
       return `${Math.round(value)} bp`;
     };
     const styleAxis = axisSelection => {
-      axisSelection.selectAll('text').attr('dy', '0.95em');
+      axisSelection.selectAll('text').attr('dy', '0.7em');
       axisSelection.selectAll('line').attr('opacity', 0.35);
       const domain = axisSelection.select('.domain');
       if (!domain.empty()) {
@@ -10681,6 +10730,25 @@ function renderVariantLibrary(section) {
         .attr('height', bandHeight)
         .attr('rx', 6)
         .attr('ry', 6);
+      const centromere = CHROMOSOME_CENTROMERES[row.chromosome];
+      const centromerePosition = Number.isFinite(centromere) ? Math.max(0, Math.min(centromere, row.chromLength)) : null;
+      const bandData = [];
+      if (centromerePosition && centromerePosition > 0 && centromerePosition < row.chromLength) {
+        bandData.push({type: 'p', x0: 0, x1: centromerePosition});
+        bandData.push({type: 'q', x0: centromerePosition, x1: row.chromLength});
+      } else {
+        bandData.push({type: 'whole', x0: 0, x1: row.chromLength});
+      }
+      const bandGroup = rowGroup.append('g')
+        .attr('class', 'variant-hotspot__bands')
+        .attr('clip-path', `url(#${clipId})`);
+      const bandRects = bandGroup.selectAll('rect')
+        .data(bandData)
+        .join('rect')
+        .attr('class', d => `variant-hotspot__band variant-hotspot__band--${d.type}`)
+        .attr('y', 0)
+        .attr('height', bandHeight);
+      applyScaleToBars(bandRects, baseScale);
       const barsGroup = rowGroup.append('g')
         .attr('class', 'variant-hotspot__bars')
         .attr('clip-path', `url(#${clipId})`);
@@ -10731,7 +10799,7 @@ function renderVariantLibrary(section) {
         .attr('dy', '0.35em')
         .attr('text-anchor', 'end')
         .text(`Chr ${row.chromosome}`);
-      const tickCount = Math.min(6, Math.max(2, Math.round(innerWidth / 160)));
+      const tickCount = Math.min(6, Math.max(2, Math.round(innerWidth / 140)));
       const axisGroup = rowGroup.append('g')
         .attr('class', 'variant-hotspot__axis')
         .attr('transform', `translate(0, ${axisOffset})`);
@@ -10742,6 +10810,7 @@ function renderVariantLibrary(section) {
       rowStates.push({
         baseScale,
         bars,
+        bands: bandRects,
         axisGroup,
         tickCount
       });
@@ -10786,6 +10855,9 @@ function renderVariantLibrary(section) {
         rowStates.forEach(state => {
           const scaled = event.transform.rescaleX(state.baseScale);
           applyScaleToBars(state.bars, scaled);
+          if (state.bands) {
+            applyScaleToBars(state.bands, scaled);
+          }
           const scaledTickCount = Math.min(12, Math.max(2, Math.round(state.tickCount * event.transform.k)));
           state.axisGroup.call(d3.axisBottom(scaled)
             .ticks(scaledTickCount)
@@ -10879,6 +10951,7 @@ function renderVariantLibrary(section) {
     } else {
       captionDetails.push('Alle viste segmenter rummer højst én registrering.');
     }
+    captionDetails.push('De diskrete bånd angiver de korte (p) og lange (q) kromosomarme, så segmenternes placering kan aflæses hurtigere.');
     if (missingCount > 0) {
       captionDetails.push(`${missingCount} SNV/indel${missingCount === 1 ? '' : 'er'} mangler koordinater og indgår derfor ikke.`);
     }
