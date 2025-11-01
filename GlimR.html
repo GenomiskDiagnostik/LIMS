@@ -10970,6 +10970,7 @@ function renderVariantLibrary(section) {
     const MAX_DYNAMIC_THRESHOLD = 50000;
     const ZOOM_BIN_EXPONENT = 2;
     const MIN_BAND_LABEL_PX = 2;
+    const MIN_CENTROMERE_WIDTH_BP = 1000000;
 
     const rows = grouped.map(([chromosome, data]) => {
       const maxPosition = d3.max(data, d => d.position) || 1;
@@ -11052,10 +11053,14 @@ function renderVariantLibrary(section) {
     };
     const applyScaleToBars = (selection, scale) => {
       selection
-        .attr('x', d => scale(Math.max(0, d.x0 || 0)))
+        .attr('x', d => {
+          const start = Math.max(0, (d?.visualStart ?? d?.x0 ?? 0));
+          return scale(start);
+        })
         .attr('width', d => {
-          const start = Math.max(0, d.x0 || 0);
-          const end = Math.max(start, d.x1 || d.x0 || 0);
+          const start = Math.max(0, (d?.visualStart ?? d?.x0 ?? 0));
+          const endCandidate = d?.visualEnd ?? d?.x1 ?? d?.x0 ?? 0;
+          const end = Math.max(start, endCandidate);
           const widthValue = scale(end) - scale(start);
           return Math.max(1, widthValue);
         });
@@ -11063,15 +11068,15 @@ function renderVariantLibrary(section) {
     const applyScaleToBandLabels = (selection, scale) => {
       selection
         .attr('x', d => {
-          const start = Math.max(0, d.x0 || 0);
-          const end = Math.max(start, d.x1 || d.x0 || 0);
+          const start = Math.max(0, (d?.visualStart ?? d?.x0 ?? 0));
+          const end = Math.max(start, d?.visualEnd ?? d?.x1 ?? d?.x0 ?? 0);
           const midPoint = start + ((end - start) / 2);
           return scale(midPoint);
         })
         .attr('display', d => {
           if (!d?.name) return 'none';
-          const start = Math.max(0, d.x0 || 0);
-          const end = Math.max(start, d.x1 || d.x0 || 0);
+          const start = Math.max(0, (d?.visualStart ?? d?.x0 ?? 0));
+          const end = Math.max(start, d?.visualEnd ?? d?.x1 ?? d?.x0 ?? 0);
           const widthValue = scale(end) - scale(start);
           return widthValue >= MIN_BAND_LABEL_PX ? null : 'none';
         });
@@ -11158,7 +11163,34 @@ function renderVariantLibrary(section) {
           }
           return sum;
         }, 0);
-        return {...band, count, xUpper: upperBound};
+        let visualStart = band.x0;
+        let visualEnd = band.x1;
+        if (band.stain === 'acen') {
+          const baseWidth = Math.max(0, band.x1 - band.x0);
+          const desiredWidth = Math.min(row.chromLength, Math.max(baseWidth, MIN_CENTROMERE_WIDTH_BP));
+          const center = band.x0 + (baseWidth / 2);
+          let startCandidate = center - (desiredWidth / 2);
+          let endCandidate = center + (desiredWidth / 2);
+          if (!Number.isFinite(startCandidate) || !Number.isFinite(endCandidate)) {
+            startCandidate = band.x0;
+            endCandidate = band.x0 + desiredWidth;
+          }
+          visualStart = Math.max(0, startCandidate);
+          visualEnd = Math.min(row.chromLength, endCandidate);
+          if (visualEnd - visualStart < desiredWidth) {
+            if (visualStart <= 0) {
+              visualEnd = Math.min(row.chromLength, desiredWidth);
+            } else if (visualEnd >= row.chromLength) {
+              visualStart = Math.max(0, row.chromLength - desiredWidth);
+            }
+          }
+          if (visualEnd <= visualStart) {
+            visualStart = Math.max(0, band.x0);
+            visualEnd = Math.max(visualStart, Math.min(row.chromLength, band.x1));
+          }
+        }
+        const visualUpper = index === bandData.length - 1 ? visualEnd + 1 : visualEnd;
+        return {...band, count, xUpper: upperBound, visualStart, visualEnd, visualUpper};
       });
       const bandGroup = rowGroup.append('g')
         .attr('class', 'variant-hotspot__bands')
@@ -11335,9 +11367,11 @@ function renderVariantLibrary(section) {
       const stateBands = state.bandData || [];
       for (let index = 0; index < stateBands.length; index++) {
         const band = stateBands[index];
-        const upper = band.xUpper ?? band.x1;
+        const lower = band.visualStart ?? band.x0;
+        const upper = band.visualUpper ?? band.visualEnd ?? band.xUpper ?? band.x1;
+        if (!Number.isFinite(lower) || !Number.isFinite(upper)) continue;
         const isLast = index === stateBands.length - 1;
-        if (domainValue >= band.x0 && (isLast ? domainValue <= upper : domainValue < upper)) {
+        if (domainValue >= lower && (isLast ? domainValue <= upper : domainValue < upper)) {
           return {state, band};
         }
       }
