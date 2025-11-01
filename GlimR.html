@@ -502,6 +502,11 @@ section[data-tab].active {
 .planning-missing-table tbody tr:hover {
   background: rgba(24, 111, 175, 0.08);
 }
+.planning-missing-table tbody tr:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  background: rgba(24, 111, 175, 0.12);
+}
 [data-theme="dark"] .planning-missing-table tbody tr:hover {
   background: rgba(56, 189, 248, 0.12);
 }
@@ -14280,7 +14285,7 @@ function renderPlanner(section) {
       const statusText = entry.status ? esc(entry.status) : 'Ikke angivet';
       const orderedText = entry.orderedDisplay ? esc(entry.orderedDisplay) : 'Ukendt';
       return `
-        <tr data-order-id="${esc(entry.orderId)}">
+        <tr data-order-id="${esc(entry.orderId)}" role="button" tabindex="0">
           <td>
             <div class="planning-missing-order">
               <div class="planning-missing-name">${priorityHtml}${priorityHtml ? ' ' : ''}${esc(entry.orderName)}</div>
@@ -14301,6 +14306,23 @@ function renderPlanner(section) {
         </tbody>
       </table>
     `;
+    const handleRowActivation = event => {
+      if (event.type === 'keydown') {
+        const key = event.key;
+        if (key !== 'Enter' && key !== ' ') return;
+        event.preventDefault();
+      }
+      const target = event.currentTarget;
+      if (!target) return;
+      const orderId = target.getAttribute('data-order-id');
+      if (orderId) {
+        openOrderDetails(orderId, {showAll: true, filter: true});
+      }
+    };
+    planningMissingList.querySelectorAll('tbody tr[data-order-id]').forEach(row => {
+      row.addEventListener('click', handleRowActivation);
+      row.addEventListener('keydown', handleRowActivation);
+    });
   };
 
   const updatePlanningSummary = () => {
@@ -15641,16 +15663,6 @@ function renderTools(section) {
         } catch (err) {
           console.error(err);
           alert('Kunne ikke kopiere til udklipsholderen.');
-      }
-    });
-    planningMissingList?.addEventListener('click', event => {
-      const target = event.target;
-      const element = target instanceof Element ? target : target?.parentElement;
-      if (!element) return;
-      const row = element.closest('tr[data-order-id]');
-      if (row) {
-        const orderId = row.getAttribute('data-order-id');
-        if (orderId) openOrderDetails(orderId, {showAll: true, filter: true});
       }
     });
   }
