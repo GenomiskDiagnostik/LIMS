@@ -11041,6 +11041,18 @@ function renderVariantLibrary(section) {
           return Math.max(1, widthValue);
         });
     };
+    const raiseSelection = selection => {
+      if (!selection) return;
+      if (typeof selection.raise === 'function') {
+        selection.raise();
+        return;
+      }
+      const node = typeof selection.node === 'function' ? selection.node() : null;
+      const parent = node?.parentNode;
+      if (parent && node) {
+        parent.appendChild(node);
+      }
+    };
     const applyScaleToBandLabels = (selection, scale) => {
       selection
         .attr('x', d => {
@@ -11233,8 +11245,8 @@ function renderVariantLibrary(section) {
         .attr('ry', 3)
         .attr('opacity', 0.9);
       applyScaleToBars(centromereRects, baseScale);
-      bandOverlayGroup.raise();
-      bandLabelGroup.raise();
+      raiseSelection(bandOverlayGroup);
+      raiseSelection(bandLabelGroup);
       const refreshBars = (bins, {scale = baseScale, animate = false} = {}) => {
         const barSelection = barsGroup.selectAll('rect')
           .data(bins, bin => `${Math.round(bin.x0 || 0)}-${Math.round(bin.x1 || 0)}`);
