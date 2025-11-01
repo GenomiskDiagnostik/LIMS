@@ -1938,50 +1938,6 @@ form textarea {
 .variant-row .variant-structure-grid {
   display: contents;
 }
-.variant-row.variant-row--batch {
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 0.65rem;
-  padding: 0.8rem 0.85rem;
-  gap: 0.55rem 0.75rem;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  box-shadow: var(--shadow);
-}
-.variant-row.variant-row--batch > button {
-  min-width: 0;
-  justify-self: flex-start;
-}
-.variant-batch-fieldset .fieldset-body {
-  display: grid;
-  gap: 1rem;
-}
-.variant-batch-fieldset label {
-  margin-top: 0;
-}
-.variant-batch-fieldset label.inline {
-  gap: 0.25rem;
-}
-.variant-batch-fieldset .filterable-select {
-  margin-top: 0;
-  gap: 0.25rem;
-}
-.variant-batch-fieldset .filterable-select input[type="search"] {
-  padding: 0.3rem 0.5rem;
-}
-.variant-batch-fieldset #variantBatchList {
-  display: grid;
-  gap: 1rem;
-}
-.variant-batch-fieldset .btn-row {
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-.variant-batch-fieldset .btn-row button {
-  flex: 0 0 auto;
-}
-.variant-batch-fieldset .form-hint {
-  margin-top: -0.25rem;
-}
 [data-variant-types][hidden],
 [data-variant-types].variant-type-hidden {
   display: none !important;
@@ -9782,7 +9738,7 @@ function renderVariants(section) {
     </div>
   </div>
   <div class="panel">
-    <fieldset data-collapsible data-collapsed="true" class="panel-fieldset variant-batch-fieldset">
+    <fieldset data-collapsible data-collapsed="true" class="panel-fieldset">
       <legend>
         <span class="fieldset-title">Massetilføj varianter</span>
         <button type="button" class="fieldset-toggle" data-label-open="Minimér" data-label-closed="Udvid" aria-expanded="false">Udvid</button>
@@ -9837,7 +9793,7 @@ function renderVariants(section) {
     const defaultClass = values.classification != null ? String(values.classification) : '3';
     const classificationOptions = ['1','2','3','4','5'].map(v => `<option value="${v}"${defaultClass === String(v) ? ' selected' : ''}>${v}</option>`).join('');
     const row = document.createElement('div');
-    row.className = 'case-row variant-row variant-row--batch';
+    row.className = 'case-row variant-row';
     row.innerHTML = `
       <label class="inline">Varianttype<select data-field="variant_type">${VARIANT_TYPE_OPTIONS.map(option => `<option value="${option.value}">${option.label}</option>`).join('')}</select></label>
       <label class="inline">Gen / region<input type="text" data-field="gene" placeholder="BRCA1"></label>
