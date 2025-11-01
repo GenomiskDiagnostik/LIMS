@@ -1913,16 +1913,38 @@ form textarea {
 .variant-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 0.75rem;
+  gap: 0.9rem 1rem;
   align-items: start;
+  padding: 1rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 0.9rem;
+  background: var(--panel-bg);
+  box-shadow: 0 4px 12px rgba(18, 76, 135, 0.08);
 }
 .variant-row > label,
 .variant-row > .variant-batch-group,
 .variant-row > button {
   margin: 0;
 }
-.variant-row > label {
+.variant-row > label,
+.variant-row .variant-batch-group > label {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-weight: 600;
+  color: var(--muted-text);
+  font-size: 0.9rem;
+}
+.variant-row > label input,
+.variant-row > label select,
+.variant-row > label textarea,
+.variant-row .variant-batch-group > label input,
+.variant-row .variant-batch-group > label select,
+.variant-row .variant-batch-group > label textarea {
+  width: 100%;
+  font-weight: 400;
+  color: var(--text);
 }
 .variant-row > label.wide,
 .variant-row > .variant-batch-group > label.wide {
@@ -1931,12 +1953,92 @@ form textarea {
 .variant-row > button {
   justify-self: flex-start;
   min-width: 160px;
+  margin-top: 0.5rem;
 }
 .variant-row .variant-batch-group {
   display: contents;
 }
 .variant-row .variant-structure-grid {
   display: contents;
+}
+.variant-row textarea.small {
+  min-height: 60px;
+}
+@media (max-width: 720px) {
+  .variant-row {
+    padding: 0.85rem;
+    gap: 0.75rem;
+  }
+}
+[data-theme="dark"] .variant-row {
+  box-shadow: 0 6px 18px rgba(8, 47, 73, 0.45);
+}
+[data-theme="dark"] .variant-row > label,
+[data-theme="dark"] .variant-row .variant-batch-group > label {
+  color: var(--muted-text);
+}
+[data-theme="dark"] .variant-row > label input,
+[data-theme="dark"] .variant-row > label select,
+[data-theme="dark"] .variant-row > label textarea,
+[data-theme="dark"] .variant-row .variant-batch-group > label input,
+[data-theme="dark"] .variant-row .variant-batch-group > label select,
+[data-theme="dark"] .variant-row .variant-batch-group > label textarea {
+  color: var(--text);
+}
+.variant-batch-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.variant-batch-form .panel-hint {
+  margin: 0;
+}
+.variant-batch-form .stacked-control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-weight: 600;
+  color: var(--muted-text);
+  max-width: min(100%, 420px);
+  font-size: 0.9rem;
+}
+.variant-batch-form .stacked-control .filterable-select {
+  margin-top: 0;
+}
+.variant-batch-form .stacked-control input,
+.variant-batch-form .stacked-control select {
+  width: 100%;
+  font-weight: 400;
+  color: var(--text);
+}
+.variant-batch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.variant-batch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  margin-top: 0.3rem;
+}
+.variant-batch-actions #variantBatchSave {
+  margin-left: auto;
+}
+@media (max-width: 640px) {
+  .variant-batch-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .variant-batch-actions #variantBatchSave {
+    margin-left: 0;
+    width: 100%;
+  }
+  .variant-batch-actions button,
+  .variant-batch-actions label {
+    width: 100%;
+  }
 }
 [data-variant-types][hidden],
 [data-variant-types].variant-type-hidden {
@@ -9744,25 +9846,27 @@ function renderVariants(section) {
         <button type="button" class="fieldset-toggle" data-label-open="Minimér" data-label-closed="Udvid" aria-expanded="false">Udvid</button>
       </legend>
       <div class="fieldset-body" hidden>
-        <p class="panel-hint">Tilføj flere varianter til en eksisterende ordination via import eller manuel indtastning.</p>
-        <label>Ordination
-          <div class="filterable-select">
-            <input type="search" data-select-filter placeholder="Filtrer ordinationer">
-            <select id="variantBatchOrder">
-              <option value="" selected>Vælg ordination</option>
-              ${orders.map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}
-            </select>
+        <div class="variant-batch-form">
+          <p class="panel-hint">Tilføj flere varianter til en eksisterende ordination via import eller manuel indtastning.</p>
+          <label class="stacked-control">Ordination
+            <div class="filterable-select">
+              <input type="search" data-select-filter placeholder="Filtrer ordinationer">
+              <select id="variantBatchOrder">
+                <option value="" selected>Vælg ordination</option>
+                ${orders.map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}
+              </select>
+            </div>
+          </label>
+          <div id="variantBatchList" class="repeater variant-batch-list"></div>
+          <div class="variant-batch-actions">
+            <button type="button" class="secondary" id="variantBatchAdd">Tilføj variant</button>
+            <button type="button" class="secondary" id="variantBatchImport">Importér VarSeq CSV</button>
+            <input type="file" id="variantBatchFile" accept=".csv,text/csv" hidden>
+            <button type="button" class="primary" id="variantBatchSave">Gem varianter</button>
+            <button type="button" class="secondary" id="variantBatchClear">Ryd rækker</button>
           </div>
-        </label>
-        <div id="variantBatchList" class="repeater"></div>
-        <div class="btn-row">
-          <button type="button" class="secondary" id="variantBatchAdd">Tilføj variant</button>
-          <button type="button" class="secondary" id="variantBatchImport">Importér VarSeq CSV</button>
-          <input type="file" id="variantBatchFile" accept=".csv,text/csv" hidden>
-          <button type="button" class="primary" id="variantBatchSave">Gem varianter</button>
-          <button type="button" class="secondary" id="variantBatchClear">Ryd rækker</button>
+          <div class="form-hint" id="variantBatchMessage" role="status" aria-live="polite"></div>
         </div>
-        <div class="form-hint" id="variantBatchMessage" role="status" aria-live="polite"></div>
       </div>
     </fieldset>
   </div>`;
@@ -9848,6 +9952,7 @@ function renderVariants(section) {
     setValue('[data-field="hgvs_c"]', values.hgvs_c);
     setValue('[data-field="hgvs_p"]', values.hgvs_p);
     setValue('[data-field="genomic_position"]', values.genomic_position);
+    setValue('[data-field="rsid"]', values.rsid);
     setValue('[data-field="zygosity"]', values.zygosity);
     setValue('[data-field="criteria"]', values.criteria);
     setValue('[data-field="genome_build"]', values.genome_build);
@@ -9896,6 +10001,7 @@ function renderVariants(section) {
         setValue('[data-field="hgvs_c"]', variant.hgvs_c);
         setValue('[data-field="hgvs_p"]', variant.hgvs_p);
         setValue('[data-field="genomic_position"]', variant.genomic_position);
+        setValue('[data-field="rsid"]', variant.rsid);
         setValue('[data-field="criteria"]', variant.criteria);
         setValue('[data-field="genome_build"]', variant.genome_build);
         setValue('[data-field="chromosome"]', variant.chromosome);
