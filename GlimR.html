@@ -10432,19 +10432,36 @@ function renderVariantLibrary(section) {
   const updateHotspotChart = variants => {
     if (!hotspotChartContainer) return;
     const variantList = Array.isArray(variants) ? variants : [];
-    const totalVariants = variantList.length;
+    const snvVariants = variantList.filter(variant => normalizeVariantType(variant?.variant_type) === 'snv');
+    const excludedCount = variantList.length - snvVariants.length;
+    const totalVariants = snvVariants.length;
+    if (!totalVariants) {
+      hotspotChartContainer.innerHTML = '<p class="variant-hotspot__empty">Ingen SNV/indels kan vises for det aktuelle udvalg.</p>';
+      hotspotChartContainer.dataset.chartEmpty = 'true';
+      if (excludedCount > 0) {
+        updateHotspotSummary(`0 SNV/indels tilgængelige (${excludedCount} andre varianttyper udeladt)`);
+        updateHotspotCaption('Hotspot-oversigten understøtter kun SNV/indel-poster. Vælg en filtrering med SNV/indels for at se en fordeling.');
+      } else if (variantList.length > 0) {
+        updateHotspotSummary('Ingen SNV/indels med koordinater i det aktuelle udvalg.');
+        updateHotspotCaption('Hotspot-oversigten understøtter kun SNV/indel-poster. Tilføj genomiske koordinater for at visualisere dem.');
+      } else {
+        updateHotspotSummary('Ingen SNV/indels i biblioteket for det aktuelle udvalg.');
+        updateHotspotCaption('Tilføj eller vælg SNV/indel-poster for at se hotspot-fordelingen.');
+      }
+      return;
+    }
     if (typeof d3 === 'undefined') {
       hotspotChartContainer.innerHTML = '<p class="variant-hotspot__empty">D3.js kunne ikke indlæses – hotspot-grafen er ikke tilgængelig.</p>';
       hotspotChartContainer.dataset.chartEmpty = 'true';
-      if (totalVariants) {
-        updateHotspotSummary(`${totalVariants} variant${totalVariants === 1 ? '' : 'er'} i alt`);
-      } else {
-        updateHotspotSummary('Ingen varianter');
+      const summaryParts = [`${totalVariants} SNV/indel${totalVariants === 1 ? '' : 'er'} i alt`];
+      if (excludedCount > 0) {
+        summaryParts.push(`(${excludedCount} andre varianttyper udeladt)`);
       }
-      updateHotspotCaption('Indlæs D3.js for at se den genomiske hotspots-visualisering.');
+      updateHotspotSummary(summaryParts.join(' '));
+      updateHotspotCaption('Indlæs D3.js for at se den genomiske hotspots-visualisering af SNV/indels.');
       return;
     }
-    const parsed = variantList.map(variant => {
+    const parsed = snvVariants.map(variant => {
       const coordinates = parseVariantCoordinates(variant);
       const chromosome = normalizeChromosomeValue(coordinates.chromosome || variant.chromosome || variant.chrom);
       if (!chromosome) return null;
@@ -10467,17 +10484,25 @@ function renderVariantLibrary(section) {
     const coordinatesCount = parsed.length;
     const missingCount = totalVariants - coordinatesCount;
     if (!coordinatesCount) {
-      hotspotChartContainer.innerHTML = '<p class="variant-hotspot__empty">Ingen varianter med genomiske koordinater i det aktuelle udvalg.</p>';
+      hotspotChartContainer.innerHTML = '<p class="variant-hotspot__empty">Ingen SNV/indels med genomiske koordinater i det aktuelle udvalg.</p>';
       hotspotChartContainer.dataset.chartEmpty = 'true';
       if (totalVariants > 0) {
         const missingLabel = missingCount > 0
           ? ` (${missingCount} uden koordinater)`
           : ' (ingen koordinater)';
-        updateHotspotSummary(`${totalVariants} variant${totalVariants === 1 ? '' : 'er'}${missingLabel}`);
-        updateHotspotCaption('Hotspot-oversigten kræver genomiske koordinater for at blive vist.');
+        const summaryParts = [`${totalVariants} SNV/indel${totalVariants === 1 ? '' : 'er'}${missingLabel}`];
+        if (excludedCount > 0) {
+          summaryParts.push(`(${excludedCount} andre varianttyper udeladt)`);
+        }
+        updateHotspotSummary(summaryParts.join(' '));
+        updateHotspotCaption('Hotspot-oversigten kræver genomiske koordinater for at blive vist. Tilføj koordinater til SNV/indels for at aktivere grafen.');
       } else {
-        updateHotspotSummary('Ingen varianter');
-        updateHotspotCaption('Ingen poster opfylder den aktuelle filtrering.');
+        const summaryParts = ['Ingen SNV/indels'];
+        if (excludedCount > 0) {
+          summaryParts.push(`(${excludedCount} andre varianttyper udeladt)`);
+        }
+        updateHotspotSummary(summaryParts.join(' '));
+        updateHotspotCaption('Ingen poster opfylder den aktuelle filtrering. Tilføj SNV/indels med koordinater for at se en fordeling.');
       }
       return;
     }
@@ -10533,10 +10558,10 @@ function renderVariantLibrary(section) {
     const maxBinCount = d3.max(rows, row => d3.max(row.histogram, bin => bin.length)) || 1;
     const containerWidth = hotspotChartContainer.clientWidth || 960;
     const width = Math.max(containerWidth, 720);
-    const margin = {top: 24, right: 32, bottom: 64, left: 96};
+    const margin = {top: 24, right: 32, bottom: 72, left: 104};
     const bandHeight = 22;
-    const axisOffset = bandHeight + 18;
-    const rowHeight = axisOffset + 24;
+    const axisOffset = bandHeight + 36;
+    const rowHeight = axisOffset + 36;
     const innerWidth = width - margin.left - margin.right;
     const height = margin.top + margin.bottom + rowHeight * rows.length;
     const svg = d3.select(hotspotChartContainer)
@@ -10603,9 +10628,9 @@ function renderVariantLibrary(section) {
             ? ` (${percentage.toFixed(percentage >= 10 ? 0 : 1)}%)`
             : '';
           if (!count) {
-            return `Ingen registreringer på kromosom ${row.chromosome} i intervallet ${rangeLabel}.`;
+            return `Ingen SNV/indels på kromosom ${row.chromosome} i intervallet ${rangeLabel}.`;
           }
-          return `${count} variant${count === 1 ? '' : 'er'} på kromosom ${row.chromosome} i intervallet ${rangeLabel}${percentageLabel}.`;
+          return `${count} SNV/indel${count === 1 ? '' : 'er'} på kromosom ${row.chromosome} i intervallet ${rangeLabel}${percentageLabel}.`;
         });
       rowGroup.append('text')
         .attr('class', 'variant-hotspot__chromosome')
@@ -10670,20 +10695,26 @@ function renderVariantLibrary(section) {
       .attr('x', legendWidth / 2)
       .attr('y', legendHeight + 12)
       .attr('text-anchor', 'middle')
-      .text('Flere varianter →');
-    const summaryParts = [`${coordinatesCount} variant${coordinatesCount === 1 ? '' : 'er'} med koordinater`];
+      .text('Flere SNV/indels →');
+    const summaryParts = [`${coordinatesCount} SNV/indel${coordinatesCount === 1 ? '' : 'er'} med koordinater`];
     if (missingCount > 0) {
       summaryParts.push(`(${missingCount} uden koordinater)`);
     }
+    if (excludedCount > 0) {
+      summaryParts.push(`(${excludedCount} andre varianttyper udeladt)`);
+    }
     updateHotspotSummary(summaryParts.join(' '));
-    const captionDetails = [`Farveintensiteten afspejler antallet af viste varianter i hvert kromosomsegment.`];
+    const captionDetails = [`Farveintensiteten afspejler antallet af viste SNV/indels i hvert kromosomsegment.`];
     if (maxBinCount > 1) {
-      captionDetails.push(`Det travleste segment indeholder ${maxBinCount} registreringer.`);
+      captionDetails.push(`Det travleste segment indeholder ${maxBinCount} registrering${maxBinCount === 1 ? '' : 'er'}.`);
     } else {
       captionDetails.push('Alle viste segmenter rummer højst én registrering.');
     }
     if (missingCount > 0) {
-      captionDetails.push(`${missingCount} variant${missingCount === 1 ? '' : 'er'} mangler koordinater og indgår derfor ikke.`);
+      captionDetails.push(`${missingCount} SNV/indel${missingCount === 1 ? '' : 'er'} mangler koordinater og indgår derfor ikke.`);
+    }
+    if (excludedCount > 0) {
+      captionDetails.push(`${excludedCount} variant${excludedCount === 1 ? '' : 'er'} af andre typer vises ikke i hotspot-grafen.`);
     }
     updateHotspotCaption(captionDetails.join(' '));
   };
