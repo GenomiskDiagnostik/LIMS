@@ -1228,6 +1228,46 @@ section[data-tab].active {
   position: relative;
   width: 100%;
   min-height: 220px;
+  background: var(--panel-bg);
+  border-radius: 1rem;
+  border: 1px solid var(--panel-border);
+  padding: 1.25rem 1.5rem 1.5rem;
+  box-shadow: var(--shadow);
+}
+.variant-hotspot__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+.variant-hotspot__zoom-indicator {
+  font-size: 0.9rem;
+  color: var(--muted-text);
+}
+.variant-hotspot__zoom-reset {
+  appearance: none;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  color: var(--accent-strong);
+  padding: 0.35rem 0.9rem;
+  border-radius: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+.variant-hotspot__zoom-reset:hover,
+.variant-hotspot__zoom-reset:focus-visible {
+  background: var(--nav-button-bg);
+  color: var(--nav-button-active-color);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+  outline: none;
+}
+.variant-hotspot__zoom-reset:active {
+  transform: translateY(0);
 }
 .variant-hotspot__chart svg {
   width: 100%;
@@ -10508,6 +10548,20 @@ function renderVariantLibrary(section) {
     }
     hotspotChartContainer.dataset.chartEmpty = 'false';
     hotspotChartContainer.innerHTML = '';
+    const controls = document.createElement('div');
+    controls.className = 'variant-hotspot__controls';
+    const zoomIndicator = document.createElement('span');
+    zoomIndicator.className = 'variant-hotspot__zoom-indicator';
+    zoomIndicator.setAttribute('role', 'status');
+    zoomIndicator.setAttribute('aria-live', 'polite');
+    controls.appendChild(zoomIndicator);
+    const resetButton = document.createElement('button');
+    resetButton.type = 'button';
+    resetButton.className = 'variant-hotspot__zoom-reset';
+    resetButton.textContent = 'Nulstil zoom';
+    resetButton.title = 'Nulstil visningen af hotspots';
+    controls.appendChild(resetButton);
+    hotspotChartContainer.appendChild(controls);
     const grouped = d3.groups(parsed, d => d.chromosome);
     const CHROMOSOME_ORDER = ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','X','Y','MT'];
     const CHROMOSOME_LENGTHS = {
@@ -10562,13 +10616,15 @@ function renderVariantLibrary(section) {
     const bandHeight = 22;
     const axisOffset = bandHeight + 36;
     const rowHeight = axisOffset + 36;
+    const chartHeight = Math.max(rowHeight, rowHeight * rows.length);
     const innerWidth = width - margin.left - margin.right;
-    const height = margin.top + margin.bottom + rowHeight * rows.length;
+    const height = margin.top + margin.bottom + chartHeight;
     const svg = d3.select(hotspotChartContainer)
       .append('svg')
       .attr('class', 'variant-hotspot__svg')
       .attr('viewBox', `0 0 ${width} ${height}`)
       .attr('preserveAspectRatio', 'xMidYMid meet');
+    const defs = svg.append('defs');
     const chartGroup = svg.append('g')
       .attr('transform', `translate(${margin.left}, ${margin.top})`);
     const colorScale = d3.scaleSequential(d3.interpolateYlOrRd)
@@ -10585,12 +10641,38 @@ function renderVariantLibrary(section) {
       }
       return `${Math.round(value)} bp`;
     };
+    const styleAxis = axisSelection => {
+      axisSelection.selectAll('text').attr('dy', '0.95em');
+      axisSelection.selectAll('line').attr('opacity', 0.35);
+      const domain = axisSelection.select('.domain');
+      if (!domain.empty()) {
+        domain.attr('opacity', 0.35);
+      }
+    };
+    const applyScaleToBars = (selection, scale) => {
+      selection
+        .attr('x', d => scale(Math.max(0, d.x0 || 0)))
+        .attr('width', d => {
+          const start = Math.max(0, d.x0 || 0);
+          const end = Math.max(start, d.x1 || d.x0 || 0);
+          const widthValue = scale(end) - scale(start);
+          return Math.max(1, widthValue);
+        });
+    };
+    const rowStates = [];
     rows.forEach((row, index) => {
       const rowGroup = chartGroup.append('g')
         .attr('transform', `translate(0, ${index * rowHeight})`);
-      const xScale = d3.scaleLinear()
+      const baseScale = d3.scaleLinear()
         .domain([0, row.chromLength])
-        .range([0, innerWidth]);
+        .range([0, innerWidth])
+        .clamp(true);
+      const clipId = `variant-hotspot-clip-${index}`;
+      defs.append('clipPath')
+        .attr('id', clipId)
+        .append('rect')
+        .attr('width', innerWidth)
+        .attr('height', bandHeight);
       rowGroup.append('rect')
         .attr('class', 'variant-hotspot__track')
         .attr('x', 0)
@@ -10600,22 +10682,32 @@ function renderVariantLibrary(section) {
         .attr('rx', 6)
         .attr('ry', 6);
       const barsGroup = rowGroup.append('g')
-        .attr('class', 'variant-hotspot__bars');
-      barsGroup.selectAll('rect')
+        .attr('class', 'variant-hotspot__bars')
+        .attr('clip-path', `url(#${clipId})`);
+      const bars = barsGroup.selectAll('rect')
         .data(row.histogram)
-        .join('rect')
-        .attr('x', d => xScale(Math.max(0, d.x0 || 0)))
-        .attr('y', 0)
-        .attr('width', d => {
-          const widthValue = xScale(Math.max(0, d.x1 || d.x0 || 0)) - xScale(Math.max(0, d.x0 || 0));
-          return Math.max(1, widthValue);
-        })
-        .attr('height', bandHeight)
-        .attr('rx', 2)
-        .attr('ry', 2)
-        .attr('fill', d => colorScale(d.length))
-        .attr('opacity', d => (d.length ? 0.95 : 0.4))
-        .append('title')
+        .join(
+          enter => enter.append('rect')
+            .attr('y', 0)
+            .attr('height', bandHeight)
+            .attr('rx', 2)
+            .attr('ry', 2)
+            .attr('fill', d => colorScale(d.length))
+            .attr('opacity', 0)
+            .call(enter => enter.transition().duration(600).delay((_, i) => i * 18)
+              .attr('opacity', d => (d.length ? 0.95 : 0.4))),
+          update => update
+            .attr('y', 0)
+            .attr('height', bandHeight)
+            .attr('rx', 2)
+            .attr('ry', 2)
+            .attr('fill', d => colorScale(d.length))
+            .attr('opacity', d => (d.length ? 0.95 : 0.4)),
+          exit => exit.remove()
+        );
+      applyScaleToBars(bars, baseScale);
+      bars.selectAll('title').remove();
+      bars.append('title')
         .text(d => {
           const count = d.length;
           const startValue = Math.max(0, d.x0 || 0);
@@ -10640,17 +10732,94 @@ function renderVariantLibrary(section) {
         .attr('text-anchor', 'end')
         .text(`Chr ${row.chromosome}`);
       const tickCount = Math.min(6, Math.max(2, Math.round(innerWidth / 160)));
-      rowGroup.append('g')
+      const axisGroup = rowGroup.append('g')
         .attr('class', 'variant-hotspot__axis')
-        .attr('transform', `translate(0, ${axisOffset})`)
-        .call(d3.axisBottom(xScale)
-          .ticks(tickCount)
-          .tickFormat(value => formatPosition(value)))
-        .call(g => g.selectAll('text').attr('dy', '0.95em'))
-        .call(g => g.selectAll('line').attr('opacity', 0.35))
-        .call(g => g.select('.domain').attr('opacity', 0.35));
+        .attr('transform', `translate(0, ${axisOffset})`);
+      axisGroup.call(d3.axisBottom(baseScale)
+        .ticks(tickCount)
+        .tickFormat(value => formatPosition(value)));
+      styleAxis(axisGroup);
+      rowStates.push({
+        baseScale,
+        bars,
+        axisGroup,
+        tickCount
+      });
     });
-    const defs = svg.append('defs');
+    const formatZoomLevel = value => {
+      const decimals = value >= 10 ? 0 : value >= 3 ? 1 : 2;
+      return value.toLocaleString('da-DK', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+      });
+    };
+    let currentTransform = d3.zoomIdentity;
+    let zoomSurfaceSelection = null;
+    const setOverlayCursor = value => {
+      if (zoomSurfaceSelection) {
+        zoomSurfaceSelection.style('cursor', value);
+      } else {
+        chartGroup.select('.variant-hotspot__zoom-surface').style('cursor', value);
+      }
+    };
+    const updateZoomIndicator = () => {
+      zoomIndicator.textContent = `Zoom: ${formatZoomLevel(currentTransform.k)}×`;
+    };
+    updateZoomIndicator();
+    const zoomBehavior = d3.zoom()
+      .scaleExtent([1, 12])
+      .translateExtent([[0, 0], [innerWidth, chartHeight]])
+      .extent([[0, 0], [innerWidth, chartHeight]])
+      .filter(event => {
+        if (event.type === 'dblclick') return false;
+        if (event.type === 'mousedown' && event.button !== 0) return false;
+        return true;
+      })
+      .on('start', () => {
+        setOverlayCursor('grabbing');
+      })
+      .on('end', () => {
+        setOverlayCursor(currentTransform.k > 1 ? 'move' : 'grab');
+      })
+      .on('zoom', event => {
+        currentTransform = event.transform;
+        rowStates.forEach(state => {
+          const scaled = event.transform.rescaleX(state.baseScale);
+          applyScaleToBars(state.bars, scaled);
+          const scaledTickCount = Math.min(12, Math.max(2, Math.round(state.tickCount * event.transform.k)));
+          state.axisGroup.call(d3.axisBottom(scaled)
+            .ticks(scaledTickCount)
+            .tickFormat(value => formatPosition(value)));
+          styleAxis(state.axisGroup);
+        });
+        updateZoomIndicator();
+        if (!event.sourceEvent || event.sourceEvent.type === 'wheel') {
+          setOverlayCursor(currentTransform.k > 1 ? 'move' : 'grab');
+        }
+      });
+    const zoomSurface = chartGroup.append('rect')
+      .attr('class', 'variant-hotspot__zoom-surface')
+      .attr('x', 0)
+      .attr('y', 0)
+      .attr('width', innerWidth)
+      .attr('height', chartHeight)
+      .style('fill', 'transparent')
+      .style('touch-action', 'none');
+    zoomSurfaceSelection = zoomSurface;
+    setOverlayCursor('grab');
+    zoomSurface.call(zoomBehavior);
+    zoomSurface.on('dblclick.zoom', null);
+    const resetZoom = () => {
+      zoomSurface.transition().duration(250)
+        .call(zoomBehavior.transform, d3.zoomIdentity);
+    };
+    zoomSurface.on('dblclick', event => {
+      event.preventDefault();
+      resetZoom();
+    });
+    resetButton.addEventListener('click', () => {
+      resetZoom();
+    });
     const gradientId = 'variant-hotspot-gradient';
     const gradient = defs.append('linearGradient')
       .attr('id', gradientId)
@@ -10716,6 +10885,7 @@ function renderVariantLibrary(section) {
     if (excludedCount > 0) {
       captionDetails.push(`${excludedCount} variant${excludedCount === 1 ? '' : 'er'} af andre typer vises ikke i hotspot-grafen.`);
     }
+    captionDetails.push('Zoom med scrollhjulet eller ved at trække for at undersøge kromosomerne. Dobbeltklik eller brug “Nulstil zoom” for at vende tilbage til udgangspunktet.');
     updateHotspotCaption(captionDetails.join(' '));
   };
   const csvColumns = [
