@@ -6,7 +6,7 @@
 <style>
 :root {
   font-family: "Segoe UI", Arial, sans-serif;
-  color-scheme: light dark;
+  color-scheme: light;
   --bg: #f5f7fb;
   --text: #162941;
   --muted-text: #41516b;
@@ -39,6 +39,7 @@
   --code-text: #e8f1ff;
 }
 [data-theme="dark"] {
+  color-scheme: dark;
   --bg: #0f172a;
   --text: #e2e8f0;
   --muted-text: #94a3b8;
@@ -1945,6 +1946,7 @@ form textarea {
   width: 100%;
   font-weight: 400;
   color: var(--text);
+  background: var(--input-bg);
 }
 .variant-row > label.wide,
 .variant-row > .variant-batch-group > label.wide {
@@ -2010,6 +2012,18 @@ form textarea {
   width: 100%;
   font-weight: 400;
   color: var(--text);
+  background: var(--input-bg);
+}
+[data-theme="light"] .variant-row > label input,
+[data-theme="light"] .variant-row > label select,
+[data-theme="light"] .variant-row > label textarea,
+[data-theme="light"] .variant-row .variant-batch-group > label input,
+[data-theme="light"] .variant-row .variant-batch-group > label select,
+[data-theme="light"] .variant-row .variant-batch-group > label textarea,
+[data-theme="light"] .variant-batch-form .stacked-control input,
+[data-theme="light"] .variant-batch-form .stacked-control select {
+  background-color: #ffffff;
+  color: #162941;
 }
 .variant-batch-list {
   display: flex;
