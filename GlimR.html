@@ -10947,6 +10947,11 @@ function renderVariantLibrary(section) {
       if (indexB !== -1) return 1;
       return a.localeCompare(b, 'da');
     };
+    const MIN_BIN_THRESHOLD = 24;
+    const MAX_BASE_THRESHOLD = 5000;
+    const MAX_DYNAMIC_THRESHOLD = 50000;
+    const ZOOM_BIN_EXPONENT = 2;
+
     const rows = grouped.map(([chromosome, data]) => {
       const maxPosition = d3.max(data, d => d.position) || 1;
       const cytobandLength = getCytobandChromosomeLength(normalizedBuild, chromosome);
@@ -11028,10 +11033,6 @@ function renderVariantLibrary(section) {
           return Math.max(1, widthValue);
         });
     };
-    const MIN_BIN_THRESHOLD = 24;
-    const MAX_BASE_THRESHOLD = 5000;
-    const MAX_DYNAMIC_THRESHOLD = 50000;
-    const ZOOM_BIN_EXPONENT = 2;
     const updateBarTitles = (selection, row) => {
       selection.each(function(d) {
         const node = d3.select(this);
