@@ -10964,7 +10964,13 @@ function renderVariantLibrary(section) {
       const histogram = d3.bin()
         .domain([0, chromLength])
         .thresholds(thresholds)(data.map(d => d.position));
-      return {chromosome, chromLength, histogram, data};
+      return {
+        chromosome,
+        chromLength,
+        histogram,
+        data,
+        baseThresholds: thresholds
+      };
     }).sort((a, b) => compareChromosomes(a.chromosome, b.chromosome));
     const maxBinCount = d3.max(rows, row => d3.max(row.histogram, bin => bin.length)) || 1;
     const containerWidth = hotspotChartContainer.clientWidth || 960;
@@ -11192,6 +11198,9 @@ function renderVariantLibrary(section) {
         }
         return merged;
       };
+      const baseThresholds = Number.isFinite(row.baseThresholds) && row.baseThresholds > 0
+        ? row.baseThresholds
+        : MIN_BIN_THRESHOLD;
       const bars = refreshBars(row.histogram, {animate: true});
       rowGroup.append('text')
         .attr('class', 'variant-hotspot__chromosome')
@@ -11219,8 +11228,8 @@ function renderVariantLibrary(section) {
         yOffset: index * rowHeight,
         axisGroup,
         tickCount,
-        baseThresholds: thresholds,
-        currentThresholds: thresholds,
+        baseThresholds,
+        currentThresholds: baseThresholds,
         dataPositions: row.data.map(d => d.position),
         histogram: row.histogram
       };
