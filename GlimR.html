@@ -11247,6 +11247,21 @@ function renderVariantLibrary(section) {
       const barsGroup = rowGroup.append('g')
         .attr('class', 'variant-hotspot__bars')
         .attr('clip-path', `url(#${clipId})`);
+      const centromereGroup = rowGroup.append('g')
+        .attr('class', 'variant-hotspot__centromeres')
+        .attr('clip-path', `url(#${clipId})`);
+      const centromereRects = centromereGroup.selectAll('rect')
+        .data(centromereOverlayData)
+        .join('rect')
+        .attr('class', 'variant-hotspot__centromere')
+        .attr('y', 0)
+        .attr('height', bandHeight)
+        .attr('rx', 3)
+        .attr('ry', 3)
+        .attr('opacity', 0.9);
+      applyScaleToBars(centromereRects, baseScale);
+      bandOverlayGroup.raise();
+      bandLabelGroup.raise();
       const refreshBars = (bins, {scale = baseScale, animate = false} = {}) => {
         const barSelection = barsGroup.selectAll('rect')
           .data(bins, bin => `${Math.round(bin.x0 || 0)}-${Math.round(bin.x1 || 0)}`);
