@@ -11168,6 +11168,16 @@ function renderVariantLibrary(section) {
         .attr('height', bandHeight)
         .attr('fill', d => getCytobandFill(d.stain, theme));
       applyScaleToBars(bandRects, baseScale);
+      const centromereGroup = rowGroup.append('g')
+        .attr('class', 'variant-hotspot__centromeres')
+        .attr('clip-path', `url(#${clipId})`);
+      const centromereRects = centromereGroup.selectAll('rect')
+        .data(centromereOverlayData)
+        .join('rect')
+        .attr('class', 'variant-hotspot__centromere')
+        .attr('y', 0)
+        .attr('height', bandHeight);
+      applyScaleToBars(centromereRects, baseScale);
       const bandOverlayGroup = rowGroup.append('g')
         .attr('class', 'variant-hotspot__band-overlays')
         .attr('clip-path', `url(#${clipId})`);
