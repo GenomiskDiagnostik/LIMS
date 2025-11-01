@@ -6026,6 +6026,12 @@ function mapVarSeqClassification(value) {
   const digit = raw.match(/[1-5]/);
   if (digit) return digit[0];
   const lower = raw.toLowerCase();
+  const compact = lower.replace(/[^a-z0-9]+/g, '');
+  if (compact === 'lp' || compact === 'likelypathogenic') return '4';
+  if (compact === 'p' || compact === 'pathogenic') return '5';
+  if (compact === 'lb' || compact === 'likelybenign') return '2';
+  if (compact === 'b' || compact === 'benign') return '1';
+  if (compact === 'vus' || compact === 'v' || compact === 'uncertain' || compact === 'unknown') return '3';
   if (lower.includes('pathogenic')) {
     return lower.includes('likely') ? '4' : '5';
   }
@@ -10190,7 +10196,18 @@ function renderVariants(section) {
   });
 }
 function renderVariantLibrary(section) {
-  const list = getCached('variant_library').slice().sort((a, b) => {
+  const rawLibrary = getCached('variant_library') || [];
+  const list = rawLibrary.map(entry => {
+    if (!entry || typeof entry !== 'object') return entry;
+    const item = {...entry};
+    const normalizedClass = mapVarSeqClassification(item.classification);
+    if (normalizedClass) {
+      item.classification = normalizedClass;
+    } else if (item.classification == null) {
+      item.classification = '';
+    }
+    return item;
+  }).sort((a, b) => {
     const titleA = formatVariantTitle(a) || '';
     const titleB = formatVariantTitle(b) || '';
     const titleCompare = titleA.localeCompare(titleB, 'da');
@@ -10199,6 +10216,7 @@ function renderVariantLibrary(section) {
     if (typeCompare) return typeCompare;
     return (a.id || 0) - (b.id || 0);
   });
+  const classificationOptions = ['1','2','3','4','5'].map(value => `<option value="${value}">${value}</option>`).join('');
   section.innerHTML = `
   <div class="panel variant-library-panel">
     <div class="variant-hotspot" data-collapsed="true">
@@ -10227,7 +10245,7 @@ function renderVariantLibrary(section) {
             <label>HGVS p.<input type="search" data-filter-library="hgvs_p" placeholder="p."></label>
             <label>rsID<input type="search" data-filter-library="rsid" placeholder="rs123456"></label>
             <label>Genomisk position<input type="search" data-filter-library="genomic_position" placeholder="chr19-11105362"></label>
-            <label>Klasse<input type="search" data-filter-library="classification" placeholder="1-5/VUS"></label>
+            <label>Klasse<input type="search" data-filter-library="classification" placeholder="1-5"></label>
             <label>Kriterier<input type="search" data-filter-library="criteria" placeholder="PM1,PP3..."></label>
             <label>Varianttype
               <select data-filter-library="variant_type">
@@ -10295,8 +10313,12 @@ function renderVariantLibrary(section) {
             <label>Berørte gener<textarea class="small" name="affected_genes"></textarea></label>
             <label>Beskrivelse<textarea class="small" name="description"></textarea></label>
           </div>
-          <label>Klasse<input name="classification" placeholder="1-5/VUS"></label>
-          <label>Kriterier<input name="criteria"></label>
+          <label>ACMG-klasse
+            <select name="classification" data-allow-legacy-option>
+              ${classificationOptions}
+            </select>
+          </label>
+          <label>Kriterier<input name="criteria" placeholder="PM1,PP3..."></label>
           <label>Tilstand<input name="condition"></label>
           <label>Nedarvning<input name="inheritance"></label>
           <label>Evidens<textarea name="evidence" rows="4"></textarea></label>
@@ -10977,6 +10999,7 @@ function renderVariantLibrary(section) {
     data.sv_subtype = normalizeStructureTypeValue(data.sv_subtype);
     const editingId = Number(form.dataset.editingId || data.id || 0);
     const creatingNew = submitterAction === 'create' || !editingId;
+    const normalizedClassification = mapVarSeqClassification(data.classification);
     const payload = {
       variant_type: data.variant_type,
       gene: data.gene || '',
@@ -10985,7 +11008,7 @@ function renderVariantLibrary(section) {
       hgvs_p: data.hgvs_p || '',
       rsid: data.rsid || '',
       genomic_position: data.genomic_position || '',
-      classification: data.classification || '',
+      classification: normalizedClassification || '',
       criteria: data.criteria || '',
       genome_build: data.genome_build || '',
       chromosome: data.chromosome || '',
