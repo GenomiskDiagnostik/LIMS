@@ -1373,6 +1373,24 @@ section[data-tab].active {
 .variant-hotspot__band-overlay.is-hovered {
   fill: rgba(24, 111, 175, 0.16);
 }
+.variant-hotspot__band-labels {
+  pointer-events: none;
+}
+.variant-hotspot__band-label {
+  font-size: 0.55rem;
+  font-weight: 600;
+  fill: var(--text);
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.85);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  letter-spacing: 0.01em;
+  text-anchor: middle;
+}
+[data-theme="dark"] .variant-hotspot__band-label {
+  fill: #e2e8f0;
+  stroke: rgba(15, 23, 42, 0.85);
+}
 [data-theme="dark"] .variant-hotspot__band-overlay {
   fill: rgba(226, 232, 240, 0.0025);
 }
@@ -10951,6 +10969,7 @@ function renderVariantLibrary(section) {
     const MAX_BASE_THRESHOLD = 5000;
     const MAX_DYNAMIC_THRESHOLD = 50000;
     const ZOOM_BIN_EXPONENT = 2;
+    const MIN_BAND_LABEL_PX = 2;
 
     const rows = grouped.map(([chromosome, data]) => {
       const maxPosition = d3.max(data, d => d.position) || 1;
@@ -11039,6 +11058,22 @@ function renderVariantLibrary(section) {
           const end = Math.max(start, d.x1 || d.x0 || 0);
           const widthValue = scale(end) - scale(start);
           return Math.max(1, widthValue);
+        });
+    };
+    const applyScaleToBandLabels = (selection, scale) => {
+      selection
+        .attr('x', d => {
+          const start = Math.max(0, d.x0 || 0);
+          const end = Math.max(start, d.x1 || d.x0 || 0);
+          const midPoint = start + ((end - start) / 2);
+          return scale(midPoint);
+        })
+        .attr('display', d => {
+          if (!d?.name) return 'none';
+          const start = Math.max(0, d.x0 || 0);
+          const end = Math.max(start, d.x1 || d.x0 || 0);
+          const widthValue = scale(end) - scale(start);
+          return widthValue >= MIN_BAND_LABEL_PX ? null : 'none';
         });
     };
     const updateBarTitles = (selection, row) => {
@@ -11163,6 +11198,17 @@ function renderVariantLibrary(section) {
       bandOverlays.selectAll('title').remove();
       bandOverlays.append('title')
         .text(describeBand);
+      const bandLabelGroup = rowGroup.append('g')
+        .attr('class', 'variant-hotspot__band-labels')
+        .attr('clip-path', `url(#${clipId})`);
+      const bandLabels = bandLabelGroup.selectAll('text')
+        .data(bandData)
+        .join('text')
+        .attr('class', 'variant-hotspot__band-label')
+        .attr('y', bandHeight / 2)
+        .attr('dy', '0.35em')
+        .text(d => d.name ? String(d.name).trim() : '');
+      applyScaleToBandLabels(bandLabels, baseScale);
       let rowState;
       const barsGroup = rowGroup.append('g')
         .attr('class', 'variant-hotspot__bars')
@@ -11227,6 +11273,8 @@ function renderVariantLibrary(section) {
         bars,
         bands: bandRects,
         bandOverlays,
+        bandLabels,
+        applyLabelScale: scale => applyScaleToBandLabels(bandLabels, scale),
         bandData,
         row,
         yOffset: index * rowHeight,
@@ -11370,6 +11418,9 @@ function renderVariantLibrary(section) {
           }
           if (state.bandOverlays) {
             applyScaleToBars(state.bandOverlays, scaled);
+          }
+          if (state.applyLabelScale) {
+            state.applyLabelScale(scaled);
           }
           const scaledTickCount = Math.min(12, Math.max(2, Math.round(state.tickCount * zoomLevel)));
           state.axisGroup.call(d3.axisBottom(scaled)
