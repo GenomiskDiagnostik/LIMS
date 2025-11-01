@@ -1938,6 +1938,74 @@ form textarea {
 .variant-row .variant-structure-grid {
   display: contents;
 }
+#variantBatchList {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+.variant-row--batch {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.85rem 1rem;
+  padding: 1.1rem 1.2rem;
+  border-radius: 14px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  box-shadow: var(--shadow);
+}
+.variant-row--batch label.inline {
+  align-items: stretch;
+  gap: 0.3rem;
+}
+.variant-row--batch label.inline .field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted-text);
+  padding-inline: 0.15rem;
+}
+.variant-row--batch select,
+.variant-row--batch input,
+.variant-row--batch textarea {
+  width: 100%;
+}
+.variant-row--batch textarea.small {
+  min-height: 48px;
+}
+.variant-row--batch .variant-group-title {
+  grid-column: 1 / -1;
+  margin: 0.25rem 0 0.1rem;
+  padding-top: 0.45rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted-text);
+  border-top: 1px solid var(--panel-border);
+}
+.variant-row--batch .variant-group-title--first {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0.35rem;
+}
+.variant-row--batch .variant-row-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+}
+.variant-row--batch .variant-row-actions button {
+  min-width: 170px;
+}
+.panel-fieldset .fieldset-body > label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-width: 420px;
+  margin-bottom: 0.75rem;
+}
+.panel-fieldset .fieldset-body > label .filterable-select {
+  margin-top: 0;
+}
 [data-variant-types][hidden],
 [data-variant-types].variant-type-hidden {
   display: none !important;
@@ -9793,37 +9861,110 @@ function renderVariants(section) {
     const defaultClass = values.classification != null ? String(values.classification) : '3';
     const classificationOptions = ['1','2','3','4','5'].map(v => `<option value="${v}"${defaultClass === String(v) ? ' selected' : ''}>${v}</option>`).join('');
     const row = document.createElement('div');
-    row.className = 'case-row variant-row';
+    row.className = 'case-row variant-row variant-row--batch';
     row.innerHTML = `
-      <label class="inline">Varianttype<select data-field="variant_type">${VARIANT_TYPE_OPTIONS.map(option => `<option value="${option.value}">${option.label}</option>`).join('')}</select></label>
-      <label class="inline">Gen / region<input type="text" data-field="gene" placeholder="BRCA1"></label>
-      <div class="variant-batch-group" data-variant-types="snv">
-        <label class="inline">Transkript<input type="text" data-field="transcript" placeholder="NM_007294.3"></label>
-        <label class="inline">HGVS c.<input type="text" data-field="hgvs_c" placeholder="c.5266dupC"></label>
-        <label class="inline">HGVS p.<input type="text" data-field="hgvs_p" placeholder="p.(Gln1756Profs*74)"></label>
-        <label class="inline">Genomisk position<input type="text" data-field="genomic_position" placeholder="chr19-11105362"></label>
-        <label class="inline">dbSNP rsID<input type="text" data-field="rsid" placeholder="rs123456"></label>
-        <label class="inline">Zygositet<input type="text" data-field="zygosity" placeholder="Heterozygot"></label>
+      <label class="inline">
+        <span class="field-label">Varianttype</span>
+        <select data-field="variant_type">${VARIANT_TYPE_OPTIONS.map(option => `<option value="${option.value}">${option.label}</option>`).join('')}</select>
+      </label>
+      <label class="inline">
+        <span class="field-label">Gen / region</span>
+        <input type="text" data-field="gene" placeholder="BRCA1">
+      </label>
+      <div class="variant-group-title" data-variant-types="snv">SNV / indel detaljer</div>
+      <div class="variant-batch-group variant-field-group" data-variant-types="snv">
+        <label class="inline">
+          <span class="field-label">Transkript</span>
+          <input type="text" data-field="transcript" placeholder="NM_007294.3">
+        </label>
+        <label class="inline">
+          <span class="field-label">HGVS c.</span>
+          <input type="text" data-field="hgvs_c" placeholder="c.5266dupC">
+        </label>
+        <label class="inline">
+          <span class="field-label">HGVS p.</span>
+          <input type="text" data-field="hgvs_p" placeholder="p.(Gln1756Profs*74)">
+        </label>
+        <label class="inline">
+          <span class="field-label">Genomisk position</span>
+          <input type="text" data-field="genomic_position" placeholder="chr19-11105362">
+        </label>
+        <label class="inline">
+          <span class="field-label">dbSNP rsID</span>
+          <input type="text" data-field="rsid" placeholder="rs123456">
+        </label>
+        <label class="inline">
+          <span class="field-label">Zygositet</span>
+          <input type="text" data-field="zygosity" placeholder="Heterozygot">
+        </label>
       </div>
-      <div class="variant-batch-group" data-variant-types="cnv sv cyto">
-        <label class="inline">Genom ref.<input type="text" data-field="genome_build" placeholder="GRCh38"></label>
-        <label class="inline">Kromosom<input type="text" data-field="chromosome" placeholder="17p"></label>
-        <label class="inline">Start<input type="text" data-field="start" placeholder="16287000"></label>
-        <label class="inline">Slut<input type="text" data-field="end" placeholder="21100000"></label>
-        <label class="inline">Kopital<input type="text" data-field="copy_number" placeholder="x1"></label>
-        <label class="inline">Strukturtype<select data-field="sv_subtype" data-allow-legacy-option>${renderStructureTypeOptions({includeBlank: true})}</select></label>
-        <label class="inline">Størrelse<input type="text" data-field="size_bp" placeholder="4.8 Mb"></label>
-        <label class="inline wide">ISCN<textarea class="small" data-field="iscn" placeholder="arr[GRCh38] 17p11.2p12(16287000_21100000)x1"></textarea></label>
-        <label class="inline wide">Berørte gener<textarea class="small" data-field="affected_genes" placeholder="RAI1; PMP22"></textarea></label>
+      <div class="variant-group-title" data-variant-types="cnv sv cyto">Strukturelle varianter</div>
+      <div class="variant-batch-group variant-field-group" data-variant-types="cnv sv cyto">
+        <label class="inline">
+          <span class="field-label">Genom ref.</span>
+          <input type="text" data-field="genome_build" placeholder="GRCh38">
+        </label>
+        <label class="inline">
+          <span class="field-label">Kromosom</span>
+          <input type="text" data-field="chromosome" placeholder="17p">
+        </label>
+        <label class="inline">
+          <span class="field-label">Start</span>
+          <input type="text" data-field="start" placeholder="16287000">
+        </label>
+        <label class="inline">
+          <span class="field-label">Slut</span>
+          <input type="text" data-field="end" placeholder="21100000">
+        </label>
+        <label class="inline">
+          <span class="field-label">Kopital</span>
+          <input type="text" data-field="copy_number" placeholder="x1">
+        </label>
+        <label class="inline">
+          <span class="field-label">Strukturtype</span>
+          <select data-field="sv_subtype" data-allow-legacy-option>${renderStructureTypeOptions({includeBlank: true})}</select>
+        </label>
+        <label class="inline">
+          <span class="field-label">Størrelse</span>
+          <input type="text" data-field="size_bp" placeholder="4.8 Mb">
+        </label>
+        <label class="inline wide">
+          <span class="field-label">ISCN</span>
+          <textarea class="small" data-field="iscn" placeholder="arr[GRCh38] 17p11.2p12(16287000_21100000)x1"></textarea>
+        </label>
+        <label class="inline wide">
+          <span class="field-label">Berørte gener</span>
+          <textarea class="small" data-field="affected_genes" placeholder="RAI1; PMP22"></textarea>
+        </label>
       </div>
-      <label class="inline wide">Beskrivelse<textarea class="small" data-field="description" placeholder="Fri tekst"></textarea></label>
-      <label class="inline">ACMG<select data-field="classification">${classificationOptions}</select></label>
-      <label class="inline">Kriterier<input type="text" data-field="criteria" placeholder="PM1,PP3"></label>
-      <label class="inline">VAF<input type="number" step="0.0001" data-field="af" placeholder="0,500"></label>
-      <label class="inline wide">Annoteringer<textarea class="small" data-field="annotations" placeholder="VarSeq-annoteringer og noter"></textarea></label>
-      <label class="inline wide">Tolkning<textarea class="small" data-field="interpretation" placeholder="Valgfrit"></textarea></label>
-      <button type="button" class="secondary case-choose-library">Vælg fra bibliotek</button>
-      <button type="button" class="secondary case-remove-row">Fjern</button>`;
+      <label class="inline wide">
+        <span class="field-label">Beskrivelse</span>
+        <textarea class="small" data-field="description" placeholder="Fri tekst"></textarea>
+      </label>
+      <label class="inline">
+        <span class="field-label">ACMG</span>
+        <select data-field="classification">${classificationOptions}</select>
+      </label>
+      <label class="inline">
+        <span class="field-label">Kriterier</span>
+        <input type="text" data-field="criteria" placeholder="PM1,PP3">
+      </label>
+      <label class="inline">
+        <span class="field-label">VAF</span>
+        <input type="number" step="0.0001" data-field="af" placeholder="0,500">
+      </label>
+      <label class="inline wide">
+        <span class="field-label">Annoteringer</span>
+        <textarea class="small" data-field="annotations" placeholder="VarSeq-annoteringer og noter"></textarea>
+      </label>
+      <label class="inline wide">
+        <span class="field-label">Tolkning</span>
+        <textarea class="small" data-field="interpretation" placeholder="Valgfrit"></textarea>
+      </label>
+      <div class="variant-row-actions">
+        <button type="button" class="secondary case-choose-library">Vælg fra bibliotek</button>
+        <button type="button" class="secondary case-remove-row">Fjern</button>
+      </div>`;
     const setValue = (selector, value) => {
       const el = row.querySelector(selector);
       if (!el) return;
@@ -9848,6 +9989,7 @@ function renderVariants(section) {
     setValue('[data-field="hgvs_c"]', values.hgvs_c);
     setValue('[data-field="hgvs_p"]', values.hgvs_p);
     setValue('[data-field="genomic_position"]', values.genomic_position);
+    setValue('[data-field="rsid"]', values.rsid);
     setValue('[data-field="zygosity"]', values.zygosity);
     setValue('[data-field="criteria"]', values.criteria);
     setValue('[data-field="genome_build"]', values.genome_build);
@@ -9880,6 +10022,10 @@ function renderVariants(section) {
       typeGroups.forEach(group => {
         const allowed = (group.dataset.variantTypes || '').split(/\s+/).filter(Boolean).map(normalizeVariantType);
         group.hidden = allowed.length ? !allowed.includes(type) : false;
+      });
+      const visibleTitles = Array.from(row.querySelectorAll('.variant-group-title')).filter(title => !title.hidden);
+      visibleTitles.forEach((title, index) => {
+        title.classList.toggle('variant-group-title--first', index === 0);
       });
     };
     updateRowVariantType();
