@@ -2616,345 +2616,6 @@ const state = {
   pendingReportSelectOrderId: null,
   pendingReportSelectReportId: null
 };
-const STORE_CONFIG = {
-  patients: {keyPath: 'id', autoIncrement: true},
-  samples: {keyPath: 'id', autoIncrement: true},
-  orders: {keyPath: 'id', autoIncrement: true},
-  patient_groups: {keyPath: 'id', autoIncrement: true},
-  panels: {keyPath: 'id', autoIncrement: true},
-  variants: {keyPath: 'id', autoIncrement: true},
-  qc: {keyPath: 'id', autoIncrement: true},
-  qc_presets: {keyPath: 'id', autoIncrement: true},
-  reports: {keyPath: 'id', autoIncrement: true},
-  users: {keyPath: 'id', autoIncrement: true},
-  audit: {keyPath: 'id', autoIncrement: true},
-  variant_library: {keyPath: 'id', autoIncrement: true},
-  responses: {keyPath: 'id', autoIncrement: true},
-  conclusion_library: {keyPath: 'id', autoIncrement: true},
-  planner: {keyPath: 'id', autoIncrement: false},
-  [SETTINGS_STORE]: {keyPath: 'key', autoIncrement: false}
-};
-const MEMORY_STORE_NAMES = [...STORES, SETTINGS_STORE];
-let memoryDbSeed = null;
-
-function writeMemoryDbSnapshot(data) {
-  try {
-    memoryDbSeed = deepClone(data || {});
-  } catch (err) {
-    console.warn('Kunne ikke gemme memory snapshot', err);
-    memoryDbSeed = {};
-  }
-}
-
-function readMemoryDbSnapshot() {
-  if (!memoryDbSeed) return null;
-  try {
-    return deepClone(memoryDbSeed);
-  } catch (err) {
-    console.warn('Kunne ikke læse memory snapshot', err);
-    return null;
-  }
-}
-
-function buildDefaultDbSnapshot() {
-  const timestamp = new Date().toISOString();
-  const blank = Object.fromEntries(STORES.map(name => [name, []]));
-  blank.users = [{
-    id: 1,
-    name: 'Admin',
-    email: 'admin@example.com',
-    role: 'Administrator',
-    pin: 'admin',
-    created_by: 'System',
-    created_at: timestamp,
-    updated_at: timestamp
-  }];
-  blank.audit = [];
-  blank.variant_library = [];
-  blank.responses = [];
-  blank.conclusion_library = [];
-  blank.planner = [];
-  return blank;
-}
-
-function createMemoryRequest(tx, executor) {
-  if (tx && typeof tx._trackRequest === 'function') {
-    tx._trackRequest();
-  }
-  const request = {result: undefined, error: undefined, onsuccess: null, onerror: null};
-  queueMicrotask(() => {
-    try {
-      request.result = executor();
-      if (typeof request.onsuccess === 'function') {
-        request.onsuccess({target: request});
-      }
-      if (tx && typeof tx._notifySuccess === 'function') {
-        tx._notifySuccess();
-      }
-    } catch (err) {
-      request.error = err;
-      if (typeof request.onerror === 'function') {
-        request.onerror({target: request});
-      }
-      if (tx && typeof tx._notifyError === 'function') {
-        tx._notifyError(err);
-      }
-    }
-  });
-  return request;
-}
-
-class MemoryTransaction {
-  constructor(storeNames, mode, dataMap, counterMap) {
-    this.storeNames = Array.isArray(storeNames) ? storeNames.slice() : [storeNames];
-    this.mode = mode;
-    this.__memoryTransaction = true;
-    this._dataMap = dataMap;
-    this._counterMap = counterMap;
-    this._pending = 0;
-    this._finalized = false;
-    this.error = null;
-    this.done = new Promise((resolve, reject) => {
-      this._resolveDone = resolve;
-      this._rejectDone = reject;
-    });
-    queueMicrotask(() => {
-      this._finalized = true;
-      if (this.error) {
-        if (this._rejectDone) this._rejectDone(this.error);
-        return;
-      }
-      if (this._pending === 0) {
-        this._complete();
-      }
-    });
-  }
-
-  _trackRequest() {
-    this._pending += 1;
-  }
-
-  _notifySuccess() {
-    if (this._pending > 0) {
-      this._pending -= 1;
-    }
-    if (this._finalized && this._pending === 0 && !this.error) {
-      this._complete();
-    }
-  }
-
-  _notifyError(err) {
-    if (this._pending > 0) {
-      this._pending -= 1;
-    }
-    if (!this.error) {
-      this.error = err;
-    }
-    if (typeof this.onerror === 'function') {
-      try { this.onerror({target: this}); } catch (handlerErr) { console.error(handlerErr); }
-    }
-    if (this._rejectDone) {
-      this._rejectDone(err);
-      this._rejectDone = null;
-    }
-  }
-
-  _complete() {
-    if (typeof this.oncomplete === 'function') {
-      try { this.oncomplete({target: this}); } catch (handlerErr) { console.error(handlerErr); }
-    }
-    if (this._resolveDone) {
-      this._resolveDone();
-      this._resolveDone = null;
-    }
-  }
-
-  objectStore(name) {
-    if (!MEMORY_STORE_NAMES.includes(name)) {
-      throw new Error('Ukendt store: ' + name);
-    }
-    if (!this.storeNames.includes(name)) {
-      this.storeNames.push(name);
-    }
-    return new MemoryObjectStore(this, name, this._dataMap, this._counterMap);
-  }
-
-  abort() {
-    this._notifyError(new Error('Transaktionen blev afbrudt.'));
-  }
-}
-
-class MemoryObjectStore {
-  constructor(tx, name, dataMap, counterMap) {
-    this.tx = tx;
-    this.name = name;
-    this.config = STORE_CONFIG[name];
-    if (!this.config) {
-      throw new Error('Manglende konfiguration for store: ' + name);
-    }
-    if (!dataMap[name]) {
-      dataMap[name] = [];
-    }
-    this.records = dataMap[name];
-    if (typeof counterMap[name] !== 'number') {
-      counterMap[name] = this._initialCounter();
-    }
-    this.counterMap = counterMap;
-  }
-
-  _initialCounter() {
-    if (!this.config.autoIncrement) return 0;
-    let max = 0;
-    for (const record of this.records) {
-      const value = record?.[this.config.keyPath];
-      const numeric = Number(value);
-      if (Number.isFinite(numeric) && numeric > max) {
-        max = numeric;
-      }
-    }
-    return max;
-  }
-
-  _currentCounter() {
-    return this.counterMap[this.name] || 0;
-  }
-
-  _setCounter(value) {
-    this.counterMap[this.name] = value;
-  }
-
-  _normalizeKey(key) {
-    if (!this.config.keyPath) return key;
-    if (this.config.autoIncrement) {
-      const numeric = Number(key);
-      if (!Number.isFinite(numeric)) {
-        throw new Error('Nøglen for ' + this.name + ' skal være numerisk.');
-      }
-      return numeric;
-    }
-    return key;
-  }
-
-  _assignKey(clone, allowGenerate) {
-    const {keyPath, autoIncrement} = this.config;
-    if (!keyPath) return undefined;
-    let key = clone[keyPath];
-    if (key === undefined || key === null || key === '') {
-      if (!allowGenerate || !autoIncrement) {
-        throw new Error('Posten mangler nøgle for ' + this.name);
-      }
-      const next = this._currentCounter() + 1;
-      this._setCounter(next);
-      clone[keyPath] = next;
-      key = next;
-    } else if (autoIncrement) {
-      key = this._normalizeKey(key);
-      clone[keyPath] = key;
-      if (key > this._currentCounter()) {
-        this._setCounter(key);
-      }
-    }
-    return key;
-  }
-
-  _findIndex(key) {
-    const {keyPath, autoIncrement} = this.config;
-    if (!keyPath) return -1;
-    const normalized = autoIncrement ? this._normalizeKey(key) : key;
-    return this.records.findIndex(record => {
-      if (!record) return false;
-      const value = record[keyPath];
-      return autoIncrement ? Number(value) === normalized : value === normalized;
-    });
-  }
-
-  add(record) {
-    const clone = deepClone(record || {});
-    return createMemoryRequest(this.tx, () => {
-      const key = this._assignKey(clone, true);
-      if (key !== undefined && this._findIndex(key) !== -1) {
-        throw new Error('Nøglen findes allerede i ' + this.name);
-      }
-      this.records.push(clone);
-      return key;
-    });
-  }
-
-  put(record) {
-    const clone = deepClone(record || {});
-    return createMemoryRequest(this.tx, () => {
-      const key = this._assignKey(clone, true);
-      if (key === undefined) {
-        this.records.push(clone);
-        return undefined;
-      }
-      const index = this._findIndex(key);
-      if (index === -1) {
-        this.records.push(clone);
-      } else {
-        this.records[index] = clone;
-      }
-      return key;
-    });
-  }
-
-  delete(key) {
-    return createMemoryRequest(this.tx, () => {
-      const idx = this._findIndex(key);
-      if (idx !== -1) {
-        this.records.splice(idx, 1);
-      }
-    });
-  }
-
-  clear() {
-    return createMemoryRequest(this.tx, () => {
-      this.records.length = 0;
-      if (this.config.autoIncrement) {
-        this._setCounter(0);
-      }
-    });
-  }
-
-  get(key) {
-    return createMemoryRequest(this.tx, () => {
-      const idx = this._findIndex(key);
-      return idx === -1 ? undefined : deepClone(this.records[idx]);
-    });
-  }
-
-  getAll() {
-    return createMemoryRequest(this.tx, () => this.records.map(item => deepClone(item)));
-  }
-
-  createIndex() {
-    return {name: 'memory-index'};
-  }
-}
-
-function createMemoryDb(initialData = null) {
-  const seed = initialData && typeof initialData === 'object' ? initialData : null;
-  const dataMap = {};
-  const counterMap = {};
-  for (const name of MEMORY_STORE_NAMES) {
-    const list = seed && Array.isArray(seed[name]) ? seed[name].map(item => deepClone(item)) : [];
-    dataMap[name] = list;
-    counterMap[name] = STORE_CONFIG[name]?.autoIncrement
-      ? list.reduce((max, item) => {
-          const value = item?.[STORE_CONFIG[name].keyPath];
-          const numeric = Number(value);
-          return Number.isFinite(numeric) && numeric > max ? numeric : max;
-        }, 0)
-      : 0;
-  }
-  return {
-    close() {},
-    transaction(storeNames, mode) {
-      return new MemoryTransaction(storeNames, mode, dataMap, counterMap);
-    }
-  };
-}
-
 const CREATED_BY_STORES = new Set(['patients','samples','orders','patient_groups','variants','qc','qc_presets','reports','conclusion_library']);
 const UPDATED_BY_STORES = new Set(['panels']);
 const ROLE_OPTIONS = [
@@ -5597,12 +5258,11 @@ function openSamplesForReport(reportId) {
   activateTab('samples');
 }
 function openDb() {
-  if (state.usingMemoryDb || !('indexedDB' in window)) {
-    state.usingMemoryDb = true;
-    const seed = readMemoryDbSnapshot() || buildDefaultDbSnapshot();
-    return Promise.resolve(createMemoryDb(seed));
-  }
   return new Promise((resolve, reject) => {
+    if (!('indexedDB' in window)) {
+      reject(new Error('Browseren understøtter ikke IndexedDB. GlimR kræver lokal databaseadgang.'));
+      return;
+    }
     const req = indexedDB.open(DB_NAME, DB_VER);
     let settled = false;
     const finish = (action) => {
@@ -5684,7 +5344,6 @@ function openDb() {
             setStatus('Databaseversion ændret. Genindlæs GlimR for at fortsætte.');
           };
         }
-        state.usingMemoryDb = false;
         resolve(db);
       });
     };
@@ -5698,10 +5357,6 @@ function requestToPromise(req) {
 }
 
 function transactionToPromise(tx) {
-  if (!tx) return Promise.resolve();
-  if (tx.__memoryTransaction && tx.done) {
-    return tx.done;
-  }
   return new Promise((resolve, reject) => {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
@@ -6218,9 +5873,6 @@ async function captureSyncedSnapshot() {
   try {
     const snapshot = await exportData();
     state.lastSyncedData = deepClone(snapshot);
-    if (state.usingMemoryDb) {
-      writeMemoryDbSnapshot(snapshot);
-    }
   } catch (err) {
     console.warn('Kunne ikke opdatere synkroniseringssnapshot', err);
   }
@@ -19329,52 +18981,6 @@ async function loadDemoData() {
   refreshLoginOptions();
   updateAuthUi();
 }
-async function completeInitialization() {
-  const statusMessage = state.usingMemoryDb
-    ? 'Database åben (midlertidig standarddatabase)'
-    : 'Database åben';
-  setStatus(statusMessage);
-  await loadAllStores();
-  await ensureDefaultPatientGroups();
-  await ensureDefaultQcPresets();
-  await ensureCreationMetadata();
-  await captureSyncedSnapshot();
-  await restoreBoundHandle();
-  hookUi();
-  restoreUserSession();
-  if (state.boundHandle) {
-    try {
-      await reloadBoundFileData({silent: true, refreshUi: false});
-    } catch (err) {
-      console.warn('Kunne ikke genindlæse bundet fil efter initialisering', err);
-    }
-  }
-  renderAll();
-  if (state.autosave && state.boundHandle) {
-    scheduleAutosave();
-  }
-  activateTab('dashboard');
-}
-
-async function initializeMemoryDbFallback(cause) {
-  console.warn('Fald tilbage til standarddatabase i hukommelsen.', cause);
-  try {
-    state.cache.clear();
-    state.boundHandle = null;
-    state.usingMemoryDb = true;
-    const seed = readMemoryDbSnapshot() || buildDefaultDbSnapshot();
-    state.db = createMemoryDb();
-    await replaceAllData(seed, {markSynced: true});
-    await completeInitialization();
-    setStatus('Database åben (midlertidig standarddatabase)');
-    return true;
-  } catch (err) {
-    console.error('Fallback-initialisering mislykkedes', err);
-    setStatus('Kunne ikke initialisere standarddatabase: ' + (err?.message || err));
-    return false;
-  }
-}
-
 function hookUi() {
   const loginForm = document.getElementById('loginForm');
   if (loginForm) loginForm.addEventListener('submit', handleLogin);
@@ -19432,15 +19038,27 @@ async function init() {
   initTabs();
   try {
     setStatus('Åbner database...');
-    state.usingMemoryDb = false;
     state.db = await openDb();
-    await completeInitialization();
+    setStatus(state.usingMemoryDb ? 'Database åben (midlertidig hukommelse)' : 'Database åben');
+    await loadAllStores();
+    await ensureDefaultPatientGroups();
+    await ensureDefaultQcPresets();
+    await ensureCreationMetadata();
+    await captureSyncedSnapshot();
+    await restoreBoundHandle();
+    hookUi();
+    restoreUserSession();
+    if (state.boundHandle) {
+      await reloadBoundFileData({silent: true, refreshUi: false});
+    }
+    renderAll();
+    if (state.autosave && state.boundHandle) {
+      scheduleAutosave();
+    }
+    activateTab('dashboard');
   } catch (err) {
     console.error(err);
-    const fallbackOk = await initializeMemoryDbFallback(err);
-    if (!fallbackOk) {
-      setStatus('Kunne ikke åbne database: ' + (err?.message || err));
-    }
+    setStatus('Kunne ikke åbne database: ' + err.message);
   }
 }
 if (document.readyState === 'loading') {
