@@ -1370,6 +1370,14 @@ section[data-tab].active {
   fill: rgba(148, 163, 184, 0.4);
   pointer-events: none;
 }
+.variant-hotspot__centromere-boundaries {
+  pointer-events: none;
+}
+.variant-hotspot__centromere-boundary {
+  stroke: #000000;
+  stroke-width: 2.5;
+  shape-rendering: crispEdges;
+}
 .variant-hotspot__band-overlay {
   fill: rgba(15, 23, 42, 0.001);
   pointer-events: all;
@@ -1401,6 +1409,9 @@ section[data-tab].active {
 }
 [data-theme="dark"] .variant-hotspot__centromere {
   fill: rgba(148, 163, 184, 0.35);
+}
+[data-theme="dark"] .variant-hotspot__centromere-boundary {
+  stroke: #000000;
 }
 [data-theme="dark"] .variant-hotspot__band-overlay {
   fill: rgba(226, 232, 240, 0.0025);
@@ -11188,6 +11199,17 @@ function renderVariantLibrary(section) {
           return Math.max(3, widthValue);
         });
     };
+    const applyScaleToCentromereBoundaries = (selection, scale) => {
+      selection
+        .attr('x1', d => {
+          const position = Math.max(0, d.position ?? d.x ?? d.start ?? 0);
+          return scale(position);
+        })
+        .attr('x2', d => {
+          const position = Math.max(0, d.position ?? d.x ?? d.end ?? 0);
+          return scale(position);
+        });
+    };
     const applyScaleToBandLabels = (selection, scale) => {
       selection
         .attr('x', d => {
@@ -11279,6 +11301,7 @@ function renderVariantLibrary(section) {
         bandData = [{start: 0, end: row.chromLength, x0: 0, x1: row.chromLength, name: '', stain: 'gneg'}];
       }
       const centromereOverlayData = [];
+      const centromereBoundaryData = [];
       bandData = bandData.map((band, index) => {
         const upperBound = index === bandData.length - 1 ? band.x1 + 1 : band.x1;
         const count = row.data.reduce((sum, point) => {
@@ -11301,8 +11324,28 @@ function renderVariantLibrary(section) {
             sourceBand: band,
             count
           });
+          const previousBand = index > 0 ? bandData[index - 1] : null;
+          const nextBand = index < bandData.length - 1 ? bandData[index + 1] : null;
+          const previousStain = previousBand?.stain ? String(previousBand.stain).toLowerCase() : '';
+          const nextStain = nextBand?.stain ? String(nextBand.stain).toLowerCase() : '';
+          if (previousStain && previousStain !== 'acen') {
+            centromereBoundaryData.push({position: Math.max(0, band.x0)});
+          }
+          if (nextStain && nextStain !== 'acen') {
+            centromereBoundaryData.push({position: Math.max(0, band.x1)});
+          }
         }
         return {...band, count, xUpper: upperBound};
+      });
+      const normalizedBoundaryData = [];
+      centromereBoundaryData.forEach(boundary => {
+        const value = Math.max(0, Math.min(row.chromLength, boundary.position ?? boundary.x ?? boundary.start ?? 0));
+        if (!Number.isFinite(value)) {
+          return;
+        }
+        if (!normalizedBoundaryData.some(item => Math.abs(item.position - value) < 1e-6)) {
+          normalizedBoundaryData.push({position: value});
+        }
       });
       const bandGroup = rowGroup.append('g')
         .attr('class', 'variant-hotspot__bands')
@@ -11325,6 +11368,16 @@ function renderVariantLibrary(section) {
         .attr('y', 0)
         .attr('height', bandHeight);
       applyScaleToBars(centromereRects, baseScale);
+      const centromereBoundaryGroup = rowGroup.append('g')
+        .attr('class', 'variant-hotspot__centromere-boundaries')
+        .attr('clip-path', `url(#${clipId})`);
+      const centromereBoundaryLines = centromereBoundaryGroup.selectAll('line')
+        .data(normalizedBoundaryData)
+        .join('line')
+        .attr('class', 'variant-hotspot__centromere-boundary')
+        .attr('y1', 0)
+        .attr('y2', bandHeight);
+      applyScaleToCentromereBoundaries(centromereBoundaryLines, baseScale);
       const bandOverlayGroup = rowGroup.append('g')
         .attr('class', 'variant-hotspot__band-overlays')
         .attr('clip-path', `url(#${clipId})`);
@@ -11417,9 +11470,9 @@ function renderVariantLibrary(section) {
         const x1 = Math.max(startValue, endValue);
         highlightData = [{x0, x1, title: highlightInfo.title || ''}];
       }
-      const highlightHeight = Math.min(10, Math.round(bandHeight * 0.4));
-      const highlightY = (bandHeight - highlightHeight) / 2;
-      const highlightRadius = Math.min(4, highlightHeight / 2);
+      const highlightHeight = bandHeight;
+      const highlightY = 0;
+      const highlightRadius = Math.min(4, Math.max(0, bandHeight / 6));
       const highlightRects = highlightGroup.selectAll('rect')
         .data(highlightData)
         .join('rect')
@@ -11466,6 +11519,7 @@ function renderVariantLibrary(section) {
         bars,
         bands: bandRects,
         centromeres: centromereRects,
+        centromereBoundaries: normalizedBoundaryData.length ? centromereBoundaryLines : null,
         bandOverlays,
         bandLabels,
         applyLabelScale: scale => applyScaleToBandLabels(bandLabels, scale),
@@ -11614,6 +11668,9 @@ function renderVariantLibrary(section) {
           }
           if (state.centromeres) {
             applyScaleToBars(state.centromeres, scaled);
+          }
+          if (state.centromereBoundaries) {
+            applyScaleToCentromereBoundaries(state.centromereBoundaries, scaled);
           }
           if (state.bandOverlays) {
             applyScaleToBars(state.bandOverlays, scaled);
