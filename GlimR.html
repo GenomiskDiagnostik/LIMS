@@ -1399,10 +1399,10 @@ section[data-tab].active {
   fill: rgba(56, 189, 248, 0.16);
 }
 [data-theme="dark"] .variant-hotspot__bands {
-  mix-blend-mode: screen;
+  mix-blend-mode: normal;
 }
 [data-theme="dark"] .variant-hotspot__band {
-  fill-opacity: 0.95;
+  fill-opacity: 1;
 }
 [data-theme="dark"] .variant-hotspot__band-overlay:hover,
 [data-theme="dark"] .variant-hotspot__band-overlay:focus-visible,
@@ -3707,26 +3707,26 @@ const CYTOBAND_DATA = {"hg38":{"1":[[0,2300000,"p36.33","gneg"],[2300000,5300000
 
 const CYTOBAND_COLOUR_PALETTES = {
   light: {
-    gneg: '#eff5ff',
-    gpos25: '#ccdffa',
-    gpos50: '#a6c3f3',
-    gpos75: '#7899e4',
-    gpos100: '#4c6fce',
-    gvar: '#f6b550',
-    stalk: '#cba0f2',
-    acen: '#525866',
-    other: '#b6caf0'
+    gneg: '#f6f8fc',
+    gpos25: '#e0e6f5',
+    gpos50: '#c7cee6',
+    gpos75: '#aab4d4',
+    gpos100: '#8b98c1',
+    gvar: '#6d7ca8',
+    stalk: '#566593',
+    acen: '#3f475c',
+    other: '#d2d9eb'
   },
   dark: {
-    gneg: '#253652',
-    gpos25: '#305080',
-    gpos50: '#3c66a6',
-    gpos75: '#4a7fce',
-    gpos100: '#5a94f0',
-    gvar: '#dca75a',
-    stalk: '#b79cff',
-    acen: '#4b5565',
-    other: '#30537f'
+    gneg: '#1b2536',
+    gpos25: '#242f45',
+    gpos50: '#2f3c5b',
+    gpos75: '#3a4a72',
+    gpos100: '#455889',
+    gvar: '#50649f',
+    stalk: '#5a71b4',
+    acen: '#353e52',
+    other: '#283555'
   }
 };
 
@@ -10649,6 +10649,7 @@ function renderVariantLibrary(section) {
     let rowStates = [];
     let activeBandState = null;
     let activeBand = null;
+    let updateNativeBandTooltip = () => {};
     const highlightBand = (state, band) => {
       if (!rowStates.length) return;
       rowStates.forEach(item => {
@@ -10684,6 +10685,7 @@ function renderVariantLibrary(section) {
       tooltipElement.setAttribute('aria-hidden', 'true');
       tooltipElement.style.transform = 'translate(-9999px, -9999px)';
       tooltipElement.replaceChildren();
+      updateNativeBandTooltip('');
     };
     const pointerFromEvent = event => {
       if (!event) return null;
@@ -10995,7 +10997,9 @@ function renderVariantLibrary(section) {
         : 'Ingen SNV/indels';
       const bandLabel = band.name ? `Chr ${row.chromosome} ${band.name}` : `Chr ${row.chromosome}`;
       const detailsLine = `${stainLabel}${rangeLabel ? ` · ${rangeLabel}` : ''}`;
+      const nativeLabel = [bandLabel, detailsLine, countLabel].filter(Boolean).join(' · ');
       showTooltipContent(event, [bandLabel, detailsLine, countLabel]);
+      updateNativeBandTooltip(nativeLabel);
     };
     const styleAxis = axisSelection => {
       axisSelection.selectAll('text').attr('dy', '0.7em');
@@ -11090,17 +11094,21 @@ function renderVariantLibrary(section) {
         .attr('y', 0)
         .attr('height', bandHeight);
       applyScaleToBars(bandOverlays, baseScale);
+      const describeBand = d => {
+        const rangeLabel = `${formatPosition(d.x0)} – ${formatPosition(d.x1)}`;
+        const bandLabel = d.name ? `Chr ${row.chromosome} ${d.name}` : `Chr ${row.chromosome}`;
+        const stainLabel = d.stain ? d.stain.toUpperCase() : '';
+        const countLabel = d.count
+          ? `${d.count} SNV/indel${d.count === 1 ? '' : 'er'}`
+          : 'Ingen SNV/indels';
+        return [bandLabel, stainLabel, rangeLabel, countLabel].filter(Boolean).join(' · ');
+      };
+      bandOverlays
+        .attr('aria-label', describeBand)
+        .attr('data-band-label', describeBand);
       bandOverlays.selectAll('title').remove();
       bandOverlays.append('title')
-        .text(d => {
-          const rangeLabel = `${formatPosition(d.x0)} – ${formatPosition(d.x1)}`;
-          const bandLabel = d.name ? ` ${d.name}` : '';
-          const stainLabel = d.stain ? ` (${d.stain.toUpperCase()})` : '';
-          const countLabel = d.count
-            ? `${d.count} SNV/indel${d.count === 1 ? '' : 'er'}`
-            : 'Ingen SNV/indels';
-          return `${countLabel} i Chr ${row.chromosome}${bandLabel}${stainLabel} (${rangeLabel})`;
-        });
+        .text(describeBand);
       bandOverlays
         .on('mouseenter', (event, d) => {
           setActiveBand(rowState, d);
@@ -11312,6 +11320,16 @@ function renderVariantLibrary(section) {
       .style('fill', 'transparent')
       .style('touch-action', 'none');
     zoomSurfaceSelection = zoomSurface;
+    updateNativeBandTooltip = text => {
+      if (!zoomSurfaceSelection) return;
+      if (text) {
+        zoomSurfaceSelection.attr('title', text);
+        zoomSurfaceSelection.attr('aria-label', text);
+      } else {
+        zoomSurfaceSelection.attr('title', null);
+        zoomSurfaceSelection.attr('aria-label', null);
+      }
+    };
     setOverlayCursor('grab');
     zoomSurface.call(zoomBehavior);
     zoomSurface
