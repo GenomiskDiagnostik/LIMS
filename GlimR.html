@@ -11015,10 +11015,12 @@ function renderVariantLibrary(section) {
       const countLabel = band.count
         ? `${band.count} SNV/indel${band.count === 1 ? '' : 'er'}`
         : 'Ingen SNV/indels';
-      const bandLabel = band.name ? `Chr ${row.chromosome} ${band.name}` : `Chr ${row.chromosome}`;
+      const chromosomeLine = `Chr ${row.chromosome}`;
+      const bandName = band.name ? String(band.name).trim() : '';
+      const iscnLine = bandName ? `ISCN: ${bandName}` : 'ISCN: Ukendt bånd';
       const detailsLine = `${stainLabel}${rangeLabel ? ` · ${rangeLabel}` : ''}`;
-      const nativeLabel = [bandLabel, detailsLine, countLabel].filter(Boolean).join(' · ');
-      showTooltipContent(event, [bandLabel, detailsLine, countLabel]);
+      const nativeLabel = [chromosomeLine, iscnLine, detailsLine, countLabel].filter(Boolean).join(' · ');
+      showTooltipContent(event, [chromosomeLine, iscnLine, detailsLine, countLabel]);
       updateNativeBandTooltip(nativeLabel);
     };
     const styleAxis = axisSelection => {
@@ -11146,12 +11148,14 @@ function renderVariantLibrary(section) {
       applyScaleToBars(bandOverlays, baseScale);
       const describeBand = d => {
         const rangeLabel = `${formatPosition(d.x0)} – ${formatPosition(d.x1)}`;
-        const bandLabel = d.name ? `Chr ${row.chromosome} ${d.name}` : `Chr ${row.chromosome}`;
+        const chromosomeLabel = `Chr ${row.chromosome}`;
+        const bandName = d.name ? String(d.name).trim() : '';
+        const iscnLabel = bandName ? `ISCN ${bandName}` : 'ISCN ukendt bånd';
         const stainLabel = d.stain ? d.stain.toUpperCase() : '';
         const countLabel = d.count
           ? `${d.count} SNV/indel${d.count === 1 ? '' : 'er'}`
           : 'Ingen SNV/indels';
-        return [bandLabel, stainLabel, rangeLabel, countLabel].filter(Boolean).join(' · ');
+        return [chromosomeLabel, iscnLabel, stainLabel, rangeLabel, countLabel].filter(Boolean).join(' · ');
       };
       bandOverlays
         .attr('aria-label', describeBand)
