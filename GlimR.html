@@ -1362,9 +1362,21 @@ section[data-tab].active {
 .variant-hotspot__band {
   fill-opacity: 0.9;
 }
-.variant-hotspot__centromere {
-  fill: #000000;
+.variant-hotspot__centromeres {
   pointer-events: none;
+  mix-blend-mode: multiply;
+}
+.variant-hotspot__centromere {
+  fill: rgba(148, 163, 184, 0.4);
+  pointer-events: none;
+}
+.variant-hotspot__centromere-boundaries {
+  pointer-events: none;
+}
+.variant-hotspot__centromere-boundary {
+  stroke: #000000;
+  stroke-width: 2.5;
+  shape-rendering: crispEdges;
 }
 .variant-hotspot__band-overlay {
   fill: rgba(15, 23, 42, 0.001);
@@ -1395,6 +1407,12 @@ section[data-tab].active {
   fill: #e2e8f0;
   stroke: rgba(15, 23, 42, 0.85);
 }
+[data-theme="dark"] .variant-hotspot__centromere {
+  fill: rgba(148, 163, 184, 0.35);
+}
+[data-theme="dark"] .variant-hotspot__centromere-boundary {
+  stroke: #000000;
+}
 [data-theme="dark"] .variant-hotspot__band-overlay {
   fill: rgba(226, 232, 240, 0.0025);
 }
@@ -1402,6 +1420,20 @@ section[data-tab].active {
 [data-theme="dark"] .variant-hotspot__band-overlay:focus-visible,
 [data-theme="dark"] .variant-hotspot__band-overlay.is-hovered {
   fill: rgba(56, 189, 248, 0.22);
+}
+.variant-hotspot__highlights {
+  pointer-events: none;
+}
+.variant-hotspot__highlight {
+  fill: #22c55e;
+  fill-opacity: 0.9;
+  stroke: #15803d;
+  stroke-width: 0.75;
+  pointer-events: none;
+}
+[data-theme="dark"] .variant-hotspot__highlight {
+  fill: #4ade80;
+  stroke: #16a34a;
 }
 .variant-hotspot__bars rect {
   shape-rendering: crispEdges;
@@ -10660,6 +10692,12 @@ function renderVariantLibrary(section) {
     if (ratio >= 0.05) return 'Meget sjælden';
     return 'Ultra sjælden';
   };
+  let filteredLibrary = list.slice();
+  let selectedId = null;
+  const getHighlightedEntry = () => {
+    if (selectedId == null) return null;
+    return filteredLibrary.find(entry => Number(entry.id) === Number(selectedId)) || null;
+  };
   const updateHotspotSummary = text => {
     if (hotspotSummary) {
       hotspotSummary.textContent = text || '';
@@ -10670,7 +10708,7 @@ function renderVariantLibrary(section) {
       hotspotCaption.textContent = text || '';
     }
   };
-  const updateHotspotChart = variants => {
+  const updateHotspotChart = (variants, options = {}) => {
     if (!hotspotChartContainer) return;
     const variantList = Array.isArray(variants) ? variants : [];
     const snvVariants = variantList.filter(variant => normalizeVariantType(variant?.variant_type) === 'snv');
@@ -10678,6 +10716,78 @@ function renderVariantLibrary(section) {
     const normalizedBuild = normalizeGenomeBuildValue(selectedGenomeBuild) || DEFAULT_GENOME_BUILD;
     selectedGenomeBuild = normalizedBuild;
     const buildLabel = getGenomeBuildLabel(normalizedBuild);
+    const highlightVariant = options?.highlightVariant ?? getHighlightedEntry();
+    const computeCoordinateInfo = variant => {
+      if (!variant) return null;
+      const coordinates = parseVariantCoordinates(variant);
+      const chromosome = normalizeChromosomeValue(coordinates?.chromosome || variant.chromosome || variant.chrom);
+      let start = Number.parseInt(coordinates?.start, 10);
+      let end = Number.parseInt(coordinates?.end, 10);
+      if (Number.isFinite(start) && Number.isFinite(end) && end < start) {
+        [start, end] = [end, start];
+      }
+      let position = Number.isFinite(start) ? start : Number.parseInt(coordinates?.end, 10);
+      if (Number.isFinite(start) && Number.isFinite(end) && start > 0 && end > 0) {
+        position = Math.round((start + end) / 2);
+      }
+      if (!Number.isFinite(position) || position <= 0) {
+        const rawPosition = variant.genomic_position || variant.genomicPosition || variant.position || '';
+        const match = String(rawPosition).match(/[-:](\d+)/);
+        if (match) {
+          position = Number.parseInt(match[1], 10);
+        }
+      }
+      if (!Number.isFinite(position) || position <= 0) {
+        const startFallback = Number.parseInt(variant.start, 10);
+        const endFallback = Number.parseInt(variant.end, 10);
+        if (Number.isFinite(startFallback) && startFallback > 0) {
+          position = startFallback;
+        } else if (Number.isFinite(endFallback) && endFallback > 0) {
+          position = endFallback;
+        }
+      }
+      const build = normalizeGenomeBuildValue(inferGenomeBuildCode(variant, coordinates, normalizedBuild)) || normalizedBuild;
+      if (!Number.isFinite(start) || start <= 0) {
+        start = Number.isFinite(position) ? Math.max(0, position) : 0;
+      }
+      if (!Number.isFinite(end) || end <= 0) {
+        end = Number.isFinite(position) ? Math.max(0, position) : start;
+      }
+      if (end < start) {
+        [start, end] = [end, start];
+      }
+      start = Math.max(0, start);
+      end = Math.max(start, end);
+      const hasPosition = Number.isFinite(position) && position > 0;
+      return {
+        chromosome: chromosome || '',
+        start,
+        end,
+        position: hasPosition ? position : 0,
+        hasPosition,
+        build,
+        buildLabel: getGenomeBuildLabel(build)
+      };
+    };
+    let highlightCandidate = null;
+    let highlightInfo = null;
+    let highlightSuppressedReason = '';
+    if (highlightVariant) {
+      const candidate = computeCoordinateInfo(highlightVariant);
+      highlightCandidate = candidate;
+      if (!candidate || !candidate.hasPosition) {
+        highlightSuppressedReason = 'position';
+      } else if (!candidate.chromosome) {
+        highlightSuppressedReason = 'chromosome';
+      } else if (candidate.build !== normalizedBuild) {
+        highlightSuppressedReason = 'build';
+      } else {
+        highlightInfo = {
+          ...candidate,
+          title: formatVariantTitle(highlightVariant) || ''
+        };
+      }
+    }
     hotspotChartContainer.innerHTML = '';
     let tooltipElement = null;
     let rowStates = [];
@@ -10785,7 +10895,7 @@ function renderVariantLibrary(section) {
       const nextBuild = normalizeGenomeBuildValue(buildSelect.value) || normalizedBuild;
       if (nextBuild !== normalizedBuild) {
         selectedGenomeBuild = nextBuild;
-        requestAnimationFrame(() => updateHotspotChart(filteredLibrary));
+        requestAnimationFrame(redrawHotspot);
       }
     });
     buildLabelElement.append(buildText, buildSelect);
@@ -10813,7 +10923,8 @@ function renderVariantLibrary(section) {
       empty.textContent = message;
       hotspotChartContainer.appendChild(empty);
     };
-    if (!snvVariants.length) {
+    const hasHighlight = Boolean(highlightInfo);
+    if (!snvVariants.length && !hasHighlight) {
       setEmptyState('Ingen SNV/indels kan vises for det aktuelle udvalg.');
       const summaryParts = [`0 SNV/indels i ${buildLabel}`];
       if (excludedCount > 0) {
@@ -10838,35 +10949,20 @@ function renderVariantLibrary(section) {
     const mismatchedBuildCounts = new Map();
     const parsed = [];
     snvVariants.forEach(variant => {
-      const coordinates = parseVariantCoordinates(variant);
-      const chromosome = normalizeChromosomeValue(coordinates.chromosome || variant.chromosome || variant.chrom);
-      if (!chromosome) {
+      const info = computeCoordinateInfo(variant);
+      if (!info || !info.chromosome) {
         missingCoordinateCount++;
         return;
       }
-      const start = Number.parseInt(coordinates.start, 10);
-      const end = Number.parseInt(coordinates.end, 10);
-      let position = Number.isFinite(start) ? start : Number.isFinite(end) ? end : NaN;
-      if (Number.isFinite(start) && Number.isFinite(end)) {
-        position = Math.round((start + end) / 2);
-      }
-      if (!Number.isFinite(position) || position <= 0) {
-        const rawPosition = variant.genomic_position || variant.genomicPosition || variant.position || '';
-        const match = String(rawPosition).match(/[-:](\d+)/);
-        if (match) {
-          position = Number.parseInt(match[1], 10);
-        }
-      }
-      if (!Number.isFinite(position) || position <= 0) {
+      if (!info.hasPosition) {
         missingCoordinateCount++;
         return;
       }
-      const inferredBuild = normalizeGenomeBuildValue(inferGenomeBuildCode(variant, coordinates, normalizedBuild)) || normalizedBuild;
-      if (inferredBuild !== normalizedBuild) {
-        mismatchedBuildCounts.set(inferredBuild, (mismatchedBuildCounts.get(inferredBuild) || 0) + 1);
+      if (info.build !== normalizedBuild) {
+        mismatchedBuildCounts.set(info.build, (mismatchedBuildCounts.get(info.build) || 0) + 1);
         return;
       }
-      parsed.push({chromosome, position});
+      parsed.push({chromosome: info.chromosome, position: info.position});
     });
     const coordinatesCount = parsed.length;
     const missingCount = missingCoordinateCount;
@@ -10874,7 +10970,7 @@ function renderVariantLibrary(section) {
     const mismatchedSummary = mismatchedTotal > 0
       ? Array.from(mismatchedBuildCounts.entries()).map(([build, count]) => `${count} i ${getGenomeBuildLabel(build)}`).join(', ')
       : '';
-    if (!coordinatesCount) {
+    if (!coordinatesCount && !hasHighlight) {
       const emptyParts = [`Ingen SNV/indels med genomiske koordinater i ${buildLabel}.`];
       if (missingCount > 0) {
         emptyParts.push(`${missingCount} uden koordinater.`);
@@ -10903,7 +10999,7 @@ function renderVariantLibrary(section) {
     }
     hotspotChartContainer.dataset.chartEmpty = 'false';
     const grouped = d3.groups(parsed, d => d.chromosome);
-    if (!grouped.length) {
+    if (!grouped.length && !hasHighlight) {
       setEmptyState('Ingen SNV/indels kan vises for det aktuelle udvalg.');
       updateHotspotSummary(`Ingen SNV/indels med koordinater i ${buildLabel}.`);
       updateHotspotCaption('Tilføj eller vælg SNV/indel-poster for at se hotspot-fordelingen.');
@@ -10979,12 +11075,15 @@ function renderVariantLibrary(section) {
     const MIN_BAND_LABEL_PX = 2;
     const CENTROMERE_DISPLAY_WIDTH = 1_000_000;
 
-    const rows = grouped.map(([chromosome, data]) => {
+    let rows = grouped.map(([chromosome, data]) => {
+      const rowHighlightMax = highlightInfo && highlightInfo.chromosome === chromosome
+        ? Math.max(highlightInfo.start, highlightInfo.end, highlightInfo.position || 0)
+        : 0;
       const maxPosition = d3.max(data, d => d.position) || 1;
       const cytobandLength = getCytobandChromosomeLength(normalizedBuild, chromosome);
-      const fallbackLength = FALLBACK_CHROMOSOME_LENGTHS[chromosome] || maxPosition;
+      const fallbackLength = FALLBACK_CHROMOSOME_LENGTHS[chromosome] || Math.max(maxPosition, rowHighlightMax, 1);
       const canonicalLength = cytobandLength || fallbackLength;
-      const chromLength = Math.max(canonicalLength, maxPosition);
+      const chromLength = Math.max(canonicalLength, maxPosition, rowHighlightMax || 0, 1);
       const densityTarget = Math.round(Math.sqrt(data.length) * 2.4);
       const spanTarget = chromLength > 0 ? Math.round(chromLength / 600000) : 0;
       const thresholds = Math.min(MAX_BASE_THRESHOLD, Math.max(MIN_BIN_THRESHOLD, densityTarget, spanTarget));
@@ -10999,6 +11098,25 @@ function renderVariantLibrary(section) {
         baseThresholds: thresholds
       };
     }).sort((a, b) => compareChromosomes(a.chromosome, b.chromosome));
+    if (highlightInfo && !rows.some(row => row.chromosome === highlightInfo.chromosome)) {
+      const chromosome = highlightInfo.chromosome;
+      const highlightMax = Math.max(highlightInfo.start, highlightInfo.end, highlightInfo.position || 0, 1);
+      const cytobandLength = getCytobandChromosomeLength(normalizedBuild, chromosome);
+      const fallbackLength = FALLBACK_CHROMOSOME_LENGTHS[chromosome] || highlightMax;
+      const chromLength = Math.max(cytobandLength || fallbackLength || 1, highlightMax);
+      const thresholds = MIN_BIN_THRESHOLD;
+      const histogram = d3.bin()
+        .domain([0, chromLength])
+        .thresholds(thresholds)([]);
+      rows.push({
+        chromosome,
+        chromLength,
+        histogram,
+        data: [],
+        baseThresholds: thresholds
+      });
+      rows.sort((a, b) => compareChromosomes(a.chromosome, b.chromosome));
+    }
     const maxBinCount = d3.max(rows, row => d3.max(row.histogram, bin => bin.length)) || 1;
     const containerWidth = hotspotChartContainer.clientWidth || 960;
     const width = Math.max(containerWidth, 720);
@@ -11066,6 +11184,30 @@ function renderVariantLibrary(section) {
           const end = Math.max(start, d.x1 || d.x0 || 0);
           const widthValue = scale(end) - scale(start);
           return Math.max(1, widthValue);
+        });
+    };
+    const applyScaleToHighlight = (selection, scale) => {
+      selection
+        .attr('x', d => {
+          const start = Math.max(0, d.x0 ?? d.start ?? 0);
+          return scale(start);
+        })
+        .attr('width', d => {
+          const start = Math.max(0, d.x0 ?? d.start ?? 0);
+          const end = Math.max(start, d.x1 ?? d.end ?? start);
+          const widthValue = scale(end) - scale(start);
+          return Math.max(3, widthValue);
+        });
+    };
+    const applyScaleToCentromereBoundaries = (selection, scale) => {
+      selection
+        .attr('x1', d => {
+          const position = Math.max(0, d.position ?? d.x ?? d.start ?? 0);
+          return scale(position);
+        })
+        .attr('x2', d => {
+          const position = Math.max(0, d.position ?? d.x ?? d.end ?? 0);
+          return scale(position);
         });
     };
     const applyScaleToBandLabels = (selection, scale) => {
@@ -11159,6 +11301,7 @@ function renderVariantLibrary(section) {
         bandData = [{start: 0, end: row.chromLength, x0: 0, x1: row.chromLength, name: '', stain: 'gneg'}];
       }
       const centromereOverlayData = [];
+      const centromereBoundaryData = [];
       bandData = bandData.map((band, index) => {
         const upperBound = index === bandData.length - 1 ? band.x1 + 1 : band.x1;
         const count = row.data.reduce((sum, point) => {
@@ -11181,8 +11324,28 @@ function renderVariantLibrary(section) {
             sourceBand: band,
             count
           });
+          const previousBand = index > 0 ? bandData[index - 1] : null;
+          const nextBand = index < bandData.length - 1 ? bandData[index + 1] : null;
+          const previousStain = previousBand?.stain ? String(previousBand.stain).toLowerCase() : '';
+          const nextStain = nextBand?.stain ? String(nextBand.stain).toLowerCase() : '';
+          if (previousStain && previousStain !== 'acen') {
+            centromereBoundaryData.push({position: Math.max(0, band.x0)});
+          }
+          if (nextStain && nextStain !== 'acen') {
+            centromereBoundaryData.push({position: Math.max(0, band.x1)});
+          }
         }
         return {...band, count, xUpper: upperBound};
+      });
+      const normalizedBoundaryData = [];
+      centromereBoundaryData.forEach(boundary => {
+        const value = Math.max(0, Math.min(row.chromLength, boundary.position ?? boundary.x ?? boundary.start ?? 0));
+        if (!Number.isFinite(value)) {
+          return;
+        }
+        if (!normalizedBoundaryData.some(item => Math.abs(item.position - value) < 1e-6)) {
+          normalizedBoundaryData.push({position: value});
+        }
       });
       const bandGroup = rowGroup.append('g')
         .attr('class', 'variant-hotspot__bands')
@@ -11205,6 +11368,16 @@ function renderVariantLibrary(section) {
         .attr('y', 0)
         .attr('height', bandHeight);
       applyScaleToBars(centromereRects, baseScale);
+      const centromereBoundaryGroup = rowGroup.append('g')
+        .attr('class', 'variant-hotspot__centromere-boundaries')
+        .attr('clip-path', `url(#${clipId})`);
+      const centromereBoundaryLines = centromereBoundaryGroup.selectAll('line')
+        .data(normalizedBoundaryData)
+        .join('line')
+        .attr('class', 'variant-hotspot__centromere-boundary')
+        .attr('y1', 0)
+        .attr('y2', bandHeight);
+      applyScaleToCentromereBoundaries(centromereBoundaryLines, baseScale);
       const bandOverlayGroup = rowGroup.append('g')
         .attr('class', 'variant-hotspot__band-overlays')
         .attr('clip-path', `url(#${clipId})`);
@@ -11286,6 +11459,45 @@ function renderVariantLibrary(section) {
         ? row.baseThresholds
         : MIN_BIN_THRESHOLD;
       const bars = refreshBars(row.histogram, {animate: true});
+      const highlightGroup = rowGroup.append('g')
+        .attr('class', 'variant-hotspot__highlights')
+        .attr('clip-path', `url(#${clipId})`);
+      let highlightData = [];
+      if (highlightInfo && highlightInfo.chromosome === row.chromosome) {
+        const startValue = Math.max(0, Math.min(row.chromLength, highlightInfo.start));
+        const endValue = Math.max(0, Math.min(row.chromLength, highlightInfo.end));
+        const x0 = Math.min(startValue, endValue);
+        const x1 = Math.max(startValue, endValue);
+        highlightData = [{x0, x1, title: highlightInfo.title || ''}];
+      }
+      const highlightHeight = bandHeight;
+      const highlightY = 0;
+      const highlightRadius = Math.min(4, Math.max(0, bandHeight / 6));
+      const highlightRects = highlightGroup.selectAll('rect')
+        .data(highlightData)
+        .join('rect')
+        .attr('class', 'variant-hotspot__highlight')
+        .attr('y', highlightY)
+        .attr('height', highlightHeight)
+        .attr('rx', highlightRadius)
+        .attr('ry', highlightRadius);
+      applyScaleToHighlight(highlightRects, baseScale);
+      highlightRects.attr('aria-label', d => {
+        const startLabel = formatPosition(d.x0);
+        const endLabel = formatPosition(d.x1);
+        const rangeLabel = d.x0 === d.x1 ? startLabel : `${startLabel} – ${endLabel}`;
+        const baseLabel = d.title ? `Valgt variant: ${d.title}` : 'Valgt variant';
+        return `${baseLabel} · ${rangeLabel} på Chr ${row.chromosome}`;
+      });
+      highlightRects.selectAll('title').remove();
+      highlightRects.append('title')
+        .text(d => {
+          const startLabel = formatPosition(d.x0);
+          const endLabel = formatPosition(d.x1);
+          const rangeLabel = d.x0 === d.x1 ? startLabel : `${startLabel} – ${endLabel}`;
+          const variantLabel = d.title ? d.title : 'Valgt variant';
+          return `${variantLabel} · ${rangeLabel} på Chr ${row.chromosome}`;
+        });
       rowGroup.append('text')
         .attr('class', 'variant-hotspot__chromosome')
         .attr('x', -12)
@@ -11307,6 +11519,7 @@ function renderVariantLibrary(section) {
         bars,
         bands: bandRects,
         centromeres: centromereRects,
+        centromereBoundaries: normalizedBoundaryData.length ? centromereBoundaryLines : null,
         bandOverlays,
         bandLabels,
         applyLabelScale: scale => applyScaleToBandLabels(bandLabels, scale),
@@ -11319,7 +11532,8 @@ function renderVariantLibrary(section) {
         baseThresholds,
         currentThresholds: baseThresholds,
         dataPositions: row.data.map(d => d.position),
-        histogram: row.histogram
+        histogram: row.histogram,
+        highlightRects: highlightData.length ? highlightRects : null
       };
       bandOverlays
         .on('mouseenter', (event, d) => {
@@ -11455,8 +11669,14 @@ function renderVariantLibrary(section) {
           if (state.centromeres) {
             applyScaleToBars(state.centromeres, scaled);
           }
+          if (state.centromereBoundaries) {
+            applyScaleToCentromereBoundaries(state.centromereBoundaries, scaled);
+          }
           if (state.bandOverlays) {
             applyScaleToBars(state.bandOverlays, scaled);
+          }
+          if (state.highlightRects) {
+            applyScaleToHighlight(state.highlightRects, scaled);
           }
           if (state.applyLabelScale) {
             state.applyLabelScale(scaled);
@@ -11624,9 +11844,31 @@ function renderVariantLibrary(section) {
     if (excludedCount > 0) {
       captionDetails.push(`${excludedCount} variant${excludedCount === 1 ? '' : 'er'} af andre typer vises ikke i hotspot-grafen.`);
     }
+    if (highlightInfo) {
+      captionDetails.push('Den valgte variant er markeret med et grønt bånd på det relevante kromosom.');
+    } else if (highlightVariant && highlightSuppressedReason) {
+      const highlightMessage = (() => {
+        switch (highlightSuppressedReason) {
+          case 'position':
+            return 'Den valgte variant mangler en gyldig genomisk position og kan derfor ikke markeres i hotspot-grafen.';
+          case 'chromosome':
+            return 'Den valgte variant mangler kromosomoplysning og kan derfor ikke markeres i hotspot-grafen.';
+          case 'build': {
+            const label = (highlightCandidate && highlightCandidate.buildLabel) || (highlightCandidate && highlightCandidate.build ? getGenomeBuildLabel(highlightCandidate.build) : '') || 'en anden reference';
+            return `Den valgte variant er registreret i ${label} og kan derfor ikke markeres i hotspot-grafen.`;
+          }
+          default:
+            return '';
+        }
+      })();
+      if (highlightMessage) {
+        captionDetails.push(highlightMessage);
+      }
+    }
     captionDetails.push('Zoom med scrollhjulet eller ved at trække for at undersøge kromosomerne. Dobbeltklik eller brug “Nulstil zoom” for at vende tilbage til udgangspunktet.');
     refreshCaptionMax();
   };
+  const redrawHotspot = () => updateHotspotChart(filteredLibrary, {highlightVariant: getHighlightedEntry()});
   const csvColumns = [
     {key: 'id', label: 'ID'},
     {label: 'Varianttitel', value: entry => formatVariantTitle(entry) || ''},
@@ -11665,8 +11907,6 @@ function renderVariantLibrary(section) {
   applyButtonTooltips(section);
   applyControlTooltips(section);
   applyFormTooltips(form);
-  let filteredLibrary = list.slice();
-  let selectedId = null;
   const hotspotWrapper = section.querySelector('.variant-hotspot');
   const hotspotToggle = section.querySelector('[data-hotspot-toggle]');
   const hotspotContent = section.querySelector('[data-hotspot-content]');
@@ -11691,7 +11931,7 @@ function renderVariantLibrary(section) {
     const nextCollapsed = !collapsed;
     setHotspotCollapsed(nextCollapsed);
     if (!nextCollapsed) {
-      requestAnimationFrame(() => updateHotspotChart(filteredLibrary));
+      requestAnimationFrame(redrawHotspot);
     }
   });
   const filterInputs = {
@@ -11854,7 +12094,7 @@ function renderVariantLibrary(section) {
     if (!filteredLibrary.length) {
       tbody.innerHTML = `<tr><td colspan="16">Ingen poster matcher filtreringen.</td></tr>`;
       annotateTableCells(section);
-      updateHotspotChart(filteredLibrary);
+      redrawHotspot();
       return;
     }
     tbody.innerHTML = filteredLibrary.map(v => {
@@ -11884,7 +12124,7 @@ function renderVariantLibrary(section) {
       return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td>${esc(title)}</td><td>${esc(typeLabel)}</td><td>${esc(genomic)}</td><td>${esc(v.hgvs_c || '')}</td><td>${esc(v.hgvs_p || '')}</td><td>${formatRsIdCell(v.rsid)}</td><td>${esc(v.classification || '')}</td><td title="${esc(frequencyTitle)}">${esc(frequencyLabel)}</td><td title="${esc(frequencyCategoryTitle)}">${esc(frequencyCategory)}</td><td>${esc(v.criteria || '')}</td><td>${esc(v.iscn || '')}</td><td>${esc(v.condition || '')}</td><td>${esc(v.inheritance || '')}</td><td>${esc(v.curated_by || '')}</td><td>${esc(lastReview)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
-    updateHotspotChart(filteredLibrary);
+    redrawHotspot();
   };
   renderRows();
   search?.addEventListener('input', renderRows);
