@@ -436,6 +436,32 @@ section[data-tab].active {
   gap: 0.6rem;
   margin-bottom: 0.8rem;
 }
+.planning-missing-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--muted-text);
+}
+.planning-missing-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.planning-missing-controls select {
+  min-width: 200px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.55rem;
+  font: inherit;
+  color: inherit;
+}
+.planning-missing-controls select:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--input-focus);
+}
 .planning-missing-totals {
   display: flex;
   flex-wrap: wrap;
@@ -13612,6 +13638,14 @@ function renderPlanner(section) {
     <div class="tool-body">
       <div class="planning-missing-intro">
         <p>Følg op på ordinationer, der mangler ansvarlige roller, så opgaverne hurtigt kan fordeles. Klik på en række for at åbne ordinationen i Ordinationer.</p>
+        <div class="planning-missing-controls">
+          <label for="planningMissingRole">Vis ordinationer der mangler</label>
+          <select id="planningMissingRole">
+            <option value="analysis_responsible_id">Analyseansvarlig</option>
+            <option value="interpreter_id">Tolker</option>
+            <option value="approver_id">Godkender</option>
+          </select>
+        </div>
         <div class="planning-missing-totals" id="planningMissingTotals"></div>
       </div>
       <div id="planningMissingList"></div>
@@ -13628,6 +13662,7 @@ function renderPlanner(section) {
   const planningMissingSummary = section.querySelector('#planningMissingSummary');
   const planningMissingTotals = section.querySelector('#planningMissingTotals');
   const planningMissingList = section.querySelector('#planningMissingList');
+  const planningMissingRoleFilter = section.querySelector('#planningMissingRole');
 
   const ROLE_LABELS = {
     analysis_responsible_id: 'Analyseansvarlig',
@@ -14158,9 +14193,14 @@ function renderPlanner(section) {
       planningMissingSummary.textContent = 'Log ind for at se manglende roller.';
       planningMissingTotals.innerHTML = '';
       planningMissingList.innerHTML = '<p class="planning-missing-empty">Log ind for at se hvilke ordinationer der mangler analyseansvarlig, tolk eller godkender.</p>';
+      planningMissingRoleFilter?.setAttribute('disabled', 'disabled');
+      if (planningMissingRoleFilter) planningMissingRoleFilter.value = ROLE_ORDER[0];
       return;
     }
     const assignments = computeMissingAssignments();
+    if (planningMissingRoleFilter) {
+      planningMissingRoleFilter.disabled = assignments.length === 0;
+    }
     const totals = ROLE_ORDER.map(key => ({
       key,
       label: ROLE_LABELS[key] || key,
@@ -14171,14 +14211,24 @@ function renderPlanner(section) {
       planningMissingSummary.textContent = 'Alle ordinationer har tildelt analyseansvarlig, tolk og godkender.';
       planningMissingTotals.innerHTML = '<span>Ingen mangler registreret.</span>';
       planningMissingList.innerHTML = '<p class="planning-missing-empty">Alle ordinationer har tildelt analyseansvarlig, tolk og godkender.</p>';
+      if (planningMissingRoleFilter) planningMissingRoleFilter.value = ROLE_ORDER[0];
       return;
     }
+    let selectedRoleKey = planningMissingRoleFilter?.value || ROLE_ORDER[0];
+    if (!ROLE_ORDER.includes(selectedRoleKey)) {
+      selectedRoleKey = ROLE_ORDER[0];
+      if (planningMissingRoleFilter) planningMissingRoleFilter.value = selectedRoleKey;
+    }
+    const selectedRoleLabel = ROLE_LABELS[selectedRoleKey] || selectedRoleKey;
     const roleSummary = totals
       .filter(item => item.count > 0)
       .map(item => `${item.label}: ${item.count}`)
       .join(' • ');
     const summaryBase = `${totalCount} ordination${totalCount === 1 ? '' : 'er'} mangler roller`;
-    planningMissingSummary.textContent = roleSummary ? `${summaryBase} (${roleSummary}).` : `${summaryBase}.`;
+    const summaryParts = [summaryBase];
+    if (roleSummary) summaryParts.push(`Fordeling: ${roleSummary}`);
+    summaryParts.push(`Viser: ${selectedRoleLabel}`);
+    planningMissingSummary.textContent = `${summaryParts.join('. ')}.`;
     const totalsHtml = totals
       .filter(item => item.count > 0)
       .map(item => `<span><strong>${esc(item.label)}:</strong> ${esc(String(item.count))}</span>`)
@@ -14211,7 +14261,13 @@ function renderPlanner(section) {
       if (nameCompare !== 0) return nameCompare;
       return a.orderId - b.orderId;
     });
-    const rowsHtml = sorted.map(entry => {
+    const filtered = sorted.filter(entry => Array.isArray(entry.missingKeys) && entry.missingKeys.includes(selectedRoleKey));
+    if (!filtered.length) {
+      const missingLabelLower = (selectedRoleLabel || '').toLowerCase();
+      planningMissingList.innerHTML = `<p class="planning-missing-empty">Ingen ordinationer mangler ${esc(missingLabelLower || 'den valgte rolle')}.</p>`;
+      return;
+    }
+    const rowsHtml = filtered.map(entry => {
       const metaParts = [];
       if (entry.patientName) metaParts.push(entry.patientName);
       if (entry.patientMrn) metaParts.push(`MRN ${entry.patientMrn}`);
@@ -14505,6 +14561,7 @@ function renderPlanner(section) {
   if (planningBoard && planningSummary) {
     updatePlanningUi();
 
+    planningMissingRoleFilter?.addEventListener('change', () => renderMissingAssignments());
     planningHideDoneToggle?.addEventListener('change', () => renderPlanningBoard());
 
     planningRefreshBtn?.addEventListener('click', async () => {
@@ -15588,11 +15645,12 @@ function renderTools(section) {
     });
     planningMissingList?.addEventListener('click', event => {
       const target = event.target;
-      if (!(target instanceof HTMLElement)) return;
-      const row = target.closest('tr[data-order-id]');
+      const element = target instanceof Element ? target : target?.parentElement;
+      if (!element) return;
+      const row = element.closest('tr[data-order-id]');
       if (row) {
         const orderId = row.getAttribute('data-order-id');
-        if (orderId) openOrderDetails(orderId, {showAll: true});
+        if (orderId) openOrderDetails(orderId, {showAll: true, filter: true});
       }
     });
   }
