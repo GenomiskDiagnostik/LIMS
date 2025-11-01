@@ -2563,6 +2563,15 @@ const SETTINGS_STORE = 'settings';
 const BOUND_HANDLE_SETTING_KEY = 'boundFileHandle';
 const BOUND_HANDLE_NAME_KEY = 'glimr-bound-handle-name';
 const AUTOSAVE_STORAGE_KEY = 'glimr-autosave';
+const BOUND_FILE_ACCESS_ERROR_NAMES = new Set([
+  'NotFoundError',
+  'NotAllowedError',
+  'SecurityError',
+  'InvalidStateError',
+  'NotReadableError',
+  'NoModificationAllowedError',
+  'PermissionDeniedError'
+]);
 const storage = (() => {
   try {
     const testKey = '__glimr_storage_test__';
@@ -5466,6 +5475,34 @@ async function ensureBoundHandlePermission(interactive = false) {
     return false;
   }
 }
+
+function isBoundFileAccessError(err) {
+  if (!err) return false;
+  const name = err.name || err.code || '';
+  if (name && BOUND_FILE_ACCESS_ERROR_NAMES.has(name)) {
+    return true;
+  }
+  const message = (err.message || '').toLowerCase();
+  if (!message) return false;
+  return /permission|denied|security|not allowed|adgang|tilladelse/.test(message);
+}
+
+async function handleBoundFileAccessLoss(err, {silent = false} = {}) {
+  if (!state.boundHandle) return;
+  console.warn('Adgang til filbinding mistet. Falder tilbage til standarddatabase.', err);
+  try {
+    await clearBoundHandle();
+  } catch (clearErr) {
+    console.warn('Kunne ikke rydde filbinding efter tabt adgang', clearErr);
+    state.boundHandle = null;
+  }
+  const detail = err?.message ? ` (${err.message})` : '';
+  const message = `Adgangen til den tilknyttede databasefil er mistet${detail}. GlimR bruger nu standarddatabasen.`;
+  setStatus(message);
+  if (!silent && typeof renderAll === 'function') {
+    try { renderAll(); } catch (renderErr) { console.warn('Kunne ikke opdatere visningen efter tabt filadgang', renderErr); }
+  }
+}
 async function loadStore(name) {
   const tx = state.db.transaction(name, 'readonly');
   const store = tx.objectStore(name);
@@ -5914,7 +5951,11 @@ async function saveBoundFile({interactive = false, reason = 'auto'} = {}) {
   } catch (err) {
     const message = 'Kunne ikke læse eksisterende data fra filen: ' + (err?.message || err);
     console.error(message);
-    setStatus(message);
+    if (isBoundFileAccessError(err)) {
+      await handleBoundFileAccessLoss(err, {silent: !interactive});
+    } else {
+      setStatus(message);
+    }
     if (interactive) {
       throw err;
     }
@@ -5949,9 +5990,10 @@ async function saveBoundFile({interactive = false, reason = 'auto'} = {}) {
     setStatus(message);
   } catch (err) {
     console.error('Fejl ved skrivning til fil', err);
-    setStatus('Kunne ikke gemme: ' + (err?.message || err));
-    if (err?.name === 'NotFoundError') {
-      await clearBoundHandle();
+    if (isBoundFileAccessError(err)) {
+      await handleBoundFileAccessLoss(err, {silent: !interactive});
+    } else {
+      setStatus('Kunne ikke gemme: ' + (err?.message || err));
     }
     if (interactive) {
       throw err;
@@ -5991,7 +6033,9 @@ async function reloadBoundFileData({silent = false, refreshUi = false} = {}) {
       return true;
     } catch (err) {
       console.error('Fejl ved genindlæsning af data fra fil', err);
-      if (!silent) {
+      if (isBoundFileAccessError(err)) {
+        await handleBoundFileAccessLoss(err, {silent});
+      } else if (!silent) {
         setStatus('Kunne ikke genindlæse data fra fil: ' + (err?.message || err));
       }
       return false;
