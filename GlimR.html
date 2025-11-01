@@ -10937,6 +10937,33 @@ function renderVariantLibrary(section) {
       'Y': 57227415,
       'MT': 16569
     };
+    const CHROMOSOME_CENTROMERES = {
+      '1': 123400000,
+      '2': 93900000,
+      '3': 90900000,
+      '4': 50000000,
+      '5': 48750000,
+      '6': 60550000,
+      '7': 60100000,
+      '8': 45200000,
+      '9': 43850000,
+      '10': 39800000,
+      '11': 53400000,
+      '12': 35500000,
+      '13': 17700000,
+      '14': 17150000,
+      '15': 19000000,
+      '16': 36850000,
+      '17': 25050000,
+      '18': 18450000,
+      '19': 26150000,
+      '20': 28050000,
+      '21': 11950000,
+      '22': 15550000,
+      'X': 60950000,
+      'Y': 10450000,
+      'MT': 0
+    };
     const compareChromosomes = (a, b) => {
       const indexA = CHROMOSOME_ORDER.indexOf(a);
       const indexB = CHROMOSOME_ORDER.indexOf(b);
@@ -10950,7 +10977,7 @@ function renderVariantLibrary(section) {
     const MAX_DYNAMIC_THRESHOLD = 50000;
     const ZOOM_BIN_EXPONENT = 2;
     const MIN_BAND_LABEL_PX = 2;
-    const CENTROMERE_DISPLAY_WIDTH = 1000000;
+    const CENTROMERE_DISPLAY_WIDTH = 1_000_000;
 
     const rows = grouped.map(([chromosome, data]) => {
       const maxPosition = d3.max(data, d => d.position) || 1;
@@ -11040,18 +11067,6 @@ function renderVariantLibrary(section) {
           const widthValue = scale(end) - scale(start);
           return Math.max(1, widthValue);
         });
-    };
-    const raiseSelection = selection => {
-      if (!selection) return;
-      if (typeof selection.raise === 'function') {
-        selection.raise();
-        return;
-      }
-      const node = typeof selection.node === 'function' ? selection.node() : null;
-      const parent = node?.parentNode;
-      if (parent && node) {
-        parent.appendChild(node);
-      }
     };
     const applyScaleToBandLabels = (selection, scale) => {
       selection
@@ -11232,21 +11247,6 @@ function renderVariantLibrary(section) {
       const barsGroup = rowGroup.append('g')
         .attr('class', 'variant-hotspot__bars')
         .attr('clip-path', `url(#${clipId})`);
-      const centromereGroup = rowGroup.append('g')
-        .attr('class', 'variant-hotspot__centromeres')
-        .attr('clip-path', `url(#${clipId})`);
-      const centromereRects = centromereGroup.selectAll('rect')
-        .data(centromereOverlayData)
-        .join('rect')
-        .attr('class', 'variant-hotspot__centromere')
-        .attr('y', 0)
-        .attr('height', bandHeight)
-        .attr('rx', 3)
-        .attr('ry', 3)
-        .attr('opacity', 0.9);
-      applyScaleToBars(centromereRects, baseScale);
-      raiseSelection(bandOverlayGroup);
-      raiseSelection(bandLabelGroup);
       const refreshBars = (bins, {scale = baseScale, animate = false} = {}) => {
         const barSelection = barsGroup.selectAll('rect')
           .data(bins, bin => `${Math.round(bin.x0 || 0)}-${Math.round(bin.x1 || 0)}`);
