@@ -2560,6 +2560,24 @@ const DB_NAME = 'glims';
 const DB_VER = 10;
 const STORES = ['patients','samples','orders','patient_groups','panels','variants','qc','qc_presets','reports','users','audit','variant_library','responses','conclusion_library','planner'];
 const SETTINGS_STORE = 'settings';
+const STORE_DEFINITIONS = {
+  patients: {keyPath: 'id', autoIncrement: true},
+  samples: {keyPath: 'id', autoIncrement: true},
+  orders: {keyPath: 'id', autoIncrement: true},
+  patient_groups: {keyPath: 'id', autoIncrement: true},
+  panels: {keyPath: 'id', autoIncrement: true},
+  variants: {keyPath: 'id', autoIncrement: true},
+  qc: {keyPath: 'id', autoIncrement: true},
+  qc_presets: {keyPath: 'id', autoIncrement: true},
+  reports: {keyPath: 'id', autoIncrement: true},
+  users: {keyPath: 'id', autoIncrement: true},
+  audit: {keyPath: 'id', autoIncrement: true},
+  variant_library: {keyPath: 'id', autoIncrement: true},
+  responses: {keyPath: 'id', autoIncrement: true},
+  conclusion_library: {keyPath: 'id', autoIncrement: true},
+  planner: {keyPath: 'id', autoIncrement: false},
+  [SETTINGS_STORE]: {keyPath: 'key', autoIncrement: false}
+};
 const BOUND_HANDLE_SETTING_KEY = 'boundFileHandle';
 const BOUND_HANDLE_NAME_KEY = 'glimr-bound-handle-name';
 const AUTOSAVE_STORAGE_KEY = 'glimr-autosave';
@@ -2616,6 +2634,282 @@ const state = {
   pendingReportSelectOrderId: null,
   pendingReportSelectReportId: null
 };
+const runMicrotask = typeof queueMicrotask === 'function'
+  ? callback => queueMicrotask(callback)
+  : callback => Promise.resolve().then(callback);
+let memoryDbState = null;
+
+function buildMemoryDbState(snapshot = {}) {
+  const stateObj = {
+    data: new Map(),
+    sequences: new Map()
+  };
+  for (const [store, definition] of Object.entries(STORE_DEFINITIONS)) {
+    const source = Array.isArray(snapshot[store]) ? snapshot[store] : [];
+    const clonedRows = source.map(row => deepClone(row));
+    stateObj.data.set(store, clonedRows);
+    if (definition.autoIncrement) {
+      let maxId = 0;
+      const key = definition.keyPath;
+      for (const row of clonedRows) {
+        if (!row || row[key] == null) continue;
+        const numeric = Number(row[key]);
+        if (Number.isFinite(numeric) && numeric > maxId) {
+          maxId = numeric;
+        }
+      }
+      stateObj.sequences.set(store, maxId);
+    }
+  }
+  return stateObj;
+}
+
+function ensureMemoryDbState(snapshot) {
+  if (snapshot) {
+    memoryDbState = buildMemoryDbState(snapshot);
+  }
+  if (!memoryDbState) {
+    memoryDbState = buildMemoryDbState();
+  }
+  return memoryDbState;
+}
+
+function writeMemoryDbSnapshot(snapshot) {
+  memoryDbState = buildMemoryDbState(snapshot || {});
+}
+
+function readMemoryDbSnapshot() {
+  const stateObj = ensureMemoryDbState();
+  const result = {};
+  for (const store of Object.keys(STORE_DEFINITIONS)) {
+    result[store] = deepClone(stateObj.data.get(store) || []);
+  }
+  return result;
+}
+
+function createMemoryDbFromState(stateObj) {
+  return {
+    objectStoreNames: {
+      contains(name) {
+        return Object.prototype.hasOwnProperty.call(STORE_DEFINITIONS, name);
+      }
+    },
+    close() {},
+    transaction(storeName, mode = 'readonly') {
+      const names = Array.isArray(storeName) ? storeName : [storeName];
+      return createMemoryTransaction(stateObj, names, mode);
+    }
+  };
+}
+
+function createMemoryTransaction(stateObj, storeNames, mode) {
+  const tx = {
+    mode,
+    objectStore(name) {
+      if (!Object.prototype.hasOwnProperty.call(STORE_DEFINITIONS, name)) {
+        throw new Error(`Ukendt data store: ${name}`);
+      }
+      return createMemoryObjectStore(stateObj, name, mode, tx);
+    },
+    oncomplete: null,
+    onerror: null,
+    onabort: null,
+    error: null
+  };
+  tx._pending = 0;
+  tx._completed = false;
+  tx._aborted = false;
+  tx.done = new Promise((resolve, reject) => {
+    tx._resolveDone = resolve;
+    tx._rejectDone = reject;
+  });
+  tx._checkComplete = () => {
+    if (tx._aborted) return;
+    if (tx._pending === 0 && !tx._completed) {
+      tx._completed = true;
+      runMicrotask(() => {
+        if (typeof tx.oncomplete === 'function') {
+          tx.oncomplete({target: tx});
+        }
+        tx._resolveDone?.();
+      });
+    }
+  };
+  tx._fail = err => {
+    if (tx._completed || tx._aborted) return;
+    tx._aborted = true;
+    tx.error = err;
+    runMicrotask(() => {
+      if (typeof tx.onerror === 'function') {
+        tx.onerror({target: tx, error: err});
+      }
+      tx._rejectDone?.(err);
+    });
+  };
+  tx.abort = () => {
+    if (tx._completed || tx._aborted) return;
+    tx._aborted = true;
+    const err = new Error('Transaction aborted');
+    tx.error = err;
+    runMicrotask(() => {
+      if (typeof tx.onabort === 'function') {
+        tx.onabort({target: tx});
+      }
+      tx._rejectDone?.(err);
+    });
+  };
+  return tx;
+}
+
+function createMemoryObjectStore(stateObj, name, mode, tx) {
+  const definition = STORE_DEFINITIONS[name];
+  const requireWrite = () => {
+    if (mode !== 'readwrite') {
+      throw new Error('Transaktionen er kun til læsning.');
+    }
+  };
+  const getRows = () => stateObj.data.get(name) || [];
+  const setRows = rows => stateObj.data.set(name, rows);
+  return {
+    getAll() {
+      return createMemoryRequest(tx, () => getRows().map(row => deepClone(row)));
+    },
+    get(key) {
+      return createMemoryRequest(tx, () => {
+        if (!definition.keyPath) return undefined;
+        const targetKey = normalizeMemoryKey(key);
+        const rows = getRows();
+        const found = rows.find(row => normalizeMemoryKey(row?.[definition.keyPath]) === targetKey);
+        return found ? deepClone(found) : undefined;
+      });
+    },
+    add(record) {
+      requireWrite();
+      return createMemoryRequest(tx, () => {
+        const rows = getRows().slice();
+        const clone = deepClone(record);
+        const key = assignMemoryKey(definition, stateObj, name, clone);
+        rows.push(clone);
+        setRows(rows);
+        return key;
+      });
+    },
+    put(record) {
+      requireWrite();
+      return createMemoryRequest(tx, () => {
+        const rows = getRows().slice();
+        const clone = deepClone(record);
+        const key = assignMemoryKey(definition, stateObj, name, clone);
+        if (definition.keyPath) {
+          const normalizedKey = normalizeMemoryKey(key);
+          let replaced = false;
+          for (let i = 0; i < rows.length; i++) {
+            const existingKey = normalizeMemoryKey(rows[i]?.[definition.keyPath]);
+            if (existingKey === normalizedKey) {
+              rows[i] = clone;
+              replaced = true;
+              break;
+            }
+          }
+          if (!replaced) {
+            rows.push(clone);
+          }
+        } else {
+          rows.push(clone);
+        }
+        setRows(rows);
+        return key;
+      });
+    },
+    delete(key) {
+      requireWrite();
+      return createMemoryRequest(tx, () => {
+        if (!definition.keyPath) return undefined;
+        const normalizedKey = normalizeMemoryKey(key);
+        const rows = getRows().filter(row => normalizeMemoryKey(row?.[definition.keyPath]) !== normalizedKey);
+        setRows(rows);
+        return undefined;
+      });
+    },
+    clear() {
+      requireWrite();
+      return createMemoryRequest(tx, () => {
+        setRows([]);
+        if (definition.autoIncrement) {
+          stateObj.sequences.set(name, 0);
+        }
+        return undefined;
+      });
+    },
+    index() {
+      throw new Error('Indekser understøttes ikke i fallback-databasen.');
+    }
+  };
+}
+
+function createMemoryRequest(tx, executor) {
+  const request = {result: undefined, error: null, onsuccess: null, onerror: null};
+  tx._pending += 1;
+  runMicrotask(() => {
+    if (tx._aborted) {
+      request.error = new Error('Transaction aborted');
+      if (typeof request.onerror === 'function') {
+        request.onerror({target: request});
+      }
+      tx._pending -= 1;
+      tx._checkComplete();
+      return;
+    }
+    try {
+      request.result = executor();
+      if (typeof request.onsuccess === 'function') {
+        request.onsuccess({target: request});
+      }
+      tx._pending -= 1;
+      tx._checkComplete();
+    } catch (err) {
+      request.error = err;
+      if (typeof request.onerror === 'function') {
+        request.onerror({target: request});
+      }
+      tx._pending -= 1;
+      tx._fail(err);
+    }
+  });
+  return request;
+}
+
+function normalizeMemoryKey(value) {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : String(value);
+}
+
+function assignMemoryKey(definition, stateObj, store, record) {
+  if (!definition.keyPath) return undefined;
+  let keyValue = record[definition.keyPath];
+  if (keyValue === undefined || keyValue === null) {
+    if (definition.autoIncrement) {
+      const current = stateObj.sequences.get(store) || 0;
+      keyValue = current + 1;
+      record[definition.keyPath] = keyValue;
+      stateObj.sequences.set(store, keyValue);
+      return keyValue;
+    }
+    throw new Error(`Posten mangler nøglen "${definition.keyPath}" for ${store}.`);
+  }
+  if (definition.autoIncrement) {
+    const numeric = Number(keyValue);
+    if (Number.isFinite(numeric)) {
+      const current = stateObj.sequences.get(store) || 0;
+      if (numeric > current) {
+        stateObj.sequences.set(store, numeric);
+      }
+    }
+  }
+  return keyValue;
+}
 const CREATED_BY_STORES = new Set(['patients','samples','orders','patient_groups','variants','qc','qc_presets','reports','conclusion_library']);
 const UPDATED_BY_STORES = new Set(['panels']);
 const ROLE_OPTIONS = [
@@ -5259,8 +5553,17 @@ function openSamplesForReport(reportId) {
 }
 function openDb() {
   return new Promise((resolve, reject) => {
+    state.usingMemoryDb = false;
     if (!('indexedDB' in window)) {
-      reject(new Error('Browseren understøtter ikke IndexedDB. GlimR kræver lokal databaseadgang.'));
+      console.warn('IndexedDB er ikke tilgængelig i denne browser. Falder tilbage til in-memory database.');
+      try {
+        state.usingMemoryDb = true;
+        setStatus('IndexedDB utilgængelig. Data gemmes midlertidigt i hukommelsen.');
+        const fallbackDb = createMemoryDbFromState(ensureMemoryDbState());
+        resolve(fallbackDb);
+      } catch (err) {
+        reject(err);
+      }
       return;
     }
     const req = indexedDB.open(DB_NAME, DB_VER);
@@ -5328,7 +5631,18 @@ function openDb() {
       });
     };
     req.onerror = () => {
-      finish(() => reject(req.error || new Error('Ukendt IndexedDB-fejl.')));
+      finish(() => {
+        console.warn('IndexedDB kunne ikke åbnes. Falder tilbage til in-memory database.', req.error);
+        try {
+          state.usingMemoryDb = true;
+          const errorMessage = req.error?.message || req.error?.name || 'ukendt fejl';
+          setStatus(`IndexedDB-fejl (${errorMessage}). Data gemmes midlertidigt i hukommelsen.`);
+          const fallbackDb = createMemoryDbFromState(ensureMemoryDbState());
+          resolve(fallbackDb);
+        } catch (fallbackErr) {
+          reject(fallbackErr);
+        }
+      });
     };
     req.onsuccess = () => {
       if (settled) {
@@ -5344,6 +5658,7 @@ function openDb() {
             setStatus('Databaseversion ændret. Genindlæs GlimR for at fortsætte.');
           };
         }
+        state.usingMemoryDb = false;
         resolve(db);
       });
     };
@@ -19058,7 +19373,7 @@ async function init() {
     activateTab('dashboard');
   } catch (err) {
     console.error(err);
-    setStatus('Kunne ikke åbne database: ' + err.message);
+    setStatus('Kunne ikke initialisere GlimR: ' + err.message);
   }
 }
 if (document.readyState === 'loading') {
