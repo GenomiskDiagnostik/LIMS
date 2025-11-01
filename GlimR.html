@@ -1362,6 +1362,10 @@ section[data-tab].active {
 .variant-hotspot__band {
   fill-opacity: 0.9;
 }
+.variant-hotspot__centromere {
+  fill: #000000;
+  pointer-events: none;
+}
 .variant-hotspot__band-overlay {
   fill: rgba(15, 23, 42, 0.001);
   pointer-events: all;
@@ -1430,6 +1434,9 @@ section[data-tab].active {
 }
 [data-theme="dark"] .variant-hotspot__band {
   fill-opacity: 1;
+}
+[data-theme="dark"] .variant-hotspot__centromere {
+  fill: #000000;
 }
 [data-theme="dark"] .variant-hotspot__band-overlay:hover,
 [data-theme="dark"] .variant-hotspot__band-overlay:focus-visible,
@@ -3741,7 +3748,7 @@ const CYTOBAND_COLOUR_PALETTES = {
     gpos100: '#8b98c1',
     gvar: '#6d7ca8',
     stalk: '#566593',
-    acen: '#3f475c',
+    acen: '#000000',
     other: '#d2d9eb'
   },
   dark: {
@@ -3752,7 +3759,7 @@ const CYTOBAND_COLOUR_PALETTES = {
     gpos100: '#455889',
     gvar: '#50649f',
     stalk: '#5a71b4',
-    acen: '#353e52',
+    acen: '#000000',
     other: '#283555'
   }
 };
@@ -10970,6 +10977,7 @@ function renderVariantLibrary(section) {
     const MAX_DYNAMIC_THRESHOLD = 50000;
     const ZOOM_BIN_EXPONENT = 2;
     const MIN_BAND_LABEL_PX = 2;
+    const CENTROMERE_DISPLAY_WIDTH = 1_000_000;
 
     const rows = grouped.map(([chromosome, data]) => {
       const maxPosition = d3.max(data, d => d.position) || 1;
@@ -11150,6 +11158,7 @@ function renderVariantLibrary(section) {
       if (!bandData.length) {
         bandData = [{start: 0, end: row.chromLength, x0: 0, x1: row.chromLength, name: '', stain: 'gneg'}];
       }
+      const centromereOverlayData = [];
       bandData = bandData.map((band, index) => {
         const upperBound = index === bandData.length - 1 ? band.x1 + 1 : band.x1;
         const count = row.data.reduce((sum, point) => {
@@ -11158,6 +11167,21 @@ function renderVariantLibrary(section) {
           }
           return sum;
         }, 0);
+        const stain = String(band.stain || '').toLowerCase();
+        if (stain === 'acen') {
+          const bandWidth = Math.max(0, band.x1 - band.x0);
+          const center = band.x0 + (bandWidth / 2);
+          const halfDisplay = CENTROMERE_DISPLAY_WIDTH / 2;
+          const overlayStart = Math.max(0, center - halfDisplay);
+          const overlayEnd = Math.min(row.chromLength, center + halfDisplay);
+          centromereOverlayData.push({
+            ...band,
+            x0: overlayStart,
+            x1: overlayEnd,
+            sourceBand: band,
+            count
+          });
+        }
         return {...band, count, xUpper: upperBound};
       });
       const bandGroup = rowGroup.append('g')
@@ -11171,6 +11195,16 @@ function renderVariantLibrary(section) {
         .attr('height', bandHeight)
         .attr('fill', d => getCytobandFill(d.stain, theme));
       applyScaleToBars(bandRects, baseScale);
+      const centromereGroup = rowGroup.append('g')
+        .attr('class', 'variant-hotspot__centromeres')
+        .attr('clip-path', `url(#${clipId})`);
+      const centromereRects = centromereGroup.selectAll('rect')
+        .data(centromereOverlayData)
+        .join('rect')
+        .attr('class', 'variant-hotspot__centromere')
+        .attr('y', 0)
+        .attr('height', bandHeight);
+      applyScaleToBars(centromereRects, baseScale);
       const bandOverlayGroup = rowGroup.append('g')
         .attr('class', 'variant-hotspot__band-overlays')
         .attr('clip-path', `url(#${clipId})`);
@@ -11272,9 +11306,11 @@ function renderVariantLibrary(section) {
         refreshBars,
         bars,
         bands: bandRects,
+        centromeres: centromereRects,
         bandOverlays,
         bandLabels,
         applyLabelScale: scale => applyScaleToBandLabels(bandLabels, scale),
+        centromereData: centromereOverlayData,
         bandData,
         row,
         yOffset: index * rowHeight,
@@ -11415,6 +11451,9 @@ function renderVariantLibrary(section) {
           }
           if (state.bands) {
             applyScaleToBars(state.bands, scaled);
+          }
+          if (state.centromeres) {
+            applyScaleToBars(state.centromeres, scaled);
           }
           if (state.bandOverlays) {
             applyScaleToBars(state.bandOverlays, scaled);
