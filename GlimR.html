@@ -1324,6 +1324,34 @@ section[data-tab].active {
   fill: var(--muted-text);
   font-size: 0.75rem;
 }
+.variant-hotspot__tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--panel-bg);
+  color: var(--text);
+  border: 1px solid var(--panel-border);
+  border-radius: 0.6rem;
+  padding: 0.4rem 0.65rem;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+  font-size: 0.75rem;
+  line-height: 1.2;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  transform: translate(-9999px, -9999px);
+  transition: opacity 0.12s ease;
+  opacity: 0;
+  z-index: 2;
+}
+.variant-hotspot__tooltip[data-visible="true"] {
+  opacity: 1;
+}
+.variant-hotspot__tooltip strong {
+  font-weight: 700;
+}
+.variant-hotspot__tooltip span {
+  color: var(--muted-text);
+}
 .variant-hotspot__track {
   fill: rgba(24, 111, 175, 0.08);
 }
@@ -1338,6 +1366,11 @@ section[data-tab].active {
   fill: transparent;
   pointer-events: all;
   cursor: help;
+}
+.variant-hotspot__band-overlay:hover,
+.variant-hotspot__band-overlay:focus-visible,
+.variant-hotspot__band-overlay.is-hovered {
+  fill: rgba(24, 111, 175, 0.12);
 }
 .variant-hotspot__bars rect {
   shape-rendering: crispEdges;
@@ -1364,6 +1397,22 @@ section[data-tab].active {
 }
 [data-theme="dark"] .variant-hotspot__track {
   fill: rgba(56, 189, 248, 0.16);
+}
+[data-theme="dark"] .variant-hotspot__bands {
+  mix-blend-mode: screen;
+}
+[data-theme="dark"] .variant-hotspot__band {
+  fill-opacity: 0.95;
+}
+[data-theme="dark"] .variant-hotspot__band-overlay:hover,
+[data-theme="dark"] .variant-hotspot__band-overlay:focus-visible,
+[data-theme="dark"] .variant-hotspot__band-overlay.is-hovered {
+  fill: rgba(56, 189, 248, 0.18);
+}
+[data-theme="dark"] .variant-hotspot__tooltip {
+  background: rgba(15, 23, 42, 0.94);
+  border-color: rgba(148, 163, 184, 0.4);
+  box-shadow: 0 12px 28px rgba(8, 47, 73, 0.55);
 }
 [data-theme="dark"] .variant-hotspot__chart svg {
   color: var(--text);
@@ -3658,26 +3707,26 @@ const CYTOBAND_DATA = {"hg38":{"1":[[0,2300000,"p36.33","gneg"],[2300000,5300000
 
 const CYTOBAND_COLOUR_PALETTES = {
   light: {
-    gneg: '#e8f1ff',
-    gpos25: '#c4d8fb',
-    gpos50: '#9ebcf5',
-    gpos75: '#6f9aec',
-    gpos100: '#3f78d7',
-    gvar: '#f6c36d',
-    stalk: '#d6a8f6',
-    acen: '#ef8a7a',
-    other: '#b7cff3'
+    gneg: '#eff5ff',
+    gpos25: '#ccdffa',
+    gpos50: '#a6c3f3',
+    gpos75: '#7899e4',
+    gpos100: '#4c6fce',
+    gvar: '#f6b550',
+    stalk: '#cba0f2',
+    acen: '#525866',
+    other: '#b6caf0'
   },
   dark: {
-    gneg: '#1c2940',
-    gpos25: '#243963',
-    gpos50: '#2d4b84',
-    gpos75: '#3560a9',
-    gpos100: '#3e76d1',
-    gvar: '#c98b46',
-    stalk: '#8f65d6',
-    acen: '#c46a5d',
-    other: '#2a3d62'
+    gneg: '#253652',
+    gpos25: '#305080',
+    gpos50: '#3c66a6',
+    gpos75: '#4a7fce',
+    gpos100: '#5a94f0',
+    gvar: '#dca75a',
+    stalk: '#b79cff',
+    acen: '#4b5565',
+    other: '#30537f'
   }
 };
 
@@ -10596,6 +10645,87 @@ function renderVariantLibrary(section) {
     selectedGenomeBuild = normalizedBuild;
     const buildLabel = getGenomeBuildLabel(normalizedBuild);
     hotspotChartContainer.innerHTML = '';
+    let tooltipElement = null;
+    let rowStates = [];
+    let activeBandState = null;
+    let activeBand = null;
+    const highlightBand = (state, band) => {
+      if (!rowStates.length) return;
+      rowStates.forEach(item => {
+        if (item?.bandOverlays) {
+          item.bandOverlays.classed('is-hovered', datum => item === state && datum === band);
+        }
+      });
+    };
+    const setActiveBand = (state, band) => {
+      activeBandState = state || null;
+      activeBand = band || null;
+      highlightBand(activeBandState, activeBand);
+    };
+    const ensureTooltipElement = () => {
+      if (!tooltipElement) {
+        tooltipElement = document.createElement('div');
+        tooltipElement.className = 'variant-hotspot__tooltip';
+        tooltipElement.setAttribute('role', 'tooltip');
+        tooltipElement.dataset.visible = 'false';
+        tooltipElement.setAttribute('aria-hidden', 'true');
+      }
+      if (tooltipElement.parentNode !== hotspotChartContainer) {
+        hotspotChartContainer.appendChild(tooltipElement);
+      } else {
+        hotspotChartContainer.appendChild(tooltipElement);
+      }
+      return tooltipElement;
+    };
+    const hideTooltip = () => {
+      setActiveBand(null, null);
+      if (!tooltipElement) return;
+      tooltipElement.dataset.visible = 'false';
+      tooltipElement.setAttribute('aria-hidden', 'true');
+      tooltipElement.style.transform = 'translate(-9999px, -9999px)';
+      tooltipElement.replaceChildren();
+    };
+    const pointerFromEvent = event => {
+      if (!event) return null;
+      if (event.touches && event.touches.length) return event.touches[0];
+      if (event.changedTouches && event.changedTouches.length) return event.changedTouches[0];
+      return event;
+    };
+    const positionTooltip = event => {
+      if (!tooltipElement || tooltipElement.dataset.visible !== 'true') return;
+      const pointer = pointerFromEvent(event);
+      if (!pointer) return;
+      const tooltip = ensureTooltipElement();
+      const rect = hotspotChartContainer.getBoundingClientRect();
+      const rawX = pointer.clientX - rect.left;
+      const rawY = pointer.clientY - rect.top;
+      requestAnimationFrame(() => {
+        const width = tooltip.offsetWidth || 0;
+        const height = tooltip.offsetHeight || 0;
+        const maxX = Math.max(8, hotspotChartContainer.clientWidth - width - 8);
+        const maxY = Math.max(8, hotspotChartContainer.clientHeight - height - 8);
+        const clampedX = Math.min(Math.max(rawX + 16, 8), maxX);
+        const clampedY = Math.min(Math.max(rawY + 16, 8), maxY);
+        tooltip.style.transform = `translate(${clampedX}px, ${clampedY}px)`;
+      });
+    };
+    const showTooltipContent = (event, lines) => {
+      const tooltip = ensureTooltipElement();
+      tooltip.replaceChildren();
+      lines.forEach((text, index) => {
+        if (!text) return;
+        const element = index === 0 ? document.createElement('strong') : document.createElement('span');
+        element.textContent = text;
+        tooltip.appendChild(element);
+      });
+      tooltip.dataset.visible = 'true';
+      tooltip.setAttribute('aria-hidden', 'false');
+      positionTooltip(event);
+    };
+    const updateTooltipPosition = event => {
+      positionTooltip(event);
+    };
+    let showBandTooltip = () => {};
     const controls = document.createElement('div');
     controls.className = 'variant-hotspot__controls';
     const buildLabelElement = document.createElement('label');
@@ -10641,6 +10771,7 @@ function renderVariantLibrary(section) {
       hotspotChartContainer.dataset.chartEmpty = 'true';
       zoomIndicator.textContent = 'Zoom: –';
       resetButton.disabled = true;
+      hideTooltip();
       const empty = document.createElement('p');
       empty.className = 'variant-hotspot__empty';
       empty.textContent = message;
@@ -10811,7 +10942,9 @@ function renderVariantLibrary(section) {
       const fallbackLength = FALLBACK_CHROMOSOME_LENGTHS[chromosome] || maxPosition;
       const canonicalLength = cytobandLength || fallbackLength;
       const chromLength = Math.max(canonicalLength, maxPosition);
-      const thresholds = Math.min(60, Math.max(12, Math.round(Math.sqrt(data.length))));
+      const densityTarget = Math.round(Math.sqrt(data.length) * 1.6);
+      const spanTarget = chromLength > 0 ? Math.round(chromLength / 4000000) : 0;
+      const thresholds = Math.min(140, Math.max(18, densityTarget, spanTarget));
       const histogram = d3.bin()
         .domain([0, chromLength])
         .thresholds(thresholds)(data.map(d => d.position));
@@ -10850,6 +10983,20 @@ function renderVariantLibrary(section) {
       }
       return `${Math.round(value)} bp`;
     };
+    showBandTooltip = (event, band, row) => {
+      const startValue = Math.max(0, band.x0 ?? band.start ?? 0);
+      const endValue = Math.max(startValue, band.x1 ?? band.end ?? startValue);
+      const rangeLabel = startValue === endValue
+        ? formatPosition(startValue)
+        : `${formatPosition(startValue)} – ${formatPosition(endValue)}`;
+      const stainLabel = band.stain ? band.stain.toUpperCase() : 'GNEG';
+      const countLabel = band.count
+        ? `${band.count} SNV/indel${band.count === 1 ? '' : 'er'}`
+        : 'Ingen SNV/indels';
+      const bandLabel = band.name ? `Chr ${row.chromosome} ${band.name}` : `Chr ${row.chromosome}`;
+      const detailsLine = `${stainLabel}${rangeLabel ? ` · ${rangeLabel}` : ''}`;
+      showTooltipContent(event, [bandLabel, detailsLine, countLabel]);
+    };
     const styleAxis = axisSelection => {
       axisSelection.selectAll('text').attr('dy', '0.7em');
       axisSelection.selectAll('line').attr('opacity', 0.35);
@@ -10868,7 +11015,9 @@ function renderVariantLibrary(section) {
           return Math.max(1, widthValue);
         });
     };
-    const rowStates = [];
+    rowStates = [];
+    activeBandState = null;
+    activeBand = null;
     rows.forEach((row, index) => {
       const rowGroup = chartGroup.append('g')
         .attr('transform', `translate(0, ${index * rowHeight})`);
@@ -10918,7 +11067,7 @@ function renderVariantLibrary(section) {
           }
           return sum;
         }, 0);
-        return {...band, count};
+        return {...band, count, xUpper: upperBound};
       });
       const bandGroup = rowGroup.append('g')
         .attr('class', 'variant-hotspot__bands')
@@ -10951,6 +11100,30 @@ function renderVariantLibrary(section) {
             ? `${d.count} SNV/indel${d.count === 1 ? '' : 'er'}`
             : 'Ingen SNV/indels';
           return `${countLabel} i Chr ${row.chromosome}${bandLabel}${stainLabel} (${rangeLabel})`;
+        });
+      bandOverlays
+        .on('mouseenter', (event, d) => {
+          setActiveBand(rowState, d);
+          showBandTooltip(event, d, row);
+        })
+        .on('mousemove', event => {
+          updateTooltipPosition(event);
+        })
+        .on('mouseleave', () => {
+          hideTooltip();
+        })
+        .on('touchstart', (event, d) => {
+          setActiveBand(rowState, d);
+          showBandTooltip(event, d, row);
+        })
+        .on('touchmove', event => {
+          updateTooltipPosition(event);
+        })
+        .on('touchend', () => {
+          hideTooltip();
+        })
+        .on('touchcancel', () => {
+          hideTooltip();
         });
       const barsGroup = rowGroup.append('g')
         .attr('class', 'variant-hotspot__bars')
@@ -11010,14 +11183,18 @@ function renderVariantLibrary(section) {
         .ticks(tickCount)
         .tickFormat(value => formatPosition(value)));
       styleAxis(axisGroup);
-      rowStates.push({
+      const rowState = {
         baseScale,
         bars,
         bands: bandRects,
         bandOverlays,
+        bandData,
+        row,
+        yOffset: index * rowHeight,
         axisGroup,
         tickCount
-      });
+      };
+      rowStates.push(rowState);
     });
     const formatZoomLevel = value => {
       const decimals = value >= 10 ? 0 : value >= 3 ? 1 : 2;
@@ -11027,6 +11204,51 @@ function renderVariantLibrary(section) {
       });
     };
     let currentTransform = d3.zoomIdentity;
+    const findBandAtPoint = (pointX, pointY) => {
+      if (!rowStates.length) return null;
+      if (!Number.isFinite(pointX) || !Number.isFinite(pointY)) return null;
+      if (pointX < 0 || pointX > innerWidth) return null;
+      if (pointY < 0 || pointY > chartHeight) return null;
+      const rowIndex = Math.floor(pointY / rowHeight);
+      const state = rowStates[rowIndex];
+      if (!state) return null;
+      const localY = pointY - state.yOffset;
+      if (localY < 0 || localY > bandHeight) return null;
+      const scaled = currentTransform.rescaleX(state.baseScale);
+      const domainValue = scaled.invert(pointX);
+      if (!Number.isFinite(domainValue)) return null;
+      const stateBands = state.bandData || [];
+      for (let index = 0; index < stateBands.length; index++) {
+        const band = stateBands[index];
+        const upper = band.xUpper ?? band.x1;
+        const isLast = index === stateBands.length - 1;
+        if (domainValue >= band.x0 && (isLast ? domainValue <= upper : domainValue < upper)) {
+          return {state, band};
+        }
+      }
+      return null;
+    };
+    const handleSurfaceHover = event => {
+      if (event?.touches && event.touches.length > 1) {
+        hideTooltip();
+        return;
+      }
+      if (event?.buttons && event.buttons !== 0) {
+        return;
+      }
+      const [pointX, pointY] = d3.pointer(event, chartGroup.node());
+      const match = findBandAtPoint(pointX, pointY);
+      if (!match) {
+        hideTooltip();
+        return;
+      }
+      if (match.state === activeBandState && match.band === activeBand) {
+        updateTooltipPosition(event);
+        return;
+      }
+      setActiveBand(match.state, match.band);
+      showBandTooltip(event, match.band, match.state.row);
+    };
     let zoomSurfaceSelection = null;
     const setOverlayCursor = value => {
       if (zoomSurfaceSelection) {
@@ -11050,6 +11272,7 @@ function renderVariantLibrary(section) {
         return true;
       })
       .on('start', () => {
+        hideTooltip();
         setOverlayCursor('grabbing');
       })
       .on('end', () => {
@@ -11073,6 +11296,9 @@ function renderVariantLibrary(section) {
           styleAxis(state.axisGroup);
         });
         updateZoomIndicator();
+        if (event.sourceEvent && event.sourceEvent.type === 'wheel') {
+          hideTooltip();
+        }
         if (!event.sourceEvent || event.sourceEvent.type === 'wheel') {
           setOverlayCursor(currentTransform.k > 1 ? 'move' : 'grab');
         }
@@ -11088,8 +11314,23 @@ function renderVariantLibrary(section) {
     zoomSurfaceSelection = zoomSurface;
     setOverlayCursor('grab');
     zoomSurface.call(zoomBehavior);
+    zoomSurface
+      .on('mouseenter.variantHotspotTooltip', handleSurfaceHover)
+      .on('mousemove.variantHotspotTooltip', handleSurfaceHover)
+      .on('mouseleave.variantHotspotTooltip', () => {
+        hideTooltip();
+      })
+      .on('touchstart.variantHotspotTooltip', handleSurfaceHover)
+      .on('touchmove.variantHotspotTooltip', handleSurfaceHover)
+      .on('touchend.variantHotspotTooltip', () => {
+        hideTooltip();
+      })
+      .on('touchcancel.variantHotspotTooltip', () => {
+        hideTooltip();
+      });
     zoomSurface.on('dblclick.zoom', null);
     const resetZoom = () => {
+      hideTooltip();
       zoomSurface.transition().duration(250)
         .call(zoomBehavior.transform, d3.zoomIdentity);
     };
