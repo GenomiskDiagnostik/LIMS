@@ -5514,28 +5514,6 @@ async function openDb() {
   }
 }
 
-async function verifyIndexedDbOperational(db) {
-  if (!db || typeof db.transaction !== 'function') {
-    throw new Error('IndexedDB utilgængelig (mangler databaseforbindelse).');
-  }
-  if (!db.objectStoreNames?.contains?.(SETTINGS_STORE)) {
-    throw new Error('IndexedDB utilgængelig (mangler indstillingslager).');
-  }
-  const testKey = '__glimr_indexeddb_probe__';
-  const writeTx = db.transaction(SETTINGS_STORE, 'readwrite');
-  const store = writeTx.objectStore(SETTINGS_STORE);
-  store.put({key: testKey, value: {ts: Date.now()}});
-  await transactionToPromise(writeTx);
-  const readTx = db.transaction(SETTINGS_STORE, 'readonly');
-  const readStore = readTx.objectStore(SETTINGS_STORE);
-  const req = readStore.get(testKey);
-  await requestToPromise(req);
-  await transactionToPromise(readTx).catch(() => {});
-  const deleteTx = db.transaction(SETTINGS_STORE, 'readwrite');
-  deleteTx.objectStore(SETTINGS_STORE).delete(testKey);
-  await transactionToPromise(deleteTx).catch(() => {});
-}
-
 function openIndexedDb() {
   return new Promise((resolve, reject) => {
     if (!('indexedDB' in window)) {
@@ -5614,29 +5592,17 @@ function openIndexedDb() {
         try { req.result?.close(); } catch (err) { console.warn('Kunne ikke lukke overflødig databaseforbindelse:', err); }
         return;
       }
-      const db = req.result;
-      const resolveWithDb = () => {
-        finish(() => {
-          if (db) {
-            db.onversionchange = () => {
-              console.warn('Databaseversion ændres, lukker eksisterende forbindelse.');
-              try { db.close(); } catch (err) { console.warn('Kunne ikke lukke database:', err); }
-              setStatus('Databaseversion ændret. Genindlæs GlimR for at fortsætte.');
-            };
-          }
-          resolve(db);
-        });
-      };
-      const handleFailure = (error) => {
-        finish(() => {
-          try { db?.close(); } catch (err) { console.warn('Kunne ikke lukke database efter fejl:', err); }
-          reject(error || new Error('IndexedDB utilgængelig.'));
-        });
-      };
-      Promise.resolve()
-        .then(() => verifyIndexedDbOperational(db))
-        .then(resolveWithDb)
-        .catch(handleFailure);
+      finish(() => {
+        const db = req.result;
+        if (db) {
+          db.onversionchange = () => {
+            console.warn('Databaseversion ændres, lukker eksisterende forbindelse.');
+            try { db.close(); } catch (err) { console.warn('Kunne ikke lukke database:', err); }
+            setStatus('Databaseversion ændret. Genindlæs GlimR for at fortsætte.');
+          };
+        }
+        resolve(db);
+      });
     };
   });
 }
