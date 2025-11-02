@@ -18696,6 +18696,7 @@ function renderAudit(section) {
       });
       setStatus('Revisionsloggen er ryddet og handlingen er registreret.');
       cleared = true;
+      scheduleAutosave();
     } catch (err) {
       console.error('Kunne ikke rydde revisionsloggen', err);
       alert('Kunne ikke rydde revisionsloggen: ' + (err?.message || err));
