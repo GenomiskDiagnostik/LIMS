@@ -18577,6 +18577,20 @@ function renderAudit(section) {
   const exportButton = section.querySelector('#auditExport');
   let filteredRows = list.slice();
 
+  const formatAuditTimestamp = value => {
+    if (!value) {
+      return {label: '', datetime: '', title: ''};
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return {label: value, datetime: '', title: ''};
+    }
+    const label = date.toLocaleString('da-DK', {dateStyle: 'short', timeStyle: 'medium'});
+    const datetime = date.toISOString();
+    const title = value || '';
+    return {label, datetime, title};
+  };
+
   const formatCountMessage = total => {
     const noun = total === 1 ? 'revisionspost' : 'revisionsposter';
     const filtersActive = Boolean((searchInput?.value || '').trim() || userFilter?.value || actionFilter?.value || entityFilter?.value);
@@ -18601,6 +18615,7 @@ function renderAudit(section) {
     const lowered = term.toLowerCase();
     const fields = [
       entry.ts,
+      formatAuditTimestamp(entry.ts).label,
       entry.user,
       entry.action,
       entry.entity,
@@ -18624,7 +18639,13 @@ function renderAudit(section) {
       return true;
     });
     tbody.innerHTML = filteredRows.length
-      ? filteredRows.map(a => `<tr><td>${esc(a.ts)}</td><td>${esc(a.user)}</td><td>${esc(a.action)}</td><td>${esc(a.entity)}</td><td>${esc(a.entity_id??'')}</td><td>${esc(a.before||'')}</td><td>${esc(a.after||'')}</td></tr>`).join('')
+      ? filteredRows.map(a => {
+          const {label, datetime, title} = formatAuditTimestamp(a.ts);
+          const timeContent = datetime
+            ? `<time datetime="${esc(datetime)}"${title ? ` title="${esc(title)}"` : ''}>${esc(label)}</time>`
+            : esc(label || (a.ts ?? ''));
+          return `<tr><td>${timeContent}</td><td>${esc(a.user)}</td><td>${esc(a.action)}</td><td>${esc(a.entity)}</td><td>${esc(a.entity_id??'')}</td><td>${esc(a.before||'')}</td><td>${esc(a.after||'')}</td></tr>`;
+        }).join('')
       : '<tr><td colspan="7">Ingen revisionsposter</td></tr>';
     if (countLabel) {
       countLabel.textContent = formatCountMessage(filteredRows.length);
