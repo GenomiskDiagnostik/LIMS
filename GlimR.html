@@ -5432,12 +5432,54 @@ async function clearBoundHandle() {
   await captureSyncedSnapshot();
 }
 
+function shouldClearBoundHandleForError(err) {
+  if (!err) return false;
+  const name = typeof err.name === 'string' ? err.name.toLowerCase() : '';
+  if (['notallowederror', 'securityerror', 'nomodificationallowederror', 'notreadableerror', 'notfounderror'].includes(name)) {
+    return true;
+  }
+  if (typeof err.code === 'number' && [18, 20].includes(err.code)) {
+    return true;
+  }
+  const message = typeof err.message === 'string' ? err.message.toLowerCase() : '';
+  if (!message) return false;
+  return ['permission', 'tillad', 'denied', 'afvist', 'not allowed', 'security', 'adgang', 'findes ikke', 'not found']
+    .some(token => message.includes(token));
+}
+
+async function handleBoundFileAccessLoss(message) {
+  const previousName = state.boundHandle?.name;
+  await clearBoundHandle();
+  if (previousName && typeof storage.setItem === 'function') {
+    try {
+      storage.setItem(BOUND_HANDLE_NAME_KEY, previousName);
+    } catch (err) {
+      console.warn('Kunne ikke huske tidligere filnavn', err);
+    }
+    renderDbTab();
+  }
+  const suffix = previousName ? ` Tidligere fil: ${previousName}.` : '';
+  const finalMessage = message ? `${message}${message.endsWith('.') ? '' : '.'}${suffix}` : suffix.trim();
+  if (finalMessage) {
+    const trimmed = finalMessage.trim();
+    console.warn(trimmed);
+    setStatus(trimmed);
+  } else {
+    console.warn('Filbinding fjernet pga. manglende adgang.');
+    setStatus('Filbinding fjernet pga. manglende adgang.');
+  }
+}
+
 async function restoreBoundHandle() {
   if (!state.db) return;
   try {
     const handle = await getSetting(BOUND_HANDLE_SETTING_KEY);
     if (handle) {
       state.boundHandle = handle;
+      const hasPermission = await ensureBoundHandlePermission(false);
+      if (!hasPermission) {
+        await handleBoundFileAccessLoss('Adgang til tidligere filbinding mangler. Standarddatabase anvendes');
+      }
     } else {
       const remembered = storage.getItem(BOUND_HANDLE_NAME_KEY);
       if (remembered) {
@@ -5991,7 +6033,9 @@ async function reloadBoundFileData({silent = false, refreshUi = false} = {}) {
       return true;
     } catch (err) {
       console.error('Fejl ved genindlæsning af data fra fil', err);
-      if (!silent) {
+      if (shouldClearBoundHandleForError(err)) {
+        await handleBoundFileAccessLoss('Adgang til den tilknyttede databasefil blev afvist. Standarddatabase anvendes');
+      } else if (!silent) {
         setStatus('Kunne ikke genindlæse data fra fil: ' + (err?.message || err));
       }
       return false;
