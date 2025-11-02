@@ -265,6 +265,16 @@ section[data-tab].active {
 .panel-header h2 {
   margin: 0;
 }
+.audit-controls {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.audit-controls input[type="search"],
+.audit-controls select {
+  min-height: 2.2rem;
+}
 .tool-panel {
   padding: 0;
   overflow: hidden;
@@ -5930,6 +5940,16 @@ async function logAudit(action, entity, entityId, before, after) {
   await tx.done?.catch(() => {});
   await loadStore('audit');
 }
+
+function registerManualExport(entity, details = {}) {
+  try {
+    const exportEntity = entity || 'export';
+    const payload = details && typeof details === 'object' ? {...details} : {value: details};
+    logAudit('EXPORT', exportEntity, null, null, payload).catch(err => console.warn('Kunne ikke logge eksport', err));
+  } catch (err) {
+    console.warn('Kunne ikke registrere manuel eksport', err);
+  }
+}
 function scheduleAutosave() {
   if (!state.autosave || !state.boundHandle) return;
   if (state.autosaveTimer) clearTimeout(state.autosaveTimer);
@@ -5944,6 +5964,25 @@ async function exportData() {
     data[store] = cloneWithCreatedBy(store, getCached(store));
   }
   return data;
+}
+
+function summarizeStoreCounts(data) {
+  if (!data || typeof data !== 'object') return {};
+  const counts = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (Array.isArray(value)) {
+      counts[key] = value.length;
+    } else if (value && typeof value === 'object' && typeof value.length === 'number') {
+      counts[key] = Number.isFinite(value.length) ? value.length : 0;
+    } else if (value && typeof value === 'object') {
+      counts[key] = Object.keys(value).length;
+    } else if (value != null) {
+      counts[key] = 1;
+    } else {
+      counts[key] = 0;
+    }
+  }
+  return counts;
 }
 
 function deepClone(value) {
@@ -6228,6 +6267,15 @@ async function saveBoundFile({interactive = false, reason = 'auto'} = {}) {
     return;
   }
   await reloadBoundFileData({silent: true, refreshUi: true});
+  if (reason !== 'auto') {
+    const filename = state.boundHandle?.name || '';
+    registerManualExport('bound_file_save', {
+      filename,
+      reason,
+      appliedChanges,
+      skippedConflicts
+    });
+  }
 }
 async function manualSave() {
   try {
@@ -6346,7 +6394,11 @@ async function importData(data, options = {}) {
 }
 async function downloadBackup() {
   const data = await exportData();
-  const filename = downloadJsonFile(data, 'glimr-backup.json');
+  const filename = downloadJsonFile(data, 'glimr-backup.json', {
+    entity: 'backup',
+    storeCounts: summarizeStoreCounts(data),
+    summary: 'Fuld backup'
+  });
   setStatus(`Fuld backup downloadet som ${filename}.`);
 }
 async function backupAndResetData() {
@@ -6354,7 +6406,11 @@ async function backupAndResetData() {
   const confirmReset = confirm('Dette vil hente en fuld backup og derefter slette alle data undtagen brugere. Fortsæt?');
   if (!confirmReset) return;
   const data = await exportData();
-  const filename = downloadJsonFile(data, 'glimr-backup-pre-reset.json');
+  const filename = downloadJsonFile(data, 'glimr-backup-pre-reset.json', {
+    entity: 'backup',
+    storeCounts: summarizeStoreCounts(data),
+    summary: 'Backup før nulstilling'
+  });
   const storesToClear = STORES.filter(store => store !== 'users');
   const preservedUsers = JSON.parse(JSON.stringify(getCached('users') || []));
   try {
@@ -6501,7 +6557,22 @@ function formatJsonCell(value) {
 function exportFilteredCsv(baseName, rows, columns, meta = {}) {
   const data = Array.isArray(rows) ? rows : [];
   const cols = Array.isArray(columns) && columns.length ? columns : inferCsvColumns(data);
-  const filename = downloadCsvFile(data, cols, baseName, meta.delimiter || ';');
+  const auditDetails = meta.auditMeta && typeof meta.auditMeta === 'object' ? {...meta.auditMeta} : {};
+  auditDetails.baseName = baseName;
+  auditDetails.rowCount = data.length;
+  if (meta.auditContext) {
+    auditDetails.filters = meta.auditContext;
+  }
+  if (meta.entity && !auditDetails.source) {
+    auditDetails.source = meta.entity;
+  }
+  const filename = downloadCsvFile(
+    data,
+    cols,
+    baseName,
+    meta.delimiter || ';',
+    {entity: meta.auditEntity || meta.entity || 'export', details: auditDetails}
+  );
   const plural = meta.plural || meta.entity || 'poster';
   setStatus(`Eksporterede ${data.length} ${plural} til ${filename}.`);
 }
@@ -6513,12 +6584,23 @@ function triggerDownload(url, filename) {
   a.click();
   document.body.removeChild(a);
 }
-function downloadJsonFile(data, baseName) {
+function downloadJsonFile(data, baseName, auditMeta = {}) {
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const filename = withDateStamp(baseName);
   triggerDownload(url, filename);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const details = (auditMeta && typeof auditMeta === 'object' && auditMeta.details && typeof auditMeta.details === 'object')
+    ? {...auditMeta.details}
+    : {};
+  details.baseName = baseName;
+  details.filename = filename;
+  details.byteSize = blob.size;
+  if (auditMeta && typeof auditMeta === 'object') {
+    if (auditMeta.summary != null && details.summary == null) details.summary = auditMeta.summary;
+    if (auditMeta.storeCounts && !details.storeCounts) details.storeCounts = auditMeta.storeCounts;
+  }
+  registerManualExport((auditMeta && auditMeta.entity) || 'json_export', details);
   return filename;
 }
 const WINDOWS_1252_EXTENDED = {
@@ -6579,7 +6661,7 @@ function sanitizeFirstCsvHeaderLabel(label) {
   }
   return text;
 }
-function downloadCsvFile(rows, columns, baseName, delimiter = ';') {
+function downloadCsvFile(rows, columns, baseName, delimiter = ';', auditMeta = {}) {
   if (!Array.isArray(rows)) rows = [];
   const cols = columns.map(col => typeof col === 'string' ? {key: col, label: col} : col);
   const header = cols.map((col, index) => {
@@ -6599,9 +6681,17 @@ function downloadCsvFile(rows, columns, baseName, delimiter = ';') {
   const filename = withDateStamp(baseName);
   triggerDownload(url, filename);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const details = (auditMeta && typeof auditMeta === 'object' && auditMeta.details && typeof auditMeta.details === 'object')
+    ? {...auditMeta.details}
+    : {};
+  details.baseName = baseName;
+  details.filename = filename;
+  details.rowCount = rows.length;
+  details.delimiter = delimiter;
+  registerManualExport((auditMeta && auditMeta.entity) || 'csv_export', details);
   return filename;
 }
-function downloadTextFile(text, baseName) {
+function downloadTextFile(text, baseName, auditMeta = {}) {
   if (typeof text !== 'string') text = '';
   const normalised = text.replace(/\r?\n|\r/g, '\r\n');
   const encoded = encodeWindows1252(normalised);
@@ -6610,6 +6700,13 @@ function downloadTextFile(text, baseName) {
   const filename = withDateStamp(baseName);
   triggerDownload(url, filename);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const details = (auditMeta && typeof auditMeta === 'object' && auditMeta.details && typeof auditMeta.details === 'object')
+    ? {...auditMeta.details}
+    : {};
+  details.baseName = baseName;
+  details.filename = filename;
+  details.byteSize = blob.size;
+  registerManualExport((auditMeta && auditMeta.entity) || 'text_export', details);
   return filename;
 }
 function escapeCsvValue(value, delimiter) {
@@ -9257,7 +9354,10 @@ function renderPanels(section) {
       return `${geneLine}\r\n${descriptionLine}`;
     });
     const text = entries.join('\r\n\r\n');
-    const filename = downloadTextFile(text, 'glimr-paneler.txt');
+    const filename = downloadTextFile(text, 'glimr-paneler.txt', {
+      entity: 'panel_export',
+      details: {panelCount: filteredPanels.length}
+    });
     setStatus(`Eksporterede ${filteredPanels.length} paneler til ${filename}.`);
   });
   tbody.addEventListener('click', e => {
@@ -14209,6 +14309,12 @@ function renderReports(section) {
       triggerDownload(url, filename);
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       setStatus(`Rapport PDF hentet som ${filename}.`);
+      registerManualExport('report_pdf', {
+        filename,
+        orderId,
+        exportedAt: exportedAt.toISOString(),
+        variantCount: Array.isArray(variantSnapshots) ? variantSnapshots.length : 0
+      });
     });
   }
 }
@@ -16257,6 +16363,11 @@ function renderPlanner(section) {
     const url = URL.createObjectURL(blob);
     triggerDownload(url, filename);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+    registerManualExport('planning_ics', {
+      filename,
+      taskCount: Array.isArray(tasks) ? tasks.length : 0,
+      generatedAt: generatedAt?.toISOString?.() || null
+    });
     return filename;
   };
 
@@ -16277,6 +16388,11 @@ function renderPlanner(section) {
     const url = URL.createObjectURL(blob);
     triggerDownload(url, filename);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+    registerManualExport('planning_csv', {
+      filename,
+      taskCount: Array.isArray(tasks) ? tasks.length : 0,
+      delimiter
+    });
     return filename;
   };
 
@@ -18135,6 +18251,11 @@ async function exportFhir(section, download) {
     triggerDownload(url, filename);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     setStatus(`FHIR-meddelelse for ordination ${id} downloadet som ${filename}.`);
+    registerManualExport('fhir_bundle', {
+      filename,
+      orderId: id,
+      byteSize: blob.size
+    });
   }
 }
 function buildFhirBundle(orderId) {
@@ -18414,12 +18535,128 @@ function renderUsers(section) {
 }
 function renderAudit(section) {
   const list = getCached('audit').slice().reverse();
+  const uniqueUsers = Array.from(new Set(list.map(entry => entry.user).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'da'));
+  const uniqueActions = Array.from(new Set(list.map(entry => entry.action).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'da'));
+  const uniqueEntities = Array.from(new Set(list.map(entry => entry.entity).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'da'));
   section.innerHTML = `
   <div class="panel">
-    <table><thead><tr><th>Tid</th><th>Bruger</th><th>Handling</th><th>Entitet</th><th>ID</th><th>Før</th><th>Efter</th></tr></thead><tbody>
-      ${list.map(a => `<tr><td>${esc(a.ts)}</td><td>${esc(a.user)}</td><td>${esc(a.action)}</td><td>${esc(a.entity)}</td><td>${esc(a.entity_id??'')}</td><td>${esc(a.before||'')}</td><td>${esc(a.after||'')}</td></tr>`).join('') || '<tr><td colspan="7">Ingen revisionsposter</td></tr>'}
-    </tbody></table>
+    <div class="panel-header audit-panel-header">
+      <h2>Revision</h2>
+      <div class="audit-controls">
+        <input type="search" id="auditSearch" placeholder="Filtrer revision..." aria-label="Filtrer revisionslog">
+        <select id="auditUserFilter" aria-label="Filtrer efter bruger">
+          <option value="">Alle brugere</option>
+          ${uniqueUsers.map(user => `<option value="${esc(user)}">${esc(user)}</option>`).join('')}
+        </select>
+        <select id="auditActionFilter" aria-label="Filtrer efter handling">
+          <option value="">Alle handlinger</option>
+          ${uniqueActions.map(action => `<option value="${esc(action)}">${esc(action)}</option>`).join('')}
+        </select>
+        <select id="auditEntityFilter" aria-label="Filtrer efter entitet">
+          <option value="">Alle entiteter</option>
+          ${uniqueEntities.map(entity => `<option value="${esc(entity)}">${esc(entity)}</option>`).join('')}
+        </select>
+        <button class="secondary with-icon" type="button" id="auditExport">
+          <span class="icon-slot" data-icon="clipboard-document-list"></span>
+          <span>Eksportér</span>
+        </button>
+      </div>
+    </div>
+    <p class="panel-hint" data-audit-count></p>
+    <table>
+      <thead><tr><th>Tid</th><th>Bruger</th><th>Handling</th><th>Entitet</th><th>ID</th><th>Før</th><th>Efter</th></tr></thead>
+      <tbody data-audit-rows></tbody>
+    </table>
   </div>`;
+  const searchInput = section.querySelector('#auditSearch');
+  const userFilter = section.querySelector('#auditUserFilter');
+  const actionFilter = section.querySelector('#auditActionFilter');
+  const entityFilter = section.querySelector('#auditEntityFilter');
+  const tbody = section.querySelector('[data-audit-rows]');
+  const countLabel = section.querySelector('[data-audit-count]');
+  const exportButton = section.querySelector('#auditExport');
+  let filteredRows = list.slice();
+
+  const formatCountMessage = total => {
+    const noun = total === 1 ? 'revisionspost' : 'revisionsposter';
+    const filtersActive = Boolean((searchInput?.value || '').trim() || userFilter?.value || actionFilter?.value || entityFilter?.value);
+    if (!filtersActive) {
+      return `${total} ${noun} i alt.`;
+    }
+    return `${total} ${noun} matcher filtrene.`;
+  };
+
+  const buildFilterSummary = () => {
+    const parts = [];
+    const term = (searchInput?.value || '').trim();
+    if (term) parts.push(`tekst=${term}`);
+    if (userFilter?.value) parts.push(`bruger=${userFilter.value}`);
+    if (actionFilter?.value) parts.push(`handling=${actionFilter.value}`);
+    if (entityFilter?.value) parts.push(`entitet=${entityFilter.value}`);
+    return parts.length ? parts.join('; ') : 'ingen filtre';
+  };
+
+  const matchesSearch = (entry, term) => {
+    if (!term) return true;
+    const lowered = term.toLowerCase();
+    const fields = [
+      entry.ts,
+      entry.user,
+      entry.action,
+      entry.entity,
+      entry.entity_id,
+      entry.before,
+      entry.after
+    ];
+    return fields.some(value => (value || '').toString().toLowerCase().includes(lowered));
+  };
+
+  const applyFilters = () => {
+    const term = (searchInput?.value || '').trim();
+    const userValue = userFilter?.value || '';
+    const actionValue = actionFilter?.value || '';
+    const entityValue = entityFilter?.value || '';
+    filteredRows = list.filter(entry => {
+      if (userValue && entry.user !== userValue) return false;
+      if (actionValue && entry.action !== actionValue) return false;
+      if (entityValue && entry.entity !== entityValue) return false;
+      if (!matchesSearch(entry, term)) return false;
+      return true;
+    });
+    tbody.innerHTML = filteredRows.length
+      ? filteredRows.map(a => `<tr><td>${esc(a.ts)}</td><td>${esc(a.user)}</td><td>${esc(a.action)}</td><td>${esc(a.entity)}</td><td>${esc(a.entity_id??'')}</td><td>${esc(a.before||'')}</td><td>${esc(a.after||'')}</td></tr>`).join('')
+      : '<tr><td colspan="7">Ingen revisionsposter</td></tr>';
+    if (countLabel) {
+      countLabel.textContent = formatCountMessage(filteredRows.length);
+    }
+    annotateTableCells(section);
+  };
+
+  applyFilters();
+  searchInput?.addEventListener('input', applyFilters);
+  userFilter?.addEventListener('change', applyFilters);
+  actionFilter?.addEventListener('change', applyFilters);
+  entityFilter?.addEventListener('change', applyFilters);
+
+  exportButton?.addEventListener('click', () => {
+    const columns = [
+      {key: 'ts', label: 'Tid'},
+      {key: 'user', label: 'Bruger'},
+      {key: 'action', label: 'Handling'},
+      {key: 'entity', label: 'Entitet'},
+      {key: 'entity_id', label: 'ID'},
+      {key: 'before', label: 'Før'},
+      {key: 'after', label: 'Efter'}
+    ];
+    exportFilteredCsv('glimr-revision-filtreret.csv', filteredRows, columns, {
+      entity: 'revision',
+      plural: 'revisionsposter',
+      auditEntity: 'audit',
+      auditContext: buildFilterSummary()
+    });
+  });
+
+  applyIconSlots(section);
   annotateHeaders(section);
   annotateTableCells(section);
   applyButtonTooltips(section);
@@ -18510,6 +18747,10 @@ function renderDbTab(section) {
     triggerDownload(url, filename);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     setStatus(`MySQL-dump downloadet som ${filename}.`);
+    registerManualExport('sql_dump', {
+      filename,
+      byteSize: blob.size
+    });
   });
   section.querySelector('#showSchema').addEventListener('click', async () => {
     const sql = await generateSqlDump();
@@ -18527,6 +18768,11 @@ function renderDbTab(section) {
     triggerDownload(url, filename);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     setStatus(`ZIP-arkiv downloadet som ${filename}.`);
+    registerManualExport('zip_archive', {
+      filename,
+      fileCount: Array.isArray(files) ? files.length : 0,
+      byteSize: blob.size
+    });
   });
 }
 function renderAdmin(section) {
