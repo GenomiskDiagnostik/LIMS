@@ -2880,10 +2880,10 @@ function roleWithDescription(role) {
   return `${match.value} – ${match.description}`;
 }
 const classificationMap = {
-  '1': {code:'LA6576-8', display:'Godartet'},
-  '2': {code:'LA6577-6', display:'Sandsynligvis godartet'},
-  '3': {code:'LA4489-6', display:'Variant af ukendt betydning (VUS)'},
-  '4': {code:'LA6668-3', display:'Sandsynligvis patogen'},
+  '1': {code:'LA6576-8', display:'Benign'},
+  '2': {code:'LA6577-6', display:'Formodet benign'},
+  '3': {code:'LA4489-6', display:'Usikker signifikans'},
+  '4': {code:'LA6668-3', display:'Formodet patogen'},
   '5': {code:'LA6708-8', display:'Patogen'}
 };
 const tabs = [
@@ -3388,7 +3388,7 @@ const tooltipCatalog = {
       rsid: 'dbSNP-reference (rsID), fx rs80357713, for SNV/indel.',
       genomic_position: 'Genomisk position (fx chr19-11105362) for SNV/indel.',
       zygosity: 'Zygositetsstatus (fx heterozygot).',
-      classification: 'ACMG-klassifikation 1 (godartet) – 5 (patogen).',
+      classification: 'ACMG-klassifikation 1 (benign) – 5 (patogen).',
       criteria: 'Anfør anvendte ACMG- eller CNV-kriterier, adskilt af komma.',
       af: 'VAF (Variant Allele Frequency) eller observationsfrekvens.',
       annotations: 'Supplerende annoteringer fra eksterne værktøjer såsom VarSeq.',
@@ -17161,10 +17161,10 @@ function renderTools(section) {
     }
     let classification;
     if (score >= 10) classification = 'Patogen';
-    else if (score >= 6) classification = 'Sandsynligvis patogen';
-    else if (score <= -6) classification = 'Godartet';
-    else if (score <= -2) classification = 'Sandsynligvis godartet';
-    else classification = 'Variant af ukendt betydning (VUS)';
+    else if (score >= 6) classification = 'Formodet patogen';
+    else if (score <= -6) classification = 'Benign';
+    else if (score <= -2) classification = 'Formodet benign';
+    else classification = 'Usikker signifikans';
     acmgResult.innerHTML = `<strong>${classification}</strong><br>` +
       `Vægtet score: ${score}.<br>` +
       `Patogene kriterier: ${formatList(selectedPath)}.<br>` +
