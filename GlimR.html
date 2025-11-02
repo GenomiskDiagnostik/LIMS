@@ -13540,13 +13540,32 @@ function renderReports(section) {
   };
   const buildConclusionPlaceholderMap = () => {
     const map = new Map();
+    const lowercaseInitialPatterns = [
+      /^ordination\d*indikation$/,
+      /^ordination\d*patientgruppe$/,
+      /^zygositet\d*$/,
+      /^sample\d*type$/,
+      /^sample\d*status$/,
+      /^variant\d*strukturtype$/,
+      /^variant\d*subtype$/
+    ];
+    const lowercaseInitialValue = value => {
+      if (!value) return value;
+      return value.replace(/^([\s]*)(\S)/u, (match, leading, ch) => `${leading}${ch.toLocaleLowerCase()}`);
+    };
+    const formatPlaceholderValue = (normalizedKey, text) => {
+      if (!text) return text;
+      return lowercaseInitialPatterns.some(pattern => pattern.test(normalizedKey))
+        ? lowercaseInitialValue(text)
+        : text;
+    };
     const add = (keys, value) => {
       if (!Array.isArray(keys)) keys = [keys];
-      const text = value == null ? '' : String(value);
       for (const key of keys) {
         const normalized = normalizePlaceholderKey(key);
         if (!normalized) continue;
-        map.set(normalized, text);
+        const text = value == null ? '' : String(value);
+        map.set(normalized, formatPlaceholderValue(normalized, text));
       }
     };
     const orderId = Number(form?.elements.order_id?.value || '') || null;
