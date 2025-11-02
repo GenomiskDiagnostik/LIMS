@@ -10666,7 +10666,6 @@ function renderVariants(section) {
     {key:'annotations', label:'Annoteringer'},
     {key:'interpretation', label:'Tolkning'},
     {key:'variant_title', label:'Varianttitel', value: row => formatVariantTitle(row)},
-    {key:'variant_range', label:'Genomisk interval', value: row => formatVariantGenomicRange(row)},
     {key:'created_by', label:'Oprettet af'},
     {key:'created_at', label:'Oprettet (ISO)'},
     {key:'created_at_formatted', label:'Oprettet', value: row => formatDanishDate(row.created_at, true)},
@@ -12333,7 +12332,7 @@ function renderVariantLibrary(section) {
     {key: 'hgvs_c', label: 'HGVS c.'},
     {key: 'hgvs_p', label: 'HGVS p.'},
     {key: 'rsid', label: 'rsID'},
-    {key: 'genomic_position', label: 'Genomisk position (rå)'},
+    {key: 'genomic_position', label: 'Genomisk position'},
     {key: 'variant_type', label: 'Varianttype (kode)'},
     {label: 'Varianttype', value: entry => getVariantTypeLabel(entry.variant_type) || ''},
     {key: 'classification', label: 'Klasse'},
@@ -12341,7 +12340,6 @@ function renderVariantLibrary(section) {
     {key: 'evidence', label: 'Evidens'},
     {key: 'condition', label: 'Tilstand'},
     {key: 'inheritance', label: 'Nedarvning'},
-    {label: 'Genomisk position', value: entry => formatVariantGenomicRange(entry) || ''},
     {key: 'genome_build', label: 'Genom'},
     {key: 'chromosome', label: 'Kromosom'},
     {key: 'start', label: 'Start'},
@@ -12738,6 +12736,8 @@ function renderVariantLibrary(section) {
         dbsnp_rs: 'rsid',
         rs_id: 'rsid',
         genomic_position: 'genomic_position',
+        genomisk_position: 'genomic_position',
+        genomisk_position_ra: 'genomic_position',
         genomicpos: 'genomic_position',
         genomic_pos: 'genomic_position',
         position: 'genomic_position',
@@ -12806,7 +12806,7 @@ function renderVariantLibrary(section) {
         sidst_gennemgaaet: 'last_review',
         lastreview: 'last_review'
       };
-      const computedColumnNames = new Set(['frekvens', 'frequency', 'forekomst', 'occurrence']);
+      const computedColumnNames = new Set(['frekvens', 'frequency', 'forekomst', 'occurrence', 'genomisk_interval', 'genomic_interval']);
       const ignoredComputedColumns = new Set();
       const columnKeys = headers.map(header => {
         const normalized = normaliseHeader(header);
