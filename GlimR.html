@@ -19305,26 +19305,50 @@ function hookUi() {
 }
 async function init() {
   initTabs();
+  const warnings = [];
+  const addWarning = (label, err) => {
+    const detail = err?.message || err || 'ukendt fejl';
+    warnings.push(`${label}: ${detail}`);
+    console.error(`Initialiseringsfejl – ${label}:`, err);
+  };
+  const runStep = async (label, fn) => {
+    try {
+      await fn();
+    } catch (err) {
+      addWarning(label, err);
+    }
+  };
   try {
     setStatus('Åbner database...');
     state.db = await openDb();
-    setStatus(state.usingMemoryDb ? 'Database åben (midlertidig hukommelse)' : 'Database åben');
-    await loadAllStores();
-    await ensureDefaultPatientGroups();
-    await ensureDefaultQcPresets();
-    await ensureCreationMetadata();
-    await captureSyncedSnapshot();
-    await restoreBoundHandle();
-    hookUi();
-    restoreUserSession();
+    const baseStatus = state.usingMemoryDb
+      ? 'Database åben (midlertidig hukommelse)'
+      : 'Database åben';
+    setStatus(baseStatus);
+    await runStep('Kunne ikke indlæse data fuldt ud', loadAllStores);
+    await runStep('Kunne ikke oprette standardpatientgrupper', ensureDefaultPatientGroups);
+    await runStep('Kunne ikke oprette standard QC-prædefinerede værdier', ensureDefaultQcPresets);
+    await runStep('Kunne ikke opdatere oprettelsesmetadata', ensureCreationMetadata);
+    await runStep('Kunne ikke opdatere synkroniseringsstatus', captureSyncedSnapshot);
+    await runStep('Kunne ikke gendanne filbinding', restoreBoundHandle);
+    await runStep('Kunne ikke initialisere brugerfladen', async () => {
+      hookUi();
+      restoreUserSession();
+    });
     if (state.boundHandle) {
-      await reloadBoundFileData({silent: true, refreshUi: false});
+      await runStep('Kunne ikke genindlæse data fra fil', () => reloadBoundFileData({silent: true, refreshUi: false}));
     }
-    renderAll();
-    if (state.autosave && state.boundHandle) {
-      scheduleAutosave();
+    await runStep('Kunne ikke gengive indhold', async () => {
+      renderAll();
+      if (state.autosave && state.boundHandle) {
+        scheduleAutosave();
+      }
+    });
+    await runStep('Kunne ikke aktivere dashboard', () => activateTab('dashboard'));
+    if (warnings.length) {
+      const warningMessage = warnings.join('; ');
+      setStatus(`${baseStatus} – begrænset funktionalitet: ${warningMessage}`);
     }
-    activateTab('dashboard');
   } catch (err) {
     console.error(err);
     setStatus('Kunne ikke åbne database: ' + err.message);
