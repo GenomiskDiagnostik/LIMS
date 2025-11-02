@@ -2511,7 +2511,6 @@ pre {
   }
 }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 </head>
 <body>
 <header>
@@ -2821,6 +2820,55 @@ const storage = (() => {
     };
   }
 })();
+
+const D3_SCRIPT_SOURCES = [
+  'https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js'
+];
+let d3LoadPromise = null;
+
+function loadExternalScript(src) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.crossOrigin = 'anonymous';
+    script.onload = () => resolve();
+    script.onerror = event => {
+      const error = new Error(`Kunne ikke indlæse script: ${src}`);
+      error.event = event;
+      reject(error);
+    };
+    document.head.appendChild(script);
+  });
+}
+
+async function ensureD3Loaded() {
+  if (typeof window !== 'undefined' && typeof window.d3 !== 'undefined') {
+    return window.d3;
+  }
+  if (!d3LoadPromise) {
+    d3LoadPromise = (async () => {
+      for (const src of D3_SCRIPT_SOURCES) {
+        try {
+          await loadExternalScript(src);
+          if (typeof window.d3 !== 'undefined') {
+            return window.d3;
+          }
+        } catch (err) {
+          console.warn('Kunne ikke indlæse D3.js fra', src, err);
+        }
+      }
+      throw new Error('D3.js kunne ikke indlæses.');
+    })();
+  }
+  try {
+    return await d3LoadPromise;
+  } catch (err) {
+    d3LoadPromise = null;
+    throw err;
+  }
+}
 
 const state = {
   db: null,
@@ -11164,7 +11212,7 @@ function renderVariantLibrary(section) {
       hotspotCaption.textContent = text || '';
     }
   };
-  const updateHotspotChart = (variants, options = {}) => {
+  const updateHotspotChart = async (variants, options = {}) => {
     if (!hotspotChartContainer) return;
     const variantList = Array.isArray(variants) ? variants : [];
     const snvVariants = variantList.filter(variant => normalizeVariantType(variant?.variant_type) === 'snv');
@@ -11390,7 +11438,14 @@ function renderVariantLibrary(section) {
       updateHotspotCaption('Hotspot-oversigten understøtter kun SNV/indel-poster. Vælg en filtrering med SNV/indels og angiv den ønskede reference.');
       return;
     }
-    if (typeof d3 === 'undefined') {
+    if (typeof window.d3 === 'undefined') {
+      try {
+        await ensureD3Loaded();
+      } catch (err) {
+        console.warn('Kunne ikke indlæse D3.js', err);
+      }
+    }
+    if (typeof window.d3 === 'undefined') {
       setEmptyState('D3.js kunne ikke indlæses – hotspot-grafen er ikke tilgængelig.');
       const summaryParts = [`${snvVariants.length} SNV/indel${snvVariants.length === 1 ? '' : 'er'} i ${buildLabel}`];
       if (excludedCount > 0) {
@@ -11400,6 +11455,7 @@ function renderVariantLibrary(section) {
       updateHotspotCaption('Indlæs D3.js for at se den genomiske hotspots-visualisering af SNV/indels.');
       return;
     }
+    const d3 = window.d3;
     const theme = getCurrentTheme();
     let missingCoordinateCount = 0;
     const mismatchedBuildCounts = new Map();
@@ -12324,7 +12380,10 @@ function renderVariantLibrary(section) {
     captionDetails.push('Zoom med scrollhjulet eller ved at trække for at undersøge kromosomerne. Dobbeltklik eller brug “Nulstil zoom” for at vende tilbage til udgangspunktet.');
     refreshCaptionMax();
   };
-  const redrawHotspot = () => updateHotspotChart(filteredLibrary, {highlightVariant: getHighlightedEntry()});
+  const redrawHotspot = () => {
+    updateHotspotChart(filteredLibrary, {highlightVariant: getHighlightedEntry()})
+      .catch(err => console.warn('Kunne ikke opdatere hotspot-visualisering', err));
+  };
   const csvColumns = [
     {key: 'id', label: 'ID'},
     {label: 'Varianttitel', value: entry => formatVariantTitle(entry) || ''},
