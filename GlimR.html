@@ -3120,6 +3120,13 @@ const iconLibrary = {
     paths: [
       {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z'}
     ]
+  },
+  trash: {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M14.7404 9l-.3462 9M9.6058 18 9.2596 9m9.968-3.2094c.342.0517.6828.107 1.0224.1658m-1.0224-.1658L18.1598 19.6726c-.0902 1.1722-1.0677 2.0774-2.2434 2.0774H8.0836c-1.1757 0-2.1532-.9052-2.2434-2.0774L4.7724 5.7906m14.4552 0c-1.1464-.1731-2.3061-.3057-3.4776-.3963M3.75 5.9563c.3396-.0588.6804-.1141 1.0224-.1657m0 0c1.1464-.1731 2.3061-.3057 3.4776-.3963m7.5 0V4.4782c0-1.1794-.9107-2.1639-2.0894-2.2017C13.1092 2.2589 12.5556 2.25 12 2.25s-1.1092.0089-1.6606.0265C9.1606 2.3142 8.25 3.2988 8.25 4.4782v.9161m7.5 0c-1.2374-.0956-2.488-.1443-3.75-.1443s-2.5126.0487-3.75.1443'}
+    ]
   }
 };
 function createIconElement(name) {
@@ -18560,6 +18567,10 @@ function renderAudit(section) {
           <span class="icon-slot" data-icon="clipboard-document-list"></span>
           <span>Eksportér</span>
         </button>
+        <button class="danger with-icon" type="button" id="auditClear" data-tooltip="Ryd revisionsloggen, når du har eksporteret">
+          <span class="icon-slot" data-icon="trash"></span>
+          <span>Ryd log</span>
+        </button>
       </div>
     </div>
     <p class="panel-hint" data-audit-count></p>
@@ -18575,6 +18586,7 @@ function renderAudit(section) {
   const tbody = section.querySelector('[data-audit-rows]');
   const countLabel = section.querySelector('[data-audit-count]');
   const exportButton = section.querySelector('#auditExport');
+  const clearButton = section.querySelector('#auditClear');
   let filteredRows = list.slice();
 
   const formatAuditTimestamp = value => {
@@ -18658,6 +18670,42 @@ function renderAudit(section) {
   userFilter?.addEventListener('change', applyFilters);
   actionFilter?.addEventListener('change', applyFilters);
   entityFilter?.addEventListener('change', applyFilters);
+
+  clearButton?.addEventListener('click', async () => {
+    if (!ensureWrite('audit')) return;
+    if (!state.db) {
+      alert('Database er ikke initialiseret endnu.');
+      return;
+    }
+    const cachedAudit = getCached('audit');
+    const totalBefore = Array.isArray(cachedAudit) ? cachedAudit.length : list.length;
+    const confirmMessage = totalBefore
+      ? `Dette vil rydde alle ${totalBefore} revisionsposter. Sørg for at have eksporteret loggen først. Handling kan ikke fortrydes. Fortsæt?`
+      : 'Der er ingen revisionsposter lige nu. Handlingen logges som en rydning. Fortsæt?';
+    if (!confirm(confirmMessage)) return;
+    clearButton.disabled = true;
+    let cleared = false;
+    try {
+      const tx = state.db.transaction('audit', 'readwrite');
+      tx.objectStore('audit').clear();
+      await transactionToPromise(tx);
+      await logAudit('CLEAR', 'audit', null, null, {
+        cleared_by: currentUserName(),
+        cleared_count: totalBefore,
+        filter_summary: buildFilterSummary()
+      });
+      setStatus('Revisionsloggen er ryddet og handlingen er registreret.');
+      cleared = true;
+    } catch (err) {
+      console.error('Kunne ikke rydde revisionsloggen', err);
+      alert('Kunne ikke rydde revisionsloggen: ' + (err?.message || err));
+    } finally {
+      clearButton.disabled = false;
+    }
+    if (cleared) {
+      renderAudit(section);
+    }
+  });
 
   exportButton?.addEventListener('click', () => {
     const columns = [
