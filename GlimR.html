@@ -18742,6 +18742,7 @@ function renderDbTab(section) {
   const memoryWarning = state.usingMemoryDb
     ? '<p class="panel-hint warning">Browseren blokerer for IndexedDB. Data gemmes kun midlertidigt i denne session.</p>'
     : '';
+  const canClearBinding = Boolean(state.boundHandle || rememberedName);
   if (!section) return;
   section.innerHTML = `
   <div class="panel">
@@ -18754,6 +18755,7 @@ function renderDbTab(section) {
       <label style="display:flex;align-items:center;gap:0.5rem;">
         <input type="checkbox" id="autosaveToggle" ${state.autosave?'checked':''}> Autogem
       </label>
+      <button class="text-link" id="unbindFile" ${canClearBinding ? '' : 'disabled'}>Fjern tilknytning</button>
     </div>
   </div>
   <div class="panel">
@@ -18789,6 +18791,14 @@ function renderDbTab(section) {
       state.autosaveTimer = null;
     }
   });
+  const unbindButton = section.querySelector('#unbindFile');
+  if (unbindButton) {
+    unbindButton.addEventListener('click', async () => {
+      if (unbindButton.disabled) return;
+      await clearBoundHandle();
+      setStatus('Filbinding fjernet.');
+    });
+  }
   section.querySelector('#downloadBackup').addEventListener('click', downloadBackup);
   const restoreInput = section.querySelector('#restoreFile');
   const restoreBtn = section.querySelector('#restoreBackup');
