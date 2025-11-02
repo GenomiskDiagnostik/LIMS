@@ -13046,7 +13046,7 @@ function buildConclusionPlaceholderGuide(context = 'report') {
               <li><code>[VariantAntal]</code> – antal valgte varianter</li>
               <li><code>[VariantTyper]</code> / <code>[VariantType]</code> – liste over varianttyper (SNV, CNV, strukturel m.m.)</li>
               <li><code>[Gen]</code>, <code>[Transkript]</code>, <code>[HGVS_c]</code>, <code>[HGVS_p]</code> – lister over værdier på tværs af varianter</li>
-              <li><code>[Zygositet]</code>, <code>[ACMG-klasse]</code>, <code>[Kriterier]</code> – kombinerede klassifikationer</li>
+              <li><code>[Zygositet]</code>, <code>[ACMG-klasse]</code>, <code>[ACMG-klasseTekst]</code>, <code>[Kriterier]</code> – kombinerede klassifikationer (inkl. tekst for ACMG-klasser)</li>
               <li><code>[Annoteringer]</code> – samlede annoteringer (inkl. VarSeq-noter)</li>
               <li><code>[Tolkning]</code> – samlede tolkninger</li>
               <li><code>[VariantListe]</code> – nummereret oversigt med detaljer (inkl. type, HGVS, ISCN m.m.)</li>
@@ -13540,13 +13540,40 @@ function renderReports(section) {
   };
   const buildConclusionPlaceholderMap = () => {
     const map = new Map();
+    const lowercaseInitialPatterns = [
+      /^ordination\d*indikation$/,
+      /^ordination\d*patientgruppe$/,
+      /^zygositet\d*$/,
+      /^sample\d*type$/,
+      /^sample\d*status$/,
+      /^acmg\d*klassetekst$/,
+      /^acmg\d*tekst$/,
+      /^variant\d*acmgtekst$/,
+      /^variant\d*\.acmgtekst$/,
+      /^variant\d*zygositet$/,
+      /^variant\d*\.zygositet$/,
+      /^variant\d*strukturtype$/,
+      /^variant\d*\.strukturtype$/,
+      /^variant\d*subtype$/,
+      /^variant\d*\.subtype$/
+    ];
+    const lowercaseInitialValue = value => {
+      if (!value) return value;
+      return value.replace(/^([\s]*)(\S)/u, (match, leading, ch) => `${leading}${ch.toLocaleLowerCase()}`);
+    };
+    const formatPlaceholderValue = (normalizedKey, text) => {
+      if (!text) return text;
+      return lowercaseInitialPatterns.some(pattern => pattern.test(normalizedKey))
+        ? lowercaseInitialValue(text)
+        : text;
+    };
     const add = (keys, value) => {
       if (!Array.isArray(keys)) keys = [keys];
-      const text = value == null ? '' : String(value);
       for (const key of keys) {
         const normalized = normalizePlaceholderKey(key);
         if (!normalized) continue;
-        map.set(normalized, text);
+        const text = value == null ? '' : String(value);
+        map.set(normalized, formatPlaceholderValue(normalized, text));
       }
     };
     const orderId = Number(form?.elements.order_id?.value || '') || null;
@@ -13583,12 +13610,18 @@ function renderReports(section) {
     add(['SampleStatus', 'ProeveStatus', 'PrøveStatus'], sample?.status || '');
     add(['SampleDato', 'Sample.Collected', 'PrøveDato'], sample?.collected_at ? formatDanishDate(sample.collected_at) : '');
     add(['VariantAntal', 'AntalVarianter'], variantCount ? String(variantCount) : '');
+    const getClassificationLabel = classification => {
+      const key = classification == null ? '' : String(classification).trim();
+      if (!key) return '';
+      return classificationMap?.[key]?.display || '';
+    };
     const geneList = joinUnique(variants.map(v => v.gene));
     const transcriptList = joinUnique(variants.map(v => v.transcript));
     const hgvscList = joinUnique(variants.map(v => v.hgvs_c));
     const hgvsPList = joinUnique(variants.map(v => v.hgvs_p));
     const zygosityList = joinUnique(variants.map(v => v.zygosity));
     const classificationList = joinUnique(variants.map(v => v.classification));
+    const classificationLabelList = joinUnique(variants.map(v => getClassificationLabel(v.classification)));
     const criteriaList = joinUnique(variants.map(v => v.criteria));
     const typeList = joinUnique(variants.map(v => getVariantTypeLabel(v.variant_type)));
     const iscnList = joinUnique(variants.map(v => v.iscn));
@@ -13612,6 +13645,12 @@ function renderReports(section) {
     add(['HGVS_p', 'HGVS p', 'HGVSp'], hgvsPList);
     add(['Zygositet', 'Zygosity'], zygosityList);
     add(['ACMG-klasse', 'ACMGklasse', 'ACMG'], classificationList);
+    add([
+      'ACMG-klasseTekst',
+      'ACMG-klasse (tekst)',
+      'ACMGklasseTekst',
+      'ACMGTekst'
+    ], classificationLabelList);
     add(['Kriterier', 'Criteria'], criteriaList);
     add(['VariantTyper', 'VariantType', 'Varianttype'], typeList);
     add(['VariantISCN', 'ISCN'], iscnList);
@@ -13631,6 +13670,11 @@ function renderReports(section) {
       add(['VariantHGVS_p', 'Variant1HGVS_p', 'Variant1.HGVS_p'], firstVariant.hgvs_p || '');
       add(['VariantZygositet', 'Variant1Zygositet'], firstVariant.zygosity || '');
       add(['VariantACMG', 'Variant1ACMG'], firstVariant.classification || '');
+      add([
+        'VariantACMGTekst',
+        'Variant1ACMGTekst',
+        'Variant1.ACMGTekst'
+      ], getClassificationLabel(firstVariant.classification));
       add(['VariantKriterier', 'Variant1Kriterier'], firstVariant.criteria || '');
       add(['VariantAnnoteringer', 'Variant1Annoteringer'], firstVariant.annotations || '');
       add(['VariantTolkning', 'Variant1Tolkning'], firstVariant.interpretation || '');
@@ -13652,6 +13696,10 @@ function renderReports(section) {
       add([`${prefix}HGVS_p`, `${prefix}.HGVS_p`], variant.hgvs_p || '');
       add([`${prefix}Zygositet`, `${prefix}.Zygositet`], variant.zygosity || '');
       add([`${prefix}ACMG`, `${prefix}.ACMG`], variant.classification || '');
+      add([
+        `${prefix}ACMGTekst`,
+        `${prefix}.ACMGTekst`
+      ], getClassificationLabel(variant.classification));
       add([`${prefix}Kriterier`, `${prefix}.Kriterier`], variant.criteria || '');
       add([`${prefix}Annoteringer`, `${prefix}.Annoteringer`], variant.annotations || '');
       add([`${prefix}Tolkning`, `${prefix}.Tolkning`], variant.interpretation || '');
