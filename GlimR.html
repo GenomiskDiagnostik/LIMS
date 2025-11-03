@@ -5390,6 +5390,14 @@ function initTabs() {
   });
 }
 async function activateTab(id) {
+  const previousTab = state.currentTab;
+  if (previousTab === 'planner' && typeof state.flushPlannerChanges === 'function') {
+    try {
+      await state.flushPlannerChanges({reason: 'tab-change'});
+    } catch (err) {
+      console.warn('Kunne ikke gemme arbejdsplan før faneskift:', err);
+    }
+  }
   state.currentTab = id;
   document.querySelectorAll('nav button').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === id);
@@ -15725,16 +15733,40 @@ function renderPlanner(section) {
 
   ensurePlanTasks();
 
-  async function persistPlanState() {
+  let planPersistQueue = Promise.resolve();
+  let planPersistPending = false;
+
+  const refreshPlanningStatusText = () => {
+    if (!planningStatusText) return;
+    if (!currentUserId) {
+      planningStatusText.textContent = '';
+      return;
+    }
+    if (planPersistPending) {
+      planningStatusText.textContent = 'Gemmer ændringer...';
+      return;
+    }
+    if (planState.updatedAt) {
+      const ts = parseDateTimeValue(planState.updatedAt);
+      if (ts) {
+        planningStatusText.textContent = `Sidst gemt: ${dateTimeFormatter.format(ts)}`;
+        return;
+      }
+    }
+    planningStatusText.textContent = 'Planen er endnu ikke gemt.';
+  };
+
+  async function persistPlanStateImmediate() {
     if (!currentUserId) return;
     ensurePlanTasks();
-    const createdAt = planState.createdAt || planState.updatedAt || new Date().toISOString();
-    const updatedAt = planState.updatedAt || new Date().toISOString();
+    const timestamp = new Date().toISOString();
+    const createdAt = planState.createdAt || planState.updatedAt || timestamp;
+    const updatedAt = timestamp;
     planState.createdAt = createdAt;
     planState.updatedAt = updatedAt;
     if (state.db) {
       try {
-        const tx = state.db.transaction('planner','readwrite');
+        const tx = state.db.transaction('planner', 'readwrite');
         const store = tx.objectStore('planner');
         store.put({
           id: currentUserId,
@@ -15746,6 +15778,7 @@ function renderPlanner(section) {
         await tx.done?.catch(() => {});
         await loadStore('planner');
         planStateSource = 'db';
+        scheduleAutosave();
       } catch (err) {
         console.warn('Kunne ikke gemme planlægning i database:', err);
       }
@@ -15759,8 +15792,31 @@ function renderPlanner(section) {
     }
   }
 
+  const queuePlanPersist = () => {
+    planPersistPending = true;
+    refreshPlanningStatusText();
+    const run = planPersistQueue.then(() => persistPlanStateImmediate());
+    planPersistQueue = run
+      .catch(err => {
+        console.warn('Kunne ikke gemme planlægning:', err);
+      })
+      .then(() => {
+        planPersistPending = false;
+        refreshPlanningStatusText();
+      });
+    return run;
+  };
+
+  const waitForPlanPersistence = async () => {
+    try {
+      await planPersistQueue;
+    } catch (err) {
+      console.warn('Kunne ikke færdiggøre plan-gemning:', err);
+    }
+  };
+
   if (planStateSource === 'legacy') {
-    persistPlanState().catch(err => console.warn('Kunne ikke migrere planlægning til database:', err));
+    queuePlanPersist().catch(err => console.warn('Kunne ikke migrere planlægning til database:', err));
   }
 
   const sanitizeDueValue = value => {
@@ -15788,39 +15844,108 @@ function renderPlanner(section) {
     };
   };
 
-  const refreshPlanningStatusText = () => {
-    if (!planningStatusText) return;
-    if (!currentUserId) {
-      planningStatusText.textContent = '';
-      return;
-    }
-    if (planState.updatedAt) {
-      const ts = parseDateTimeValue(planState.updatedAt);
-      if (ts) {
-        planningStatusText.textContent = `Sidst gemt: ${dateTimeFormatter.format(ts)}`;
-        return;
+  const setPlanSettings = (id, updates, options = {}) => {
+    if (!id || !updates || typeof updates !== 'object') return false;
+    ensurePlanTasks();
+    const previous = planState.tasks?.[id] && typeof planState.tasks[id] === 'object'
+      ? planState.tasks[id]
+      : null;
+    const current = {...(previous || {})};
+    let changed = false;
+    if (Object.prototype.hasOwnProperty.call(updates, 'due')) {
+      const sanitizedDue = sanitizeDueValue(updates.due);
+      if ((previous?.due || '') !== sanitizedDue) {
+        changed = true;
+      }
+      if (sanitizedDue) {
+        current.due = sanitizedDue;
+      } else {
+        delete current.due;
       }
     }
-    planningStatusText.textContent = 'Planen er endnu ikke gemt.';
-  };
-
-  const setPlanSettings = (id, updates) => {
-    if (!id) return;
-    ensurePlanTasks();
-    const current = {...(planState.tasks?.[id] || {})};
-    if (updates.due !== undefined) current.due = sanitizeDueValue(updates.due);
-    if (updates.note !== undefined) current.note = sanitizeNoteValue(updates.note);
-    if (updates.done !== undefined) current.done = Boolean(updates.done);
+    if (Object.prototype.hasOwnProperty.call(updates, 'note')) {
+      const sanitizedNote = sanitizeNoteValue(updates.note);
+      if ((previous?.note || '') !== sanitizedNote) {
+        changed = true;
+      }
+      if (sanitizedNote) {
+        current.note = sanitizedNote;
+      } else {
+        delete current.note;
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'done')) {
+      const doneValue = Boolean(updates.done);
+      if (Boolean(previous?.done) !== doneValue) {
+        changed = true;
+      }
+      if (doneValue) {
+        current.done = true;
+      } else {
+        delete current.done;
+      }
+    }
     const hasData = Boolean(current.due) || Boolean(current.note) || Boolean(current.done);
     if (hasData) {
-      planState.tasks[id] = current;
-    } else if (planState.tasks[id]) {
+      if (changed || !previous) {
+        planState.tasks[id] = current;
+      }
+    } else if (previous) {
       delete planState.tasks[id];
+      changed = true;
     }
-    planState.updatedAt = new Date().toISOString();
-    persistPlanState().catch(err => console.warn('Kunne ikke gemme planlægning:', err));
-    refreshPlanningStatusText();
+    if (!changed) return false;
+    if (options.persist === false) {
+      return true;
+    }
+    queuePlanPersist().catch(err => console.warn('Kunne ikke gemme planlægning:', err));
+    return true;
   };
+
+  const commitPlannerEdits = () => {
+    if (!planningBoard || !currentUserId) return false;
+    let changed = false;
+    const cards = planningBoard.querySelectorAll('.planning-card');
+    cards.forEach(card => {
+      if (!(card instanceof HTMLElement)) return;
+      const taskId = card.dataset.taskId;
+      if (!taskId) return;
+      const updates = {};
+      let hasUpdates = false;
+      const dueInput = card.querySelector('.planning-due');
+      if (dueInput instanceof HTMLInputElement) {
+        updates.due = dueInput.value;
+        hasUpdates = true;
+      }
+      const noteInput = card.querySelector('.planning-note');
+      if (noteInput instanceof HTMLTextAreaElement) {
+        updates.note = noteInput.value;
+        hasUpdates = true;
+      }
+      const doneInput = card.querySelector('.planning-done');
+      if (doneInput instanceof HTMLInputElement && doneInput.type === 'checkbox') {
+        updates.done = doneInput.checked;
+        hasUpdates = true;
+      }
+      if (!hasUpdates) return;
+      if (setPlanSettings(taskId, updates, {persist: false})) {
+        changed = true;
+      }
+    });
+    return changed;
+  };
+
+  const flushPlannerChanges = async () => {
+    if (!currentUserId) return false;
+    const hadNewChanges = commitPlannerEdits();
+    if (hadNewChanges) {
+      await queuePlanPersist();
+    }
+    await waitForPlanPersistence();
+    return hadNewChanges;
+  };
+
+  state.flushPlannerChanges = flushPlannerChanges;
 
   const formatRelativeDue = (date, now = new Date()) => {
     if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
@@ -16358,12 +16483,13 @@ function renderPlanner(section) {
       updatePlanningUi();
       return;
     }
+    await waitForPlanPersistence();
     await loadAllStores();
     planState = loadPlanState();
     ensurePlanTasks();
     if (planStateSource === 'legacy') {
       try {
-        await persistPlanState();
+        await queuePlanPersist();
       } catch (err) {
         console.warn('Kunne ikke migrere planlægning til database:', err);
       }
@@ -16480,8 +16606,10 @@ function renderPlanner(section) {
         return;
       }
       planningRefreshBtn.disabled = true;
-      setStatus('Opdaterer plan...');
+      setStatus('Gemmer ændringer i planen...');
       try {
+        await flushPlannerChanges();
+        setStatus('Opdaterer plan...');
         await refreshPlanningData();
         setStatus('Planen er opdateret.');
       } catch (err) {
