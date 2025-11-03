@@ -605,6 +605,10 @@ section[data-tab].active {
   gap: 0.6rem;
   transition: border-color 0.2s ease, background 0.2s ease;
 }
+.planning-card[data-healthy="true"] {
+  background: rgba(99, 179, 237, 0.12);
+  border-color: rgba(99, 179, 237, 0.65);
+}
 .planning-card[data-status="done"] {
   background: rgba(56, 189, 248, 0.08);
   border-color: rgba(56, 189, 248, 0.35);
@@ -622,6 +626,24 @@ section[data-tab].active {
   display: flex;
   justify-content: space-between;
   gap: 0.6rem;
+}
+.planning-card-badges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.3rem;
+}
+.planning-card-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 999px;
+  background: rgba(99, 179, 237, 0.18);
+  color: var(--accent-strong);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15rem 0.55rem;
+  white-space: nowrap;
 }
 .planning-card-title {
   font-weight: 600;
@@ -752,6 +774,10 @@ section[data-tab].active {
 }
 [data-theme="dark"] .planning-card {
   background: rgba(14, 165, 233, 0.06);
+}
+[data-theme="dark"] .planning-card[data-healthy="true"] {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.55);
 }
 [data-theme="dark"] .planning-card[data-status="done"] {
   background: rgba(14, 165, 233, 0.12);
@@ -1773,6 +1799,14 @@ form label {
   margin-top: 0.4rem;
   color: var(--muted-text);
 }
+.field-with-combo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+form .field-with-combo {
+  margin-top: 0.4rem;
+}
 .label-note {
   display: inline-block;
   margin-left: 0.35rem;
@@ -1917,6 +1951,9 @@ form textarea {
 }
 .case-form .inline-group > label,
 .case-form label.inline {
+  flex: 1 1 220px;
+}
+.case-form .inline-group > .field-with-combo {
   flex: 1 1 220px;
 }
 .case-form label.inline {
@@ -2460,8 +2497,28 @@ input[type="search"] {
 .family-combo select {
   flex: 0 0 12rem;
 }
-.family-combo input {
+.family-combo input:not([type="checkbox"]) {
   flex: 1 1 auto;
+}
+.family-combo input[type="checkbox"] {
+  flex: 0 0 auto;
+}
+.family-combo .family-healthy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.family-healthy-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.family-healthy-group input[type="checkbox"] {
+  margin: 0;
+  width: auto;
+  accent-color: var(--accent);
 }
 .advanced-filter {
   margin-top: 0.6rem;
@@ -3289,7 +3346,7 @@ function buildQcPresetOptions(kind, currentValue, blankLabel) {
   return options.join('');
 }
 const schemaFields = {
-  patients: ['id','mrn','extra_id','family_number','name','gender','birth_date','notes','created_by','created_at','updated_at'],
+  patients: ['id','mrn','extra_id','family_number','healthy_family_member','name','gender','birth_date','notes','created_by','created_at','updated_at'],
   samples: ['id','pmb_number','patient_id','sample_type','collected_at','status','notes','created_by','created_at','updated_at'],
   panels: ['id','name','description','version','gene_list','gene_count','created_at','updated_at','updated_by'],
   orders: ['id','patient_id','sample_id','panel_id','analysis_responsible_id','interpreter_id','approver_id','clinician','indication','patient_group_id','hpo_terms','status','acute','urgent','ordered_at','created_by','created_at','updated_at'],
@@ -3413,6 +3470,7 @@ const tooltipCatalog = {
       mrn: 'Patientens MRN/CPR til entydig identifikation.',
       extra_id: 'Supplerende identifikator til intern brug (valgfrit).',
       family_number: 'Familienummer anvendt til at gruppere beslægtede patienter.',
+      healthy_family_member: 'Markér patienten som rask familiemedlem. Opgaver får særlig markering i arbejdsplanlæggeren.',
       name: 'Patientens fulde navn som angivet i journalen.',
       gender: 'Registreret køn for patienten.',
       birth_date: 'Patientens fødselsdato (ÅÅÅÅ-MM-DD).',
@@ -3529,6 +3587,7 @@ const tooltipCatalog = {
       patient_mrn: 'Patientens MRN eller CPR til entydig identifikation.',
       patient_extra_id: 'Supplerende identifikator til lokal brug (valgfrit).',
       patient_family: 'Evt. familienummer der kobler patienten til andre sager.',
+      patient_healthy: 'Markér patienten som rask familiemedlem. Opgaver får særlig markering i arbejdsplanlæggeren.',
       patient_name: 'Patientens fulde navn.',
       patient_gender: 'Patientens registrerede køn.',
       patient_birth: 'Patientens fødselsdato.',
@@ -3744,7 +3803,12 @@ function applyFormTooltips(form) {
       if (!el) return;
       setTooltip(el, tip);
       const label = el.closest('label');
-      if (label) setTooltip(label, tip);
+      if (label) {
+        setTooltip(label, tip);
+      } else if (el.id) {
+        const explicit = form.querySelector(`label[for="${el.id.replace(/"/g, '\\"')}"]`);
+        if (explicit) setTooltip(explicit, tip);
+      }
       const filterable = el.closest('.filterable-select');
       if (filterable) {
         setTooltip(filterable, tip);
@@ -7611,14 +7675,19 @@ function renderCreateCase(section) {
             <label class="inline">MRN<input name="patient_mrn" required placeholder="Fx 010170-1234"></label>
             <label class="inline">ID<input name="patient_extra_id" placeholder="Fx intern ID"></label>
             <label class="inline">Navn<input name="patient_name" required placeholder="Patientnavn"></label>
-            <label class="inline">Familienummer
+            <div class="field-with-combo">
+              <label for="createCasePatientFamily">Familienummer</label>
               <div class="family-combo">
                 <select data-family-select>
                   ${familySelectOptions}
                 </select>
-                <input name="patient_family" data-family-input placeholder="${esc(familyPlaceholder)}">
+                <input id="createCasePatientFamily" name="patient_family" data-family-input placeholder="${esc(familyPlaceholder)}">
+                <div class="family-healthy-group">
+                  <input type="checkbox" id="createCasePatientHealthy" name="patient_healthy">
+                  <label class="family-healthy" for="createCasePatientHealthy">Rask familiemedlem</label>
+                </div>
               </div>
-            </label>
+            </div>
           </div>
           <div class="inline-group">
             <label class="inline">Køn<select name="patient_gender"><option value="">-</option><option value="male">Mand</option><option value="female">Kvinde</option><option value="other">Andet</option></select></label>
@@ -8118,6 +8187,7 @@ function renderCreateCase(section) {
       mrn: patientMrn,
       extra_id: form.elements.patient_extra_id?.value.trim() || '',
       family_number: form.elements.patient_family?.value.trim() || '',
+      healthy_family_member: Boolean(form.elements.patient_healthy?.checked),
       name: patientName,
       gender: form.elements.patient_gender.value || '',
       birth_date: form.elements.patient_birth.value || '',
@@ -8632,14 +8702,19 @@ function renderPatients(section) {
           <input type="hidden" name="id">
           <label>MRN<input name="mrn" required></label>
           <label>ID<input name="extra_id" placeholder="Fx lokalt ID"></label>
-          <label>Familienummer
+          <div class="field-with-combo">
+            <label for="patientFamilyNumber">Familienummer</label>
             <div class="family-combo">
               <select data-family-select>
                 ${familySelectOptions}
               </select>
-              <input name="family_number" data-family-input placeholder="${esc(familyPlaceholder)}">
+              <input id="patientFamilyNumber" name="family_number" data-family-input placeholder="${esc(familyPlaceholder)}">
+              <div class="family-healthy-group">
+                <input type="checkbox" id="patientHealthyMember" name="healthy_family_member">
+                <label class="family-healthy" for="patientHealthyMember">Rask familiemedlem</label>
+              </div>
             </div>
-          </label>
+          </div>
           <label>Navn<input name="name" required></label>
           <label>Køn<select name="gender"><option value="">-</option><option value="male">Mand</option><option value="female">Kvinde</option><option value="other">Andet</option></select></label>
           <label>Fødselsdato<span class="label-note" data-patient-age hidden></span><input type="date" name="birth_date"></label>
@@ -8820,6 +8895,7 @@ function renderPatients(section) {
     e.preventDefault();
     if (!ensureWrite('patients')) return;
     const data = Object.fromEntries(new FormData(form).entries());
+    data.healthy_family_member = Boolean(form.elements.healthy_family_member?.checked);
     data.variant_type = normalizeVariantType(data.variant_type);
     if (data.id) {
       const id = Number(data.id);
@@ -15505,6 +15581,10 @@ function renderPlanner(section) {
             <input type="checkbox" id="planningHideNotStarted" checked>
             Skjul ikke startede trin
           </label>
+          <label class="list-toggle">
+            <input type="checkbox" id="planningHideHealthy" checked>
+            Skjul raske familiemedlemmer
+          </label>
         </div>
         <div class="planning-actions">
           <button type="button" class="secondary planning-button" id="planningRefresh">Opdater</button>
@@ -15553,6 +15633,7 @@ function renderPlanner(section) {
   const planningSummary = section.querySelector('#planningSummary');
   const planningHideDoneToggle = section.querySelector('#planningHideDone');
   const planningHideNotStartedToggle = section.querySelector('#planningHideNotStarted');
+  const planningHideHealthyToggle = section.querySelector('#planningHideHealthy');
   const planningExportBtn = section.querySelector('#planningExport');
   const planningExportCsvBtn = section.querySelector('#planningExportCsv');
   const planningRefreshBtn = section.querySelector('#planningRefresh');
@@ -15717,6 +15798,7 @@ function renderPlanner(section) {
     {label: 'Trin', value: task => task.stage?.label || ''},
     {label: 'Patient', value: task => task.patientName || ''},
     {label: 'Patient MRN', value: task => task.patientMrn || ''},
+    {label: 'Rask familiemedlem', value: task => task.healthyFamilyMember ? 'Ja' : 'Nej'},
     {label: 'Prøve', value: task => task.sampleLabel || ''},
     {label: 'Rolle', value: task => task.roleLabel || ''},
     {label: 'Prøvestatus', value: task => task.sampleStatusText || ''},
@@ -15728,20 +15810,23 @@ function renderPlanner(section) {
     {label: 'Ekstra info', value: task => Array.isArray(task.info) ? task.info.join(' | ') : ''}
   ];
 
-  const DEFAULT_PLAN_VIEW = {hideDone: true, hideNotStarted: true};
+  const DEFAULT_PLAN_VIEW = {hideDone: true, hideNotStarted: true, hideHealthy: true};
 
   const sanitizePlanView = value => {
     const view = {...DEFAULT_PLAN_VIEW};
     if (value && typeof value === 'object') {
-      if (Object.prototype.hasOwnProperty.call(value, 'hideDone')) {
-        view.hideDone = Boolean(value.hideDone);
-      }
-      if (Object.prototype.hasOwnProperty.call(value, 'hideNotStarted')) {
-        view.hideNotStarted = Boolean(value.hideNotStarted);
-      }
+    if (Object.prototype.hasOwnProperty.call(value, 'hideDone')) {
+      view.hideDone = Boolean(value.hideDone);
     }
-    return view;
-  };
+    if (Object.prototype.hasOwnProperty.call(value, 'hideNotStarted')) {
+      view.hideNotStarted = Boolean(value.hideNotStarted);
+    }
+    if (Object.prototype.hasOwnProperty.call(value, 'hideHealthy')) {
+      view.hideHealthy = Boolean(value.hideHealthy);
+    }
+  }
+  return view;
+};
 
   const currentUser = state.currentUser;
   const currentUserId = currentUser?.id != null ? String(currentUser.id) : null;
@@ -15935,6 +16020,13 @@ function renderPlanner(section) {
         changed = true;
       }
     }
+    if (Object.prototype.hasOwnProperty.call(updates, 'hideHealthy')) {
+      const hideHealthy = Boolean(updates.hideHealthy);
+      if (next.hideHealthy !== hideHealthy) {
+        next.hideHealthy = hideHealthy;
+        changed = true;
+      }
+    }
     if (!changed) return false;
     planState.view = next;
     if (options.persist === false) {
@@ -16125,6 +16217,7 @@ function renderPlanner(section) {
       if (!Number.isFinite(orderId)) return;
       const sample = sampleMap.get(Number(order.sample_id));
       const patient = patientMap.get(Number(order.patient_id));
+      const healthyFamilyMember = Boolean(patient?.healthy_family_member);
       const sampleStatusRaw = sample?.status || order?.status || '';
       if (shouldHideSampleStatus(sampleStatusRaw)) return;
       planningStages.forEach(stage => {
@@ -16171,6 +16264,9 @@ function renderPlanner(section) {
         } else if (stageInfo) {
           info.push(stageInfo);
         }
+        if (healthyFamilyMember) {
+          info.unshift('Patient markeret som rask familiemedlem');
+        }
         const familyType = normalizeFamilyType(order?.family_type);
         const familyTypeLabel = getFamilyTypeLabel(familyType);
         if (familyTypeLabel) info.push(`Familietype: ${familyTypeLabel}`);
@@ -16200,6 +16296,7 @@ function renderPlanner(section) {
           roleLabel,
           familyType,
           familyTypeLabel,
+          healthyFamilyMember,
           statusKey,
           statusLabel: STAGE_STATUS_LABELS[statusKey] || 'Status ukendt',
           statusDescription: STAGE_STATUS_DESCRIPTIONS[statusKey] || '',
@@ -16462,6 +16559,11 @@ function renderPlanner(section) {
     if (task.sampleLabel) metaParts.push(task.sampleLabel);
     if (task.roleLabel) metaParts.push(task.roleLabel);
     const metaHtml = metaParts.length ? `<div class="planning-card-meta">${metaParts.map(part => `<span>${esc(part)}</span>`).join(' • ')}</div>` : '';
+    const healthyFlag = task.healthyFamilyMember ? '<span class="planning-card-flag" title="Patienten er markeret som rask familiemedlem">Rask familiemedlem</span>' : '';
+    const badgeFragments = [];
+    if (healthyFlag) badgeFragments.push(healthyFlag);
+    if (task.priorityHtml) badgeFragments.push(task.priorityHtml);
+    const badgeHtml = badgeFragments.length ? `<div class="planning-card-badges">${badgeFragments.join('')}</div>` : '';
     const dueText = task.dueDate ? `${esc(task.dueDisplay)}${task.dueRelative ? ` (${esc(task.dueRelative)})` : ''}` : 'Ikke planlagt';
     const infoHtml = task.info.length ? `<ul class="planning-info-list">${task.info.map(item => `<li>${esc(item)}</li>`).join('')}</ul>` : '';
     const actionsHtml = task.stage.actions?.length ? task.stage.actions.map(action => `<button type="button" class="secondary planning-button" data-action="${esc(action.type)}" data-task-id="${esc(task.id)}">${esc(action.label)}</button>`).join('') : '';
@@ -16489,13 +16591,13 @@ function renderPlanner(section) {
       </div>
     `;
     return `
-      <article class="planning-card" data-task-id="${esc(task.id)}" data-status="${esc(task.statusKey)}" data-due="${esc(task.dueState)}">
+      <article class="planning-card" data-task-id="${esc(task.id)}" data-status="${esc(task.statusKey)}" data-due="${esc(task.dueState)}" data-healthy="${task.healthyFamilyMember ? 'true' : 'false'}">
         <div class="planning-card-header">
           <div>
             <div class="planning-card-title">${esc(task.orderName)}</div>
             ${metaHtml}
           </div>
-          ${task.priorityHtml || ''}
+          ${badgeHtml}
         </div>
         <div class="planning-card-stage" title="${esc(task.statusDescription)}">
           <span class="planning-stage-badge">${esc(task.stage.shortLabel)}</span>
@@ -16543,12 +16645,14 @@ function renderPlanner(section) {
     }
     const hideDone = Boolean(planningHideDoneToggle?.checked);
     const hideNotStarted = Boolean(planningHideNotStartedToggle?.checked);
+    const hideHealthy = Boolean(planningHideHealthyToggle?.checked);
     const lanes = planningStages.reduce((output, stage) => {
       const allStageTasks = planningTasks.filter(task => task.stage.id === stage.id);
       if (!allStageTasks.length) return output;
       const visibleTasks = allStageTasks.filter(task => {
         if (hideDone && task.isDone) return false;
         if (hideNotStarted && task.statusKey === 'pending') return false;
+        if (hideHealthy && task.healthyFamilyMember) return false;
         return true;
       });
       if (!visibleTasks.length) return output;
@@ -16592,6 +16696,9 @@ function renderPlanner(section) {
     if (planningHideNotStartedToggle) {
       planningHideNotStartedToggle.checked = view.hideNotStarted;
     }
+    if (planningHideHealthyToggle) {
+      planningHideHealthyToggle.checked = view.hideHealthy;
+    }
     renderMissingAssignments();
     if (!planningBoard || !planningSummary) return;
     planningTasks = computePlanningTasks();
@@ -16602,6 +16709,10 @@ function renderPlanner(section) {
     if (planningHideNotStartedToggle) {
       const hasPending = planningTasks.some(task => task.statusKey === 'pending');
       planningHideNotStartedToggle.disabled = !currentUserId || !hasPending;
+    }
+    if (planningHideHealthyToggle) {
+      const hasHealthy = planningTasks.some(task => task.healthyFamilyMember);
+      planningHideHealthyToggle.disabled = !currentUserId || !hasHealthy;
     }
     if (planningRefreshBtn) planningRefreshBtn.disabled = !currentUserId;
     updatePlanningSummary();
@@ -16727,6 +16838,7 @@ function renderPlanner(section) {
     const initialView = getPlanView();
     if (planningHideDoneToggle) planningHideDoneToggle.checked = initialView.hideDone;
     if (planningHideNotStartedToggle) planningHideNotStartedToggle.checked = initialView.hideNotStarted;
+    if (planningHideHealthyToggle) planningHideHealthyToggle.checked = initialView.hideHealthy;
     updatePlanningUi();
 
     planningMissingRoleFilter?.addEventListener('change', () => renderMissingAssignments());
@@ -16736,6 +16848,10 @@ function renderPlanner(section) {
     });
     planningHideNotStartedToggle?.addEventListener('change', () => {
       setPlanView({hideNotStarted: planningHideNotStartedToggle.checked});
+      renderPlanningBoard();
+    });
+    planningHideHealthyToggle?.addEventListener('change', () => {
+      setPlanView({hideHealthy: planningHideHealthyToggle.checked});
       renderPlanningBoard();
     });
 
