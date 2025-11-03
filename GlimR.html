@@ -679,6 +679,29 @@ section[data-tab].active {
   gap: 0.2rem;
   font-size: 0.85rem;
 }
+.planning-note-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.planning-note-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  color: var(--muted-text);
+}
+.planning-note-actions .planning-note-save {
+  font-size: 0.8rem;
+}
+.planning-note-hint {
+  font-style: italic;
+}
+.planning-card.planning-note-dirty .planning-note {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(24, 111, 175, 0.25);
+}
 .planning-card-controls input[type="datetime-local"],
 .planning-card-controls textarea,
 .planning-card-controls select {
@@ -5390,6 +5413,14 @@ function initTabs() {
   });
 }
 async function activateTab(id) {
+  const previousTab = state.currentTab;
+  if (previousTab === 'planner' && typeof state.flushPlannerChanges === 'function') {
+    try {
+      await state.flushPlannerChanges({reason: 'tab-change'});
+    } catch (err) {
+      console.warn('Kunne ikke gemme arbejdsplan før faneskift:', err);
+    }
+  }
   state.currentTab = id;
   document.querySelectorAll('nav button').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === id);
@@ -15664,6 +15695,21 @@ function renderPlanner(section) {
     {label: 'Ekstra info', value: task => Array.isArray(task.info) ? task.info.join(' | ') : ''}
   ];
 
+  const DEFAULT_PLAN_VIEW = {hideDone: true, hideNotStarted: true};
+
+  const sanitizePlanView = value => {
+    const view = {...DEFAULT_PLAN_VIEW};
+    if (value && typeof value === 'object') {
+      if (Object.prototype.hasOwnProperty.call(value, 'hideDone')) {
+        view.hideDone = Boolean(value.hideDone);
+      }
+      if (Object.prototype.hasOwnProperty.call(value, 'hideNotStarted')) {
+        view.hideNotStarted = Boolean(value.hideNotStarted);
+      }
+    }
+    return view;
+  };
+
   const currentUser = state.currentUser;
   const currentUserId = currentUser?.id != null ? String(currentUser.id) : null;
   const canModifySampleStatus = currentCanWrite();
@@ -15680,6 +15726,7 @@ function renderPlanner(section) {
       if (!parsed.tasks || typeof parsed.tasks !== 'object') parsed.tasks = {};
       if (!parsed.createdAt && parsed.created_at) parsed.createdAt = parsed.created_at;
       if (!parsed.updatedAt && parsed.updated_at) parsed.updatedAt = parsed.updated_at;
+      parsed.view = sanitizePlanView(parsed.view);
       return parsed;
     } catch (err) {
       console.warn('Kunne ikke indlæse planlægning fra lokalt lager:', err);
@@ -15690,7 +15737,7 @@ function renderPlanner(section) {
   const loadPlanState = () => {
     if (!currentUserId) {
       planStateSource = 'none';
-      return {tasks: {}};
+      return {tasks: {}, view: sanitizePlanView(null)};
     }
     const plannerRows = getCached('planner') || [];
     const entry = plannerRows.find(row => String(row.id) === currentUserId);
@@ -15699,7 +15746,8 @@ function renderPlanner(section) {
       const tasks = entry.tasks && typeof entry.tasks === 'object' ? {...entry.tasks} : {};
       const createdAt = entry.created_at || entry.createdAt || null;
       const updatedAt = entry.updated_at || entry.updatedAt || null;
-      return {tasks, createdAt, updatedAt};
+      const view = sanitizePlanView(entry.view);
+      return {tasks, view, createdAt, updatedAt};
     }
     const legacy = loadLegacyPlanState();
     if (legacy) {
@@ -15707,7 +15755,7 @@ function renderPlanner(section) {
       return legacy;
     }
     planStateSource = 'new';
-    return {tasks: {}};
+    return {tasks: {}, view: sanitizePlanView(null)};
   };
 
   let planState = loadPlanState();
@@ -15721,31 +15769,60 @@ function renderPlanner(section) {
     if (planState.updatedAt === undefined) {
       planState.updatedAt = null;
     }
+    planState.view = sanitizePlanView(planState.view);
   };
 
   ensurePlanTasks();
 
-  async function persistPlanState() {
+  let planPersistQueue = Promise.resolve();
+  let planPersistPending = false;
+
+  const refreshPlanningStatusText = () => {
+    if (!planningStatusText) return;
+    if (!currentUserId) {
+      planningStatusText.textContent = '';
+      return;
+    }
+    if (planPersistPending) {
+      planningStatusText.textContent = 'Gemmer ændringer...';
+      return;
+    }
+    if (planState.updatedAt) {
+      const ts = parseDateTimeValue(planState.updatedAt);
+      if (ts) {
+        planningStatusText.textContent = `Sidst gemt: ${dateTimeFormatter.format(ts)}`;
+        return;
+      }
+    }
+    planningStatusText.textContent = 'Planen er endnu ikke gemt.';
+  };
+
+  async function persistPlanStateImmediate() {
     if (!currentUserId) return;
     ensurePlanTasks();
-    const createdAt = planState.createdAt || planState.updatedAt || new Date().toISOString();
-    const updatedAt = planState.updatedAt || new Date().toISOString();
+    const timestamp = new Date().toISOString();
+    const createdAt = planState.createdAt || planState.updatedAt || timestamp;
+    const updatedAt = timestamp;
     planState.createdAt = createdAt;
     planState.updatedAt = updatedAt;
     if (state.db) {
       try {
-        const tx = state.db.transaction('planner','readwrite');
+        const tx = state.db.transaction('planner', 'readwrite');
         const store = tx.objectStore('planner');
+        const view = sanitizePlanView(planState.view);
+        planState.view = view;
         store.put({
           id: currentUserId,
           user_id: currentUserId,
           tasks: planState.tasks,
+          view,
           created_at: createdAt,
           updated_at: updatedAt
         });
         await tx.done?.catch(() => {});
         await loadStore('planner');
         planStateSource = 'db';
+        scheduleAutosave();
       } catch (err) {
         console.warn('Kunne ikke gemme planlægning i database:', err);
       }
@@ -15759,8 +15836,31 @@ function renderPlanner(section) {
     }
   }
 
+  const queuePlanPersist = () => {
+    planPersistPending = true;
+    refreshPlanningStatusText();
+    const run = planPersistQueue.then(() => persistPlanStateImmediate());
+    planPersistQueue = run
+      .catch(err => {
+        console.warn('Kunne ikke gemme planlægning:', err);
+      })
+      .then(() => {
+        planPersistPending = false;
+        refreshPlanningStatusText();
+      });
+    return run;
+  };
+
+  const waitForPlanPersistence = async () => {
+    try {
+      await planPersistQueue;
+    } catch (err) {
+      console.warn('Kunne ikke færdiggøre plan-gemning:', err);
+    }
+  };
+
   if (planStateSource === 'legacy') {
-    persistPlanState().catch(err => console.warn('Kunne ikke migrere planlægning til database:', err));
+    queuePlanPersist().catch(err => console.warn('Kunne ikke migrere planlægning til database:', err));
   }
 
   const sanitizeDueValue = value => {
@@ -15773,6 +15873,42 @@ function renderPlanner(section) {
   const sanitizeNoteValue = value => {
     if (typeof value !== 'string') return '';
     return value.replace(/\r/g, '').slice(0, 2000);
+  };
+
+  const getPlanView = () => {
+    ensurePlanTasks();
+    const view = sanitizePlanView(planState.view);
+    planState.view = view;
+    return {...view};
+  };
+
+  const setPlanView = (updates, options = {}) => {
+    if (!updates || typeof updates !== 'object') return false;
+    ensurePlanTasks();
+    const previous = sanitizePlanView(planState.view);
+    const next = {...previous};
+    let changed = false;
+    if (Object.prototype.hasOwnProperty.call(updates, 'hideDone')) {
+      const hideDone = Boolean(updates.hideDone);
+      if (next.hideDone !== hideDone) {
+        next.hideDone = hideDone;
+        changed = true;
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'hideNotStarted')) {
+      const hideNotStarted = Boolean(updates.hideNotStarted);
+      if (next.hideNotStarted !== hideNotStarted) {
+        next.hideNotStarted = hideNotStarted;
+        changed = true;
+      }
+    }
+    if (!changed) return false;
+    planState.view = next;
+    if (options.persist === false) {
+      return true;
+    }
+    queuePlanPersist().catch(err => console.warn('Kunne ikke gemme planlægning:', err));
+    return true;
   };
 
   const getPlanSettings = id => {
@@ -15788,39 +15924,109 @@ function renderPlanner(section) {
     };
   };
 
-  const refreshPlanningStatusText = () => {
-    if (!planningStatusText) return;
-    if (!currentUserId) {
-      planningStatusText.textContent = '';
-      return;
-    }
-    if (planState.updatedAt) {
-      const ts = parseDateTimeValue(planState.updatedAt);
-      if (ts) {
-        planningStatusText.textContent = `Sidst gemt: ${dateTimeFormatter.format(ts)}`;
-        return;
+  const setPlanSettings = (id, updates, options = {}) => {
+    if (!id || !updates || typeof updates !== 'object') return false;
+    ensurePlanTasks();
+    const previous = planState.tasks?.[id] && typeof planState.tasks[id] === 'object'
+      ? planState.tasks[id]
+      : null;
+    const current = {...(previous || {})};
+    let changed = false;
+    if (Object.prototype.hasOwnProperty.call(updates, 'due')) {
+      const sanitizedDue = sanitizeDueValue(updates.due);
+      if ((previous?.due || '') !== sanitizedDue) {
+        changed = true;
+      }
+      if (sanitizedDue) {
+        current.due = sanitizedDue;
+      } else {
+        delete current.due;
       }
     }
-    planningStatusText.textContent = 'Planen er endnu ikke gemt.';
-  };
-
-  const setPlanSettings = (id, updates) => {
-    if (!id) return;
-    ensurePlanTasks();
-    const current = {...(planState.tasks?.[id] || {})};
-    if (updates.due !== undefined) current.due = sanitizeDueValue(updates.due);
-    if (updates.note !== undefined) current.note = sanitizeNoteValue(updates.note);
-    if (updates.done !== undefined) current.done = Boolean(updates.done);
+    if (Object.prototype.hasOwnProperty.call(updates, 'note')) {
+      const sanitizedNote = sanitizeNoteValue(updates.note);
+      if ((previous?.note || '') !== sanitizedNote) {
+        changed = true;
+      }
+      if (sanitizedNote) {
+        current.note = sanitizedNote;
+      } else {
+        delete current.note;
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'done')) {
+      const doneValue = Boolean(updates.done);
+      if (Boolean(previous?.done) !== doneValue) {
+        changed = true;
+      }
+      if (doneValue) {
+        current.done = true;
+      } else {
+        delete current.done;
+      }
+    }
     const hasData = Boolean(current.due) || Boolean(current.note) || Boolean(current.done);
     if (hasData) {
-      planState.tasks[id] = current;
-    } else if (planState.tasks[id]) {
+      if (changed || !previous) {
+        planState.tasks[id] = current;
+      }
+    } else if (previous) {
       delete planState.tasks[id];
+      changed = true;
     }
-    planState.updatedAt = new Date().toISOString();
-    persistPlanState().catch(err => console.warn('Kunne ikke gemme planlægning:', err));
-    refreshPlanningStatusText();
+    if (!changed) return false;
+    if (options.persist === false) {
+      return true;
+    }
+    queuePlanPersist().catch(err => console.warn('Kunne ikke gemme planlægning:', err));
+    return true;
   };
+
+  const commitPlannerEdits = () => {
+    if (!planningBoard || !currentUserId) return false;
+    let changed = false;
+    const cards = planningBoard.querySelectorAll('.planning-card');
+    cards.forEach(card => {
+      if (!(card instanceof HTMLElement)) return;
+      const taskId = card.dataset.taskId;
+      if (!taskId) return;
+      const updates = {};
+      let hasUpdates = false;
+      const dueInput = card.querySelector('.planning-due');
+      if (dueInput instanceof HTMLInputElement) {
+        updates.due = dueInput.value;
+        hasUpdates = true;
+      }
+      const noteInput = card.querySelector('.planning-note');
+      const noteIsDirty = card.classList.contains('planning-note-dirty');
+      if (noteInput instanceof HTMLTextAreaElement && !noteIsDirty) {
+        updates.note = noteInput.value;
+        hasUpdates = true;
+      }
+      const doneInput = card.querySelector('.planning-done');
+      if (doneInput instanceof HTMLInputElement && doneInput.type === 'checkbox') {
+        updates.done = doneInput.checked;
+        hasUpdates = true;
+      }
+      if (!hasUpdates) return;
+      if (setPlanSettings(taskId, updates, {persist: false})) {
+        changed = true;
+      }
+    });
+    return changed;
+  };
+
+  const flushPlannerChanges = async () => {
+    if (!currentUserId) return false;
+    const hadNewChanges = commitPlannerEdits();
+    if (hadNewChanges) {
+      await queuePlanPersist();
+    }
+    await waitForPlanPersistence();
+    return hadNewChanges;
+  };
+
+  state.flushPlannerChanges = flushPlannerChanges;
 
   const formatRelativeDue = (date, now = new Date()) => {
     if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
@@ -16266,9 +16472,15 @@ function renderPlanner(section) {
           <label>Deadline
             <input type="datetime-local" class="planning-due" data-task-id="${esc(task.id)}" value="${esc(task.dueInputValue)}">
           </label>
-          <label>Noter
-            <textarea class="planning-note" data-task-id="${esc(task.id)}" placeholder="Tilføj dine noter her">${esc(task.note || '')}</textarea>
-          </label>
+          <div class="planning-note-block">
+            <label>Noter
+              <textarea class="planning-note" data-task-id="${esc(task.id)}" placeholder="Tilføj dine noter her">${esc(task.note || '')}</textarea>
+            </label>
+            <div class="planning-note-actions">
+              <button type="button" class="secondary planning-button planning-note-save" data-note-save data-task-id="${esc(task.id)}" disabled>Gem note</button>
+              <span class="planning-note-hint">Gem når du er færdig med at skrive.</span>
+            </div>
+          </div>
           ${statusControlHtml}
           <label class="planning-checkbox">
             <input type="checkbox" class="planning-done" data-task-id="${esc(task.id)}" ${task.planDone ? 'checked' : ''}>
@@ -16335,6 +16547,13 @@ function renderPlanner(section) {
   };
 
   const updatePlanningUi = () => {
+    const view = getPlanView();
+    if (planningHideDoneToggle) {
+      planningHideDoneToggle.checked = view.hideDone;
+    }
+    if (planningHideNotStartedToggle) {
+      planningHideNotStartedToggle.checked = view.hideNotStarted;
+    }
     renderMissingAssignments();
     if (!planningBoard || !planningSummary) return;
     planningTasks = computePlanningTasks();
@@ -16358,12 +16577,13 @@ function renderPlanner(section) {
       updatePlanningUi();
       return;
     }
+    await waitForPlanPersistence();
     await loadAllStores();
     planState = loadPlanState();
     ensurePlanTasks();
     if (planStateSource === 'legacy') {
       try {
-        await persistPlanState();
+        await queuePlanPersist();
       } catch (err) {
         console.warn('Kunne ikke migrere planlægning til database:', err);
       }
@@ -16466,11 +16686,20 @@ function renderPlanner(section) {
   };
 
   if (planningBoard && planningSummary) {
+    const initialView = getPlanView();
+    if (planningHideDoneToggle) planningHideDoneToggle.checked = initialView.hideDone;
+    if (planningHideNotStartedToggle) planningHideNotStartedToggle.checked = initialView.hideNotStarted;
     updatePlanningUi();
 
     planningMissingRoleFilter?.addEventListener('change', () => renderMissingAssignments());
-    planningHideDoneToggle?.addEventListener('change', () => renderPlanningBoard());
-    planningHideNotStartedToggle?.addEventListener('change', () => renderPlanningBoard());
+    planningHideDoneToggle?.addEventListener('change', () => {
+      setPlanView({hideDone: planningHideDoneToggle.checked});
+      renderPlanningBoard();
+    });
+    planningHideNotStartedToggle?.addEventListener('change', () => {
+      setPlanView({hideNotStarted: planningHideNotStartedToggle.checked});
+      renderPlanningBoard();
+    });
 
     planningRefreshBtn?.addEventListener('click', async () => {
       if (!planningRefreshBtn || planningRefreshBtn.disabled) return;
@@ -16480,8 +16709,10 @@ function renderPlanner(section) {
         return;
       }
       planningRefreshBtn.disabled = true;
-      setStatus('Opdaterer plan...');
+      setStatus('Gemmer ændringer i planen...');
       try {
+        await flushPlannerChanges();
+        setStatus('Opdaterer plan...');
         await refreshPlanningData();
         setStatus('Planen er opdateret.');
       } catch (err) {
@@ -16568,12 +16799,61 @@ function renderPlanner(section) {
       if (target.classList.contains('planning-note')) {
         const taskId = target.dataset.taskId;
         if (!taskId) return;
-        setPlanSettings(taskId, {note: target.value});
+        const card = target.closest('.planning-card');
+        const saveButton = card?.querySelector('.planning-note-save');
+        const savedNote = getPlanSettings(taskId).note || '';
+        const hasChanges = target.value !== savedNote;
+        if (saveButton instanceof HTMLButtonElement) {
+          saveButton.disabled = !hasChanges;
+        }
+        if (card instanceof HTMLElement) {
+          card.classList.toggle('planning-note-dirty', hasChanges);
+        }
       }
     });
 
     planningBoard.addEventListener('click', event => {
       if (!(event.target instanceof HTMLElement)) return;
+      const noteSaveButton = event.target.closest('button[data-note-save]');
+      if (noteSaveButton instanceof HTMLButtonElement) {
+        if (!currentUserId) {
+          alert('Log ind for at gemme noter.');
+          return;
+        }
+        const taskId = noteSaveButton.dataset.taskId;
+        if (!taskId) return;
+        const card = noteSaveButton.closest('.planning-card');
+        const textarea = card?.querySelector('.planning-note');
+        if (!(textarea instanceof HTMLTextAreaElement)) return;
+        const currentNote = textarea.value;
+        const savedSettings = getPlanSettings(taskId);
+        const savedNote = savedSettings.note || '';
+        if (currentNote === savedNote) {
+          setStatus('Ingen ændringer i noten at gemme.');
+          noteSaveButton.disabled = true;
+          if (card instanceof HTMLElement) {
+            card.classList.remove('planning-note-dirty');
+          }
+          return;
+        }
+        const didUpdate = setPlanSettings(taskId, {note: currentNote});
+        if (didUpdate) {
+          const sanitizedNote = getPlanSettings(taskId).note || '';
+          textarea.value = sanitizedNote;
+          noteSaveButton.disabled = true;
+          if (card instanceof HTMLElement) {
+            card.classList.remove('planning-note-dirty');
+          }
+          setStatus('Noten er gemt.');
+        } else {
+          setStatus('Ingen ændringer i noten at gemme.');
+          noteSaveButton.disabled = true;
+          if (card instanceof HTMLElement) {
+            card.classList.remove('planning-note-dirty');
+          }
+        }
+        return;
+      }
       const exportButton = event.target.closest('button[data-export]');
       if (exportButton) {
         if (!currentUserId) {
