@@ -679,31 +679,6 @@ section[data-tab].active {
   gap: 0.2rem;
   font-size: 0.85rem;
 }
-.planning-card-controls label.planning-checkbox {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  justify-self: start;
-  justify-content: flex-start;
-  align-self: center;
-  text-align: left;
-}
-.planning-card-controls label.planning-checkbox input {
-  width: auto;
-  accent-color: var(--accent);
-}
-.planning-card-status-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: flex-end;
-}
-.planning-card-status-row .planning-status-select {
-  flex: 1 1 200px;
-}
-.planning-card-status-row .planning-status-select select {
-  width: 100%;
-}
 .planning-card-controls input[type="datetime-local"],
 .planning-card-controls textarea {
   width: 100%;
@@ -719,6 +694,19 @@ section[data-tab].active {
 .planning-card-controls textarea {
   min-height: 60px;
   resize: vertical;
+}
+.planning-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  justify-self: start;
+  justify-content: flex-start;
+  align-self: start;
+  text-align: left;
+}
+.planning-checkbox input {
+  width: auto;
+  accent-color: var(--accent);
 }
 .planning-card-actions {
   display: flex;
@@ -15874,25 +15862,19 @@ function renderPlanner(section) {
     orders.forEach(order => {
       const orderId = Number(order.id);
       if (!Number.isFinite(orderId)) return;
-      const sampleIdValue = Number(order.sample_id);
-      const sample = Number.isFinite(sampleIdValue) ? sampleMap.get(sampleIdValue) : undefined;
-      const statusSource = sample?.status || order?.status || '';
-      if (statusSource && !isActiveStatus(statusSource)) {
-        return;
-      }
-      const patient = patientMap.get(Number(order.patient_id));
       planningStages.forEach(stage => {
         const matchedRoles = stage.roleKeys.filter(key => {
           const value = order?.[key];
           return value !== undefined && value !== null && String(value) === currentUserId;
         });
         if (!matchedRoles.length) return;
+        const sample = sampleMap.get(Number(order.sample_id));
+        const patient = patientMap.get(Number(order.patient_id));
         const taskId = `${orderId}:${stage.id}`;
         const planSettings = getPlanSettings(taskId);
         const dueInputValue = sanitizeDueValue(planSettings.due);
         const dueDate = dueInputValue ? parseDateTimeValue(dueInputValue) : null;
-        const sampleStatusText = statusSource || 'Ikke angivet';
-        const sampleStatusValue = sampleStatusText.toLowerCase();
+        const sampleStatusValue = (sample?.status || '').toLowerCase();
         const sampleStatusIndex = sampleStatusOrder.get(sampleStatusValue);
         const stageStatusIndex = stage.sampleStatus ? sampleStatusOrder.get(stage.sampleStatus.toLowerCase()) : undefined;
         let statusKey = 'unknown';
@@ -15937,12 +15919,12 @@ function renderPlanner(section) {
         const sampleLabel = sample ? `Prøve ${sample.id}${sample.pmb_number ? ` (${sample.pmb_number})` : ''}` : '';
         const roleNames = matchedRoles.map(key => ROLE_LABELS[key] || key);
         const roleLabel = roleNames.length ? `Din rolle: ${roleNames.join(' & ')}` : '';
+        const sampleStatusText = sample?.status || 'Ikke angivet';
         const priorityHtml = renderOrderPriorityIcons(order);
         results.push({
           id: taskId,
           orderId,
           stage,
-          sampleId: Number.isFinite(sampleIdValue) ? sampleIdValue : null,
           orderName,
           patientName,
           patientMrn,
@@ -15959,7 +15941,6 @@ function renderPlanner(section) {
           note,
           planDone,
           isDone,
-          sampleStatusRaw: statusSource,
           sampleStatusText,
           info,
           priorityHtml
@@ -16211,47 +16192,14 @@ function renderPlanner(section) {
     if (task.roleLabel) metaParts.push(task.roleLabel);
     const metaHtml = metaParts.length ? `<div class="planning-card-meta">${metaParts.map(part => `<span>${esc(part)}</span>`).join(' • ')}</div>` : '';
     const dueText = task.dueDate ? `${esc(task.dueDisplay)}${task.dueRelative ? ` (${esc(task.dueRelative)})` : ''}` : 'Ikke planlagt';
-    const infoItems = Array.isArray(task.info) ? task.info : [];
-    const infoHtml = infoItems.length ? `<ul class="planning-info-list">${infoItems.map(item => `<li>${esc(item)}</li>`).join('')}</ul>` : '';
-    const actionsList = Array.isArray(task.stage?.actions) ? task.stage.actions : [];
-    const actionsHtml = actionsList.length
-      ? actionsList.map(action => `<button type="button" class="secondary planning-button" data-action="${esc(action.type)}" data-task-id="${esc(task.id)}">${esc(action.label)}</button>`).join('')
-      : '';
+    const infoHtml = task.info.length ? `<ul class="planning-info-list">${task.info.map(item => `<li>${esc(item)}</li>`).join('')}</ul>` : '';
+    const actionsHtml = task.stage.actions?.length ? task.stage.actions.map(action => `<button type="button" class="secondary planning-button" data-action="${esc(action.type)}" data-task-id="${esc(task.id)}">${esc(action.label)}</button>`).join('') : '';
     const exportHtml = `
       <div class="planning-card-actions planning-card-export-actions">
         <button type="button" class="secondary planning-button" data-export="calendar" data-task-id="${esc(task.id)}">Eksportér opgave til kalender</button>
         <button type="button" class="secondary planning-button" data-export="csv" data-task-id="${esc(task.id)}">Eksportér opgave til CSV</button>
       </div>
     `;
-    const statusSelectId = `plannerStatus-${String(task.id).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
-    const knownStatus = SAMPLE_STATUSES.includes(task.sampleStatusRaw) ? task.sampleStatusRaw : '';
-    const statusOptions = [];
-    statusOptions.push(`<option value=""${knownStatus ? '' : ' selected'}>Vælg status</option>`);
-    if (!knownStatus && task.sampleStatusRaw) {
-      statusOptions.push(`<option value="${esc(task.sampleStatusRaw)}" selected>${esc(task.sampleStatusRaw)}</option>`);
-    }
-    SAMPLE_STATUSES.forEach(status => {
-      const selectedAttr = status === knownStatus ? ' selected' : '';
-      statusOptions.push(`<option value="${esc(status)}"${selectedAttr}>${esc(status)}</option>`);
-    });
-    const canWriteSamples = currentCanWrite();
-    const statusSelectHtml = task.sampleId != null
-      ? `<label class="planning-status-select" for="${esc(statusSelectId)}">Prøvestatus
-          <select id="${esc(statusSelectId)}" class="planning-status" data-task-id="${esc(task.id)}" data-sample-id="${esc(task.sampleId)}" data-order-id="${esc(task.orderId)}" data-original-status="${esc(task.sampleStatusRaw || '')}"${canWriteSamples ? '' : ' disabled'}>
-            ${statusOptions.join('')}
-          </select>
-        </label>`
-      : '';
-    const completionControlHtml = `<label class="planning-checkbox">
-            <input type="checkbox" class="planning-done" data-task-id="${esc(task.id)}" ${task.planDone ? 'checked' : ''}>
-            Markér som færdig
-          </label>`;
-    const statusRowHtml = task.sampleId != null
-      ? `<div class="planning-card-status-row">
-          ${statusSelectHtml}
-          ${completionControlHtml}
-        </div>`
-      : completionControlHtml;
     return `
       <article class="planning-card" data-task-id="${esc(task.id)}" data-status="${esc(task.statusKey)}" data-due="${esc(task.dueState)}">
         <div class="planning-card-header">
@@ -16277,7 +16225,10 @@ function renderPlanner(section) {
           <label>Noter
             <textarea class="planning-note" data-task-id="${esc(task.id)}" placeholder="Tilføj dine noter her">${esc(task.note || '')}</textarea>
           </label>
-          ${statusRowHtml}
+          <label class="planning-checkbox">
+            <input type="checkbox" class="planning-done" data-task-id="${esc(task.id)}" ${task.planDone ? 'checked' : ''}>
+            Markér som færdig
+          </label>
         </div>
         ${actionsHtml ? `<div class="planning-card-actions">${actionsHtml}</div>` : ''}
         ${exportHtml}
@@ -16485,7 +16436,7 @@ function renderPlanner(section) {
       }
     });
 
-    planningBoard.addEventListener('change', async event => {
+    planningBoard.addEventListener('change', event => {
       const target = event.target;
       if (!(target instanceof HTMLElement)) return;
       const taskId = target.dataset.taskId;
@@ -16495,54 +16446,6 @@ function renderPlanner(section) {
         updatePlanningUi();
       } else if (target.classList.contains('planning-done')) {
         setPlanSettings(taskId, {done: target.checked});
-        updatePlanningUi();
-      } else if (target.classList.contains('planning-status')) {
-        const sampleId = Number(target.dataset.sampleId);
-        const previousStatus = target.dataset.originalStatus || '';
-        const newStatus = target.value;
-        if (newStatus === previousStatus) return;
-        if (!ensureWrite('samples')) {
-          target.value = previousStatus;
-          return;
-        }
-        if (!Number.isFinite(sampleId)) {
-          alert('Kan ikke opdatere prøvestatus: prøven mangler.');
-          target.value = previousStatus;
-          return;
-        }
-        const sample = findById('samples', sampleId);
-        if (!sample) {
-          alert('Prøven findes ikke længere i systemet.');
-          target.value = previousStatus;
-          return;
-        }
-        const nextStatus = newStatus || '';
-        if ((sample.status || '') === nextStatus) {
-          target.dataset.originalStatus = nextStatus;
-          return;
-        }
-        const beforeSample = {...sample};
-        const updatedSample = {...sample, status: nextStatus};
-        target.disabled = true;
-        try {
-          await updateRecord('samples', updatedSample, beforeSample);
-          const relatedOrders = getCached('orders').filter(order => Number(order.sample_id) === sampleId);
-          for (const order of relatedOrders) {
-            if ((order.status || '') === nextStatus) continue;
-            const beforeOrder = {...order};
-            const updatedOrder = {...order, status: nextStatus};
-            await updateRecord('orders', updatedOrder, beforeOrder);
-          }
-          await loadStore('samples');
-          await loadStore('orders');
-          target.dataset.originalStatus = nextStatus;
-        } catch (err) {
-          console.error('Kunne ikke opdatere prøvestatus:', err);
-          alert('Kunne ikke opdatere prøvestatus: ' + (err?.message || err));
-          target.value = previousStatus;
-        } finally {
-          target.disabled = false;
-        }
         updatePlanningUi();
       }
     });
