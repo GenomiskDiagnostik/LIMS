@@ -15778,6 +15778,7 @@ function renderPlanner(section) {
         await tx.done?.catch(() => {});
         await loadStore('planner');
         planStateSource = 'db';
+        scheduleAutosave();
       } catch (err) {
         console.warn('Kunne ikke gemme planlægning i database:', err);
       }
