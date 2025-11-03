@@ -19143,11 +19143,11 @@ function renderDbTab(section) {
     ${memoryWarning}
     <div class="btn-row">
       <button class="secondary" id="bindFile">Knyt/åbn DB-fil...</button>
+      <button class="secondary" id="unbindFile" ${canClearBinding ? '' : 'disabled'}>Fjern tilknytning</button>
       <button class="secondary" id="saveNow">Gem nu</button>
       <label style="display:flex;align-items:center;gap:0.5rem;">
         <input type="checkbox" id="autosaveToggle" ${state.autosave?'checked':''}> Autogem
       </label>
-      <button class="secondary" id="unbindFile" ${canClearBinding ? '' : 'disabled'}>Fjern tilknytning</button>
     </div>
   </div>
   <div class="panel">
