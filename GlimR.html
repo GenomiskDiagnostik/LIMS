@@ -15870,12 +15870,18 @@ function renderPlanner(section) {
         if (!matchedRoles.length) return;
         const sample = sampleMap.get(Number(order.sample_id));
         const patient = patientMap.get(Number(order.patient_id));
+        const sampleStatusRaw = sample?.status || '';
+        const orderStatusRaw = order?.status || '';
+        const sampleStatusLookup = sampleStatusRaw.toLowerCase();
+        const orderStatusLookup = orderStatusRaw.toLowerCase();
+        if (INACTIVE_SAMPLE_STATUSES.has(sampleStatusLookup) || INACTIVE_SAMPLE_STATUSES.has(orderStatusLookup)) {
+          return;
+        }
         const taskId = `${orderId}:${stage.id}`;
         const planSettings = getPlanSettings(taskId);
         const dueInputValue = sanitizeDueValue(planSettings.due);
         const dueDate = dueInputValue ? parseDateTimeValue(dueInputValue) : null;
-        const sampleStatusValue = (sample?.status || '').toLowerCase();
-        const sampleStatusIndex = sampleStatusOrder.get(sampleStatusValue);
+        const sampleStatusIndex = sampleStatusOrder.get(sampleStatusLookup);
         const stageStatusIndex = stage.sampleStatus ? sampleStatusOrder.get(stage.sampleStatus.toLowerCase()) : undefined;
         let statusKey = 'unknown';
         if (!sample) {
@@ -15916,10 +15922,13 @@ function renderPlanner(section) {
         const orderName = getOrderDisplayName(orderId) || `Ordination #${orderId}`;
         const patientName = patient?.name || '';
         const patientMrn = patient?.mrn || '';
-        const sampleLabel = sample ? `Prøve ${sample.id}${sample.pmb_number ? ` (${sample.pmb_number})` : ''}` : '';
+        const sampleId = sample ? Number(sample.id) : null;
+        const sampleLabel = sampleId != null
+          ? `Prøve ${sampleId}${sample?.pmb_number ? ` (${sample.pmb_number})` : ''}`
+          : '';
         const roleNames = matchedRoles.map(key => ROLE_LABELS[key] || key);
         const roleLabel = roleNames.length ? `Din rolle: ${roleNames.join(' & ')}` : '';
-        const sampleStatusText = sample?.status || 'Ikke angivet';
+        const sampleStatusText = sampleStatusRaw || 'Ikke angivet';
         const priorityHtml = renderOrderPriorityIcons(order);
         results.push({
           id: taskId,
@@ -15928,6 +15937,7 @@ function renderPlanner(section) {
           orderName,
           patientName,
           patientMrn,
+          sampleId,
           sampleLabel,
           roleLabel,
           statusKey,
@@ -15941,6 +15951,7 @@ function renderPlanner(section) {
           note,
           planDone,
           isDone,
+          sampleStatusValue: sampleStatusRaw,
           sampleStatusText,
           info,
           priorityHtml
@@ -16200,6 +16211,21 @@ function renderPlanner(section) {
         <button type="button" class="secondary planning-button" data-export="csv" data-task-id="${esc(task.id)}">Eksportér opgave til CSV</button>
       </div>
     `;
+    const currentStatusValue = task.sampleStatusValue || '';
+    const statusChoices = [{value: '', label: 'Vælg status'}].concat(
+      SAMPLE_STATUSES.map(status => ({value: status, label: status}))
+    );
+    const statusOptions = statusChoices.map(choice => {
+      const selected = choice.value === currentStatusValue ? ' selected' : '';
+      return `<option value="${esc(choice.value)}"${selected}>${esc(choice.label)}</option>`;
+    }).join('');
+    const sampleStatusSelect = `
+      <label>Skift status
+        <select class="planning-sample-status" data-task-id="${esc(task.id)}" data-sample-id="${task.sampleId != null ? esc(String(task.sampleId)) : ''}" data-current-status="${esc(currentStatusValue)}"${task.sampleId == null ? ' disabled' : ''}>
+          ${statusOptions}
+        </select>
+      </label>
+    `;
     return `
       <article class="planning-card" data-task-id="${esc(task.id)}" data-status="${esc(task.statusKey)}" data-due="${esc(task.dueState)}">
         <div class="planning-card-header">
@@ -16225,6 +16251,7 @@ function renderPlanner(section) {
           <label>Noter
             <textarea class="planning-note" data-task-id="${esc(task.id)}" placeholder="Tilføj dine noter her">${esc(task.note || '')}</textarea>
           </label>
+          ${sampleStatusSelect}
           <label class="planning-checkbox">
             <input type="checkbox" class="planning-done" data-task-id="${esc(task.id)}" ${task.planDone ? 'checked' : ''}>
             Markér som færdig
@@ -16296,6 +16323,71 @@ function renderPlanner(section) {
     renderPlanningBoard();
     updateExportButtons();
     refreshPlanningStatusText();
+  };
+
+  const applySampleStatusUpdate = async select => {
+    if (!(select instanceof HTMLSelectElement)) return;
+    const previousValue = select.dataset.currentStatus ?? '';
+    const nextValue = select.value;
+    if (nextValue === previousValue) return;
+    const sampleIdAttr = select.dataset.sampleId || '';
+    const hasSampleId = sampleIdAttr !== '';
+    const sampleId = hasSampleId ? Number(sampleIdAttr) : NaN;
+    if (!hasSampleId || !Number.isFinite(sampleId)) {
+      alert('Kan ikke opdatere status: der er ingen prøve knyttet til opgaven.');
+      select.value = previousValue;
+      return;
+    }
+    if (!ensureWrite('samples')) {
+      select.value = previousValue;
+      return;
+    }
+    const sample = findById('samples', sampleId);
+    if (!sample) {
+      alert('Kunne ikke finde prøven i databasen. Prøv at opdatere data og forsøg igen.');
+      select.value = previousValue;
+      updatePlanningUi();
+      return;
+    }
+    const sanitizedStatus = (nextValue || '').trim();
+    if ((sample.status || '') === sanitizedStatus) {
+      select.dataset.currentStatus = sanitizedStatus;
+      updatePlanningUi();
+      return;
+    }
+    const originalDisabled = select.disabled;
+    select.disabled = true;
+    try {
+      const sampleBefore = {...sample};
+      const updatedSample = {...sample, status: sanitizedStatus};
+      await updateRecord('samples', updatedSample, sampleBefore);
+      const orders = getCached('orders') || [];
+      let ordersUpdated = false;
+      for (const order of orders) {
+        if (Number(order.sample_id) !== sampleId) continue;
+        if ((order.status || '') === sanitizedStatus) continue;
+        const beforeOrder = {...order};
+        const updatedOrder = {...order, status: sanitizedStatus};
+        await updateRecord('orders', updatedOrder, beforeOrder);
+        ordersUpdated = true;
+      }
+      if (ordersUpdated && state.currentTab === 'orders') {
+        renderTab('orders');
+      }
+      select.dataset.currentStatus = sanitizedStatus;
+      setStatus(`Prøvestatus opdateret${sanitizedStatus ? ` til ${sanitizedStatus}` : ''}.`);
+    } catch (err) {
+      console.error('Kunne ikke opdatere prøvestatus:', err);
+      alert('Kunne ikke opdatere prøvestatus: ' + (err?.message || err));
+      select.value = previousValue;
+    } finally {
+      if (select.isConnected) select.disabled = originalDisabled;
+      updatePlanningUi();
+      const dashboardSection = document.querySelector('section[data-tab="dashboard"]');
+      if (dashboardSection) {
+        renderDashboard(dashboardSection);
+      }
+    }
   };
 
   const refreshPlanningData = async () => {
@@ -16436,9 +16528,14 @@ function renderPlanner(section) {
       }
     });
 
-    planningBoard.addEventListener('change', event => {
+    planningBoard.addEventListener('change', async event => {
       const target = event.target;
       if (!(target instanceof HTMLElement)) return;
+      if (target.classList.contains('planning-sample-status')) {
+        event.preventDefault();
+        await applySampleStatusUpdate(target);
+        return;
+      }
       const taskId = target.dataset.taskId;
       if (!taskId) return;
       if (target.classList.contains('planning-due')) {
