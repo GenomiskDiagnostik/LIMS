@@ -15672,6 +15672,21 @@ function renderPlanner(section) {
     {label: 'Ekstra info', value: task => Array.isArray(task.info) ? task.info.join(' | ') : ''}
   ];
 
+  const DEFAULT_PLAN_VIEW = {hideDone: true, hideNotStarted: true};
+
+  const sanitizePlanView = value => {
+    const view = {...DEFAULT_PLAN_VIEW};
+    if (value && typeof value === 'object') {
+      if (Object.prototype.hasOwnProperty.call(value, 'hideDone')) {
+        view.hideDone = Boolean(value.hideDone);
+      }
+      if (Object.prototype.hasOwnProperty.call(value, 'hideNotStarted')) {
+        view.hideNotStarted = Boolean(value.hideNotStarted);
+      }
+    }
+    return view;
+  };
+
   const currentUser = state.currentUser;
   const currentUserId = currentUser?.id != null ? String(currentUser.id) : null;
   const canModifySampleStatus = currentCanWrite();
@@ -15688,6 +15703,7 @@ function renderPlanner(section) {
       if (!parsed.tasks || typeof parsed.tasks !== 'object') parsed.tasks = {};
       if (!parsed.createdAt && parsed.created_at) parsed.createdAt = parsed.created_at;
       if (!parsed.updatedAt && parsed.updated_at) parsed.updatedAt = parsed.updated_at;
+      parsed.view = sanitizePlanView(parsed.view);
       return parsed;
     } catch (err) {
       console.warn('Kunne ikke indlæse planlægning fra lokalt lager:', err);
@@ -15698,7 +15714,7 @@ function renderPlanner(section) {
   const loadPlanState = () => {
     if (!currentUserId) {
       planStateSource = 'none';
-      return {tasks: {}};
+      return {tasks: {}, view: sanitizePlanView(null)};
     }
     const plannerRows = getCached('planner') || [];
     const entry = plannerRows.find(row => String(row.id) === currentUserId);
@@ -15707,7 +15723,8 @@ function renderPlanner(section) {
       const tasks = entry.tasks && typeof entry.tasks === 'object' ? {...entry.tasks} : {};
       const createdAt = entry.created_at || entry.createdAt || null;
       const updatedAt = entry.updated_at || entry.updatedAt || null;
-      return {tasks, createdAt, updatedAt};
+      const view = sanitizePlanView(entry.view);
+      return {tasks, view, createdAt, updatedAt};
     }
     const legacy = loadLegacyPlanState();
     if (legacy) {
@@ -15715,7 +15732,7 @@ function renderPlanner(section) {
       return legacy;
     }
     planStateSource = 'new';
-    return {tasks: {}};
+    return {tasks: {}, view: sanitizePlanView(null)};
   };
 
   let planState = loadPlanState();
@@ -15729,6 +15746,7 @@ function renderPlanner(section) {
     if (planState.updatedAt === undefined) {
       planState.updatedAt = null;
     }
+    planState.view = sanitizePlanView(planState.view);
   };
 
   ensurePlanTasks();
@@ -15768,10 +15786,13 @@ function renderPlanner(section) {
       try {
         const tx = state.db.transaction('planner', 'readwrite');
         const store = tx.objectStore('planner');
+        const view = sanitizePlanView(planState.view);
+        planState.view = view;
         store.put({
           id: currentUserId,
           user_id: currentUserId,
           tasks: planState.tasks,
+          view,
           created_at: createdAt,
           updated_at: updatedAt
         });
@@ -15829,6 +15850,42 @@ function renderPlanner(section) {
   const sanitizeNoteValue = value => {
     if (typeof value !== 'string') return '';
     return value.replace(/\r/g, '').slice(0, 2000);
+  };
+
+  const getPlanView = () => {
+    ensurePlanTasks();
+    const view = sanitizePlanView(planState.view);
+    planState.view = view;
+    return {...view};
+  };
+
+  const setPlanView = (updates, options = {}) => {
+    if (!updates || typeof updates !== 'object') return false;
+    ensurePlanTasks();
+    const previous = sanitizePlanView(planState.view);
+    const next = {...previous};
+    let changed = false;
+    if (Object.prototype.hasOwnProperty.call(updates, 'hideDone')) {
+      const hideDone = Boolean(updates.hideDone);
+      if (next.hideDone !== hideDone) {
+        next.hideDone = hideDone;
+        changed = true;
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'hideNotStarted')) {
+      const hideNotStarted = Boolean(updates.hideNotStarted);
+      if (next.hideNotStarted !== hideNotStarted) {
+        next.hideNotStarted = hideNotStarted;
+        changed = true;
+      }
+    }
+    if (!changed) return false;
+    planState.view = next;
+    if (options.persist === false) {
+      return true;
+    }
+    queuePlanPersist().catch(err => console.warn('Kunne ikke gemme planlægning:', err));
+    return true;
   };
 
   const getPlanSettings = id => {
@@ -16460,6 +16517,13 @@ function renderPlanner(section) {
   };
 
   const updatePlanningUi = () => {
+    const view = getPlanView();
+    if (planningHideDoneToggle) {
+      planningHideDoneToggle.checked = view.hideDone;
+    }
+    if (planningHideNotStartedToggle) {
+      planningHideNotStartedToggle.checked = view.hideNotStarted;
+    }
     renderMissingAssignments();
     if (!planningBoard || !planningSummary) return;
     planningTasks = computePlanningTasks();
@@ -16592,11 +16656,20 @@ function renderPlanner(section) {
   };
 
   if (planningBoard && planningSummary) {
+    const initialView = getPlanView();
+    if (planningHideDoneToggle) planningHideDoneToggle.checked = initialView.hideDone;
+    if (planningHideNotStartedToggle) planningHideNotStartedToggle.checked = initialView.hideNotStarted;
     updatePlanningUi();
 
     planningMissingRoleFilter?.addEventListener('change', () => renderMissingAssignments());
-    planningHideDoneToggle?.addEventListener('change', () => renderPlanningBoard());
-    planningHideNotStartedToggle?.addEventListener('change', () => renderPlanningBoard());
+    planningHideDoneToggle?.addEventListener('change', () => {
+      setPlanView({hideDone: planningHideDoneToggle.checked});
+      renderPlanningBoard();
+    });
+    planningHideNotStartedToggle?.addEventListener('change', () => {
+      setPlanView({hideNotStarted: planningHideNotStartedToggle.checked});
+      renderPlanningBoard();
+    });
 
     planningRefreshBtn?.addEventListener('click', async () => {
       if (!planningRefreshBtn || planningRefreshBtn.disabled) return;
