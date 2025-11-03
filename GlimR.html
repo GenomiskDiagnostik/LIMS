@@ -15434,8 +15434,12 @@ function renderPlanner(section) {
       <div class="planning-controls">
         <div class="planning-toggles">
           <label class="list-toggle">
-            <input type="checkbox" id="planningHideDone">
+            <input type="checkbox" id="planningHideDone" checked>
             Skjul færdige trin
+          </label>
+          <label class="list-toggle">
+            <input type="checkbox" id="planningHideNotStarted" checked>
+            Skjul ikke startede trin
           </label>
         </div>
         <div class="planning-actions">
@@ -15484,6 +15488,7 @@ function renderPlanner(section) {
   const planningBoard = section.querySelector('#planningBoard');
   const planningSummary = section.querySelector('#planningSummary');
   const planningHideDoneToggle = section.querySelector('#planningHideDone');
+  const planningHideNotStartedToggle = section.querySelector('#planningHideNotStarted');
   const planningExportBtn = section.querySelector('#planningExport');
   const planningExportCsvBtn = section.querySelector('#planningExportCsv');
   const planningRefreshBtn = section.querySelector('#planningRefresh');
@@ -16287,12 +16292,19 @@ function renderPlanner(section) {
       return;
     }
     const hideDone = Boolean(planningHideDoneToggle?.checked);
+    const hideNotStarted = Boolean(planningHideNotStartedToggle?.checked);
     const lanes = planningStages.reduce((output, stage) => {
       const allStageTasks = planningTasks.filter(task => task.stage.id === stage.id);
       if (!allStageTasks.length) return output;
-      const visibleTasks = hideDone ? allStageTasks.filter(task => !task.isDone) : allStageTasks;
+      const visibleTasks = allStageTasks.filter(task => {
+        if (hideDone && task.isDone) return false;
+        if (hideNotStarted && task.statusKey === 'pending') return false;
+        return true;
+      });
       if (!visibleTasks.length) return output;
-      const laneCount = hideDone ? `${visibleTasks.length} af ${allStageTasks.length}` : `${allStageTasks.length}`;
+      const laneCount = visibleTasks.length === allStageTasks.length
+        ? `${allStageTasks.length}`
+        : `${visibleTasks.length} af ${allStageTasks.length}`;
       const cards = visibleTasks.sort(comparePlanningTasks).map(buildPlanningCard).join('');
       output.push(`
         <section class="planning-lane" data-stage="${esc(stage.id)}">
@@ -16329,7 +16341,10 @@ function renderPlanner(section) {
     if (planningHideDoneToggle) {
       const hasCompleted = planningTasks.some(task => task.isDone);
       planningHideDoneToggle.disabled = !currentUserId || !hasCompleted;
-      if (!hasCompleted) planningHideDoneToggle.checked = false;
+    }
+    if (planningHideNotStartedToggle) {
+      const hasPending = planningTasks.some(task => task.statusKey === 'pending');
+      planningHideNotStartedToggle.disabled = !currentUserId || !hasPending;
     }
     if (planningRefreshBtn) planningRefreshBtn.disabled = !currentUserId;
     updatePlanningSummary();
@@ -16455,6 +16470,7 @@ function renderPlanner(section) {
 
     planningMissingRoleFilter?.addEventListener('change', () => renderMissingAssignments());
     planningHideDoneToggle?.addEventListener('change', () => renderPlanningBoard());
+    planningHideNotStartedToggle?.addEventListener('change', () => renderPlanningBoard());
 
     planningRefreshBtn?.addEventListener('click', async () => {
       if (!planningRefreshBtn || planningRefreshBtn.disabled) return;
