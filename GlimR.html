@@ -680,7 +680,8 @@ section[data-tab].active {
   font-size: 0.85rem;
 }
 .planning-card-controls input[type="datetime-local"],
-.planning-card-controls textarea {
+.planning-card-controls textarea,
+.planning-card-controls select {
   width: 100%;
   max-width: 100%;
   border: 1px solid var(--input-border);
@@ -690,6 +691,9 @@ section[data-tab].active {
   color: inherit;
   font: inherit;
   box-sizing: border-box;
+}
+.planning-card-controls select {
+  appearance: none;
 }
 .planning-card-controls textarea {
   min-height: 60px;
@@ -15489,6 +15493,18 @@ function renderPlanner(section) {
   const planningMissingList = section.querySelector('#planningMissingList');
   const planningMissingRoleFilter = section.querySelector('#planningMissingRole');
 
+  const HIDDEN_SAMPLE_STATUS_KEYS = new Set(['svaret', 'biobank', 'annulleret']);
+  const shouldHideSampleStatus = status => {
+    if (!status) return false;
+    const normalized = status.toString().trim().toLowerCase();
+    if (!normalized) return false;
+    if (HIDDEN_SAMPLE_STATUS_KEYS.has(normalized)) return true;
+    for (const key of HIDDEN_SAMPLE_STATUS_KEYS) {
+      if (normalized.startsWith(`${key} `)) return true;
+    }
+    return false;
+  };
+
   const ROLE_LABELS = {
     analysis_responsible_id: 'Analyseansvarlig',
     interpreter_id: 'Tolker',
@@ -15645,6 +15661,7 @@ function renderPlanner(section) {
 
   const currentUser = state.currentUser;
   const currentUserId = currentUser?.id != null ? String(currentUser.id) : null;
+  const canModifySampleStatus = currentCanWrite();
   const legacyPlanningStorageKey = currentUserId ? `glimr-plan-${currentUserId}` : null;
   let planStateSource = 'none';
 
@@ -15862,22 +15879,22 @@ function renderPlanner(section) {
     orders.forEach(order => {
       const orderId = Number(order.id);
       if (!Number.isFinite(orderId)) return;
+      const sample = sampleMap.get(Number(order.sample_id));
+      const patient = patientMap.get(Number(order.patient_id));
+      const sampleStatusRaw = sample?.status || order?.status || '';
+      if (shouldHideSampleStatus(sampleStatusRaw)) return;
       planningStages.forEach(stage => {
         const matchedRoles = stage.roleKeys.filter(key => {
           const value = order?.[key];
           return value !== undefined && value !== null && String(value) === currentUserId;
         });
         if (!matchedRoles.length) return;
-        const sample = sampleMap.get(Number(order.sample_id));
-        if (sample && INACTIVE_SAMPLE_STATUSES.has((sample.status || '').toLowerCase())) {
-          return;
-        }
-        const patient = patientMap.get(Number(order.patient_id));
         const taskId = `${orderId}:${stage.id}`;
         const planSettings = getPlanSettings(taskId);
         const dueInputValue = sanitizeDueValue(planSettings.due);
         const dueDate = dueInputValue ? parseDateTimeValue(dueInputValue) : null;
-        const sampleStatusValue = (sample?.status || '').toLowerCase();
+        const sampleStatusValueRaw = sample?.status || '';
+        const sampleStatusValue = sampleStatusValueRaw.toLowerCase();
         const sampleStatusIndex = sampleStatusOrder.get(sampleStatusValue);
         const stageStatusIndex = stage.sampleStatus ? sampleStatusOrder.get(stage.sampleStatus.toLowerCase()) : undefined;
         let statusKey = 'unknown';
@@ -15922,14 +15939,13 @@ function renderPlanner(section) {
         const sampleLabel = sample ? `Prøve ${sample.id}${sample.pmb_number ? ` (${sample.pmb_number})` : ''}` : '';
         const roleNames = matchedRoles.map(key => ROLE_LABELS[key] || key);
         const roleLabel = roleNames.length ? `Din rolle: ${roleNames.join(' & ')}` : '';
-        const sampleStatusValueRaw = sample?.status || '';
         const sampleStatusText = sampleStatusValueRaw || 'Ikke angivet';
-        const sampleId = Number(sample?.id);
         const priorityHtml = renderOrderPriorityIcons(order);
         results.push({
           id: taskId,
           orderId,
           stage,
+          sampleId: sample?.id != null ? Number(sample.id) : null,
           orderName,
           patientName,
           patientMrn,
@@ -15946,7 +15962,6 @@ function renderPlanner(section) {
           note,
           planDone,
           isDone,
-          sampleId: Number.isFinite(sampleId) ? sampleId : null,
           sampleStatusValue: sampleStatusValueRaw,
           sampleStatusText,
           info,
@@ -16201,26 +16216,21 @@ function renderPlanner(section) {
     const dueText = task.dueDate ? `${esc(task.dueDisplay)}${task.dueRelative ? ` (${esc(task.dueRelative)})` : ''}` : 'Ikke planlagt';
     const infoHtml = task.info.length ? `<ul class="planning-info-list">${task.info.map(item => `<li>${esc(item)}</li>`).join('')}</ul>` : '';
     const actionsHtml = task.stage.actions?.length ? task.stage.actions.map(action => `<button type="button" class="secondary planning-button" data-action="${esc(action.type)}" data-task-id="${esc(task.id)}">${esc(action.label)}</button>`).join('') : '';
-    const statusChoices = [{value: '', label: 'Ikke angivet'}]
-      .concat(SAMPLE_STATUSES.map(status => ({value: status, label: status})));
-    const seenStatusValues = new Set();
-    const sampleStatusOptions = statusChoices
-      .filter(choice => {
-        const key = choice.value.toLowerCase();
-        if (seenStatusValues.has(key)) return false;
-        seenStatusValues.add(key);
-        return true;
+    const statusOptionsList = SAMPLE_STATUSES.slice();
+    const normalizedStatusOptions = new Set(statusOptionsList.map(status => status.toLowerCase()));
+    if (task.sampleStatusValue && !normalizedStatusOptions.has(task.sampleStatusValue.toLowerCase())) {
+      statusOptionsList.push(task.sampleStatusValue);
+    }
+    const statusOptionsHtml = [
+      `<option value="" disabled${task.sampleStatusValue ? '' : ' selected'}>Vælg status</option>`,
+      ...statusOptionsList.map(status => {
+        const selectedAttr = status === task.sampleStatusValue ? ' selected' : '';
+        return `<option value="${esc(status)}"${selectedAttr}>${esc(status)}</option>`;
       })
-      .map(choice => {
-        const selected = choice.value === (task.sampleStatusValue || '') ? ' selected' : '';
-        return `<option value="${esc(choice.value)}"${selected}>${esc(choice.label)}</option>`;
-      })
-      .join('');
-    const sampleStatusControl = Number.isFinite(task.sampleId)
-      ? `<label>Skift prøvestatus
-            <select class="planning-sample-status" data-task-id="${esc(task.id)}" data-sample-id="${esc(task.sampleId)}" data-original-value="${esc(task.sampleStatusValue || '')}">
-              ${sampleStatusOptions}
-            </select>
+    ].join('');
+    const statusControlHtml = task.sampleId
+      ? `<label>Skift status
+            <select class="planning-status-select" data-task-id="${esc(task.id)}" data-sample-id="${esc(task.sampleId)}" data-original-status="${esc(task.sampleStatusValue || '')}"${canModifySampleStatus ? '' : ' disabled'}>${statusOptionsHtml}</select>
           </label>`
       : '';
     const exportHtml = `
@@ -16254,7 +16264,7 @@ function renderPlanner(section) {
           <label>Noter
             <textarea class="planning-note" data-task-id="${esc(task.id)}" placeholder="Tilføj dine noter her">${esc(task.note || '')}</textarea>
           </label>
-          ${sampleStatusControl}
+          ${statusControlHtml}
           <label class="planning-checkbox">
             <input type="checkbox" class="planning-done" data-task-id="${esc(task.id)}" ${task.planDone ? 'checked' : ''}>
             Markér som færdig
@@ -16477,43 +16487,62 @@ function renderPlanner(section) {
       } else if (target.classList.contains('planning-done')) {
         setPlanSettings(taskId, {done: target.checked});
         updatePlanningUi();
-      } else if (target.classList.contains('planning-sample-status')) {
-        const previousValue = target.dataset.originalValue ?? '';
+      } else if (target.classList.contains('planning-status-select')) {
         const sampleId = Number(target.dataset.sampleId);
+        const originalStatus = target.dataset.originalStatus || '';
+        const newStatus = (target instanceof HTMLSelectElement ? target.value : target.getAttribute('value') || '').trim();
         if (!Number.isFinite(sampleId)) {
-          target.value = previousValue;
+          target.value = originalStatus;
           return;
         }
+        if (newStatus === originalStatus) return;
         if (!ensureWrite('samples')) {
-          target.value = previousValue;
+          target.value = originalStatus;
           return;
         }
         const sample = findById('samples', sampleId);
         if (!sample) {
-          setStatus('Kunne ikke finde prøven for opdatering.');
-          target.value = previousValue;
-          target.dataset.originalValue = previousValue;
+          alert('Kunne ikke finde prøve i databasen.');
+          target.value = originalStatus;
           return;
         }
-        const newStatus = target.value;
-        if ((sample.status || '') === newStatus) {
-          target.dataset.originalValue = newStatus;
+        if (!newStatus) {
+          target.value = originalStatus;
           return;
         }
-        const before = {...sample};
-        const updated = {...sample, status: newStatus};
+        const trimmedStatus = newStatus;
         try {
-          await updateRecord('samples', updated, before);
-          target.dataset.originalValue = newStatus;
-          setStatus(`Prøvestatus opdateret til ${newStatus || 'Ikke angivet'}.`);
+          const beforeSample = {...sample};
+          const updatedSample = {...sample, status: trimmedStatus};
+          await updateRecord('samples', updatedSample, beforeSample);
+          const relatedOrders = getCached('orders').filter(order => Number(order.sample_id) === sampleId);
+          let ordersUpdated = false;
+          for (const order of relatedOrders) {
+            if ((order.status || '') !== trimmedStatus) {
+              const beforeOrder = {...order};
+              const updatedOrder = {...order, status: trimmedStatus};
+              await updateRecord('orders', updatedOrder, beforeOrder);
+              ordersUpdated = true;
+            }
+          }
+          await loadStore('samples');
+          if (ordersUpdated) {
+            await loadStore('orders');
+            if (state.currentTab === 'orders') {
+              renderTab('orders');
+            }
+          }
+          target.dataset.originalStatus = trimmedStatus;
+          if (target instanceof HTMLSelectElement) {
+            target.value = trimmedStatus;
+          }
+          setStatus(`Prøvestatus opdateret til ${trimmedStatus || 'Ikke angivet'}.`);
+          updatePlanningUi();
         } catch (err) {
-          console.error('Kunne ikke opdatere prøvestatus fra planlæggeren:', err);
-          target.value = previousValue;
-          target.dataset.originalValue = previousValue;
-          setStatus('Kunne ikke opdatere prøvestatus.');
-          return;
+          console.error('Kunne ikke opdatere prøvestatus:', err);
+          alert('Kunne ikke opdatere prøvestatus: ' + (err?.message || err));
+          target.value = originalStatus;
         }
-        updatePlanningUi();
       }
     });
 
