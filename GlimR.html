@@ -679,6 +679,29 @@ section[data-tab].active {
   gap: 0.2rem;
   font-size: 0.85rem;
 }
+.planning-note-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.planning-note-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  color: var(--muted-text);
+}
+.planning-note-actions .planning-note-save {
+  font-size: 0.8rem;
+}
+.planning-note-hint {
+  font-style: italic;
+}
+.planning-card.planning-note-dirty .planning-note {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(24, 111, 175, 0.25);
+}
 .planning-card-controls input[type="datetime-local"],
 .planning-card-controls textarea,
 .planning-card-controls select {
@@ -15975,7 +15998,8 @@ function renderPlanner(section) {
         hasUpdates = true;
       }
       const noteInput = card.querySelector('.planning-note');
-      if (noteInput instanceof HTMLTextAreaElement) {
+      const noteIsDirty = card.classList.contains('planning-note-dirty');
+      if (noteInput instanceof HTMLTextAreaElement && !noteIsDirty) {
         updates.note = noteInput.value;
         hasUpdates = true;
       }
@@ -16448,9 +16472,15 @@ function renderPlanner(section) {
           <label>Deadline
             <input type="datetime-local" class="planning-due" data-task-id="${esc(task.id)}" value="${esc(task.dueInputValue)}">
           </label>
-          <label>Noter
-            <textarea class="planning-note" data-task-id="${esc(task.id)}" placeholder="Tilføj dine noter her">${esc(task.note || '')}</textarea>
-          </label>
+          <div class="planning-note-block">
+            <label>Noter
+              <textarea class="planning-note" data-task-id="${esc(task.id)}" placeholder="Tilføj dine noter her">${esc(task.note || '')}</textarea>
+            </label>
+            <div class="planning-note-actions">
+              <button type="button" class="secondary planning-button planning-note-save" data-note-save data-task-id="${esc(task.id)}" disabled>Gem note</button>
+              <span class="planning-note-hint">Gem når du er færdig med at skrive.</span>
+            </div>
+          </div>
           ${statusControlHtml}
           <label class="planning-checkbox">
             <input type="checkbox" class="planning-done" data-task-id="${esc(task.id)}" ${task.planDone ? 'checked' : ''}>
@@ -16769,12 +16799,61 @@ function renderPlanner(section) {
       if (target.classList.contains('planning-note')) {
         const taskId = target.dataset.taskId;
         if (!taskId) return;
-        setPlanSettings(taskId, {note: target.value});
+        const card = target.closest('.planning-card');
+        const saveButton = card?.querySelector('.planning-note-save');
+        const savedNote = getPlanSettings(taskId).note || '';
+        const hasChanges = target.value !== savedNote;
+        if (saveButton instanceof HTMLButtonElement) {
+          saveButton.disabled = !hasChanges;
+        }
+        if (card instanceof HTMLElement) {
+          card.classList.toggle('planning-note-dirty', hasChanges);
+        }
       }
     });
 
     planningBoard.addEventListener('click', event => {
       if (!(event.target instanceof HTMLElement)) return;
+      const noteSaveButton = event.target.closest('button[data-note-save]');
+      if (noteSaveButton instanceof HTMLButtonElement) {
+        if (!currentUserId) {
+          alert('Log ind for at gemme noter.');
+          return;
+        }
+        const taskId = noteSaveButton.dataset.taskId;
+        if (!taskId) return;
+        const card = noteSaveButton.closest('.planning-card');
+        const textarea = card?.querySelector('.planning-note');
+        if (!(textarea instanceof HTMLTextAreaElement)) return;
+        const currentNote = textarea.value;
+        const savedSettings = getPlanSettings(taskId);
+        const savedNote = savedSettings.note || '';
+        if (currentNote === savedNote) {
+          setStatus('Ingen ændringer i noten at gemme.');
+          noteSaveButton.disabled = true;
+          if (card instanceof HTMLElement) {
+            card.classList.remove('planning-note-dirty');
+          }
+          return;
+        }
+        const didUpdate = setPlanSettings(taskId, {note: currentNote});
+        if (didUpdate) {
+          const sanitizedNote = getPlanSettings(taskId).note || '';
+          textarea.value = sanitizedNote;
+          noteSaveButton.disabled = true;
+          if (card instanceof HTMLElement) {
+            card.classList.remove('planning-note-dirty');
+          }
+          setStatus('Noten er gemt.');
+        } else {
+          setStatus('Ingen ændringer i noten at gemme.');
+          noteSaveButton.disabled = true;
+          if (card instanceof HTMLElement) {
+            card.classList.remove('planning-note-dirty');
+          }
+        }
+        return;
+      }
       const exportButton = event.target.closest('button[data-export]');
       if (exportButton) {
         if (!currentUserId) {
