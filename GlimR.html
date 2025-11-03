@@ -3193,6 +3193,31 @@ function applyIconSlots(scope = document) {
 applyIconSlots(document);
 const SAMPLE_TYPES = ['Blod','Kindskrab','Biopsi','Kontrol'];
 const SAMPLE_STATUSES = ['Modtaget','Afventer','QC','Analyse','Tolkning','Godkendelse','Rapport','Svaret','Biobank','Annulleret'];
+const FAMILY_TYPES = [
+  {value: 'singleton', label: 'Singleton'},
+  {value: 'duo', label: 'Duo'},
+  {value: 'trio', label: 'Trio'},
+  {value: 'other', label: 'Andet'}
+];
+const FAMILY_TYPE_LABELS = FAMILY_TYPES.reduce((acc, entry) => {
+  acc[entry.value] = entry.label;
+  return acc;
+}, {});
+function normalizeFamilyType(value) {
+  const asString = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  switch (asString) {
+    case 'singleton':
+    case 'duo':
+    case 'trio':
+    case 'other':
+      return asString;
+    default:
+      return 'singleton';
+  }
+}
+function getFamilyTypeLabel(value) {
+  return FAMILY_TYPE_LABELS[normalizeFamilyType(value)] || 'Singleton';
+}
 const INACTIVE_SAMPLE_STATUSES = new Set(['svaret','biobank','annulleret']);
 function isActiveStatus(status) {
   return !INACTIVE_SAMPLE_STATUSES.has((status || '').toLowerCase());
@@ -9609,6 +9634,11 @@ function renderOrders(section) {
               </select>
             </div>
           </label>
+          <label>Familietype
+            <select name="family_type" data-allow-legacy-option>
+              ${FAMILY_TYPES.map(type => `<option value="${type.value}"${type.value === 'singleton' ? ' selected' : ''}>${type.label}</option>`).join('')}
+            </select>
+          </label>
           <label>Panel
             <div class="filterable-select">
               <input type="search" data-select-filter placeholder="Filtrer paneler">
@@ -10016,6 +10046,8 @@ function renderOrders(section) {
     {key:'sample_label', label:'Prøve', value: row => getName('samples', Number(row.sample_id))},
     {key:'panel_id', label:'Panel-ID'},
     {key:'panel_name', label:'Panel', value: row => getName('panels', Number(row.panel_id))},
+    {key:'family_type', label:'Familietype (kode)', value: row => normalizeFamilyType(row.family_type)},
+    {key:'family_type_display', label:'Familietype', value: row => getFamilyTypeLabel(row.family_type)},
     {key:'status', label:'Status (kode)'},
     {key:'status_display', label:'Status', value: row => {
       const sample = sampleMap.get(Number(row.sample_id));
@@ -10082,6 +10114,7 @@ function renderOrders(section) {
     data.urgent = isUrgent;
     data.patient_id = Number(data.patient_id);
     data.sample_id = Number(data.sample_id);
+    data.family_type = normalizeFamilyType(data.family_type);
     data.panel_id = data.panel_id ? Number(data.panel_id) : null;
     data.analysis_responsible_id = data.analysis_responsible_id ? Number(data.analysis_responsible_id) : null;
     data.interpreter_id = data.interpreter_id ? Number(data.interpreter_id) : null;
@@ -16138,6 +16171,9 @@ function renderPlanner(section) {
         } else if (stageInfo) {
           info.push(stageInfo);
         }
+        const familyType = normalizeFamilyType(order?.family_type);
+        const familyTypeLabel = getFamilyTypeLabel(familyType);
+        if (familyTypeLabel) info.push(`Familietype: ${familyTypeLabel}`);
         if (sample?.sample_type) info.push(`Prøvetype: ${sample.sample_type}`);
         if (order?.status) info.push(`Ordinationsstatus: ${order.status}`);
         if (order?.ordered_at) {
@@ -16162,6 +16198,8 @@ function renderPlanner(section) {
           patientMrn,
           sampleLabel,
           roleLabel,
+          familyType,
+          familyTypeLabel,
           statusKey,
           statusLabel: STAGE_STATUS_LABELS[statusKey] || 'Status ukendt',
           statusDescription: STAGE_STATUS_DESCRIPTIONS[statusKey] || '',
