@@ -4211,16 +4211,35 @@ function buildUcscUrl(variant, info = extractVariantGenomicInfo(variant)) {
   return `https://genome.ucsc.edu/cgi-bin/hgTracks?db=${genome}&position=${encodeURIComponent(region)}`;
 }
 
+function buildGnomadUrl(variant, info = extractVariantGenomicInfo(variant)) {
+  if (!variant || !info) return '';
+  const type = normalizeVariantType(variant.variant_type);
+  if (type !== 'snv') return '';
+  const chromosome = info.chromosome || ensureChromosomePrefix(variant.chromosome || '');
+  const start = info.start;
+  const ref = (info.ref || '').toUpperCase();
+  const alt = (info.alt || '').toUpperCase();
+  if (!chromosome || !start || !ref || !alt) return '';
+  const chrPart = chromosome.replace(/^chr/i, '');
+  if (!chrPart) return '';
+  const variantId = `${chrPart}-${start}-${ref}-${alt}`;
+  return `https://gnomad.broadinstitute.org/variant/${variantId}?dataset=gnomad_r4`;
+}
+
 function formatVariantLookupCell(variant) {
   if (!variant) return '';
   const info = extractVariantGenomicInfo(variant);
   const franklinUrl = buildFranklinUrl(variant, info);
   const genccUrl = buildGenccUrl(variant);
   const ucscUrl = buildUcscUrl(variant, info);
+  const gnomadUrl = buildGnomadUrl(variant, info);
   const title = formatVariantTitle(variant) || variant.gene || variant.hgvs_c || 'varianten';
   const labels = [];
   if (franklinUrl) {
     labels.push({label: 'F', url: franklinUrl, title: `Åbn Franklin (Genoox) for ${title}`});
+  }
+  if (gnomadUrl) {
+    labels.push({label: 'G', url: gnomadUrl, title: `Åbn varianten i gnomAD (${title})`});
   }
   if (genccUrl) {
     const gene = extractPrimaryGeneName(variant.gene || '');
