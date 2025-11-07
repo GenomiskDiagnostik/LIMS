@@ -9839,6 +9839,7 @@ function renderOrders(section) {
   applySelectFilters(section);
   const statusSelect = form?.elements?.status;
   const sampleSelect = form?.elements?.sample_id;
+  const patientSelect = form?.elements?.patient_id;
   const ensureStatusOption = value => {
     if (!statusSelect || !value) return;
     if (!Array.from(statusSelect.options).some(opt => opt.value === value)) {
@@ -9860,14 +9861,91 @@ function renderOrders(section) {
       statusSelect.value = sample.status;
     }
   };
-  sampleSelect?.addEventListener('change', () => {
-    const sampleId = Number(sampleSelect.value);
+  const getSamplePatientId = sampleId => {
+    if (!sampleId) return null;
+    const sample = sampleMap.get(Number(sampleId));
+    const patientId = Number(sample?.patient_id);
+    return Number.isFinite(patientId) && patientId > 0 ? patientId : null;
+  };
+  const updateSampleOptions = () => {
+    if (!sampleSelect) return;
+    const selectedPatientId = Number(patientSelect?.value || 0);
+    const enforcePatient = Number.isFinite(selectedPatientId) && selectedPatientId > 0;
+    const currentSampleId = Number(sampleSelect.value || 0);
+    Array.from(sampleSelect.options).forEach(opt => {
+      if (!opt.value) {
+        opt.disabled = false;
+        opt.hidden = false;
+        return;
+      }
+      const optionPatientId = getSamplePatientId(opt.value);
+      const matches = !enforcePatient || optionPatientId === selectedPatientId;
+      opt.disabled = !matches;
+      opt.hidden = !matches;
+    });
+    if (enforcePatient && currentSampleId) {
+      const currentPatientId = getSamplePatientId(currentSampleId);
+      if (currentPatientId !== selectedPatientId) {
+        sampleSelect.value = '';
+        if (statusSelect) statusSelect.value = '';
+      }
+    }
+  };
+  const updatePatientOptions = () => {
+    if (!patientSelect) return;
+    const selectedSampleId = Number(sampleSelect?.value || 0);
+    const samplePatientId = getSamplePatientId(selectedSampleId);
+    const enforceSample = Number.isFinite(samplePatientId);
+    Array.from(patientSelect.options).forEach(opt => {
+      if (!opt.value) {
+        opt.disabled = enforceSample;
+        opt.hidden = false;
+        return;
+      }
+      if (!enforceSample) {
+        opt.disabled = false;
+        opt.hidden = false;
+        return;
+      }
+      const optionPatientId = Number(opt.value);
+      const matches = Number.isFinite(optionPatientId) && optionPatientId === samplePatientId;
+      opt.disabled = !matches;
+      opt.hidden = !matches;
+    });
+    if (enforceSample && samplePatientId != null) {
+      const desiredValue = String(samplePatientId);
+      if (patientSelect.value !== desiredValue) {
+        patientSelect.value = desiredValue;
+      }
+    }
+  };
+  const applyPatientSampleConstraints = () => {
+    updatePatientOptions();
+    updateSampleOptions();
+  };
+  patientSelect?.addEventListener('change', () => {
+    updateSampleOptions();
+    updatePatientOptions();
+  });
+  const handleSampleChange = () => {
+    const sampleId = Number(sampleSelect?.value || 0);
     if (sampleId) {
       syncStatusFromSample(sampleId);
+      const samplePatientId = getSamplePatientId(sampleId);
+      if (samplePatientId != null && patientSelect) {
+        const value = String(samplePatientId);
+        if (patientSelect.value !== value) {
+          patientSelect.value = value;
+        }
+      }
     } else if (statusSelect) {
       statusSelect.value = '';
     }
-  });
+    updatePatientOptions();
+    updateSampleOptions();
+  };
+  sampleSelect?.addEventListener('change', handleSampleChange);
+  applyPatientSampleConstraints();
   let filteredOrders = list.slice();
   let activeFilters = {};
   let selectedOrderId = state.pendingOrderId != null ? Number(state.pendingOrderId) : null;
@@ -10083,6 +10161,7 @@ function renderOrders(section) {
       fillForm(form, pendingOrder);
       syncStatusFromSample(pendingOrder.sample_id);
       enforcePrioritySelection();
+      applyPatientSampleConstraints();
       const pendingRow = tbody?.querySelector(`tr[data-id="${pendingOrder.id}"]`);
       if (pendingRow) {
         pendingRow.scrollIntoView({block: 'nearest'});
@@ -10176,6 +10255,7 @@ function renderOrders(section) {
     fillForm(form, order);
     syncStatusFromSample(order.sample_id);
     enforcePrioritySelection();
+    applyPatientSampleConstraints();
     renderRows();
   });
   form.addEventListener('submit', async e => {
@@ -10243,6 +10323,7 @@ function renderOrders(section) {
     selectedOrderId = null;
     enforcePrioritySelection();
     renderRows();
+    setTimeout(() => applyPatientSampleConstraints(), 0);
   });
   section.querySelector('#orderClear').addEventListener('click', () => form.reset());
 }
