@@ -3272,6 +3272,67 @@ const INACTIVE_SAMPLE_STATUSES = new Set(['svaret','biobank','annulleret']);
 function isActiveStatus(status) {
   return !INACTIVE_SAMPLE_STATUSES.has((status || '').toLowerCase());
 }
+
+function isLikelyControlSample(sample) {
+  if (!sample) return false;
+  const type = (sample.sample_type || '').toString().toLowerCase();
+  if (type.includes('kontrol') || type.includes('control')) return true;
+  const pmb = (sample.pmb_number || '').toString().toLowerCase();
+  return pmb.includes('kontrol') || pmb.includes('control');
+}
+
+function normalizeCollectionDate(value) {
+  if (!value) return '';
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    const datePart = trimmed.split('T')[0];
+    if (datePart && /^\d{4}-\d{2}-\d{2}$/.test(datePart)) return datePart;
+    const parsed = new Date(trimmed);
+    if (!Number.isNaN(parsed.valueOf())) return parsed.toISOString().slice(0, 10);
+    return datePart || '';
+  }
+  const parsed = new Date(value);
+  if (!Number.isNaN(parsed.valueOf())) return parsed.toISOString().slice(0, 10);
+  return '';
+}
+
+async function syncControlSampleStatus(sample, newStatus) {
+  const result = {updated: false, ordersUpdated: false};
+  if (!sample) return result;
+  if (isLikelyControlSample(sample)) return result;
+  const patientId = Number(sample.patient_id);
+  if (!Number.isFinite(patientId)) return result;
+  const collectedDate = normalizeCollectionDate(sample.collected_at);
+  if (!collectedDate) return result;
+  const statusToApply = newStatus == null ? '' : String(newStatus).trim();
+
+  const samples = getCached('samples') || [];
+  const orders = getCached('orders') || [];
+  for (const candidate of samples) {
+    if (!candidate || candidate.id === sample.id) continue;
+    if (Number(candidate.patient_id) !== patientId) continue;
+    if (!isLikelyControlSample(candidate)) continue;
+    const candidateDate = normalizeCollectionDate(candidate.collected_at);
+    if (!candidateDate || candidateDate !== collectedDate) continue;
+    const currentStatus = (candidate.status || '').toString().trim();
+    if (currentStatus === statusToApply) continue;
+    const beforeSample = {...candidate};
+    const updatedSample = {...candidate, status: statusToApply};
+    await updateRecord('samples', updatedSample, beforeSample);
+    result.updated = true;
+    for (const order of orders) {
+      if (Number(order.sample_id) !== Number(candidate.id)) continue;
+      const orderStatus = (order.status || '').toString().trim();
+      if (orderStatus === statusToApply) continue;
+      const beforeOrder = {...order};
+      const updatedOrder = {...order, status: statusToApply};
+      await updateRecord('orders', updatedOrder, beforeOrder);
+      result.ordersUpdated = true;
+    }
+  }
+  return result;
+}
 const DEFAULT_PATIENT_GROUPS = [
   'Arvelige hjertesygdomme',
   'Arvelig hæmatologisk sygdom',
@@ -9333,6 +9394,7 @@ function renderSamples(section) {
     if (data.status) data.status = data.status.trim();
     if (data.notes) data.notes = data.notes.trim();
     let sampleId;
+    let controlSyncResult = {updated: false, ordersUpdated: false};
     if (currentId) {
       const id = currentId;
       const before = {...findById('samples', id)};
@@ -9355,7 +9417,10 @@ function renderSamples(section) {
           ordersUpdated = true;
         }
       }
-      if (ordersUpdated && state.currentTab === 'orders') {
+      const existingSample = findById('samples', sampleId) || {};
+      const sampleRecord = {...existingSample, ...data, id: sampleId, status: sampleStatus};
+      controlSyncResult = await syncControlSampleStatus(sampleRecord, sampleStatus);
+      if ((ordersUpdated || controlSyncResult.ordersUpdated) && state.currentTab === 'orders') {
         renderTab('orders');
       }
     }
@@ -10395,6 +10460,7 @@ function renderOrders(section) {
     if (sampleBefore && (sampleBefore.status || '') !== (data.status || '')) {
       const updatedSample = {...sampleBefore, status: data.status || ''};
       await updateRecord('samples', updatedSample, sampleBefore);
+      await syncControlSampleStatus(updatedSample, data.status || '');
       if (state.currentTab === 'samples') {
         renderTab('samples');
       }
@@ -17095,8 +17161,9 @@ function renderPlanner(section) {
           const beforeSample = {...sample};
           const updatedSample = {...sample, status: trimmedStatus};
           await updateRecord('samples', updatedSample, beforeSample);
+          const controlSync = await syncControlSampleStatus(updatedSample, trimmedStatus);
           const relatedOrders = getCached('orders').filter(order => Number(order.sample_id) === sampleId);
-          let ordersUpdated = false;
+          let ordersUpdated = controlSync.ordersUpdated;
           for (const order of relatedOrders) {
             if ((order.status || '') !== trimmedStatus) {
               const beforeOrder = {...order};
