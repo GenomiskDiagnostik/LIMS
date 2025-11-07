@@ -12101,6 +12101,10 @@ function renderVariantLibrary(section) {
       });
       rows.sort((a, b) => compareChromosomes(a.chromosome, b.chromosome));
     }
+    const hideOtherChromosomes = Boolean(highlightInfo);
+    if (hideOtherChromosomes) {
+      rows = rows.filter(row => row.chromosome === highlightInfo.chromosome);
+    }
     const maxBinCount = d3.max(rows, row => d3.max(row.histogram, bin => bin.length)) || 1;
     const containerWidth = hotspotChartContainer.clientWidth || 960;
     const width = Math.max(containerWidth, 720);
@@ -12830,6 +12834,9 @@ function renderVariantLibrary(section) {
     }
     if (highlightInfo) {
       captionDetails.push('Den valgte variant er markeret med et grønt bånd på det relevante kromosom.');
+      if (hideOtherChromosomes) {
+        captionDetails.push(`Visningen er afgrænset til kromosom ${highlightInfo.chromosome}, så fokus er på den valgte variant.`);
+      }
     } else if (highlightVariant && highlightSuppressedReason) {
       const highlightMessage = (() => {
         switch (highlightSuppressedReason) {
