@@ -3352,7 +3352,8 @@ const schemaFields = {
   audit: ['id','ts','user','action','entity','entity_id','before','after','created_at','updated_at'],
   variant_library: ['id','variant_type','gene','transcript','hgvs_c','hgvs_p','rsid','classification','criteria','genomic_position','evidence','condition','inheritance','genome_build','chromosome','start','end','copy_number','sv_subtype','size_bp','iscn','description','affected_genes','curated_by','last_review','created_at','updated_at'],
   responses: ['id','ts','sender','patient','diagnostic_report_id','variant_count','variants','raw','created_at','updated_at'],
-  conclusion_library: ['id','title','body','created_by','created_at','updated_at']
+  conclusion_library: ['id','title','body','created_by','created_at','updated_at'],
+  planner: ['id','user_id','tasks','view','created_at','updated_at']
 };
 const tooltipCatalog = {
   tabs: {
@@ -3671,6 +3672,8 @@ const tooltipCatalog = {
     downloadSql: 'Download komplet MySQL-dump af GlimR-data.',
     showSchema: 'Vis MySQL-skemaet direkte på siden.',
     downloadZip: 'Download ZIP med GlimR og aktuelle data.',
+    downloadCsvBackup: 'Eksportér alle datatabeller som CSV-filer i et ZIP-arkiv.',
+    restoreCsvBackup: 'Importer komplette CSV-datatabeller fra en CSV- eller ZIP-fil.',
     bindFile: 'Vælg eller opret en lokal databasefil til autogem.',
     saveNow: 'Gem straks til den tilknyttede databasefil.',
     downloadBackup: 'Eksportér alle data som JSON-backup.',
@@ -3694,6 +3697,7 @@ const tooltipCatalog = {
     reportVariantSelect: 'Vælg blandt ordinationens registrerede varianter.',
     reportVariantList: 'Varianter der er føjet til rapportens fund.',
     restoreBackup: 'Gendan databasen fra en tidligere JSON-backup.',
+    restoreCsvFile: 'Vælg CSV- eller ZIP-filer med datatabeller til import.',
     schemaText: 'Viser MySQL-skema og INSERT-statements til reference.',
     patientsFilterPanel: 'Åbn avancerede filtre for at søge præcist i patientlisten.',
     samplesFilterPanel: 'Finfiltrér prøver efter patient, status og indsamlingstid.',
@@ -6526,6 +6530,294 @@ async function downloadBackup() {
   });
   setStatus(`Fuld backup downloadet som ${filename}.`);
 }
+const CSV_BOOLEAN_FIELDS = new Set(['acute','urgent','healthy_family_member']);
+const CSV_INTEGER_FIELDS = new Set(['gene_count','sort_order','variant_count']);
+const CSV_FLOAT_FIELDS = new Set(['af','value','copy_number','size_bp']);
+const CSV_JSON_FIELDS = new Set(['variant_details','variants','tasks','view','__serialized__']);
+function buildStoreCsvColumns(store, rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  const fields = schemaFields[store];
+  if (Array.isArray(fields) && fields.length) {
+    return fields.map(field => {
+      if (CSV_JSON_FIELDS.has(field)) {
+        return {key: field, label: field, value: row => formatJsonCell(row?.[field])};
+      }
+      return {key: field, label: field};
+    });
+  }
+  const inferred = inferCsvColumns(list);
+  return inferred.map(col => {
+    if (CSV_JSON_FIELDS.has(col.key)) {
+      return {...col, value: row => formatJsonCell(row?.[col.key])};
+    }
+    return col;
+  });
+}
+async function downloadCsvBackup() {
+  const data = await exportData();
+  const files = [];
+  const storeCounts = {};
+  for (const store of STORES) {
+    const rows = Array.isArray(data[store]) ? data[store] : [];
+    storeCounts[store] = rows.length;
+    const columns = buildStoreCsvColumns(store, rows);
+    const {encoded} = buildCsvExport(rows, columns, ';');
+    files.push({name: `${store}.csv`, data: encoded});
+  }
+  const zipBytes = createZip(files);
+  const blob = new Blob([zipBytes], {type: 'application/zip'});
+  const url = URL.createObjectURL(blob);
+  const filename = withDateStamp('glimr-backup-csv.zip');
+  triggerDownload(url, filename);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  registerManualExport('csv_backup', {
+    baseName: 'glimr-backup-csv.zip',
+    filename,
+    storeCounts,
+    byteSize: blob.size
+  });
+  setStatus(`CSV-backup downloadet som ${filename}.`);
+}
+function decodeWindows1252Bytes(bytes) {
+  const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+  if (typeof TextDecoder !== 'undefined') {
+    const candidates = ['windows-1252', 'iso-8859-1'];
+    for (const label of candidates) {
+      try {
+        return new TextDecoder(label).decode(data);
+      } catch (err) {
+        /* prøv næste encoder */
+      }
+    }
+  }
+  let result = '';
+  for (let i = 0; i < data.length; i++) {
+    result += String.fromCharCode(data[i]);
+  }
+  return result;
+}
+function decodeUtf8(bytes) {
+  const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+  if (typeof TextDecoder !== 'undefined') {
+    try {
+      return new TextDecoder('utf-8').decode(data);
+    } catch (err) {
+      /* ignore */
+    }
+  }
+  let result = '';
+  for (let i = 0; i < data.length; i++) {
+    result += String.fromCharCode(data[i]);
+  }
+  try {
+    return decodeURIComponent(escape(result));
+  } catch (err) {
+    return result;
+  }
+}
+function parseZipEntries(bytes) {
+  const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+  if (!data.length) return [];
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  let offset = data.byteLength - 22;
+  while (offset >= 0 && view.getUint32(offset, true) !== 0x06054b50) {
+    offset--;
+  }
+  if (offset < 0) {
+    throw new Error('Ugyldigt ZIP-arkiv.');
+  }
+  const entryCount = view.getUint16(offset + 10, true);
+  const centralOffset = view.getUint32(offset + 16, true);
+  const entries = [];
+  let cursor = centralOffset;
+  for (let i = 0; i < entryCount; i++) {
+    if (view.getUint32(cursor, true) !== 0x02014b50) {
+      throw new Error('Ugyldigt ZIP-arkiv (central directory).');
+    }
+    const compression = view.getUint16(cursor + 10, true);
+    const uncompressedSize = view.getUint32(cursor + 24, true);
+    const nameLength = view.getUint16(cursor + 28, true);
+    const extraLength = view.getUint16(cursor + 30, true);
+    const commentLength = view.getUint16(cursor + 32, true);
+    const localHeaderOffset = view.getUint32(cursor + 42, true);
+    const nameBytes = data.slice(cursor + 46, cursor + 46 + nameLength);
+    const name = decodeUtf8(nameBytes);
+    if (compression !== 0) {
+      throw new Error('ZIP-arkivet anvender komprimering, som ikke understøttes.');
+    }
+    const localView = new DataView(data.buffer, data.byteOffset + localHeaderOffset, data.byteLength - localHeaderOffset);
+    if (localView.getUint32(0, true) !== 0x04034b50) {
+      throw new Error('Ugyldigt ZIP-arkiv (lokal filheader).');
+    }
+    const localNameLength = localView.getUint16(26, true);
+    const localExtraLength = localView.getUint16(28, true);
+    const dataStart = localHeaderOffset + 30 + localNameLength + localExtraLength;
+    const fileBytes = data.slice(dataStart, dataStart + uncompressedSize);
+    entries.push({name, data: fileBytes});
+    cursor += 46 + nameLength + extraLength + commentLength;
+  }
+  return entries;
+}
+function normaliseStoreFilename(name) {
+  if (!name) return '';
+  const base = name.replace(/^.*[\\/]/, '');
+  const withoutExt = base.replace(/\.csv$/i, '');
+  return withoutExt.replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '').toLowerCase();
+}
+function mapFilenameToStore(name) {
+  const normalized = normaliseStoreFilename(name);
+  if (!normalized) return null;
+  const candidates = new Set([normalized]);
+  candidates.add(normalized.replace(/^glimr_/, ''));
+  candidates.add(normalized.replace(/^data_/, ''));
+  candidates.add(normalized.replace(/^backup_/, ''));
+  candidates.add(normalized.replace(/^export_/, ''));
+  candidates.add(normalized.replace(/_backup$/, ''));
+  candidates.add(normalized.replace(/_export$/, ''));
+  for (const candidate of Array.from(candidates).filter(Boolean)) {
+    if (STORES.includes(candidate)) return candidate;
+    const singular = candidate.endsWith('s') ? candidate.slice(0, -1) : candidate;
+    if (STORES.includes(singular)) return singular;
+    const plural = candidate.endsWith('s') ? candidate : `${candidate}s`;
+    if (STORES.includes(plural)) return plural;
+  }
+  return null;
+}
+function parseCsvFieldValue(store, field, raw) {
+  if (raw == null) return undefined;
+  const text = String(raw);
+  const trimmed = text.trim();
+  if (!trimmed) {
+    if (CSV_BOOLEAN_FIELDS.has(field)) return false;
+    if (field === 'id' || field.endsWith('_id') || CSV_INTEGER_FIELDS.has(field) || CSV_FLOAT_FIELDS.has(field)) return null;
+    if (CSV_JSON_FIELDS.has(field)) return null;
+    return '';
+  }
+  if (CSV_BOOLEAN_FIELDS.has(field)) {
+    const lower = trimmed.toLowerCase();
+    if (['1','true','ja','yes','y','on'].includes(lower)) return true;
+    if (['0','false','nej','no','n','off'].includes(lower)) return false;
+    if (/^[0-9]+$/.test(lower)) return Number(lower) !== 0;
+    return lower === 'sand';
+  }
+  if (field === 'id' || field.endsWith('_id') || CSV_INTEGER_FIELDS.has(field)) {
+    const num = Number(trimmed.replace(',', '.'));
+    return Number.isFinite(num) ? num : trimmed;
+  }
+  if (CSV_FLOAT_FIELDS.has(field)) {
+    const num = Number(trimmed.replace(',', '.'));
+    return Number.isFinite(num) ? num : trimmed;
+  }
+  if (CSV_JSON_FIELDS.has(field)) {
+    try {
+      return JSON.parse(trimmed);
+    } catch (err) {
+      return trimmed;
+    }
+  }
+  return trimmed;
+}
+function parseCsvRecordsForStore(store, text) {
+  const {headers, rows} = parseCsv(text);
+  if (!headers.length) return [];
+  const schema = schemaFields[store];
+  const schemaMap = new Map();
+  if (Array.isArray(schema)) {
+    schema.forEach(field => {
+      schemaMap.set(normaliseHeader(field), field);
+    });
+  }
+  const columnKeys = headers.map(header => {
+    const normalized = normaliseHeader(header);
+    if (schemaMap.has(normalized)) return schemaMap.get(normalized);
+    return normalized || null;
+  });
+  const records = [];
+  for (const rowValues of rows) {
+    if (!rowValues || rowValues.every(cell => !cell || !String(cell).trim())) continue;
+    const record = {};
+    let hasValue = false;
+    columnKeys.forEach((key, idx) => {
+      if (!key) return;
+      const raw = rowValues[idx];
+      if (key === '__serialized__') {
+        const payload = typeof raw === 'string' ? raw.trim() : (raw == null ? '' : String(raw).trim());
+        if (payload) {
+          try {
+            const parsed = JSON.parse(payload);
+            if (parsed && typeof parsed === 'object') {
+              Object.assign(record, parsed);
+              if (Object.keys(parsed).length) {
+                hasValue = true;
+              }
+            } else {
+              record[key] = parsed;
+              if (parsed !== null && parsed !== '') {
+                hasValue = true;
+              }
+            }
+          } catch (err) {
+            record[key] = payload;
+            hasValue = true;
+          }
+        }
+        return;
+      }
+      const value = parseCsvFieldValue(store, key, raw);
+      if (value === undefined) return;
+      if (value !== '' && value !== null && !(typeof value === 'object' && Object.keys(value).length === 0)) {
+        hasValue = true;
+      }
+      record[key] = value;
+    });
+    if (!hasValue && record.id == null) continue;
+    records.push(record);
+  }
+  return records;
+}
+async function restoreFromCsvFile(file) {
+  if (!file) throw new Error('Ingen fil valgt.');
+  const nameLower = (file.name || '').toLowerCase();
+  let rawEntries = [];
+  if (nameLower.endsWith('.zip')) {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    rawEntries = parseZipEntries(bytes).map(entry => ({name: entry.name, text: decodeWindows1252Bytes(entry.data)}));
+  } else {
+    rawEntries = [{name: file.name || 'data.csv', text: await file.text()}];
+  }
+  const parsedEntries = [];
+  for (const entry of rawEntries) {
+    const store = mapFilenameToStore(entry.name || '');
+    if (!store) {
+      continue;
+    }
+    parsedEntries.push({store, text: entry.text});
+  }
+  if (!parsedEntries.length) {
+    const hint = rawEntries[0]?.name ? ` (${rawEntries[0].name})` : '';
+    throw new Error(`Kunne ikke identificere datatabeller ud fra filnavn${hint}.`);
+  }
+  const storeMap = new Map();
+  for (const entry of parsedEntries) {
+    const rows = parseCsvRecordsForStore(entry.store, entry.text);
+    storeMap.set(entry.store, rows);
+  }
+  const data = {};
+  const summary = [];
+  for (const store of STORES) {
+    const rows = storeMap.get(store) || [];
+    data[store] = rows;
+    if (storeMap.has(store)) {
+      summary.push(`${store} (${rows.length})`);
+    }
+  }
+  await importData(data);
+  if (summary.length) {
+    setStatus(`CSV-data importeret for ${summary.join(', ')}.`);
+  } else {
+    setStatus('CSV-data importeret.');
+  }
+}
 async function backupAndResetData() {
   if (!ensureWrite('patients')) return;
   const confirmReset = confirm('Dette vil hente en fuld backup og derefter slette alle data undtagen brugere. Fortsæt?');
@@ -6679,6 +6971,32 @@ function formatJsonCell(value) {
     return String(value);
   }
 }
+function buildCsvExport(rows, columns, delimiter = ';') {
+  const data = Array.isArray(rows) ? rows : [];
+  const sourceColumns = Array.isArray(columns) && columns.length ? columns : inferCsvColumns(data);
+  const cols = sourceColumns.map(col => {
+    if (typeof col === 'string') {
+      return {key: col, label: col};
+    }
+    const normalised = {...col};
+    if (!Object.prototype.hasOwnProperty.call(normalised, 'label')) {
+      normalised.label = normalised.key ?? '';
+    }
+    return normalised;
+  });
+  const header = cols.map((col, index) => {
+    const label = index === 0
+      ? sanitizeFirstCsvHeaderLabel(col.label ?? col.key)
+      : (col.label ?? col.key);
+    return escapeCsvValue(label, delimiter);
+  }).join(delimiter);
+  const lines = data.map(row => cols.map(col => {
+    const raw = typeof col.value === 'function' ? col.value(row) : (row ? row[col.key] : undefined);
+    return escapeCsvValue(raw, delimiter);
+  }).join(delimiter));
+  const csv = [header, ...lines].join('\r\n');
+  return {columns: cols, csv, encoded: encodeWindows1252(csv), rowCount: data.length};
+}
 function exportFilteredCsv(baseName, rows, columns, meta = {}) {
   const data = Array.isArray(rows) ? rows : [];
   const cols = Array.isArray(columns) && columns.length ? columns : inferCsvColumns(data);
@@ -6787,20 +7105,7 @@ function sanitizeFirstCsvHeaderLabel(label) {
   return text;
 }
 function downloadCsvFile(rows, columns, baseName, delimiter = ';', auditMeta = {}) {
-  if (!Array.isArray(rows)) rows = [];
-  const cols = columns.map(col => typeof col === 'string' ? {key: col, label: col} : col);
-  const header = cols.map((col, index) => {
-    const label = index === 0
-      ? sanitizeFirstCsvHeaderLabel(col.label ?? col.key)
-      : (col.label ?? col.key);
-    return escapeCsvValue(label, delimiter);
-  }).join(delimiter);
-  const lines = rows.map(row => cols.map(col => {
-    const raw = typeof col.value === 'function' ? col.value(row) : row?.[col.key];
-    return escapeCsvValue(raw, delimiter);
-  }).join(delimiter));
-  const csv = [header, ...lines].join('\r\n');
-  const encoded = encodeWindows1252(csv);
+  const {encoded, rowCount} = buildCsvExport(rows, columns, delimiter);
   const blob = new Blob([encoded], {type: 'text/csv;charset=windows-1252;'});
   const url = URL.createObjectURL(blob);
   const filename = withDateStamp(baseName);
@@ -6811,7 +7116,7 @@ function downloadCsvFile(rows, columns, baseName, delimiter = ';', auditMeta = {
     : {};
   details.baseName = baseName;
   details.filename = filename;
-  details.rowCount = rows.length;
+  details.rowCount = rowCount;
   details.delimiter = delimiter;
   registerManualExport((auditMeta && auditMeta.entity) || 'csv_export', details);
   return filename;
@@ -19392,6 +19697,11 @@ function renderDbTab(section) {
       <input type="file" id="restoreFile" accept="application/json" hidden>
     </div>
     <div class="btn-row">
+      <button class="secondary" id="downloadCsvBackup">Eksportér data (csv)</button>
+      <button class="secondary" type="button" id="restoreCsvBackup">Importer data (csv)</button>
+      <input type="file" id="restoreCsvFile" accept=".csv,.zip,text/csv,application/zip" hidden>
+    </div>
+    <div class="btn-row">
       <button class="secondary" type="button" id="downloadSql">Hent glimr.sql</button>
       <button class="secondary" id="showSchema">Vis skema</button>
       <button class="secondary" id="downloadZip">Hent ZIP</button>
@@ -19438,6 +19748,22 @@ function renderDbTab(section) {
     } catch (err) {
       console.error(err);
       alert('Kunne ikke gendanne: ' + err.message);
+    }
+    e.target.value = '';
+  });
+  section.querySelector('#downloadCsvBackup').addEventListener('click', downloadCsvBackup);
+  const restoreCsvInput = section.querySelector('#restoreCsvFile');
+  const restoreCsvBtn = section.querySelector('#restoreCsvBackup');
+  restoreCsvBtn?.addEventListener('click', () => restoreCsvInput?.click());
+  restoreCsvInput?.addEventListener('change', async e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      await restoreFromCsvFile(file);
+      alert('CSV-data gendannet.');
+    } catch (err) {
+      console.error(err);
+      alert('Kunne ikke importere CSV-data: ' + (err?.message || err));
     }
     e.target.value = '';
   });
