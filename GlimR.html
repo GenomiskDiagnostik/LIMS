@@ -3281,6 +3281,14 @@ function isLikelyControlSample(sample) {
   return pmb.includes('kontrol') || pmb.includes('control');
 }
 
+function isControlOrder(order) {
+  if (!order) return false;
+  const sampleId = Number(order.sample_id);
+  if (!Number.isFinite(sampleId)) return false;
+  const sample = findById('samples', sampleId);
+  return !!sample && isLikelyControlSample(sample);
+}
+
 function normalizeCollectionDate(value) {
   if (!value) return '';
   if (typeof value === 'string') {
@@ -7416,11 +7424,12 @@ function renderTab(id) {
 function renderDashboard(section) {
   const patients = getCached('patients').length;
   const samples = getCached('samples');
-  const sampleCount = samples.length;
+  const primarySamples = samples.filter(sample => !isLikelyControlSample(sample));
+  const sampleCount = primarySamples.length;
   const orders = getCached('orders');
   const reports = getCached('reports');
   const variants = getCached('variants');
-  const statusCounts = samples.reduce((acc, sample) => {
+  const statusCounts = primarySamples.reduce((acc, sample) => {
     const status = (sample.status || '').toLowerCase();
     if (status === 'modtaget') acc.received += 1;
     else if (status === 'qc') acc.qc += 1;
@@ -7430,20 +7439,44 @@ function renderDashboard(section) {
     else if (status === 'biobank') acc.biobank += 1;
     return acc;
   }, {received: 0, qc: 0, analysis: 0, interpretation: 0, report: 0, biobank: 0});
+  const ordersForStats = orders.filter(order => !isControlOrder(order));
+  const variantsForStats = variants.filter(variant => {
+    const sampleId = Number(variant.sample_id);
+    if (Number.isFinite(sampleId)) {
+      const sample = findById('samples', sampleId);
+      if (sample && isLikelyControlSample(sample)) return false;
+    }
+    const orderId = Number(variant.order_id);
+    if (!Number.isFinite(orderId)) return true;
+    const order = findById('orders', orderId);
+    return !isControlOrder(order);
+  });
+  const reportsForStats = reports.filter(report => {
+    const sampleId = Number(report.sample_id);
+    if (Number.isFinite(sampleId)) {
+      const sample = findById('samples', sampleId);
+      if (sample && isLikelyControlSample(sample)) return false;
+    }
+    const orderId = Number(report.order_id);
+    if (!Number.isFinite(orderId)) return true;
+    const order = findById('orders', orderId);
+    return !isControlOrder(order);
+  });
   const recentOrders = orders.slice().sort((a,b)=> (b.updated_at||'').localeCompare(a.updated_at||'' )).slice(0,5);
   const activeOrders = orders.filter(order => {
     const sample = findById('samples', Number(order.sample_id));
     const status = (sample?.status || order.status || '').toLowerCase();
     return isActiveStatus(status);
   });
-  const priorityOrdersCount = activeOrders.filter(order => order.acute || order.urgent).length;
+  const activeOrdersForStats = activeOrders.filter(order => !isControlOrder(order));
+  const priorityOrdersCount = activeOrdersForStats.filter(order => order.acute || order.urgent).length;
   const MS_PER_DAY = 86400000;
   const MS_PER_WEEK = MS_PER_DAY * 7;
   const now = new Date();
   const weekAgo = new Date(now.getTime() - MS_PER_WEEK);
   const monthAgo = new Date(now.getTime() - MS_PER_DAY * 30);
   const responseDurations = [];
-  reports.forEach(report => {
+  reportsForStats.forEach(report => {
     const order = findById('orders', Number(report.order_id));
     if (!order) return;
     const sample = order.sample_id ? findById('samples', Number(order.sample_id)) : null;
@@ -7456,22 +7489,22 @@ function renderDashboard(section) {
     }
   });
   const responseTimeP90 = calculatePercentile(responseDurations, 0.9);
-  const samplesLastWeek = samples.filter(sample => {
+  const samplesLastWeek = primarySamples.filter(sample => {
     const receivedAt = parseDateTimeValue(sample.created_at || sample.collected_at || sample.updated_at);
     return receivedAt && receivedAt >= weekAgo;
   }).length;
-  const samplesLastMonth = samples.filter(sample => {
+  const samplesLastMonth = primarySamples.filter(sample => {
     const receivedAt = parseDateTimeValue(sample.created_at || sample.collected_at || sample.updated_at);
     return receivedAt && receivedAt >= monthAgo;
   }).length;
-  const ordersLastMonth = orders.filter(order => {
+  const ordersLastMonth = ordersForStats.filter(order => {
     const orderedAt = parseDateTimeValue(order.ordered_at || order.created_at || order.updated_at);
     return orderedAt && orderedAt >= monthAgo;
   });
   const ordersLastMonthCount = ordersLastMonth.length;
   const weeksCovered = Math.max((now.getTime() - monthAgo.getTime()) / MS_PER_WEEK, 1 / 52);
   const avgOrdersPerWeek = ordersLastMonthCount ? ordersLastMonthCount / weeksCovered : 0;
-  const reportsLastMonth = reports.filter(report => {
+  const reportsLastMonth = reportsForStats.filter(report => {
     const issuedAt = parseDateTimeValue(report.issued_at || report.updated_at || report.created_at);
     return issuedAt && issuedAt >= monthAgo;
   });
@@ -7486,13 +7519,13 @@ function renderDashboard(section) {
   const metrics = [
     {icon: 'user-group', badge: 'Patienter', value: formatNumberDa(patients)},
     {icon: 'beaker', badge: 'Prøver', value: formatNumberDa(sampleCount)},
-    {icon: 'clipboard-document-list', badge: 'Ordinationer', value: formatNumberDa(orders.length)},
+    {icon: 'clipboard-document-list', badge: 'Ordinationer', value: formatNumberDa(ordersForStats.length)},
     {icon: 'inbox', badge: 'Modtaget', value: formatNumberDa(statusCounts.received)},
     {icon: 'exclamation-triangle', badge: 'Akutte/Haster', value: formatNumberDa(priorityOrdersCount)},
     {icon: 'wrench-screwdriver', badge: 'Analyse', value: formatNumberDa(statusCounts.analysis)},
     {icon: 'book-open', badge: 'Tolkning', value: formatNumberDa(statusCounts.interpretation)},
     {icon: 'document-text', badge: 'Rapport', value: formatNumberDa(statusCounts.report)},
-    {icon: 'dna', badge: 'Varianter', value: formatNumberDa(variants.length)},
+    {icon: 'dna', badge: 'Varianter', value: formatNumberDa(variantsForStats.length)},
     {icon: 'circle-stack', badge: 'Biobank', value: formatNumberDa(statusCounts.biobank)}
   ];
   const metricsHtml = metrics.map(metric => `
