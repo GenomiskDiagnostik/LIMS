@@ -1799,14 +1799,6 @@ form label {
   margin-top: 0.4rem;
   color: var(--muted-text);
 }
-.field-with-combo {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-form .field-with-combo {
-  margin-top: 0.4rem;
-}
 .label-note {
   display: inline-block;
   margin-left: 0.35rem;
@@ -1948,12 +1940,10 @@ form textarea {
   flex-wrap: wrap;
   gap: 1rem;
   margin-bottom: 0.5rem;
+  align-items: flex-start;
 }
 .case-form .inline-group > label,
 .case-form label.inline {
-  flex: 1 1 220px;
-}
-.case-form .inline-group > .field-with-combo {
   flex: 1 1 220px;
 }
 .case-form label.inline {
@@ -2490,15 +2480,17 @@ input[type="search"] {
 }
 .family-combo {
   display: flex;
-  gap: 0.4rem;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.4rem;
   align-items: center;
-  margin-top: 0.3rem;
 }
 .family-combo select {
-  flex: 0 0 12rem;
+  flex: 1 0 11rem;
+  min-width: 9rem;
 }
 .family-combo input:not([type="checkbox"]) {
-  flex: 1 1 auto;
+  flex: 1 1 12rem;
+  min-width: 10rem;
 }
 .family-combo input[type="checkbox"] {
   flex: 0 0 auto;
@@ -2514,6 +2506,7 @@ input[type="search"] {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+  margin-left: auto;
 }
 .family-healthy-group input[type="checkbox"] {
   margin: 0;
@@ -7676,8 +7669,7 @@ function renderCreateCase(section) {
             <label class="inline">MRN<input name="patient_mrn" required placeholder="Fx 010170-1234"></label>
             <label class="inline">ID<input name="patient_extra_id" placeholder="Fx intern ID"></label>
             <label class="inline">Navn<input name="patient_name" required placeholder="Patientnavn"></label>
-            <div class="field-with-combo">
-              <label for="createCasePatientFamily">Familienummer</label>
+            <label class="inline" for="createCasePatientFamily">Familienummer
               <div class="family-combo">
                 <select data-family-select>
                   ${familySelectOptions}
@@ -7688,7 +7680,7 @@ function renderCreateCase(section) {
                   <label class="family-healthy" for="createCasePatientHealthy">Rask familiemedlem</label>
                 </div>
               </div>
-            </div>
+            </label>
           </div>
           <div class="inline-group">
             <label class="inline">Køn<select name="patient_gender"><option value="">-</option><option value="male">Mand</option><option value="female">Kvinde</option><option value="other">Andet</option></select></label>
@@ -8710,8 +8702,7 @@ function renderPatients(section) {
           <input type="hidden" name="id">
           <label>MRN<input name="mrn" required></label>
           <label>ID<input name="extra_id" placeholder="Fx lokalt ID"></label>
-          <div class="field-with-combo">
-            <label for="patientFamilyNumber">Familienummer</label>
+          <label for="patientFamilyNumber">Familienummer
             <div class="family-combo">
               <select data-family-select>
                 ${familySelectOptions}
@@ -8722,7 +8713,7 @@ function renderPatients(section) {
                 <label class="family-healthy" for="patientHealthyMember">Rask familiemedlem</label>
               </div>
             </div>
-          </div>
+          </label>
           <label>Navn<input name="name" required></label>
           <label>Køn<select name="gender"><option value="">-</option><option value="male">Mand</option><option value="female">Kvinde</option><option value="other">Andet</option></select></label>
           <label>Fødselsdato<span class="label-note" data-patient-age hidden></span><input type="date" name="birth_date"></label>
