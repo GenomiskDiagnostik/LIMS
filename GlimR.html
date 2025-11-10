@@ -2660,6 +2660,12 @@ input[type="search"] {
 }
 .families-toolbar {
   display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: stretch;
+}
+.families-toolbar-row {
+  display: flex;
   flex-wrap: wrap;
   gap: 1rem;
   align-items: flex-end;
@@ -2680,6 +2686,16 @@ input[type="search"] {
 }
 .families-filter input {
   min-width: 16rem;
+  width: 100%;
+}
+.families-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.families-actions button {
+  white-space: nowrap;
 }
 .families-hint {
   margin: 0;
@@ -2716,8 +2732,23 @@ input[type="search"] {
   color: var(--muted-text);
   font-size: 0.85rem;
 }
+.family-relations-table td.family-sibling-cell {
+  vertical-align: top;
+}
 .family-relations-table select {
   width: 100%;
+}
+.family-relations-table select[multiple] {
+  min-height: 6.5rem;
+}
+.family-relations-table .twin-select {
+  margin-top: 0.4rem;
+}
+.family-relations-table .twin-note {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--muted-text);
 }
 .family-relations-table .empty-row {
   text-align: center;
@@ -2748,6 +2779,19 @@ input[type="search"] {
 .pedigree-links line {
   stroke: var(--muted-text);
   stroke-width: 2;
+}
+.pedigree-links line.sibling,
+.pedigree-links line.sibling-leg {
+  stroke-width: 2.5;
+}
+.pedigree-links line.twin,
+.pedigree-links line.twin-leg {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+.pedigree-links line.twin.mono-marker {
+  stroke-width: 1.5;
+  stroke-dasharray: 4 2;
 }
 .pedigree-node rect,
 .pedigree-node circle,
@@ -2916,7 +2960,7 @@ pre {
 (() => {
 'use strict';
 const DB_NAME = 'glims';
-const DB_VER = 12;
+const DB_VER = 13;
 const STORES = ['patients','samples','orders','patient_groups','family_relations','panels','variants','qc','qc_presets','reports','users','audit','variant_library','responses','fhir_templates','conclusion_library','planner'];
 const SETTINGS_STORE = 'settings';
 const MEMORY_DB_STORE_DEFINITIONS = {
@@ -3760,7 +3804,7 @@ const schemaFields = {
   panels: ['id','name','description','version','gene_list','gene_count','created_at','updated_at','updated_by'],
   orders: ['id','patient_id','sample_id','panel_id','analysis_responsible_id','interpreter_id','approver_id','clinician','indication','patient_group_id','family_type','hpo_terms','status','acute','urgent','ordered_at','created_by','created_at','updated_at'],
   patient_groups: ['id','name','created_by','created_at','updated_at'],
-  family_relations: ['id','family_number','patient_id','mother_id','father_id','created_by','created_at','updated_at'],
+  family_relations: ['id','family_number','patient_id','mother_id','father_id','sibling_ids','twin_type','created_by','created_at','updated_at'],
   variants: ['id','order_id','variant_type','gene','transcript','hgvs_c','hgvs_p','rsid','zygosity','classification','criteria','af','annotations','interpretation','genomic_position','genome_build','chromosome','start','end','copy_number','sv_subtype','size_bp','iscn','description','affected_genes','created_by','created_at','updated_at'],
   qc: ['id','sample_id','metric','value','unit','notes','created_by','created_at','updated_at'],
   qc_presets: ['id','kind','value','sort_order','created_by','created_at','updated_at'],
@@ -9412,7 +9456,7 @@ function renderFamilies(section) {
     ? filteredFamilyNumbers.map(num => `<option value="${esc(num)}"${num === selectedFamily ? ' selected' : ''}>${esc(num)}</option>`).join('')
     : `<option value="">${hasFamilies ? 'Ingen familier matcher filtreringen' : 'Ingen familier'}</option>`;
   const placeholderTree = selectedFamily
-    ? '<p>Tilføj relationer for at opdatere stamtræet.</p>'
+    ? '<p>Tilføj forældre eller søskende for at opdatere stamtræet.</p>'
     : hasMatches
       ? '<p>Vælg en familie for at se stamtræet.</p>'
       : filterTerm
@@ -9422,24 +9466,30 @@ function renderFamilies(section) {
   section.innerHTML = `
   <div class="panel families-panel">
     <div class="families-toolbar">
-      <div class="families-selector">
-        <label for="familySelector">Familie</label>
-        <select id="familySelector"${hasMatches ? '' : ' disabled'}>
-          ${selectorOptions}
-        </select>
-      </div>
       <div class="families-filter">
         <label for="familyFilter">Filter</label>
         <input id="familyFilter" type="search" placeholder="Filtrér familier"${hasFamilies ? '' : ' disabled'} autocomplete="off">
       </div>
+      <div class="families-toolbar-row">
+        <div class="families-selector">
+          <label for="familySelector">Familie</label>
+          <select id="familySelector"${hasMatches ? '' : ' disabled'}>
+            ${selectorOptions}
+          </select>
+        </div>
+        <div class="families-actions">
+          <button type="button" class="secondary" id="familyPedigreePrint"${selectedFamily ? '' : ' disabled'}>Udskriv stamtræ</button>
+          <button type="button" class="secondary" id="familyPedigreeDownload"${selectedFamily ? '' : ' disabled'}>Hent stamtræ (SVG)</button>
+        </div>
+      </div>
     </div>
-    <p class="families-hint">Vælg en familie for at angive forældre og generere stamtræ. Ændringer gemmes automatisk.</p>
+    <p class="families-hint">Vælg en familie for at angive forældre, søskende og tvillingestatus og generere stamtræ. Ændringer gemmes automatisk, og stamtræet kan udskrives eller gemmes som SVG.</p>
     <p class="families-status" hidden></p>
     <p class="families-empty"${hasMatches ? ' hidden' : ''}>${emptyMessageText}</p>
     <div class="families-layout"${selectedFamily ? '' : ' hidden'}>
       <div class="family-editor">
         <table class="data-grid family-relations-table">
-          <thead><tr><th>Patient</th><th>Mor</th><th>Far</th><th>Indikationer</th></tr></thead>
+          <thead><tr><th>Patient</th><th>Mor</th><th>Far</th><th>Søskende</th><th>Indikationer</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -9508,12 +9558,75 @@ function renderFamilies(section) {
     } else {
       statusLine.classList.remove('error');
     }
-    if (hideAfter > 0) {
-      statusHideTimer = setTimeout(() => {
-        setFamiliesStatus('');
-      }, hideAfter);
-    }
+  if (hideAfter > 0) {
+    statusHideTimer = setTimeout(() => {
+      setFamiliesStatus('');
+    }, hideAfter);
+  }
+};
+  const getPedigreeSvg = () => {
+    const container = section.querySelector('#familyPedigree');
+    if (!container) return null;
+    return container.querySelector('svg');
   };
+  const sanitizeFileLabel = value => {
+    if (!value || typeof value !== 'string') return 'familie';
+    const normalized = value.toLowerCase().replace(/[^0-9a-zæøå_-]+/gi, '_');
+    return normalized.replace(/_{2,}/g, '_').replace(/^_+|_+$/g, '') || 'familie';
+  };
+  const familyLabel = () => state.currentFamilyNumber || '';
+  const printButton = section.querySelector('#familyPedigreePrint');
+  const downloadButton = section.querySelector('#familyPedigreeDownload');
+  if (printButton) {
+    printButton.addEventListener('click', () => {
+      const svg = getPedigreeSvg();
+      if (!svg) {
+        setFamiliesStatus('Stamtræet er ikke klar til udskrivning.', {error: true, hideAfter: 5000});
+        return;
+      }
+      const clone = svg.cloneNode(true);
+      clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      const serializer = new XMLSerializer();
+      const markup = serializer.serializeToString(clone);
+      const label = familyLabel();
+      const styles = `:root{color:#0f172a;font-family:"Inter","Segoe UI",system-ui,sans-serif;}body{margin:1.5rem;background:#fff;}h1{font-size:1.4rem;margin:0 0 1rem;}p{margin:0 0 0.75rem;color:#475569;}@media print{body{margin:0.5rem 0.75rem;}}.pedigree-print svg{width:100%;height:auto;}.pedigree-links line{stroke:#475569;stroke-width:2;}.pedigree-links line.sibling,.pedigree-links line.sibling-leg{stroke-width:2.5;}.pedigree-links line.twin,.pedigree-links line.twin-leg{stroke:#be123c;stroke-width:2.5;}.pedigree-links line.twin.mono-marker{stroke:#be123c;stroke-width:1.5;stroke-dasharray:4 2;}.pedigree-node rect,.pedigree-node circle,.pedigree-node path{fill:#fff;stroke:#0f172a;stroke-width:2.5;}.pedigree-node.affected rect,.pedigree-node.affected circle,.pedigree-node.affected path{fill:#fef08a;}.pedigree-label{font-size:12px;fill:#0f172a;}`;
+      const win = window.open('', '_blank');
+      if (!win) {
+        setFamiliesStatus('Tillad pop op-vinduer for at udskrive stamtræet.', {error: true, hideAfter: 6000});
+        return;
+      }
+      win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Stamtræ for ${esc(label || 'Familie')}</title><style>${styles}</style></head><body><h1>Stamtræ for ${esc(label || 'familie')}</h1><p>Udskrevet fra GlimR ${new Date().toLocaleString('da-DK')}</p><div class="pedigree-print">${markup}</div></body></html>`);
+      win.document.close();
+      win.focus();
+      setTimeout(() => {
+        try { win.print(); } catch (err) {}
+      }, 150);
+      setFamiliesStatus('Åbnede stamtræet i et udskriftsvenligt vindue.', {hideAfter: 5000});
+    });
+  }
+  if (downloadButton) {
+    downloadButton.addEventListener('click', () => {
+      const svg = getPedigreeSvg();
+      if (!svg) {
+        setFamiliesStatus('Stamtræet er ikke klar til download.', {error: true, hideAfter: 5000});
+        return;
+      }
+      const clone = svg.cloneNode(true);
+      clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      const serializer = new XMLSerializer();
+      const markup = serializer.serializeToString(clone);
+      const blob = new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n', markup], {type: 'image/svg+xml'});
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `stamtrae_${sanitizeFileLabel(familyLabel())}.svg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      setFamiliesStatus('Stamtræet er gemt som SVG-fil.', {hideAfter: 5000});
+    });
+  }
   let currentFamilyPatients = [];
   const flushFamilyAutosave = () => {
     if (state.familyAutosaveTimer) {
@@ -9581,12 +9694,145 @@ function renderFamilies(section) {
       if (!patientId) return null;
       const motherSelect = row.querySelector('select[data-role="mother"]');
       const fatherSelect = row.querySelector('select[data-role="father"]');
+      const siblingSelect = row.querySelector('select[data-role="siblings"]');
+      const twinSelect = row.querySelector('select[data-role="twin-type"]');
+      const siblingIds = siblingSelect
+        ? Array.from(siblingSelect.selectedOptions).map(option => normalizeId(option.value)).filter(Boolean)
+        : [];
+      const twinValue = (twinSelect?.value || '').trim().toLowerCase();
+      const twinEnabled = twinSelect ? !twinSelect.disabled : false;
+      const normalizedTwin = twinEnabled && siblingIds.length
+        ? (twinValue === 'mono' ? 'mono' : twinValue === 'di' ? 'di' : '')
+        : '';
       return {
         patientId,
         motherId: normalizeId(motherSelect?.value || null),
-        fatherId: normalizeId(fatherSelect?.value || null)
+        fatherId: normalizeId(fatherSelect?.value || null),
+        siblings: Array.from(new Set(siblingIds)),
+        twinType: normalizedTwin
       };
     }).filter(Boolean);
+  }
+  function normalizeSiblingRelations(relations) {
+    const map = new Map();
+    relations.forEach(rel => {
+      if (!rel || !rel.patientId) return;
+      const patientId = Number(rel.patientId);
+      if (!Number.isFinite(patientId) || patientId <= 0) return;
+      const siblings = new Set((rel.siblings || []).map(Number).filter(id => Number.isFinite(id) && id > 0 && id !== patientId));
+      const twinType = rel.twinType === 'mono' || rel.twinType === 'di' ? rel.twinType : '';
+      map.set(patientId, {
+        patientId,
+        motherId: normalizeId(rel.motherId),
+        fatherId: normalizeId(rel.fatherId),
+        siblings,
+        twinType
+      });
+    });
+    map.forEach((rel, patientId) => {
+      rel.siblings.forEach(siblingId => {
+        if (!map.has(siblingId)) {
+          map.set(siblingId, {
+            patientId: siblingId,
+            motherId: null,
+            fatherId: null,
+            siblings: new Set([patientId]),
+            twinType: ''
+          });
+        } else {
+          map.get(siblingId).siblings.add(patientId);
+        }
+      });
+    });
+    return Array.from(map.values()).map(rel => {
+      const siblings = Array.from(rel.siblings).filter(id => id !== rel.patientId);
+      siblings.sort((a, b) => a - b);
+      const twinType = siblings.length ? rel.twinType : '';
+      return {
+        patientId: rel.patientId,
+        motherId: rel.motherId ?? null,
+        fatherId: rel.fatherId ?? null,
+        siblings,
+        twinType
+      };
+    });
+  }
+  function applySiblingSelections(relations) {
+    const relationMap = new Map(relations.map(rel => [rel.patientId, rel]));
+    const rows = section.querySelectorAll('.family-relations-table tbody tr[data-patient-id]');
+    rows.forEach(row => {
+      const patientId = normalizeId(row.dataset.patientId);
+      if (!patientId) return;
+      const relation = relationMap.get(patientId);
+      const siblingSelect = row.querySelector('select[data-role="siblings"]');
+      if (siblingSelect) {
+        const selectedIds = new Set((relation?.siblings || []).map(Number));
+        Array.from(siblingSelect.options).forEach(option => {
+          const optionId = normalizeId(option.value);
+          if (!optionId) {
+            option.selected = false;
+            return;
+          }
+          option.selected = selectedIds.has(optionId);
+        });
+      }
+      const twinSelect = row.querySelector('select[data-role="twin-type"]');
+      if (twinSelect) {
+        const twinType = relation?.twinType || '';
+        if (!twinSelect.disabled || !twinType) {
+          twinSelect.value = twinType;
+        }
+      }
+    });
+  }
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  function parseIsoDate(value) {
+    if (!value || typeof value !== 'string') return null;
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return null;
+    const year = Number(match[1]);
+    const month = Number(match[2]) - 1;
+    const day = Number(match[3]);
+    const date = new Date(year, month, day);
+    if (!Number.isFinite(date.getTime())) return null;
+    if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return null;
+    return date;
+  }
+  function isTwinCandidate(patient, sibling) {
+    if (!patient || !sibling) return false;
+    const a = parseIsoDate(patient.birth_date);
+    const b = parseIsoDate(sibling.birth_date);
+    if (!a || !b) return false;
+    const diff = Math.abs(a.getTime() - b.getTime());
+    return diff <= 7 * DAY_MS;
+  }
+  function refreshTwinSelectors(relations) {
+    const relationMap = new Map(relations.map(rel => [rel.patientId, rel]));
+    const patientMap = new Map(currentFamilyPatients.map(p => [Number(p.id), p]));
+    const rows = section.querySelectorAll('.family-relations-table tbody tr[data-patient-id]');
+    rows.forEach(row => {
+      const patientId = normalizeId(row.dataset.patientId);
+      if (!patientId) return;
+      const patient = patientMap.get(patientId);
+      if (!patient) return;
+      const relation = relationMap.get(patientId);
+      const twinSelect = row.querySelector('select[data-role="twin-type"]');
+      const siblingSelect = row.querySelector('select[data-role="siblings"]');
+      if (!twinSelect || !siblingSelect) return;
+      const siblingIds = new Set((relation?.siblings || []).map(Number));
+      let eligible = false;
+      siblingIds.forEach(id => {
+        const sibling = patientMap.get(id);
+        if (!sibling || eligible) return;
+        if (isTwinCandidate(patient, sibling)) eligible = true;
+      });
+      twinSelect.disabled = !eligible;
+      if (!eligible) {
+        twinSelect.value = '';
+      } else if (relation?.twinType) {
+        twinSelect.value = relation.twinType;
+      }
+    });
   }
   function populateParentOptions(select, familyPatients, patientId, expectedGender) {
     if (!select) return;
@@ -9617,23 +9863,77 @@ function renderFamilies(section) {
       select.appendChild(option);
     });
   }
+  function populateSiblingOptions(select, familyPatients, patientId) {
+    if (!select) return;
+    select.multiple = true;
+    const candidates = familyPatients
+      .filter(p => Number(p.id) !== Number(patientId))
+      .sort((a, b) => {
+        const birthA = a.birth_date || '';
+        const birthB = b.birth_date || '';
+        if (birthA && birthB && birthA !== birthB) return birthA.localeCompare(birthB);
+        const nameA = (a.name || '').toLowerCase();
+        const nameB = (b.name || '').toLowerCase();
+        if (nameA && nameB && nameA !== nameB) return nameA.localeCompare(nameB, 'da');
+        return Number(a.id) - Number(b.id);
+      });
+    select.size = Math.min(6, Math.max(3, candidates.length || 1));
+    if (!candidates.length) {
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = 'Ingen andre familiemedlemmer';
+      placeholder.disabled = true;
+      select.appendChild(placeholder);
+      select.disabled = true;
+      return;
+    }
+    candidates.forEach(candidate => {
+      const option = document.createElement('option');
+      option.value = String(candidate.id);
+      const labelParts = [];
+      const label = candidate.name && candidate.name.trim() ? candidate.name.trim() : `Patient #${candidate.id}`;
+      labelParts.push(label);
+      const details = [];
+      if (candidate.birth_date) details.push(candidate.birth_date);
+      if (candidate.gender) {
+        const genderKey = (candidate.gender || '').toLowerCase();
+        const genderLabel = genderLabels[genderKey];
+        if (genderLabel) details.push(genderLabel);
+      }
+      if (candidate.mrn) details.push(candidate.mrn);
+      if (details.length) labelParts.push(`(${details.join(' • ')})`);
+      option.textContent = labelParts.join(' ');
+      select.appendChild(option);
+    });
+  }
   function renderPedigree() {
     const container = section.querySelector('#familyPedigree');
     if (!container) return;
     const familyNumber = state.currentFamilyNumber;
+    const printButton = section.querySelector('#familyPedigreePrint');
+    const downloadButton = section.querySelector('#familyPedigreeDownload');
+    const togglePedigreeActions = enabled => {
+      if (printButton) printButton.disabled = !enabled;
+      if (downloadButton) downloadButton.disabled = !enabled;
+    };
     if (!familyNumber) {
       container.innerHTML = '<p>Vælg en familie for at se stamtræet.</p>';
+      togglePedigreeActions(false);
       return;
     }
     if (!currentFamilyPatients.length) {
       container.innerHTML = '<p>Ingen patienter i den valgte familie.</p>';
+      togglePedigreeActions(false);
       return;
     }
+    const relations = normalizeSiblingRelations(collectRelationsFromTable());
+    applySiblingSelections(relations);
+    refreshTwinSelectors(relations);
     if (typeof d3 === 'undefined') {
       container.innerHTML = '<p>Kan ikke indlæse D3.js – stamtræet kan ikke vises.</p>';
+      togglePedigreeActions(false);
       return;
     }
-    const relations = collectRelationsFromTable();
     const relationMap = new Map(relations.map(rel => [rel.patientId, rel]));
     const nodes = currentFamilyPatients.map(patient => {
       const patientId = Number(patient.id);
@@ -9656,7 +9956,10 @@ function renderFamilies(section) {
         healthy: healthyMember,
         affected: affectedMember,
         motherId: normalizeId(relation?.motherId ?? relation?.mother_id ?? null),
-        fatherId: normalizeId(relation?.fatherId ?? relation?.father_id ?? null)
+        fatherId: normalizeId(relation?.fatherId ?? relation?.father_id ?? null),
+        siblings: Array.isArray(relation?.siblings) ? relation.siblings.map(Number).filter(id => Number.isFinite(id) && id > 0) : [],
+        twinType: relation?.twinType || '',
+        birthDateValue: parseIsoDate(patient.birth_date)
       };
     });
     const nodeById = new Map(nodes.map(node => [node.id, node]));
@@ -9695,7 +9998,7 @@ function renderFamilies(section) {
       list.sort((a, b) => a.name.localeCompare(b.name, 'da'));
       if (list.length > maxNodesPerLevel) maxNodesPerLevel = list.length;
     });
-    const margin = {top: 50, right: 80, bottom: 60, left: 80};
+    const margin = {top: 90, right: 80, bottom: 60, left: 80};
     const width = Math.max(margin.left + margin.right + (maxNodesPerLevel - 1) * NODE_SPACING + NODE_SIZE, container.clientWidth || 0, 720);
     const height = margin.top + margin.bottom + maxLevel * LEVEL_SPACING + NODE_SIZE;
     levels.forEach(list => {
@@ -9715,9 +10018,9 @@ function renderFamilies(section) {
       .attr('role', 'img')
       .attr('aria-label', `Stamtræ for familie ${familyNumber}`);
     const segments = [];
-    const addSegment = (x1, y1, x2, y2) => {
+    const addSegment = (x1, y1, x2, y2, className) => {
       if (!Number.isFinite(x1) || !Number.isFinite(y1) || !Number.isFinite(x2) || !Number.isFinite(y2)) return;
-      segments.push({x1, y1, x2, y2});
+      segments.push({x1, y1, x2, y2, className: className || ''});
     };
     const nodeTop = node => node.y - HALF;
     const nodeBottom = node => node.y + HALF;
@@ -9746,11 +10049,96 @@ function renderFamilies(section) {
         }
       }
     });
+    const withinTwinWindowNodes = (nodeA, nodeB) => {
+      if (!nodeA || !nodeB) return false;
+      const a = nodeA.birthDateValue;
+      const b = nodeB.birthDateValue;
+      if (!a || !b) return false;
+      return Math.abs(a.getTime() - b.getTime()) <= 7 * DAY_MS;
+    };
+    const siblingAdjacency = new Map(nodes.map(node => [node.id, new Set((node.siblings || []).map(Number).filter(Boolean))]));
+    const visitedSiblingIds = new Set();
+    const siblingGroups = [];
+    siblingAdjacency.forEach((siblings, id) => {
+      if (visitedSiblingIds.has(id) || !siblings || siblings.size === 0) return;
+      const stack = [id];
+      const group = new Set();
+      while (stack.length) {
+        const currentId = stack.pop();
+        if (visitedSiblingIds.has(currentId)) continue;
+        visitedSiblingIds.add(currentId);
+        group.add(currentId);
+        const neighbours = siblingAdjacency.get(currentId);
+        if (!neighbours) continue;
+        neighbours.forEach(nextId => {
+          if (!visitedSiblingIds.has(nextId)) stack.push(nextId);
+        });
+      }
+      if (group.size > 1) {
+        siblingGroups.push(Array.from(group));
+      }
+    });
+    siblingGroups.forEach(groupIds => {
+      const groupNodes = groupIds.map(id => nodeById.get(id)).filter(Boolean).sort((a, b) => a.x - b.x);
+      if (groupNodes.length < 2) return;
+      const twinComponents = [];
+      ['mono', 'di'].forEach(type => {
+        const typedNodes = groupNodes.filter(node => node.twinType === type);
+        const visited = new Set();
+        typedNodes.forEach(node => {
+          if (visited.has(node.id)) return;
+          const stack = [node];
+          const component = [];
+          while (stack.length) {
+            const current = stack.pop();
+            if (visited.has(current.id)) continue;
+            visited.add(current.id);
+            component.push(current);
+            typedNodes.forEach(other => {
+              if (visited.has(other.id) || other.id === current.id) return;
+              if (withinTwinWindowNodes(current, other)) stack.push(other);
+            });
+          }
+          if (component.length >= 2) {
+            twinComponents.push({type, nodes: component.slice()});
+          }
+        });
+      });
+      const topY = Math.min(...groupNodes.map(nodeTop));
+      const hasTwin = twinComponents.length > 0;
+      let connectorY = topY - (hasTwin ? 50 : 28);
+      if (connectorY < 12) connectorY = 12;
+      const twinY = Math.max(4, connectorY - 18);
+      const twinNodeIds = new Set();
+      twinComponents.forEach(component => {
+        const sorted = component.nodes.slice().sort((a, b) => a.x - b.x);
+        const left = sorted[0];
+        const right = sorted[sorted.length - 1];
+        sorted.forEach(node => {
+          twinNodeIds.add(node.id);
+          addSegment(node.x, nodeTop(node), node.x, twinY, 'twin-leg');
+          addSegment(node.x, twinY, node.x, connectorY, 'sibling-leg');
+        });
+        const twinClass = component.type === 'mono' ? 'twin mono' : 'twin di';
+        addSegment(left.x, twinY, right.x, twinY, twinClass);
+        if (component.type === 'mono') {
+          addSegment(left.x, twinY + 4, right.x, twinY + 4, 'twin mono-marker');
+        }
+      });
+      groupNodes.forEach(node => {
+        if (twinNodeIds.has(node.id)) return;
+        addSegment(node.x, nodeTop(node), node.x, connectorY, 'sibling-leg');
+      });
+      const leftNode = groupNodes[0];
+      const rightNode = groupNodes[groupNodes.length - 1];
+      addSegment(leftNode.x, connectorY, rightNode.x, connectorY, 'sibling');
+    });
     svg.append('g')
       .attr('class', 'pedigree-links')
       .selectAll('line')
       .data(segments)
       .join('line')
+      .attr('class', d => d.className ? `pedigree-link ${d.className}` : 'pedigree-link')
       .attr('x1', d => d.x1)
       .attr('y1', d => d.y1)
       .attr('x2', d => d.x2)
@@ -9798,6 +10186,7 @@ function renderFamilies(section) {
       if (d.indicationsText) lines.push(`Indikationer: ${d.indicationsText}`);
       return lines.join('\n');
     });
+    togglePedigreeActions(true);
   }
   function updateFamilyView() {
     const familyNumber = state.currentFamilyNumber;
@@ -9824,7 +10213,7 @@ function renderFamilies(section) {
       if (!familyPatients.length) {
         const row = document.createElement('tr');
         const cell = document.createElement('td');
-        cell.colSpan = 4;
+        cell.colSpan = 5;
         cell.className = 'empty-row';
         cell.textContent = 'Ingen patienter i den valgte familie.';
         row.appendChild(cell);
@@ -9847,6 +10236,7 @@ function renderFamilies(section) {
           if (!patientId) return;
           relationMap.set(patientId, rel);
         });
+        const patientMap = new Map(familyPatients.map(p => [Number(p.id), p]));
         familyPatients.forEach(patient => {
           const row = document.createElement('tr');
           row.dataset.patientId = String(patient.id);
@@ -9868,31 +10258,92 @@ function renderFamilies(section) {
           }
           const motherCell = document.createElement('td');
           const fatherCell = document.createElement('td');
+          const siblingCell = document.createElement('td');
+          siblingCell.className = 'family-sibling-cell';
+          const indicationCell = document.createElement('td');
           const motherSelect = document.createElement('select');
           motherSelect.dataset.role = 'mother';
           populateParentOptions(motherSelect, familyPatients, patient.id, 'female');
           const fatherSelect = document.createElement('select');
           fatherSelect.dataset.role = 'father';
           populateParentOptions(fatherSelect, familyPatients, patient.id, 'male');
+          const siblingSelect = document.createElement('select');
+          siblingSelect.dataset.role = 'siblings';
+          siblingSelect.className = 'sibling-select';
+          populateSiblingOptions(siblingSelect, familyPatients, patient.id);
+          const twinSelect = document.createElement('select');
+          twinSelect.dataset.role = 'twin-type';
+          twinSelect.className = 'twin-select';
+          [
+            {value: '', label: 'Ingen tvillingemarkering'},
+            {value: 'mono', label: 'Enæggede tvillinger'},
+            {value: 'di', label: 'Tveæggede tvillinger'}
+          ].forEach(optionDef => {
+            const option = document.createElement('option');
+            option.value = optionDef.value;
+            option.textContent = optionDef.label;
+            twinSelect.appendChild(option);
+          });
+          const twinNote = document.createElement('span');
+          twinNote.className = 'twin-note';
+          twinNote.textContent = 'Tilgængelig for søskende med samme fødselsdato (±7 dage).';
           const relation = relationMap.get(Number(patient.id));
           const motherValue = normalizeId(relation?.mother_id);
           const fatherValue = normalizeId(relation?.father_id);
           if (motherValue) motherSelect.value = String(motherValue);
           if (fatherValue) fatherSelect.value = String(fatherValue);
+          const storedSiblings = new Set(
+            Array.isArray(relation?.sibling_ids)
+              ? relation.sibling_ids.map(normalizeId).filter(Boolean)
+              : Array.isArray(relation?.siblings)
+                ? relation.siblings.map(normalizeId).filter(Boolean)
+                : []
+          );
+          Array.from(siblingSelect.options).forEach(option => {
+            const optionId = normalizeId(option.value);
+            if (!optionId) return;
+            if (storedSiblings.has(optionId)) option.selected = true;
+          });
+          const storedTwinType = (relation?.twin_type || relation?.twinType || '').toLowerCase();
+          if (storedTwinType === 'mono' || storedTwinType === 'di') {
+            twinSelect.value = storedTwinType;
+          }
+          const updateTwinState = () => {
+            const selectedIds = Array.from(siblingSelect.selectedOptions)
+              .map(option => normalizeId(option.value))
+              .filter(Boolean);
+            const eligible = selectedIds.some(id => {
+              const sibling = patientMap.get(id);
+              return sibling && isTwinCandidate(patient, sibling);
+            });
+            twinSelect.disabled = !eligible;
+            if (!eligible) {
+              twinSelect.value = '';
+            }
+          };
+          updateTwinState();
           const handleRelationChange = () => {
             renderPedigree();
             scheduleFamilyAutosave();
           };
           motherSelect.addEventListener('change', handleRelationChange);
           fatherSelect.addEventListener('change', handleRelationChange);
+          siblingSelect.addEventListener('change', () => {
+            updateTwinState();
+            handleRelationChange();
+          });
+          twinSelect.addEventListener('change', handleRelationChange);
           motherCell.appendChild(motherSelect);
           fatherCell.appendChild(fatherSelect);
-          const indicationCell = document.createElement('td');
+          siblingCell.appendChild(siblingSelect);
+          siblingCell.appendChild(twinSelect);
+          siblingCell.appendChild(twinNote);
           const indicationText = getIndicationList(patient.id).join(', ');
           indicationCell.textContent = indicationText || '—';
           row.appendChild(nameCell);
           row.appendChild(motherCell);
           row.appendChild(fatherCell);
+          row.appendChild(siblingCell);
           row.appendChild(indicationCell);
           tbody.appendChild(row);
         });
@@ -9904,7 +10355,7 @@ function renderFamilies(section) {
     const familyNumber = state.currentFamilyNumber;
     if (!familyNumber) return false;
     const silent = options && typeof options === 'object' ? Boolean(options.silent) : false;
-    const relations = collectRelationsFromTable();
+    const relations = normalizeSiblingRelations(collectRelationsFromTable());
     const normalizedFamily = familyNumber.trim();
     const existing = familyRelations.filter(rel => (rel.family_number || '').trim() === normalizedFamily);
     const existingMap = new Map(existing.map(rel => [normalizeId(rel.patient_id), rel]));
@@ -9915,16 +10366,33 @@ function renderFamilies(section) {
       if (!patientId) continue;
       const motherId = normalizeId(relation.motherId);
       const fatherId = normalizeId(relation.fatherId);
-      const hasData = Boolean(motherId || fatherId);
+      const siblings = Array.from(new Set((relation.siblings || []).map(Number).filter(id => Number.isFinite(id) && id > 0 && id !== patientId))).sort((a, b) => a - b);
+      const twinType = relation.twinType === 'mono' || relation.twinType === 'di' ? relation.twinType : '';
+      const hasData = Boolean(motherId || fatherId || siblings.length || twinType);
       const current = existingMap.get(patientId) || null;
       if (current) {
         const previousMother = normalizeId(current.mother_id);
         const previousFather = normalizeId(current.father_id);
+        const previousSiblings = Array.isArray(current.sibling_ids)
+          ? current.sibling_ids.map(normalizeId).filter(Boolean).sort((a, b) => a - b)
+          : [];
+        const previousTwinRaw = (current.twin_type || '').toLowerCase();
+        const previousTwin = previousTwinRaw === 'mono' || previousTwinRaw === 'di' ? previousTwinRaw : '';
+        const siblingsChanged = previousSiblings.length !== siblings.length || previousSiblings.some((id, index) => id !== siblings[index]);
+        const twinChanged = previousTwin !== twinType;
         if (!hasData) {
           tasks.push(deleteRecord('family_relations', current.id));
           changed = true;
-        } else if (previousMother !== motherId || previousFather !== fatherId) {
-          const updated = {...current, family_number: normalizedFamily, patient_id: patientId, mother_id: motherId, father_id: fatherId};
+        } else if (previousMother !== motherId || previousFather !== fatherId || siblingsChanged || twinChanged) {
+          const updated = {
+            ...current,
+            family_number: normalizedFamily,
+            patient_id: patientId,
+            mother_id: motherId,
+            father_id: fatherId,
+            sibling_ids: siblings,
+            twin_type: twinType || null
+          };
           tasks.push(updateRecord('family_relations', updated, current));
           changed = true;
         }
@@ -9932,7 +10400,14 @@ function renderFamilies(section) {
         continue;
       }
       if (hasData) {
-        tasks.push(addRecord('family_relations', {family_number: normalizedFamily, patient_id: patientId, mother_id: motherId, father_id: fatherId}));
+        tasks.push(addRecord('family_relations', {
+          family_number: normalizedFamily,
+          patient_id: patientId,
+          mother_id: motherId,
+          father_id: fatherId,
+          sibling_ids: siblings,
+          twin_type: twinType || null
+        }));
         changed = true;
       }
     }
