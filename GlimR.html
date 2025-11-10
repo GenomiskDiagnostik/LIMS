@@ -2673,15 +2673,29 @@ input[type="search"] {
 .families-selector select {
   min-width: 14rem;
 }
-.families-actions {
+.families-filter {
   display: flex;
-  gap: 0.6rem;
-  align-items: center;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.families-filter input {
+  min-width: 16rem;
 }
 .families-hint {
   margin: 0;
   color: var(--muted-text);
   font-size: 0.95rem;
+}
+.families-status {
+  margin: 0;
+  color: var(--muted-text);
+  font-size: 0.9rem;
+}
+.families-status.error {
+  color: var(--danger);
+}
+.families-status[hidden] {
+  display: none !important;
 }
 .families-layout {
   display: grid;
@@ -2902,7 +2916,7 @@ pre {
 (() => {
 'use strict';
 const DB_NAME = 'glims';
-const DB_VER = 11;
+const DB_VER = 12;
 const STORES = ['patients','samples','orders','patient_groups','family_relations','panels','variants','qc','qc_presets','reports','users','audit','variant_library','responses','fhir_templates','conclusion_library','planner'];
 const SETTINGS_STORE = 'settings';
 const MEMORY_DB_STORE_DEFINITIONS = {
@@ -3198,7 +3212,10 @@ const state = {
   pendingReportSelectOrderId: null,
   pendingReportSelectReportId: null,
   pendingPatientVariantFilter: null,
-  currentFamilyNumber: ''
+  currentFamilyNumber: '',
+  familyFilterTerm: '',
+  familyAutosaveTimer: null,
+  familySavingPromise: null
 };
 const CREATED_BY_STORES = new Set(['patients','samples','orders','patient_groups','family_relations','variants','qc','qc_presets','reports','fhir_templates','conclusion_library']);
 const UPDATED_BY_STORES = new Set(['panels']);
@@ -9354,28 +9371,71 @@ function renderFamilies(section) {
   const patients = getCached('patients') || [];
   const orders = getCached('orders') || [];
   let familyRelations = getCached('family_relations') || [];
-  const familyNumbers = Array.from(new Set(patients.map(p => (p.family_number || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'da'));
-  const existingSelection = state.currentFamilyNumber && familyNumbers.includes(state.currentFamilyNumber) ? state.currentFamilyNumber : '';
-  const selectedFamily = existingSelection || familyNumbers[0] || '';
-  state.currentFamilyNumber = selectedFamily;
-  const options = familyNumbers.map(num => `<option value="${esc(num)}"${num === selectedFamily ? ' selected' : ''}>${esc(num)}</option>`).join('');
+  const familyMembers = new Map();
+  for (const patient of patients) {
+    if (!patient) continue;
+    const familyNumber = (patient.family_number || '').trim();
+    if (!familyNumber) continue;
+    if (!familyMembers.has(familyNumber)) {
+      familyMembers.set(familyNumber, []);
+    }
+    familyMembers.get(familyNumber).push(patient);
+  }
+  const familyNumbers = Array.from(familyMembers.keys()).sort((a, b) => a.localeCompare(b, 'da'));
   const hasFamilies = familyNumbers.length > 0;
-  const placeholderTree = selectedFamily ? '<p>Tilføj relationer for at opdatere stamtræet.</p>' : '<p>Vælg en familie for at se stamtræet.</p>';
+  const filterTerm = (state.familyFilterTerm || '').trim().toLowerCase();
+  const matchesFilter = familyNumber => {
+    if (!filterTerm) return true;
+    if (familyNumber.toLowerCase().includes(filterTerm)) return true;
+    const members = familyMembers.get(familyNumber) || [];
+    return members.some(member => {
+      if (!member) return false;
+      const haystacks = [member.name, member.mrn, member.birth_date];
+      if (member.id != null) haystacks.push(String(member.id));
+      return haystacks.some(value => value && String(value).toLowerCase().includes(filterTerm));
+    });
+  };
+  const filteredFamilyNumbers = filterTerm ? familyNumbers.filter(matchesFilter) : familyNumbers.slice();
+  const hasMatches = filteredFamilyNumbers.length > 0;
+  let selectedFamily = '';
+  if (hasMatches) {
+    if (filteredFamilyNumbers.includes(state.currentFamilyNumber)) {
+      selectedFamily = state.currentFamilyNumber;
+    } else {
+      selectedFamily = filteredFamilyNumbers[0] || '';
+    }
+    state.currentFamilyNumber = selectedFamily;
+  } else if (!hasFamilies) {
+    state.currentFamilyNumber = '';
+  }
+  const selectorOptions = hasMatches
+    ? filteredFamilyNumbers.map(num => `<option value="${esc(num)}"${num === selectedFamily ? ' selected' : ''}>${esc(num)}</option>`).join('')
+    : `<option value="">${hasFamilies ? 'Ingen familier matcher filtreringen' : 'Ingen familier'}</option>`;
+  const placeholderTree = selectedFamily
+    ? '<p>Tilføj relationer for at opdatere stamtræet.</p>'
+    : hasMatches
+      ? '<p>Vælg en familie for at se stamtræet.</p>'
+      : filterTerm
+        ? '<p>Ingen familier matcher filtreringen.</p>'
+        : '<p>Vælg en familie for at se stamtræet.</p>';
+  const emptyMessageText = hasFamilies ? 'Ingen familier matcher filtreringen.' : 'Der er endnu ingen patienter med familienummer.';
   section.innerHTML = `
   <div class="panel families-panel">
     <div class="families-toolbar">
       <div class="families-selector">
         <label for="familySelector">Familie</label>
-        <select id="familySelector"${hasFamilies ? '' : ' disabled'}>
-          ${hasFamilies ? options : '<option value="">Ingen familier</option>'}
+        <select id="familySelector"${hasMatches ? '' : ' disabled'}>
+          ${selectorOptions}
         </select>
       </div>
-      <div class="families-actions">
-        <button type="button" class="primary" id="familySave"${hasFamilies ? '' : ' disabled'}>Gem relationer</button>
+      <div class="families-filter">
+        <label for="familyFilter">Filter</label>
+        <input id="familyFilter" type="search" placeholder="Filtrér familier"${hasFamilies ? '' : ' disabled'} autocomplete="off">
       </div>
     </div>
-    <p class="families-hint">Vælg en familie for at angive forældre og generere stamtræ.</p>
-    <p class="families-empty"${hasFamilies ? ' hidden' : ''}>Der er endnu ingen patienter med familienummer.</p>
+    <p class="families-hint">Vælg en familie for at angive forældre og generere stamtræ. Ændringer gemmes automatisk.</p>
+    <p class="families-status" hidden></p>
+    <p class="families-empty"${hasMatches ? ' hidden' : ''}>${emptyMessageText}</p>
     <div class="families-layout"${selectedFamily ? '' : ' hidden'}>
       <div class="family-editor">
         <table class="data-grid family-relations-table">
@@ -9390,7 +9450,25 @@ function renderFamilies(section) {
     </div>
   </div>`;
   const familySelector = section.querySelector('#familySelector');
-  const saveButton = section.querySelector('#familySave');
+  const filterInput = section.querySelector('#familyFilter');
+  const statusLine = section.querySelector('.families-status');
+  if (filterInput) {
+    filterInput.value = state.familyFilterTerm || '';
+    filterInput.addEventListener('input', async () => {
+      state.familyFilterTerm = filterInput.value;
+      await flushFamilyAutosave();
+      renderFamilies(section);
+    });
+    filterInput.addEventListener('keydown', async event => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        state.familyFilterTerm = '';
+        filterInput.value = '';
+        await flushFamilyAutosave();
+        renderFamilies(section);
+      }
+    });
+  }
   const genderLabels = {male: 'Mand', female: 'Kvinde', other: 'Andet'};
   const indicationsByPatient = new Map();
   for (const order of orders) {
@@ -9409,7 +9487,86 @@ function renderFamilies(section) {
     if (!set || !set.size) return [];
     return Array.from(set);
   };
+  let statusHideTimer = null;
+  const setFamiliesStatus = (message, options = {}) => {
+    if (!statusLine) return;
+    if (statusHideTimer) {
+      clearTimeout(statusHideTimer);
+      statusHideTimer = null;
+    }
+    const {error = false, hideAfter = 0} = options && typeof options === 'object' ? options : {};
+    if (!message) {
+      statusLine.textContent = '';
+      statusLine.hidden = true;
+      statusLine.classList.remove('error');
+      return;
+    }
+    statusLine.textContent = message;
+    statusLine.hidden = false;
+    if (error) {
+      statusLine.classList.add('error');
+    } else {
+      statusLine.classList.remove('error');
+    }
+    if (hideAfter > 0) {
+      statusHideTimer = setTimeout(() => {
+        setFamiliesStatus('');
+      }, hideAfter);
+    }
+  };
   let currentFamilyPatients = [];
+  const flushFamilyAutosave = () => {
+    if (state.familyAutosaveTimer) {
+      clearTimeout(state.familyAutosaveTimer);
+      state.familyAutosaveTimer = null;
+      return persistFamilyRelations();
+    }
+    if (state.familySavingPromise) {
+      return state.familySavingPromise;
+    }
+    return Promise.resolve();
+  };
+  function scheduleFamilyAutosave() {
+    if (!state.currentFamilyNumber) return;
+    setFamiliesStatus('Gemmer ændringer...');
+    if (state.familyAutosaveTimer) {
+      clearTimeout(state.familyAutosaveTimer);
+      state.familyAutosaveTimer = null;
+    }
+    state.familyAutosaveTimer = setTimeout(() => {
+      state.familyAutosaveTimer = null;
+      persistFamilyRelations();
+    }, 450);
+  }
+  function persistFamilyRelations() {
+    if (!state.currentFamilyNumber) {
+      setFamiliesStatus('');
+      return Promise.resolve();
+    }
+    const runner = async () => {
+      try {
+        const changed = await saveRelations({silent: true});
+        if (changed) {
+          setFamiliesStatus('Ændringer gemt automatisk.', {hideAfter: 3000});
+        } else {
+          setFamiliesStatus('');
+        }
+      } catch (err) {
+        console.error('Kunne ikke gemme familierelationer', err);
+        setFamiliesStatus('Fejl: Kunne ikke gemme familierelationer.', {error: true});
+        setStatus('Fejl: Kunne ikke gemme familierelationer.');
+      }
+    };
+    const promise = state.familySavingPromise
+      ? state.familySavingPromise.then(() => runner(), () => runner())
+      : runner();
+    state.familySavingPromise = promise.finally(() => {
+      if (state.familySavingPromise === promise) {
+        state.familySavingPromise = null;
+      }
+    });
+    return state.familySavingPromise;
+  }
   const normalizeId = value => {
     if (value === undefined || value === null || value === '') return null;
     const num = Number(value);
@@ -9647,19 +9804,20 @@ function renderFamilies(section) {
     const layout = section.querySelector('.families-layout');
     const emptyMessage = section.querySelector('.families-empty');
     const tbody = section.querySelector('.family-relations-table tbody');
-    if (!familyNumber) {
+    if (!familyNumber || !filteredFamilyNumbers.includes(familyNumber)) {
       currentFamilyPatients = [];
       if (layout) layout.hidden = true;
-      if (saveButton) saveButton.disabled = true;
-      if (emptyMessage) emptyMessage.hidden = !hasFamilies ? false : true;
+      if (familySelector && familySelector.value !== '') familySelector.value = '';
       renderPedigree();
       return;
     }
+    if (familySelector && familySelector.value !== familyNumber) {
+      familySelector.value = familyNumber;
+    }
     if (layout) layout.hidden = false;
-    if (saveButton) saveButton.disabled = false;
     if (emptyMessage) emptyMessage.hidden = true;
     const normalizedFamily = familyNumber.trim();
-    const familyPatients = patients.filter(p => (p.family_number || '').trim() === normalizedFamily);
+    const familyPatients = (familyMembers.get(normalizedFamily) || []).slice();
     currentFamilyPatients = familyPatients.slice();
     if (tbody) {
       tbody.innerHTML = '';
@@ -9721,8 +9879,12 @@ function renderFamilies(section) {
           const fatherValue = normalizeId(relation?.father_id);
           if (motherValue) motherSelect.value = String(motherValue);
           if (fatherValue) fatherSelect.value = String(fatherValue);
-          motherSelect.addEventListener('change', renderPedigree);
-          fatherSelect.addEventListener('change', renderPedigree);
+          const handleRelationChange = () => {
+            renderPedigree();
+            scheduleFamilyAutosave();
+          };
+          motherSelect.addEventListener('change', handleRelationChange);
+          fatherSelect.addEventListener('change', handleRelationChange);
           motherCell.appendChild(motherSelect);
           fatherCell.appendChild(fatherSelect);
           const indicationCell = document.createElement('td');
@@ -9738,14 +9900,16 @@ function renderFamilies(section) {
     }
     renderPedigree();
   }
-  async function saveRelations() {
+  async function saveRelations(options = {}) {
     const familyNumber = state.currentFamilyNumber;
-    if (!familyNumber) return;
+    if (!familyNumber) return false;
+    const silent = options && typeof options === 'object' ? Boolean(options.silent) : false;
     const relations = collectRelationsFromTable();
     const normalizedFamily = familyNumber.trim();
     const existing = familyRelations.filter(rel => (rel.family_number || '').trim() === normalizedFamily);
     const existingMap = new Map(existing.map(rel => [normalizeId(rel.patient_id), rel]));
     const tasks = [];
+    let changed = false;
     for (const relation of relations) {
       const patientId = relation.patientId;
       if (!patientId) continue;
@@ -9758,46 +9922,42 @@ function renderFamilies(section) {
         const previousFather = normalizeId(current.father_id);
         if (!hasData) {
           tasks.push(deleteRecord('family_relations', current.id));
+          changed = true;
         } else if (previousMother !== motherId || previousFather !== fatherId) {
           const updated = {...current, family_number: normalizedFamily, patient_id: patientId, mother_id: motherId, father_id: fatherId};
           tasks.push(updateRecord('family_relations', updated, current));
+          changed = true;
         }
         existingMap.delete(patientId);
         continue;
       }
       if (hasData) {
         tasks.push(addRecord('family_relations', {family_number: normalizedFamily, patient_id: patientId, mother_id: motherId, father_id: fatherId}));
+        changed = true;
       }
     }
     existingMap.forEach(record => {
       tasks.push(deleteRecord('family_relations', record.id));
+      changed = true;
     });
     for (const task of tasks) {
       await task;
     }
     familyRelations = getCached('family_relations') || [];
     updateFamilyView();
+    if (!silent && changed) {
+      setStatus(`Familierelationer gemt for ${familyNumber}.`);
+    }
+    return changed;
   }
   if (familySelector) {
-    familySelector.addEventListener('change', () => {
-      state.currentFamilyNumber = familySelector.value || '';
+    familySelector.addEventListener('change', async () => {
+      const nextFamily = familySelector.value || '';
+      if (nextFamily === state.currentFamilyNumber) return;
+      await flushFamilyAutosave();
+      state.currentFamilyNumber = nextFamily;
+      setFamiliesStatus('');
       updateFamilyView();
-    });
-  }
-  if (saveButton) {
-    saveButton.addEventListener('click', async () => {
-      const familyNumber = state.currentFamilyNumber;
-      if (!familyNumber) return;
-      saveButton.disabled = true;
-      try {
-        await saveRelations();
-        setStatus(`Familierelationer gemt for ${familyNumber}.`);
-      } catch (err) {
-        console.error('Kunne ikke gemme familierelationer', err);
-        setStatus('Fejl: Kunne ikke gemme familierelationer.');
-      } finally {
-        saveButton.disabled = !state.currentFamilyNumber;
-      }
     });
   }
   updateFamilyView();
