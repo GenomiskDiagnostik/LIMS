@@ -265,15 +265,103 @@ section[data-tab].active {
 .panel-header h2 {
   margin: 0;
 }
-.audit-controls {
+.audit-controls,
+.response-controls {
   display: inline-flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   align-items: center;
 }
+.fhir-template-summary {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.fhir-template-summary .form-hint {
+  margin: 0;
+}
+.template-summary-list {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.4fr) 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0;
+}
+.template-summary-list dt {
+  font-weight: 600;
+  color: var(--muted-text);
+}
+.template-summary-list dd {
+  margin: 0;
+}
+.fhir-template-manager {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+.fhir-template-list {
+  flex: 1 1 260px;
+  min-width: 240px;
+}
+.fhir-template-form {
+  flex: 2 1 360px;
+  min-width: 320px;
+}
+.fhir-template-form textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+.fhir-template-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0.5rem 0 0;
+}
+.fhir-template-checkboxes label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}
+.template-form-grid {
+  display: grid;
+  gap: 0.75rem 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-top: 0.75rem;
+}
+.template-form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.template-advanced {
+  margin-top: 1rem;
+}
+.template-advanced summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent-strong);
+}
+.template-advanced summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.template-advanced .template-form-grid {
+  margin-top: 0.5rem;
+}
 .audit-controls input[type="search"],
-.audit-controls select {
+.audit-controls select,
+.response-controls input[type="search"],
+.response-controls select {
   min-height: 2.2rem;
+}
+.response-controls .filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted-text);
 }
 .tool-panel {
   padding: 0;
@@ -2671,8 +2759,8 @@ pre {
 (() => {
 'use strict';
 const DB_NAME = 'glims';
-const DB_VER = 10;
-const STORES = ['patients','samples','orders','patient_groups','panels','variants','qc','qc_presets','reports','users','audit','variant_library','responses','conclusion_library','planner'];
+const DB_VER = 11;
+const STORES = ['patients','samples','orders','patient_groups','panels','variants','qc','qc_presets','reports','users','audit','variant_library','responses','fhir_templates','conclusion_library','planner'];
 const SETTINGS_STORE = 'settings';
 const MEMORY_DB_STORE_DEFINITIONS = {
   patients: {keyPath: 'id', autoIncrement: true},
@@ -2688,6 +2776,7 @@ const MEMORY_DB_STORE_DEFINITIONS = {
   audit: {keyPath: 'id', autoIncrement: true},
   variant_library: {keyPath: 'id', autoIncrement: true},
   responses: {keyPath: 'id', autoIncrement: true},
+  fhir_templates: {keyPath: 'id', autoIncrement: true},
   conclusion_library: {keyPath: 'id', autoIncrement: true},
   planner: {keyPath: 'id', autoIncrement: false},
   [SETTINGS_STORE]: {keyPath: 'key', autoIncrement: false}
@@ -2967,7 +3056,7 @@ const state = {
   pendingReportSelectReportId: null,
   pendingPatientVariantFilter: null
 };
-const CREATED_BY_STORES = new Set(['patients','samples','orders','patient_groups','variants','qc','qc_presets','reports','conclusion_library']);
+const CREATED_BY_STORES = new Set(['patients','samples','orders','patient_groups','variants','qc','qc_presets','reports','fhir_templates','conclusion_library']);
 const UPDATED_BY_STORES = new Set(['panels']);
 const ROLE_OPTIONS = [
   {value: 'Observatør', description: 'Kun læseadgang til data', canWrite: false},
@@ -3390,6 +3479,64 @@ const DEFAULT_PATIENT_GROUPS = [
 ];
 const DEFAULT_QC_METRICS = ['DNA konc.','Dækningsgrad 10X','Gns. dækning'];
 const DEFAULT_QC_UNITS = ['ng','ug','%','X'];
+const DEFAULT_FHIR_TEMPLATES = [
+  {
+    name: 'Sundhedsplatformen (SP) – rapport og journal',
+    target_system: 'Sundhedsplatformen (EPIC)',
+    description: 'CareCommunication-besked med journalnotat og laboratorierapport til Sundhedsplatformen.',
+    bundle_profile: 'http://medcom.dk/fhir/StructureDefinition/medcom-careCommunication-message',
+    message_profile: 'http://medcom.dk/fhir/StructureDefinition/medcom-careCommunication-messageHeader',
+    message_event_system: 'http://medcom.dk/fhir/medcom-messaging-event',
+    message_event_code: 'medcom-carecommunication-report',
+    message_event_display: 'MedCom CareCommunication Report',
+    destination_name: 'Sundhedsplatformen (SP)',
+    diagnostic_report_profile: 'http://medcom.dk/fhir/StructureDefinition/medcom-careCommunication-diagnosticReport',
+    observation_profile: 'http://medcom.dk/fhir/StructureDefinition/medcom-careCommunication-observation',
+    include_document_reference: true,
+    include_composition: true,
+    include_variant_observations: true,
+    composition_title: 'Genetisk notat til journal',
+    composition_type_system: 'http://loinc.org',
+    composition_type_code: '11488-4',
+    composition_type_display: 'Consult note',
+    composition_profile: 'http://medcom.dk/fhir/StructureDefinition/medcom-careCommunication-composition',
+    document_profile: 'http://medcom.dk/fhir/StructureDefinition/medcom-careCommunication-documentReference',
+    document_type_system: 'http://loinc.org',
+    document_type_code: '51969-4',
+    document_type_display: 'Genetic analysis report',
+    document_title: 'Genetisk laboratoriesvar',
+    destination_endpoint: '',
+    destination_identifier_system: '',
+    destination_identifier_value: ''
+  },
+  {
+    name: 'Patologi og Genetik Databank (PGDB) – svar og variantdata',
+    target_system: 'Patologi og Genetik Databank (www.patobank.dk)',
+    description: 'Laboratoriesvar med variantobservationer til Patobank/PGDB i henhold til MedCom laboratoriemeddelelser.',
+    bundle_profile: 'http://medcom.dk/fhir/StructureDefinition/medcom-laboratory-message',
+    message_profile: 'http://medcom.dk/fhir/StructureDefinition/medcom-laboratory-messageHeader',
+    message_event_system: 'http://medcom.dk/fhir/medcom-messaging-event',
+    message_event_code: 'medcom-lab-reporting',
+    message_event_display: 'MedCom Lab Report',
+    destination_name: 'Patologi og Genetik Databank',
+    destination_endpoint: 'https://www.patobank.dk/fhir/medcom/message',
+    diagnostic_report_profile: 'http://medcom.dk/fhir/StructureDefinition/medcom-laboratory-diagnosticReport',
+    observation_profile: 'http://medcom.dk/fhir/StructureDefinition/medcom-laboratory-observation',
+    include_document_reference: false,
+    include_composition: false,
+    include_variant_observations: true,
+    document_profile: '',
+    document_type_system: '',
+    document_type_code: '',
+    document_type_display: '',
+    document_title: '',
+    composition_profile: '',
+    composition_type_system: '',
+    composition_type_code: '',
+    composition_type_display: '',
+    composition_title: ''
+  }
+];
 
 function sortQcPresets(list) {
   return list
@@ -3449,6 +3596,7 @@ const schemaFields = {
   audit: ['id','ts','user','action','entity','entity_id','before','after','created_at','updated_at'],
   variant_library: ['id','variant_type','gene','transcript','hgvs_c','hgvs_p','rsid','classification','criteria','genomic_position','evidence','condition','inheritance','genome_build','chromosome','start','end','copy_number','sv_subtype','size_bp','iscn','description','affected_genes','curated_by','last_review','created_at','updated_at'],
   responses: ['id','ts','sender','patient','diagnostic_report_id','variant_count','variants','raw','created_at','updated_at'],
+  fhir_templates: ['id','name','target_system','description','bundle_profile','message_profile','message_event_system','message_event_code','message_event_display','destination_name','destination_endpoint','destination_identifier_system','destination_identifier_value','diagnostic_report_profile','observation_profile','include_document_reference','include_composition','include_variant_observations','composition_title','composition_type_system','composition_type_code','composition_type_display','composition_profile','document_type_system','document_type_code','document_type_display','document_title','document_profile','created_by','created_at','updated_at'],
   conclusion_library: ['id','title','body','created_by','created_at','updated_at'],
   planner: ['id','user_id','tasks','view','created_at','updated_at']
 };
@@ -3466,7 +3614,7 @@ const tooltipCatalog = {
     conclusion_library: 'Administrer standardtekster til rapportkonklusioner.',
     reports: 'Opret og redigér laboratoriesvar og rapporter.',
     qc: 'Registrer kvalitetskontrolmålinger for prøver.',
-    responses: 'Importer og gennemse MedCom/FHIR-svar.',
+    responses: 'Importer og gennemse MedCom/FHIR-svar og eksportér via skabeloner.',
     tools: 'Åbn værktøjskassen med beregnere og hjælpeværktøjer til variantfortolkning.',
     users: 'Administrer GlimR-brugere og roller.',
     audit: 'Gennemgå revisionsloggen for alle ændringer.',
@@ -3554,7 +3702,8 @@ const tooltipCatalog = {
     libSearch: 'Filtrer variantbiblioteket efter gen eller HGVS.',
     reportSearch: 'Find rapporter ved at søge på status.',
     qcSearch: 'Søg efter kvalitetsmålinger.',
-    userSearch: 'Søg brugere på navn, e-mail eller rolle.'
+    userSearch: 'Søg brugere på navn, e-mail eller rolle.',
+    fhirTemplateSearch: 'Find FHIR-skabeloner efter navn, modtagersystem eller beskrivelse.'
   },
   forms: {
     patientForm: {
@@ -3706,6 +3855,35 @@ const tooltipCatalog = {
       order_hpo_terms: 'Valgfri liste over HPO-termer (én per linje eller separeret af semikolon).',
       order_ordered_at: 'Tidspunkt hvor ordinationen registreres.'
     },
+    fhirTemplateForm: {
+      name: 'Navn der gør skabelonen let at genkende ved FHIR-eksport (fx Sundhedsplatformen).',
+      target_system: 'Beskriv modtagersystemet, fx EPIC Sundhedsplatformen eller Patologi og Genetik Databank.',
+      destination_name: 'Visningsnavn for destinationen i MessageHeader.destination.name.',
+      destination_endpoint: 'HTTP-endpoint eller adresse til modtagerens MedCom gateway.',
+      composition_title: 'Overskrift for Composition/journalnotat, når CareCommunication anvendes.',
+      description: 'Kort forklaring af hvornår skabelonen bruges og særlige MedCom-krav.',
+      message_event_system: 'URI til MedComs event-kodesystem (typisk http://medcom.dk/fhir/medcom-messaging-event).',
+      message_event_code: 'Event-kode fra MedCom (fx medcom-carecommunication-report eller medcom-lab-reporting).',
+      message_event_display: 'Visningstekst til event-koden som modtageren ser.',
+      bundle_profile: 'FHIR-profil for hele bundlen (fx medcom-careCommunication-message).',
+      message_profile: 'FHIR-profil for MessageHeader (fx medcom-careCommunication-messageHeader).',
+      diagnostic_report_profile: 'Profil for DiagnosticReport (fx medcom-careCommunication-diagnosticReport).',
+      observation_profile: 'Profil for Observationer, når variantdata skal følge MedCom laboratoriestandarder.',
+      destination_identifier_system: 'Identifier-system for destination.receiver.identifier (urn:oid fra MedCom-aftalen).',
+      destination_identifier_value: 'Identifier-værdi der matcher modtagerens registrerede endpoint-ID.',
+      include_variant_observations: 'Medtag Observation-ressourcer for hver variant i svaret.',
+      include_document_reference: 'Medtag DocumentReference med rapportbilag, når modtageren forventer dokumentprofilen.',
+      include_composition: 'Medtag Composition/journalnotat for modtagere der understøtter CareCommunication-dokumenter.',
+      document_profile: 'Profil for DocumentReference (fx medcom-careCommunication-documentReference).',
+      document_type_system: 'Kodesystem til DocumentReference.type (ofte http://loinc.org).',
+      document_type_code: 'Kode for DocumentReference.type (fx 51969-4 for genetisk rapport).',
+      document_type_display: 'Visningstekst for DocumentReference.type.',
+      document_title: 'Titel der vises på dokumentbilaget for modtageren.',
+      composition_profile: 'Profil for Composition (fx medcom-careCommunication-composition).',
+      composition_type_system: 'Kodesystem til Composition.type (fx http://loinc.org).',
+      composition_type_code: 'Kode for Composition.type (fx 11488-4 for konsultationsnotat).',
+      composition_type_display: 'Visningstekst for Composition.type.'
+    },
     userForm: {
       name: 'Brugerens fulde navn.',
       email: 'Brugerens arbejds-e-mailadresse.',
@@ -3784,11 +3962,16 @@ const tooltipCatalog = {
     variantBatchClear: 'Ryd alle midlertidige rækker uden at gemme dem.',
     createCaseSubmit: 'Opretter patient, prøve, ordination, QC og varianter i ét trin.',
     createCaseReset: 'Ryd alle felter i oprettelsesformularen.',
-    'Vælg fra bibliotek': 'Hent variantoplysninger fra biblioteket.'
+    'Vælg fra bibliotek': 'Hent variantoplysninger fra biblioteket.',
+    fhirTemplateSave: 'Gem eller opdater den valgte FHIR-skabelon.',
+    fhirTemplateClear: 'Ryd formularen og start en ny FHIR-skabelon.',
+    fhirTemplateDelete: 'Slet den valgte FHIR-skabelon permanent.'
   },
   controls: {
     autosaveToggle: 'Aktiver eller deaktiver automatisk gemning til fil.',
     fhirOrderSelect: 'Vælg hvilken ordination der skal bruges til FHIR-svar.',
+    fhirTemplateSelect: 'Vælg hvilken FHIR-skabelon og MedCom-profil der skal anvendes til eksport.',
+    fhirTemplateSummary: 'Oversigt over felter, profiler og leveringsinformation for den valgte skabelon.',
     fhirImportLabel: 'Importer en modtaget FHIR JSON-fil.',
     fhirPreview: 'JSON-visning af den genererede FHIR-bundle.',
     reportVariantSelect: 'Vælg blandt ordinationens registrerede varianter.',
@@ -5717,6 +5900,12 @@ function openIndexedDb() {
       withTimestamps(ensureStore('audit',{keyPath:'id',autoIncrement:true}));
       withTimestamps(ensureStore('variant_library',{keyPath:'id',autoIncrement:true}));
       withTimestamps(ensureStore('responses',{keyPath:'id',autoIncrement:true}));
+      const fhirTemplateStore = withTimestamps(ensureStore('fhir_templates',{keyPath:'id',autoIncrement:true}));
+      ['target_system','name'].forEach(idx => {
+        if (!fhirTemplateStore.indexNames.contains(idx)) {
+          try { fhirTemplateStore.createIndex(idx, idx); } catch (e) {}
+        }
+      });
       withTimestamps(ensureStore('conclusion_library',{keyPath:'id',autoIncrement:true}));
       const plannerStore = withTimestamps(ensureStore('planner',{keyPath:'id'}));
       if (!plannerStore.indexNames.contains('user_id')) {
@@ -8850,6 +9039,15 @@ async function ensureDefaultQcPresets() {
     }
   }
   await loadStore('qc_presets');
+}
+
+async function ensureDefaultFhirTemplates() {
+  const existing = getCached('fhir_templates');
+  if (existing && existing.length) return;
+  for (const template of DEFAULT_FHIR_TEMPLATES) {
+    await addRecord('fhir_templates', {...template});
+  }
+  await loadStore('fhir_templates');
 }
 function creationKey(entity, id) {
   if (!entity || id === undefined || id === null) return null;
@@ -19452,20 +19650,59 @@ function renderTools(section) {
 
 function renderResponses(section) {
   const list = getCached('responses').slice().reverse();
+  const uniqueSenders = Array.from(new Set(list.map(r => (r.sender || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'da'));
+  const senderOptions = uniqueSenders.map(sender => `<option value="${esc(sender)}">${esc(sender)}</option>`).join('');
+  const templates = getCached('fhir_templates').slice().sort((a, b) => (a?.name || '').localeCompare(b?.name || '', 'da'));
+  const templateOptions = templates
+    .map((tpl, index) => `<option value="${tpl.id}"${index === 0 ? ' selected' : ''}>${esc(tpl.name || `Skabelon ${tpl.id}`)}</option>`)
+    .join('');
+  const templateSelectOptions = templates.length
+    ? `${templateOptions}<option value="">Standard (basisformat)</option>`
+    : '<option value="" selected>Standard (basisformat)</option>';
   section.innerHTML = `
   <div class="panel">
-    <div class="btn-row">
-      <label class="secondary" id="fhirImportLabel" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.4rem 0.8rem;border-radius:0.5rem;cursor:pointer;">Importér FHIR...
-        <input type="file" id="fhirImport" accept="application/json" style="display:none;">
-      </label>
+    <div class="panel-header">
+      <h2>Importerede MedCom/FHIR-svar</h2>
+      <div class="response-controls">
+        <div class="filter-field">
+          <label for="responseSearch">Søg</label>
+          <input type="search" id="responseSearch" placeholder="Filtrer svar...">
+        </div>
+        <div class="filter-field">
+          <label for="responseSenderFilter">Sender</label>
+          <div class="filterable-select">
+            <input type="search" data-select-filter placeholder="Filtrer afsendere">
+            <select id="responseSenderFilter">
+              <option value="">Alle afsendere</option>
+              ${senderOptions}
+            </select>
+          </div>
+        </div>
+        <label class="secondary" id="fhirImportLabel" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.4rem 0.8rem;border-radius:0.5rem;cursor:pointer;">Importér FHIR...
+          <input type="file" id="fhirImport" accept="application/json" style="display:none;">
+        </label>
+      </div>
     </div>
-    <table><thead><tr><th>Tid</th><th>Sender</th><th>Patient</th><th>Rapport</th><th>Varianter</th></tr></thead><tbody>
-      ${list.map(r => `<tr><td>${esc(r.ts)}</td><td>${esc(r.sender||'')}</td><td>${esc(r.patient||'')}</td><td>${esc(r.diagnostic_report_id||'')}</td><td>${esc(r.variant_count||0)}</td></tr>`).join('') || '<tr><td colspan="5">Ingen svar</td></tr>'}
-    </tbody></table>
+    <p class="panel-hint" data-response-count></p>
+    <table><thead><tr><th>Tid</th><th>Sender</th><th>Patient</th><th>Rapport</th><th>Varianter</th></tr></thead><tbody data-response-rows></tbody></table>
   </div>
   <div class="panel">
     <h2>Udgående MedCom-svar</h2>
-    <label>Vælg ordre<select id="fhirOrderSelect"><option value="">Vælg...</option>${getCached('orders').map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}</select></label>
+    <label>Vælg ordre
+      <div class="filterable-select">
+        <input type="search" data-select-filter placeholder="Filtrer ordinationer">
+        <select id="fhirOrderSelect"><option value="">Vælg...</option>${getCached('orders').map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}</select>
+      </div>
+    </label>
+    <label>Vælg skabelon
+      <div class="filterable-select">
+        <input type="search" data-select-filter placeholder="Filtrer skabeloner">
+        <select id="fhirTemplateSelect">${templateSelectOptions}</select>
+      </div>
+    </label>
+    <div class="fhir-template-summary" data-template-summary>
+      <p class="form-hint">${templates.length ? 'Vælg en skabelon for at se detaljer om profiler og levering.' : 'Opret skabeloner under Administration for at målrette FHIR-eksporten.'}</p>
+    </div>
     <div class="btn-row">
       <button class="primary" id="generateFhir">Generér FHIR-bundle</button>
       <button class="secondary" id="previewFhir">Forhåndsvis</button>
@@ -19473,12 +19710,105 @@ function renderResponses(section) {
     <pre id="fhirPreview" style="display:none"></pre>
   </div>`;
   annotateHeaders(section);
-  annotateTableCells(section);
+  annotateSearchInputs(section);
+  applySelectFilters(section);
   applyButtonTooltips(section);
   applyControlTooltips(section);
   const orderLabel = section.querySelector('#fhirOrderSelect')?.closest('label');
   if (orderLabel) setTooltip(orderLabel, tooltipCatalog.controls.fhirOrderSelect);
-  section.querySelector('#fhirOrderSelect').addEventListener('change', () => section.querySelector('#fhirPreview').style.display='none');
+  const templateSelect = section.querySelector('#fhirTemplateSelect');
+  const templateLabel = templateSelect?.closest('label');
+  if (templateLabel) setTooltip(templateLabel, tooltipCatalog.controls.fhirTemplateSelect);
+  const templateSummary = section.querySelector('[data-template-summary]');
+  if (templateSummary) setTooltip(templateSummary, tooltipCatalog.controls.fhirTemplateSummary);
+  const previewBox = section.querySelector('#fhirPreview');
+  const findTemplate = value => {
+    if (!value) return null;
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return null;
+    return templates.find(tpl => Number(tpl.id) === numeric) || null;
+  };
+  const renderTemplateSummary = () => {
+    if (!templateSummary) return;
+    const template = findTemplate(templateSelect?.value);
+    if (!template) {
+      templateSummary.innerHTML = '<p class="form-hint">Standard (basisformat) udsender DiagnosticReport og variantobservationer uden ekstra profiler.</p>';
+      return;
+    }
+    const rows = [];
+    if (template.target_system) rows.push(`<dt>Modtager</dt><dd>${esc(template.target_system)}</dd>`);
+    if (template.message_event_display || template.message_event_code) {
+      const label = [template.message_event_display, template.message_event_code].filter(Boolean).map(esc).join(' – ');
+      rows.push(`<dt>MedCom-event</dt><dd>${label}</dd>`);
+    }
+    if (template.bundle_profile) rows.push(`<dt>Bundle-profil</dt><dd>${esc(template.bundle_profile)}</dd>`);
+    if (template.message_profile) rows.push(`<dt>Header-profil</dt><dd>${esc(template.message_profile)}</dd>`);
+    if (template.diagnostic_report_profile) rows.push(`<dt>DiagnosticReport-profil</dt><dd>${esc(template.diagnostic_report_profile)}</dd>`);
+    if (template.observation_profile) rows.push(`<dt>Observation-profil</dt><dd>${esc(template.observation_profile)}</dd>`);
+    if (template.destination_name || template.destination_endpoint) {
+      const destParts = [template.destination_name, template.destination_endpoint].filter(Boolean).map(part => esc(part)).join('<br>');
+      rows.push(`<dt>Destination</dt><dd>${destParts}</dd>`);
+    }
+    if (template.destination_identifier_value || template.destination_identifier_system) {
+      const identifier = [template.destination_identifier_system, template.destination_identifier_value].filter(Boolean).map(esc).join(' · ');
+      rows.push(`<dt>Destination-ID</dt><dd>${identifier}</dd>`);
+    }
+    const boolRow = (label, value) => rows.push(`<dt>${label}</dt><dd>${value ? 'Ja' : 'Nej'}</dd>`);
+    boolRow('Journalnotat', Boolean(template.include_composition));
+    boolRow('Variantobservationer', template.include_variant_observations !== false);
+    boolRow('Rapportbilag', Boolean(template.include_document_reference));
+    templateSummary.innerHTML = `
+      <p class="form-hint">${esc(template.description || 'Skabelonen er ikke beskrevet endnu.')}</p>
+      ${rows.length ? `<dl class="template-summary-list">${rows.join('')}</dl>` : ''}
+    `;
+  };
+  const responseRows = section.querySelector('[data-response-rows]');
+  const searchInput = section.querySelector('#responseSearch');
+  const senderFilter = section.querySelector('#responseSenderFilter');
+  const countLabel = section.querySelector('[data-response-count]');
+  const renderRows = () => {
+    const term = (searchInput?.value || '').trim().toLowerCase();
+    const senderValue = senderFilter?.value || '';
+    const filtered = list.filter(entry => {
+      if (senderValue && entry.sender !== senderValue) return false;
+      if (!term) return true;
+      const fields = [entry.ts, entry.sender, entry.patient, entry.diagnostic_report_id, entry.variant_count, entry.variants];
+      return fields.some(value => (value || '').toString().toLowerCase().includes(term));
+    });
+    if (responseRows) {
+      responseRows.innerHTML = filtered.length
+        ? filtered.map(r => `<tr><td>${esc(r.ts || '')}</td><td>${esc(r.sender || '')}</td><td>${esc(r.patient || '')}</td><td>${esc(r.diagnostic_report_id || '')}</td><td>${esc(Number.isFinite(Number(r.variant_count)) ? Number(r.variant_count) : (r.variant_count || 0))}</td></tr>`).join('')
+        : '<tr><td colspan="5">Ingen svar</td></tr>';
+    }
+    if (countLabel) {
+      if (!list.length) {
+        countLabel.textContent = 'Ingen importerede FHIR-svar endnu.';
+      } else {
+        const filtersActive = Boolean(term || senderValue);
+        if (!filtered.length) {
+          countLabel.textContent = filtersActive ? 'Ingen svar matcher filtrene.' : 'Ingen importerede FHIR-svar.';
+        } else {
+          const noun = filtered.length === 1 ? 'svar' : 'svar';
+          countLabel.textContent = filtersActive
+            ? `${filtered.length} ${noun} matcher filtrene.`
+            : `${filtered.length} ${noun} importeret.`;
+        }
+      }
+    }
+    annotateTableCells(section);
+  };
+  renderRows();
+  searchInput?.addEventListener('input', renderRows);
+  senderFilter?.addEventListener('change', renderRows);
+  const orderSelect = section.querySelector('#fhirOrderSelect');
+  orderSelect?.addEventListener('change', () => {
+    if (previewBox) previewBox.style.display = 'none';
+  });
+  renderTemplateSummary();
+  templateSelect?.addEventListener('change', () => {
+    if (previewBox) previewBox.style.display = 'none';
+    renderTemplateSummary();
+  });
   section.querySelector('#generateFhir').addEventListener('click', () => exportFhir(section, true));
   section.querySelector('#previewFhir').addEventListener('click', () => exportFhir(section, false));
   section.querySelector('#fhirImport').addEventListener('change', async e => {
@@ -19500,9 +19830,13 @@ function renderResponses(section) {
 }
 async function exportFhir(section, download) {
   const select = section.querySelector('#fhirOrderSelect');
-  const id = Number(select.value);
+  const id = Number(select?.value);
   if (!id) return alert('Vælg ordre');
-  const bundle = buildFhirBundle(id);
+  const templateSelect = section.querySelector('#fhirTemplateSelect');
+  const templateValue = templateSelect?.value || '';
+  const templateId = Number(templateValue);
+  const template = templateValue && Number.isFinite(templateId) ? findById('fhir_templates', templateId) : null;
+  const bundle = buildFhirBundle(id, Number.isFinite(templateId) ? templateId : null);
   const json = JSON.stringify(bundle, null, 2);
   const preview = section.querySelector('#fhirPreview');
   preview.textContent = json;
@@ -19517,21 +19851,34 @@ async function exportFhir(section, download) {
     registerManualExport('fhir_bundle', {
       filename,
       orderId: id,
-      byteSize: blob.size
+      byteSize: blob.size,
+      templateId: template?.id ?? null,
+      templateName: template?.name || (templateValue ? `Skabelon ${templateValue}` : 'Standard')
     });
   }
 }
-function buildFhirBundle(orderId) {
+function resolveFhirTemplate(templateId) {
+  if (templateId == null) return null;
+  const numeric = Number(templateId);
+  if (!Number.isFinite(numeric)) return null;
+  const templates = getCached('fhir_templates') || [];
+  return templates.find(tpl => Number(tpl.id) === numeric) || null;
+}
+
+function buildFhirBundle(orderId, templateId = null) {
   const order = findById('orders', orderId);
   if (!order) throw new Error('Ordination ikke fundet');
   const patient = findById('patients', Number(order.patient_id));
   const sample = findById('samples', Number(order.sample_id));
   const panel = order.panel_id ? findById('panels', Number(order.panel_id)) : null;
+  const template = resolveFhirTemplate(templateId);
   const report = getCached('reports').find(r => r.order_id === orderId) || {status:'final', summary:'', variant_ids:'[]', variant_details:[]};
   let variants = getReportVariantSnapshots(report, orderId);
   if (!variants.length) {
     variants = getCached('variants').filter(v => v.order_id === orderId).map(snapshotVariant);
   }
+  const variantSummaries = variants.map(describeVariantNarrative).filter(Boolean);
+  const narrative = variantSummaries.join('\n');
   const timestamp = new Date().toISOString();
   const patientIdentifiers = [];
   if (patient?.mrn) patientIdentifiers.push({system:'urn:oid:1.2.208.176.1.2', value:patient.mrn});
@@ -19553,16 +19900,8 @@ function buildFhirBundle(orderId) {
     receivedTime: sample?.collected_at || undefined,
     subject: {reference:`Patient/${patientResource.id}`}
   };
-  const producerOrg = {
-    resourceType:'Organization',
-    id:'org-producer',
-    name:'GenLab Producer'
-  };
-  const requesterOrg = {
-    resourceType:'Organization',
-    id:'org-requester',
-    name: order.clinician || 'Requester'
-  };
+  const producerOrg = {resourceType:'Organization', id:'org-producer', name:'GenLab Producer'};
+  const requesterOrg = {resourceType:'Organization', id:'org-requester', name: order.clinician || 'Requester'};
   const diagnosticReport = {
     resourceType:'DiagnosticReport',
     id:`dr-${orderId}`,
@@ -19576,51 +19915,165 @@ function buildFhirBundle(orderId) {
     resultsInterpreter: requesterOrg.name ? [{reference:'Organization/org-requester'}] : undefined,
     conclusion: report.summary || undefined
   };
-  const narrative = variants.map(describeVariantNarrative).filter(Boolean).join('\n');
   if (narrative) {
     diagnosticReport.presentedForm = [{contentType:'text/plain', data:base64EncodeUtf8(narrative)}];
   }
+  if (template?.diagnostic_report_profile) {
+    diagnosticReport.meta = {profile:[template.diagnostic_report_profile]};
+  }
+  const includeVariantObservations = template ? template.include_variant_observations !== false : true;
+  const includeDocumentReference = Boolean(template?.include_document_reference);
+  const includeComposition = Boolean(template?.include_composition);
   const entries = [];
   const addEntry = resource => entries.push({fullUrl:`urn:uuid:${crypto.randomUUID?.() || Math.random().toString(36).slice(2)}`, resource});
+  const eventSystem = template?.message_event_system || 'http://medcom.dk/fhir/medcom-messaging-event';
+  const eventCode = template?.message_event_code || 'medcom-lab-reporting';
+  const eventDisplay = template?.message_event_display || 'MedCom Lab Report';
+  const destination = {name: template?.destination_name || 'Recipient'};
+  if (template?.destination_endpoint) destination.endpoint = template.destination_endpoint;
+  if (template?.destination_identifier_value) {
+    destination.receiver = {
+      identifier: {
+        system: template.destination_identifier_system || undefined,
+        value: template.destination_identifier_value
+      }
+    };
+  }
   const messageHeader = {
     resourceType:'MessageHeader',
     id:`mh-${orderId}`,
-    eventCoding:{system:'http://medcom.dk/fhir/medcom-messaging-communication-event', code:'medcom-lab-reporting', display:'MedCom Lab Report'},
+    eventCoding:{system: eventSystem, code: eventCode, display: eventDisplay},
     source:{name:'GlimR'},
-    destination:[{name:'Recipient'}],
+    destination:[destination],
     sender:{reference:'Organization/org-producer'},
-    focus:[{reference:`DiagnosticReport/${diagnosticReport.id}`}] 
+    focus:[]
   };
+  if (template?.message_profile) {
+    messageHeader.meta = {profile:[template.message_profile]};
+  }
+  const messageFocus = new Set();
+  const addFocus = reference => { if (reference) messageFocus.add(reference); };
   addEntry(messageHeader);
   addEntry(patientResource);
   addEntry(producerOrg);
   addEntry(requesterOrg);
   addEntry(specimenResource);
   addEntry(diagnosticReport);
-  variants.forEach((variant, idx) => {
-    const obs = {
-      resourceType:'Observation',
-      id:`var-${orderId}-${idx+1}`,
-      status:'final',
-      category:[{coding:[{system:'http://terminology.hl7.org/CodeSystem/observation-category', code:'laboratory'}]}],
-      code:{coding:[{system:'http://loinc.org', code:'69548-6', display:'Genomic sequence variation interpretation'}]},
-      subject:{reference:`Patient/${patientResource.id}`},
-      specimen:{reference:`Specimen/${specimenResource.id}`},
-      valueCodeableConcept:{text:[variant.hgvs_c, variant.hgvs_p].filter(Boolean).join(' / ') || variant.gene},
-      component:[{code:{text:'Gene'}, valueCodeableConcept:{text:variant.gene}}],
-      interpretation: classificationMap[String(variant.classification)] ? [{coding:[{system:'http://loinc.org', code:classificationMap[String(variant.classification)].code, display:classificationMap[String(variant.classification)].display}]}] : undefined,
-      note: variant.criteria ? [{text:`ACMG: ${variant.criteria}`}]: undefined
-    };
-    addEntry(obs);
-    diagnosticReport.result = diagnosticReport.result || [];
-    diagnosticReport.result.push({reference:`Observation/${obs.id}`});
-  });
+  addFocus(`DiagnosticReport/${diagnosticReport.id}`);
+  if (includeVariantObservations) {
+    variants.forEach((variant, idx) => {
+      const obs = {
+        resourceType:'Observation',
+        id:`var-${orderId}-${idx+1}`,
+        status:'final',
+        category:[{coding:[{system:'http://terminology.hl7.org/CodeSystem/observation-category', code:'laboratory'}]}],
+        code:{coding:[{system:'http://loinc.org', code:'69548-6', display:'Genomic sequence variation interpretation'}]},
+        subject:{reference:`Patient/${patientResource.id}`},
+        specimen:{reference:`Specimen/${specimenResource.id}`},
+        valueCodeableConcept:{text:[variant.hgvs_c, variant.hgvs_p].filter(Boolean).join(' / ') || variant.gene},
+        component:[{code:{text:'Gene'}, valueCodeableConcept:{text:variant.gene}}],
+        interpretation: classificationMap[String(variant.classification)] ? [{coding:[{system:'http://loinc.org', code:classificationMap[String(variant.classification)].code, display:classificationMap[String(variant.classification)].display}]}] : undefined,
+        note: variant.criteria ? [{text:`ACMG: ${variant.criteria}`}]: undefined
+      };
+      if (template?.observation_profile) {
+        obs.meta = {profile:[template.observation_profile]};
+      }
+      addEntry(obs);
+      diagnosticReport.result = diagnosticReport.result || [];
+      diagnosticReport.result.push({reference:`Observation/${obs.id}`});
+    });
+  }
+  if (includeDocumentReference) {
+    const docParts = [];
+    if (report.summary) docParts.push(`Konklusion: ${report.summary}`);
+    if (variantSummaries.length) docParts.push('Varianter:\n' + variantSummaries.join('\n'));
+    const documentText = docParts.join('\n\n').trim();
+    if (documentText) {
+      const documentReference = {
+        resourceType:'DocumentReference',
+        id:`doc-${orderId}`,
+        status:'current',
+        type: template?.document_type_code || template?.document_type_display || template?.document_type_system
+          ? {
+              coding:[{
+                system: template?.document_type_system || 'http://loinc.org',
+                code: template?.document_type_code || '51969-4',
+                display: template?.document_type_display || 'Genetic analysis report'
+              }]
+            }
+          : undefined,
+        subject:{reference:`Patient/${patientResource.id}`},
+        author:[{reference:'Organization/org-producer'}],
+        date: timestamp,
+        description: template?.document_title || `Genetisk rapport for ordination ${orderId}`,
+        content:[{
+          attachment:{
+            contentType:'text/plain',
+            data: base64EncodeUtf8(documentText),
+            title: template?.document_title || 'Genetisk rapport',
+            creation: timestamp
+          }
+        }],
+        context:{related:[{reference:`DiagnosticReport/${diagnosticReport.id}`}]}
+      };
+      if (template?.document_profile) {
+        documentReference.meta = {profile:[template.document_profile]};
+      }
+      addEntry(documentReference);
+      addFocus(`DocumentReference/${documentReference.id}`);
+    }
+  }
+  if (includeComposition) {
+    const htmlEscape = text => esc(text || '').replace(/\n/g, '<br>');
+    const sections = [];
+    if (report.summary) {
+      sections.push({
+        title: 'Rapport',
+        text: {status:'generated', div:`<div xmlns="http://www.w3.org/1999/xhtml"><p>${htmlEscape(report.summary)}</p></div>`}
+      });
+    }
+    if (variantSummaries.length) {
+      const items = variantSummaries.map(item => `<li>${esc(item)}</li>`).join('');
+      sections.push({
+        title: 'Varianter',
+        text: {status:'generated', div:`<div xmlns="http://www.w3.org/1999/xhtml"><ul>${items}</ul></div>`}
+      });
+    }
+    if (sections.length) {
+      const composition = {
+        resourceType:'Composition',
+        id:`comp-${orderId}`,
+        status:'final',
+        type:{
+          coding:[{
+            system: template?.composition_type_system || 'http://loinc.org',
+            code: template?.composition_type_code || '11488-4',
+            display: template?.composition_type_display || 'Consult note'
+          }]
+        },
+        title: template?.composition_title || 'Genetisk journalnotat',
+        date: timestamp,
+        subject:{reference:`Patient/${patientResource.id}`},
+        author:[{reference:'Organization/org-producer'}],
+        section: sections
+      };
+      if (template?.composition_profile) {
+        composition.meta = {profile:[template.composition_profile]};
+      }
+      addEntry(composition);
+      addFocus(`Composition/${composition.id}`);
+    }
+  }
+  messageHeader.focus = Array.from(messageFocus).map(reference => ({reference}));
   const bundle = {
     resourceType:'Bundle',
     type:'message',
     timestamp,
     entry: entries
   };
+  if (template?.bundle_profile) {
+    bundle.meta = {profile:[template.bundle_profile]};
+  }
   return bundle;
 }
 async function handleInboundFhir(bundle, offerLibrary=false) {
@@ -20188,6 +20641,69 @@ function renderAdmin(section) {
     </div>
   </div>
   <div class="panel">
+    <h2>FHIR-eksport skabeloner</h2>
+    <p class="form-hint">Opret og vedligehold modtagerspecifikke skabeloner til FHIR-eksport.</p>
+    <div class="fhir-template-manager">
+      <div class="fhir-template-list">
+        <label for="fhirTemplateSearch">Søg</label>
+        <input id="fhirTemplateSearch" type="search" placeholder="Skabelon eller modtager...">
+        <table data-fhir-template-table>
+          <thead><tr><th>ID</th><th>Navn</th><th>Modtager</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="fhir-template-form">
+        <h3>Skabelon</h3>
+        <form id="fhirTemplateForm">
+          <input type="hidden" name="id">
+          <div class="template-form-grid">
+            <label>Navn<input name="name" required></label>
+            <label>Modtagersystem<input name="target_system" placeholder="fx Sundhedsplatformen"></label>
+            <label>Destination navn<input name="destination_name" placeholder="fx Sundhedsplatformen"></label>
+            <label>Destination endpoint<input name="destination_endpoint" placeholder="https://..."></label>
+            <label>Journal-overskrift<input name="composition_title" placeholder="fx Genetisk notat"></label>
+            <label>Beskrivelse<textarea name="description" placeholder="Formål, format og særlige krav"></textarea></label>
+          </div>
+          <div class="template-form-grid">
+            <label>MedCom event-system<input name="message_event_system" placeholder="http://medcom.dk/fhir/..."></label>
+            <label>MedCom event-kode<input name="message_event_code" placeholder="fx medcom-lab-reporting"></label>
+            <label>MedCom event-tekst<input name="message_event_display" placeholder="Visningsnavn"></label>
+            <label>Bundle-profil<input name="bundle_profile" placeholder="http://..."></label>
+            <label>Header-profil<input name="message_profile" placeholder="http://..."></label>
+            <label>DiagnosticReport-profil<input name="diagnostic_report_profile" placeholder="http://..."></label>
+            <label>Observation-profil<input name="observation_profile" placeholder="http://..."></label>
+            <label>Destination ID-system<input name="destination_identifier_system" placeholder="urn:..."></label>
+            <label>Destination ID-værdi<input name="destination_identifier_value" placeholder="Fx GLIMR"></label>
+          </div>
+          <div class="template-checkboxes">
+            <label><input type="checkbox" name="include_variant_observations" checked> Inkludér variantobservationer</label>
+            <label><input type="checkbox" name="include_document_reference"> Inkludér rapportbilag</label>
+            <label><input type="checkbox" name="include_composition"> Inkludér journalnotat</label>
+          </div>
+          <details class="template-advanced">
+            <summary>Avancerede profiler og koder</summary>
+            <div class="template-form-grid">
+              <label>DocumentReference-profil<input name="document_profile" placeholder="http://..."></label>
+              <label>DocumentReference type-system<input name="document_type_system" placeholder="http://loinc.org"></label>
+              <label>DocumentReference type-kode<input name="document_type_code" placeholder="fx 51969-4"></label>
+              <label>DocumentReference type-visning<input name="document_type_display" placeholder="Visningsnavn"></label>
+              <label>Dokumenttitel<input name="document_title" placeholder="fx Genetisk laboratoriesvar"></label>
+              <label>Composition-profil<input name="composition_profile" placeholder="http://..."></label>
+              <label>Composition type-system<input name="composition_type_system" placeholder="http://loinc.org"></label>
+              <label>Composition type-kode<input name="composition_type_code" placeholder="fx 11488-4"></label>
+              <label>Composition type-visning<input name="composition_type_display" placeholder="Visningsnavn"></label>
+            </div>
+          </details>
+          <div class="btn-row">
+            <button class="primary" type="submit" id="fhirTemplateSave">Gem</button>
+            <button class="secondary" type="button" id="fhirTemplateClear">Ny</button>
+            <button class="danger" type="button" id="fhirTemplateDelete">Slet</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
     <h2>Forvalg til kvalitetskontrol</h2>
     <p class="form-hint">Administrer dropdownværdier for QC-målinger og enheder.</p>
     <div class="flex qc-preset-manager">
@@ -20226,7 +20742,9 @@ function renderAdmin(section) {
   </div>`;
   applyButtonTooltips(section);
   applyControlTooltips(section);
+  annotateSearchInputs(section);
   annotateHeaders(section);
+  section.querySelectorAll('form').forEach(form => applyFormTooltips(form));
   const testsBody = section.querySelector('#testsBody');
   if (testsBody) {
     testsBody.innerHTML = state.testResults.length
@@ -20333,6 +20851,201 @@ function renderAdmin(section) {
     await loadStore('patient_groups');
     renderTab('admin');
     refreshDependentTabs();
+  });
+
+  const templateTableBody = section.querySelector('[data-fhir-template-table] tbody');
+  const templateSearch = section.querySelector('#fhirTemplateSearch');
+  const templateForm = section.querySelector('#fhirTemplateForm');
+  const templateClearBtn = section.querySelector('#fhirTemplateClear');
+  const templateDeleteBtn = section.querySelector('#fhirTemplateDelete');
+  let templateFormDirty = false;
+  const markTemplateDirty = () => { templateFormDirty = true; };
+  templateForm?.addEventListener('input', markTemplateDirty, true);
+  templateForm?.addEventListener('change', evt => {
+    if (evt.target && evt.target.form === templateForm) {
+      templateFormDirty = true;
+    }
+  }, true);
+  const getSortedTemplates = () => (getCached('fhir_templates') || []).slice().sort((a, b) => (a?.name || '').localeCompare(b?.name || '', 'da'));
+  const refreshTemplateConsumers = () => {
+    const responsesSection = document.querySelector('section[data-tab="responses"]');
+    if (responsesSection && responsesSection.classList.contains('active')) {
+      renderTab('responses');
+    }
+  };
+  let templateData = getSortedTemplates();
+  let filteredTemplates = templateData.slice();
+  let selectedTemplateId = templateData[0] && Number.isFinite(Number(templateData[0].id)) ? Number(templateData[0].id) : null;
+  const loadTemplateIntoForm = template => {
+    if (!templateForm) return;
+    if (template) {
+      fillForm(templateForm, template);
+      templateForm.elements.include_variant_observations.checked = template.include_variant_observations !== false;
+      templateForm.elements.include_document_reference.checked = Boolean(template.include_document_reference);
+      templateForm.elements.include_composition.checked = Boolean(template.include_composition);
+    } else {
+      templateForm.reset();
+      clearFormIdentifier(templateForm);
+      const includeVariantsField = templateForm.elements.include_variant_observations;
+      if (includeVariantsField) includeVariantsField.checked = true;
+    }
+    templateFormDirty = false;
+  };
+  const renderTemplateRows = () => {
+    if (!templateTableBody) return;
+    const term = (templateSearch?.value || '').trim().toLowerCase();
+    filteredTemplates = templateData.filter(template => {
+      if (!term) return true;
+      const haystack = `${template.name || ''} ${template.target_system || ''} ${template.description || ''}`.toLowerCase();
+      return haystack.includes(term);
+    });
+    if (!filteredTemplates.length) {
+      templateTableBody.innerHTML = '<tr><td colspan="3">Ingen skabeloner.</td></tr>';
+      annotateTableCells(section);
+      if (!term) {
+        loadTemplateIntoForm(null);
+        selectedTemplateId = null;
+      }
+      return;
+    }
+    if (selectedTemplateId != null && !filteredTemplates.some(template => Number(template.id) === selectedTemplateId)) {
+      if (templateFormDirty) {
+        selectedTemplateId = null;
+      } else {
+        const firstTemplateId = filteredTemplates[0]?.id;
+        selectedTemplateId = Number.isFinite(Number(firstTemplateId)) ? Number(firstTemplateId) : null;
+        if (selectedTemplateId != null) {
+          const match = filteredTemplates.find(t => Number(t.id) === selectedTemplateId);
+          loadTemplateIntoForm(match || null);
+        } else {
+          loadTemplateIntoForm(null);
+        }
+      }
+    }
+    templateTableBody.innerHTML = filteredTemplates.map(template => {
+      const selectedAttr = Number(template.id) === selectedTemplateId ? ' data-selected="true"' : '';
+      return `<tr data-id="${template.id}"${selectedAttr}><td>${template.id}</td><td>${esc(template.name || '')}</td><td>${esc(template.target_system || '')}</td></tr>`;
+    }).join('');
+    annotateTableCells(section);
+  };
+  renderTemplateRows();
+  if (selectedTemplateId != null) {
+    const initialTemplate = templateData.find(t => Number(t.id) === selectedTemplateId);
+    if (initialTemplate) loadTemplateIntoForm(initialTemplate);
+  } else {
+    loadTemplateIntoForm(null);
+  }
+  templateSearch?.addEventListener('input', renderTemplateRows);
+  templateTableBody?.addEventListener('click', evt => {
+    const row = evt.target.closest('tr[data-id]');
+    if (!row) return;
+    const id = Number(row.dataset.id);
+    if (!Number.isFinite(id)) return;
+    if (templateFormDirty && id !== selectedTemplateId) {
+      const discard = confirm('Der er ugemte ændringer i skabelonen. Kassér ændringerne?');
+      if (!discard) return;
+    }
+    const template = templateData.find(item => Number(item.id) === id);
+    if (!template) return;
+    selectedTemplateId = id;
+    loadTemplateIntoForm(template);
+    renderTemplateRows();
+  });
+  templateClearBtn?.addEventListener('click', () => {
+    if (templateFormDirty) {
+      const discard = confirm('Der er ugemte ændringer i skabelonen. Kassér ændringerne?');
+      if (!discard) return;
+    }
+    selectedTemplateId = null;
+    loadTemplateIntoForm(null);
+    renderTemplateRows();
+  });
+  templateForm?.addEventListener('submit', async evt => {
+    evt.preventDefault();
+    if (!ensureWrite('fhir_templates')) return;
+    const formData = new FormData(templateForm);
+    const toNullable = value => {
+      if (value == null) return null;
+      const trimmed = value.toString().trim();
+      return trimmed ? trimmed : null;
+    };
+    const payload = {
+      name: toNullable(formData.get('name')),
+      target_system: toNullable(formData.get('target_system')),
+      destination_name: toNullable(formData.get('destination_name')),
+      destination_endpoint: toNullable(formData.get('destination_endpoint')),
+      composition_title: toNullable(formData.get('composition_title')),
+      description: toNullable(formData.get('description')),
+      message_event_system: toNullable(formData.get('message_event_system')),
+      message_event_code: toNullable(formData.get('message_event_code')),
+      message_event_display: toNullable(formData.get('message_event_display')),
+      bundle_profile: toNullable(formData.get('bundle_profile')),
+      message_profile: toNullable(formData.get('message_profile')),
+      diagnostic_report_profile: toNullable(formData.get('diagnostic_report_profile')),
+      observation_profile: toNullable(formData.get('observation_profile')),
+      destination_identifier_system: toNullable(formData.get('destination_identifier_system')),
+      destination_identifier_value: toNullable(formData.get('destination_identifier_value')),
+      composition_type_system: toNullable(formData.get('composition_type_system')),
+      composition_type_code: toNullable(formData.get('composition_type_code')),
+      composition_type_display: toNullable(formData.get('composition_type_display')),
+      composition_profile: toNullable(formData.get('composition_profile')),
+      document_type_system: toNullable(formData.get('document_type_system')),
+      document_type_code: toNullable(formData.get('document_type_code')),
+      document_type_display: toNullable(formData.get('document_type_display')),
+      document_title: toNullable(formData.get('document_title')),
+      document_profile: toNullable(formData.get('document_profile')),
+      include_variant_observations: templateForm.elements.include_variant_observations.checked,
+      include_document_reference: templateForm.elements.include_document_reference.checked,
+      include_composition: templateForm.elements.include_composition.checked
+    };
+    if (!payload.name) {
+      alert('Angiv et navn for skabelonen.');
+      templateForm.elements.name?.focus();
+      return;
+    }
+    const idValue = formData.get('id');
+    let nextSelectedId = null;
+    if (idValue) {
+      const id = Number(idValue);
+      const before = {...findById('fhir_templates', id)};
+      const updated = {...before, ...payload, id};
+      await updateRecord('fhir_templates', updated, before);
+      setStatus('Skabelon opdateret.');
+      nextSelectedId = id;
+    } else {
+      const createdId = await addRecord('fhir_templates', payload);
+      setStatus('Skabelon oprettet.');
+      nextSelectedId = createdId;
+    }
+    await loadStore('fhir_templates');
+    templateData = getSortedTemplates();
+    selectedTemplateId = nextSelectedId != null && Number.isFinite(Number(nextSelectedId)) ? Number(nextSelectedId) : null;
+    if (selectedTemplateId == null && templateData.length) {
+      const fallbackId = templateData[0]?.id;
+      selectedTemplateId = Number.isFinite(Number(fallbackId)) ? Number(fallbackId) : null;
+    }
+    renderTemplateRows();
+    const activeTemplate = templateData.find(t => Number(t.id) === selectedTemplateId);
+    loadTemplateIntoForm(activeTemplate || null);
+    refreshTemplateConsumers();
+  });
+  templateDeleteBtn?.addEventListener('click', async () => {
+    const id = Number(templateForm?.elements.id?.value);
+    if (!id) {
+      alert('Vælg en skabelon der skal slettes.');
+      return;
+    }
+    if (!ensureWrite('fhir_templates')) return;
+    if (!confirm('Slet skabelonen? Handling kan ikke fortrydes.')) return;
+    await deleteRecord('fhir_templates', id);
+    await loadStore('fhir_templates');
+    templateData = getSortedTemplates();
+    const firstTemplateId = templateData[0]?.id;
+    selectedTemplateId = Number.isFinite(Number(firstTemplateId)) ? Number(firstTemplateId) : null;
+    const nextTemplate = templateData.find(t => Number(t.id) === selectedTemplateId) || null;
+    loadTemplateIntoForm(nextTemplate);
+    renderTemplateRows();
+    refreshTemplateConsumers();
   });
 
   const presetLists = {
@@ -20824,6 +21537,39 @@ CREATE TABLE IF NOT EXISTS \`responses\` (
   \`created_at\` DATETIME,
   \`updated_at\` DATETIME
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS \`fhir_templates\` (
+  \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+  \`name\` VARCHAR(255),
+  \`target_system\` VARCHAR(255),
+  \`description\` TEXT,
+  \`bundle_profile\` VARCHAR(512),
+  \`message_profile\` VARCHAR(512),
+  \`message_event_system\` VARCHAR(512),
+  \`message_event_code\` VARCHAR(255),
+  \`message_event_display\` VARCHAR(255),
+  \`destination_name\` VARCHAR(255),
+  \`destination_endpoint\` VARCHAR(512),
+  \`destination_identifier_system\` VARCHAR(255),
+  \`destination_identifier_value\` VARCHAR(255),
+  \`diagnostic_report_profile\` VARCHAR(512),
+  \`observation_profile\` VARCHAR(512),
+  \`include_document_reference\` TINYINT(1),
+  \`include_composition\` TINYINT(1),
+  \`include_variant_observations\` TINYINT(1),
+  \`composition_title\` VARCHAR(255),
+  \`composition_type_system\` VARCHAR(255),
+  \`composition_type_code\` VARCHAR(64),
+  \`composition_type_display\` VARCHAR(255),
+  \`composition_profile\` VARCHAR(512),
+  \`document_type_system\` VARCHAR(255),
+  \`document_type_code\` VARCHAR(64),
+  \`document_type_display\` VARCHAR(255),
+  \`document_title\` VARCHAR(255),
+  \`document_profile\` VARCHAR(512),
+  \`created_by\` VARCHAR(255),
+  \`created_at\` DATETIME,
+  \`updated_at\` DATETIME
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE IF NOT EXISTS \`audit_log\` (
   \`id\` INT AUTO_INCREMENT PRIMARY KEY,
   \`ts\` DATETIME,
@@ -20852,6 +21598,7 @@ CREATE TABLE IF NOT EXISTS \`audit_log\` (
     variant_library: 'variant_library',
     conclusion_library: 'conclusion_library',
     responses: 'responses',
+    fhir_templates: 'fhir_templates',
     audit: 'audit_log'
   };
   for (const [store, table] of Object.entries(mapTable)) {
@@ -20964,6 +21711,7 @@ async function init() {
     await loadAllStores();
     await ensureDefaultPatientGroups();
     await ensureDefaultQcPresets();
+    await ensureDefaultFhirTemplates();
     await ensureCreationMetadata();
     await captureSyncedSnapshot();
     await restoreBoundHandle();
