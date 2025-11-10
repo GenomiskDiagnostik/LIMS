@@ -17948,8 +17948,9 @@ function renderPlanner(section) {
     });
 
     planningBoard.addEventListener('click', event => {
-      if (!(event.target instanceof HTMLElement)) return;
-      const noteSaveButton = event.target.closest('button[data-note-save]');
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const noteSaveButton = target.closest('button[data-note-save]');
       if (noteSaveButton instanceof HTMLButtonElement) {
         if (!currentUserId) {
           alert('Log ind for at gemme noter.');
@@ -17989,7 +17990,7 @@ function renderPlanner(section) {
         }
         return;
       }
-      const mailButton = event.target.closest('button.planning-mail-send');
+      const mailButton = target.closest('button.planning-mail-send');
       if (mailButton instanceof HTMLButtonElement) {
         if (!currentUserId) {
           alert('Log ind for at dele opgaver via mail.');
