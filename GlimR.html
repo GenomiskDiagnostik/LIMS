@@ -3259,6 +3259,7 @@ const state = {
   pendingOrderFamilyNumber: '',
   pendingSampleId: null,
   pendingSampleShowAll: false,
+  pendingSampleFamilyNumber: '',
   pendingReportFilterOrderId: null,
   pendingReportFilterOrderExact: false,
   pendingReportFilterSampleId: null,
@@ -3268,6 +3269,7 @@ const state = {
   pendingReportSelectReportId: null,
   pendingPatientVariantFilter: null,
   pendingPatientFamilyNumber: '',
+  pendingPatientSelectId: null,
   currentFamilyNumber: '',
   familyFilterTerm: '',
   familyAutosaveTimer: null,
@@ -9491,6 +9493,7 @@ function renderFamilies(section) {
           <div class="families-links">
             <button type="button" class="secondary" id="familyShowPatients"${selectedFamily ? '' : ' disabled'}>Patienter</button>
             <button type="button" class="secondary" id="familyShowOrders"${selectedFamily ? '' : ' disabled'}>Ordinationer</button>
+            <button type="button" class="secondary" id="familyShowSamples"${selectedFamily ? '' : ' disabled'}>Prøver</button>
           </div>
         </div>
         <div class="families-actions">
@@ -9588,6 +9591,7 @@ function renderFamilies(section) {
   const printButton = section.querySelector('#familyPedigreePrint');
   const patientButton = section.querySelector('#familyShowPatients');
   const ordersButton = section.querySelector('#familyShowOrders');
+  const samplesButton = section.querySelector('#familyShowSamples');
   if (printButton) {
     printButton.addEventListener('click', () => {
       const svg = getPedigreeSvg();
@@ -9633,6 +9637,15 @@ function renderFamilies(section) {
     setStatus(`Viser ordinationer for familien ${familyNumber}.`);
     activateTab('orders');
   };
+  const goToSamples = async () => {
+    const familyNumber = (state.currentFamilyNumber || '').trim();
+    if (!familyNumber) return;
+    await flushFamilyAutosave();
+    state.pendingSampleFamilyNumber = familyNumber;
+    state.pendingSampleShowAll = true;
+    setStatus(`Viser prøver for familien ${familyNumber}.`);
+    activateTab('samples');
+  };
   if (patientButton) {
     setTooltip(patientButton, 'Åbn Patienter-fanen filtreret på familienummeret.');
     patientButton.addEventListener('click', goToPatients);
@@ -9640,6 +9653,10 @@ function renderFamilies(section) {
   if (ordersButton) {
     setTooltip(ordersButton, 'Åbn Ordinationer-fanen filtreret på familienummeret.');
     ordersButton.addEventListener('click', goToOrders);
+  }
+  if (samplesButton) {
+    setTooltip(samplesButton, 'Åbn Prøver-fanen filtreret på familienummeret.');
+    samplesButton.addEventListener('click', goToSamples);
   }
   let currentFamilyPatients = [];
   const flushFamilyAutosave = () => {
@@ -10001,13 +10018,116 @@ function renderFamilies(section) {
       if (!levels.has(node.level)) levels.set(node.level, []);
       levels.get(node.level).push(node);
     });
+    const shareParent = (a, b) => {
+      if (!a || !b) return false;
+      if (a.motherId && b.motherId && a.motherId === b.motherId) return true;
+      if (a.fatherId && b.fatherId && a.fatherId === b.fatherId) return true;
+      return false;
+    };
+    const collectParentSiblingIds = (parentNode, levelNodes) => {
+      const ids = new Set();
+      if (!parentNode) return ids;
+      levelNodes.forEach(candidate => {
+        if (!candidate || candidate.id === parentNode.id) return;
+        if (shareParent(candidate, parentNode)) {
+          ids.add(candidate.id);
+        }
+      });
+      return ids;
+    };
+    const determineProband = () => {
+      if (!nodes.length) return null;
+      const withParents = nodes.filter(node => node.motherId || node.fatherId);
+      const pool = withParents.length ? withParents.slice() : nodes.slice();
+      pool.sort((a, b) => {
+        if (a.level !== b.level) return b.level - a.level;
+        const affectedScoreA = a.affected ? 1 : 0;
+        const affectedScoreB = b.affected ? 1 : 0;
+        if (affectedScoreA !== affectedScoreB) return affectedScoreB - affectedScoreA;
+        return a.id - b.id;
+      });
+      return pool[0] || null;
+    };
+    const proband = determineProband();
+    const probandMother = proband?.motherId ? nodeById.get(proband.motherId) : null;
+    const probandFather = proband?.fatherId ? nodeById.get(proband.fatherId) : null;
+    const applyParentSiblingOrdering = (list, levelValue) => {
+      if (!proband || !Array.isArray(list) || list.length < 2) return;
+      const motherOnLevel = probandMother && probandMother.level === levelValue ? probandMother : null;
+      const fatherOnLevel = probandFather && probandFather.level === levelValue ? probandFather : null;
+      if (!motherOnLevel && !fatherOnLevel) return;
+      const originalIndex = new Map(list.map((node, index) => [node.id, index]));
+      const parentIds = new Set();
+      if (motherOnLevel) parentIds.add(motherOnLevel.id);
+      if (fatherOnLevel) parentIds.add(fatherOnLevel.id);
+      const motherSiblingIds = motherOnLevel ? collectParentSiblingIds(motherOnLevel, list) : new Set();
+      const fatherSiblingIds = fatherOnLevel ? collectParentSiblingIds(fatherOnLevel, list) : new Set();
+      if (motherOnLevel && fatherSiblingIds.has(motherOnLevel.id)) fatherSiblingIds.delete(motherOnLevel.id);
+      if (fatherOnLevel && motherSiblingIds.has(fatherOnLevel.id)) motherSiblingIds.delete(fatherOnLevel.id);
+      const leftSiblings = [];
+      const rightSiblings = [];
+      const remainder = [];
+      list.forEach(node => {
+        if (motherSiblingIds.has(node.id)) {
+          leftSiblings.push(node);
+          return;
+        }
+        if (fatherSiblingIds.has(node.id)) {
+          rightSiblings.push(node);
+          return;
+        }
+        remainder.push(node);
+      });
+      const parentsInLevel = remainder.filter(node => parentIds.has(node.id));
+      const others = remainder.filter(node => !parentIds.has(node.id));
+      if (!parentsInLevel.length) {
+        list.splice(0, list.length, ...leftSiblings, ...remainder, ...rightSiblings);
+        return;
+      }
+      const parentIndices = parentsInLevel
+        .map(node => originalIndex.get(node.id))
+        .filter(idx => Number.isFinite(idx));
+      if (!parentIndices.length) {
+        list.splice(0, list.length, ...leftSiblings, ...remainder, ...rightSiblings);
+        return;
+      }
+      const firstParentIndex = Math.min(...parentIndices);
+      const lastParentIndex = Math.max(...parentIndices);
+      const beforeParents = [];
+      const afterParents = [];
+      const betweenParents = [];
+      others.forEach(node => {
+        const idx = originalIndex.get(node.id) ?? 0;
+        if (idx < firstParentIndex) {
+          beforeParents.push(node);
+        } else if (idx > lastParentIndex) {
+          afterParents.push(node);
+        } else {
+          betweenParents.push(node);
+        }
+      });
+      const orderedParents = [];
+      if (motherOnLevel) orderedParents.push(motherOnLevel);
+      if (fatherOnLevel && (!motherOnLevel || fatherOnLevel.id !== motherOnLevel.id)) {
+        orderedParents.push(fatherOnLevel);
+      }
+      parentsInLevel.forEach(node => {
+        if (!orderedParents.includes(node)) {
+          orderedParents.push(node);
+        }
+      });
+      const centreBand = [...beforeParents, ...betweenParents, ...orderedParents, ...afterParents];
+      const finalOrder = [...leftSiblings, ...centreBand, ...rightSiblings];
+      list.splice(0, list.length, ...finalOrder);
+    };
     const NODE_SIZE = 60;
     const HALF = NODE_SIZE / 2;
     const LEVEL_SPACING = 170;
     const NODE_SPACING = 170;
     let maxNodesPerLevel = 1;
-    levels.forEach(list => {
+    levels.forEach((list, levelValue) => {
       list.sort((a, b) => a.name.localeCompare(b.name, 'da'));
+      applyParentSiblingOrdering(list, levelValue);
       if (list.length > maxNodesPerLevel) maxNodesPerLevel = list.length;
     });
     const margin = {top: 90, right: 80, bottom: 60, left: 80};
@@ -10033,6 +10153,20 @@ function renderFamilies(section) {
     const addSegment = (x1, y1, x2, y2, className) => {
       if (!Number.isFinite(x1) || !Number.isFinite(y1) || !Number.isFinite(x2) || !Number.isFinite(y2)) return;
       segments.push({x1, y1, x2, y2, className: className || ''});
+    };
+    const ensureAutosaveEnabled = () => {
+      if (state.autosave) return;
+      state.autosave = true;
+      storage.setItem(AUTOSAVE_STORAGE_KEY, '1');
+      const toggle = document.querySelector('#autosaveToggle');
+      if (toggle && !toggle.checked) toggle.checked = true;
+      setStatus('Autogemning aktiveret.');
+    };
+    const openPatientFromPedigree = async node => {
+      if (!node || !Number.isFinite(node.id)) return;
+      state.pendingPatientSelectId = Number(node.id);
+      ensureAutosaveEnabled();
+      await goToPatients();
     };
     const nodeTop = node => node.y - HALF;
     const nodeBottom = node => node.y + HALF;
@@ -10161,7 +10295,22 @@ function renderFamilies(section) {
       .data(nodes)
       .join('g')
       .attr('class', d => `pedigree-node${d.affected ? ' affected' : ''}`)
-      .attr('transform', d => `translate(${d.x}, ${d.y})`);
+      .attr('transform', d => `translate(${d.x}, ${d.y})`)
+      .attr('tabindex', 0)
+      .attr('role', 'link');
+    nodeGroup
+      .style('cursor', 'pointer')
+      .on('click', async (event, d) => {
+        event.preventDefault();
+        event.stopPropagation();
+        await openPatientFromPedigree(d);
+      })
+      .on('keydown', async (event, d) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          await openPatientFromPedigree(d);
+        }
+      });
     nodeGroup.each(function(d) {
       const g = d3.select(this);
       if (d.gender === 'female') {
@@ -10648,6 +10797,10 @@ function renderPatients(section) {
       filterPanel.open = true;
     }
   }
+  const pendingSelectId = Number(state.pendingPatientSelectId);
+  if (Number.isFinite(pendingSelectId) && pendingSelectId > 0) {
+    selectedPatientId = pendingSelectId;
+  }
   const normalizedVariantFilterLabel = variantFilterLabel || 'den valgte variant';
   annotateHeaders(section);
   annotateSearchInputs(section);
@@ -10754,6 +10907,20 @@ function renderPatients(section) {
     annotateTableCells(section);
   };
   renderRows();
+  if (selectedPatientId != null) {
+    const selectedPatient = list.find(p => p.id === selectedPatientId) || null;
+    if (selectedPatient) {
+      fillForm(form, selectedPatient);
+      updateAgeNote();
+      const selectedRow = tbody?.querySelector(`tr[data-id="${selectedPatientId}"]`);
+      if (selectedRow && typeof selectedRow.scrollIntoView === 'function') {
+        selectedRow.scrollIntoView({block: 'nearest'});
+      }
+    } else {
+      selectedPatientId = null;
+    }
+  }
+  state.pendingPatientSelectId = null;
   state.pendingPatientFamilyNumber = '';
   variantFilterClearButton?.addEventListener('click', () => {
     variantFilterKey = null;
@@ -10986,6 +11153,19 @@ function renderSamples(section) {
       activeToggle.checked = false;
     }
   }
+  const pendingSampleFamily = (state.pendingSampleFamilyNumber || '').trim();
+  if (pendingSampleFamily) {
+    if (filterInputs.patient) filterInputs.patient.value = pendingSampleFamily;
+    if (search) search.value = '';
+    const filterPanel = section.querySelector('#samplesFilterPanel');
+    if (filterPanel) {
+      filterPanel.open = true;
+    }
+    if (state.pendingSampleShowAll && activeToggle) {
+      showActiveOnly = false;
+      activeToggle.checked = false;
+    }
+  }
   const renderRows = () => {
     const term = search.value.toLowerCase();
     const filters = {
@@ -11074,6 +11254,7 @@ function renderSamples(section) {
   }
   state.pendingSampleId = null;
   state.pendingSampleShowAll = false;
+  state.pendingSampleFamilyNumber = '';
   activeToggle?.addEventListener('change', () => {
     showActiveOnly = activeToggle.checked;
     renderRows();
