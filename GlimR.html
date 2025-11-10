@@ -265,15 +265,25 @@ section[data-tab].active {
 .panel-header h2 {
   margin: 0;
 }
-.audit-controls {
+.audit-controls,
+.response-controls {
   display: inline-flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   align-items: center;
 }
 .audit-controls input[type="search"],
-.audit-controls select {
+.audit-controls select,
+.response-controls input[type="search"],
+.response-controls select {
   min-height: 2.2rem;
+}
+.response-controls .filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted-text);
 }
 .tool-panel {
   padding: 0;
@@ -19452,20 +19462,43 @@ function renderTools(section) {
 
 function renderResponses(section) {
   const list = getCached('responses').slice().reverse();
+  const uniqueSenders = Array.from(new Set(list.map(r => (r.sender || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'da'));
+  const senderOptions = uniqueSenders.map(sender => `<option value="${esc(sender)}">${esc(sender)}</option>`).join('');
   section.innerHTML = `
   <div class="panel">
-    <div class="btn-row">
-      <label class="secondary" id="fhirImportLabel" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.4rem 0.8rem;border-radius:0.5rem;cursor:pointer;">Importér FHIR...
-        <input type="file" id="fhirImport" accept="application/json" style="display:none;">
-      </label>
+    <div class="panel-header">
+      <h2>Importerede MedCom/FHIR-svar</h2>
+      <div class="response-controls">
+        <div class="filter-field">
+          <label for="responseSearch">Søg</label>
+          <input type="search" id="responseSearch" placeholder="Filtrer svar...">
+        </div>
+        <div class="filter-field">
+          <label for="responseSenderFilter">Sender</label>
+          <div class="filterable-select">
+            <input type="search" data-select-filter placeholder="Filtrer afsendere">
+            <select id="responseSenderFilter">
+              <option value="">Alle afsendere</option>
+              ${senderOptions}
+            </select>
+          </div>
+        </div>
+        <label class="secondary" id="fhirImportLabel" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.4rem 0.8rem;border-radius:0.5rem;cursor:pointer;">Importér FHIR...
+          <input type="file" id="fhirImport" accept="application/json" style="display:none;">
+        </label>
+      </div>
     </div>
-    <table><thead><tr><th>Tid</th><th>Sender</th><th>Patient</th><th>Rapport</th><th>Varianter</th></tr></thead><tbody>
-      ${list.map(r => `<tr><td>${esc(r.ts)}</td><td>${esc(r.sender||'')}</td><td>${esc(r.patient||'')}</td><td>${esc(r.diagnostic_report_id||'')}</td><td>${esc(r.variant_count||0)}</td></tr>`).join('') || '<tr><td colspan="5">Ingen svar</td></tr>'}
-    </tbody></table>
+    <p class="panel-hint" data-response-count></p>
+    <table><thead><tr><th>Tid</th><th>Sender</th><th>Patient</th><th>Rapport</th><th>Varianter</th></tr></thead><tbody data-response-rows></tbody></table>
   </div>
   <div class="panel">
     <h2>Udgående MedCom-svar</h2>
-    <label>Vælg ordre<select id="fhirOrderSelect"><option value="">Vælg...</option>${getCached('orders').map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}</select></label>
+    <label>Vælg ordre
+      <div class="filterable-select">
+        <input type="search" data-select-filter placeholder="Filtrer ordinationer">
+        <select id="fhirOrderSelect"><option value="">Vælg...</option>${getCached('orders').map(o => `<option value="${o.id}">${o.id} – ${esc(getName('patients', o.patient_id))}</option>`).join('')}</select>
+      </div>
+    </label>
     <div class="btn-row">
       <button class="primary" id="generateFhir">Generér FHIR-bundle</button>
       <button class="secondary" id="previewFhir">Forhåndsvis</button>
@@ -19473,11 +19506,50 @@ function renderResponses(section) {
     <pre id="fhirPreview" style="display:none"></pre>
   </div>`;
   annotateHeaders(section);
-  annotateTableCells(section);
+  annotateSearchInputs(section);
+  applySelectFilters(section);
   applyButtonTooltips(section);
   applyControlTooltips(section);
   const orderLabel = section.querySelector('#fhirOrderSelect')?.closest('label');
   if (orderLabel) setTooltip(orderLabel, tooltipCatalog.controls.fhirOrderSelect);
+  const responseRows = section.querySelector('[data-response-rows]');
+  const searchInput = section.querySelector('#responseSearch');
+  const senderFilter = section.querySelector('#responseSenderFilter');
+  const countLabel = section.querySelector('[data-response-count]');
+  const renderRows = () => {
+    const term = (searchInput?.value || '').trim().toLowerCase();
+    const senderValue = senderFilter?.value || '';
+    const filtered = list.filter(entry => {
+      if (senderValue && entry.sender !== senderValue) return false;
+      if (!term) return true;
+      const fields = [entry.ts, entry.sender, entry.patient, entry.diagnostic_report_id, entry.variant_count, entry.variants];
+      return fields.some(value => (value || '').toString().toLowerCase().includes(term));
+    });
+    if (responseRows) {
+      responseRows.innerHTML = filtered.length
+        ? filtered.map(r => `<tr><td>${esc(r.ts || '')}</td><td>${esc(r.sender || '')}</td><td>${esc(r.patient || '')}</td><td>${esc(r.diagnostic_report_id || '')}</td><td>${esc(Number.isFinite(Number(r.variant_count)) ? Number(r.variant_count) : (r.variant_count || 0))}</td></tr>`).join('')
+        : '<tr><td colspan="5">Ingen svar</td></tr>';
+    }
+    if (countLabel) {
+      if (!list.length) {
+        countLabel.textContent = 'Ingen importerede FHIR-svar endnu.';
+      } else {
+        const filtersActive = Boolean(term || senderValue);
+        if (!filtered.length) {
+          countLabel.textContent = filtersActive ? 'Ingen svar matcher filtrene.' : 'Ingen importerede FHIR-svar.';
+        } else {
+          const noun = filtered.length === 1 ? 'svar' : 'svar';
+          countLabel.textContent = filtersActive
+            ? `${filtered.length} ${noun} matcher filtrene.`
+            : `${filtered.length} ${noun} importeret.`;
+        }
+      }
+    }
+    annotateTableCells(section);
+  };
+  renderRows();
+  searchInput?.addEventListener('input', renderRows);
+  senderFilter?.addEventListener('change', renderRows);
   section.querySelector('#fhirOrderSelect').addEventListener('change', () => section.querySelector('#fhirPreview').style.display='none');
   section.querySelector('#generateFhir').addEventListener('click', () => exportFhir(section, true));
   section.querySelector('#previewFhir').addEventListener('click', () => exportFhir(section, false));
