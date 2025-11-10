@@ -2145,6 +2145,33 @@ form textarea {
 .table-actions button {
   min-width: 220px;
 }
+#libraryOpenPatients {
+  margin-right: auto;
+}
+.filter-banner {
+  display: none;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  border-left: 4px solid var(--accent);
+  background: rgba(24, 111, 175, 0.12);
+  color: var(--muted-text);
+}
+.filter-banner[data-visible="true"] {
+  display: flex;
+}
+[data-theme="dark"] .filter-banner {
+  background: rgba(56, 189, 248, 0.18);
+  color: var(--text);
+}
+.filter-banner span {
+  flex: 1 1 auto;
+}
+.filter-banner button {
+  flex: 0 0 auto;
+}
 .list-toggle {
   display: inline-flex;
   align-items: center;
@@ -2937,7 +2964,8 @@ const state = {
   pendingReportFilterSampleExact: false,
   pendingReportShowAll: false,
   pendingReportSelectOrderId: null,
-  pendingReportSelectReportId: null
+  pendingReportSelectReportId: null,
+  pendingPatientVariantFilter: null
 };
 const CREATED_BY_STORES = new Set(['patients','samples','orders','patient_groups','variants','qc','qc_presets','reports','conclusion_library']);
 const UPDATED_BY_STORES = new Set(['panels']);
@@ -4694,6 +4722,45 @@ function computeVariantFrequencyData() {
   return {countMap, patientCount: patients.length, maxCount};
 }
 
+function getPatientIdsForVariantKey(variantKey) {
+  const key = (variantKey || '').toString();
+  if (!key) return [];
+  const variants = getCached('variants') || [];
+  const orders = getCached('orders') || [];
+  const orderToPatient = new Map();
+  orders.forEach(order => {
+    if (!order) return;
+    const orderId = Number(order.id);
+    const patientId = Number(order.patient_id);
+    if (Number.isFinite(orderId) && Number.isFinite(patientId)) {
+      orderToPatient.set(orderId, patientId);
+    }
+  });
+  const patientIds = new Set();
+  variants.forEach(variant => {
+    if (!variant) return;
+    const currentKey = createVariantComparisonKey(variant);
+    if (!currentKey || currentKey !== key) return;
+    const directPatientId = variant.patient_id != null ? Number(variant.patient_id) : NaN;
+    if (Number.isFinite(directPatientId)) {
+      patientIds.add(directPatientId);
+      return;
+    }
+    const orderId = Number(variant.order_id);
+    const mappedPatientId = orderToPatient.get(orderId);
+    if (Number.isFinite(mappedPatientId)) {
+      patientIds.add(mappedPatientId);
+    }
+  });
+  return Array.from(patientIds).sort((a, b) => a - b);
+}
+
+function getPatientIdsForVariant(variant) {
+  const key = createVariantComparisonKey(variant);
+  if (!key) return [];
+  return getPatientIdsForVariantKey(key);
+}
+
 function formatVariantFrequencyLabel(count, patientCount) {
   const registrations = Number(count) || 0;
   const patientsTotal = Number(patientCount) || 0;
@@ -5556,6 +5623,21 @@ function openSamplesForReport(reportId) {
   state.pendingSampleId = sampleId;
   state.pendingSampleShowAll = true;
   activateTab('samples');
+}
+
+function openPatientsForVariant(variant) {
+  if (!variant) return;
+  const key = createVariantComparisonKey(variant);
+  if (!key) {
+    alert('Varianten mangler tilstrækkelige oplysninger til at filtrere patienter.');
+    return;
+  }
+  const fallbackLabel = variant.id != null ? `Variant ${variant.id}` : 'den valgte variant';
+  const label = (formatVariantTitle(variant) || fallbackLabel).trim() || fallbackLabel;
+  const patientIds = getPatientIdsForVariantKey(key);
+  state.pendingPatientVariantFilter = {key, label, patientIds};
+  activateTab('patients');
+  setStatus(`Viser patienter for ${label}.`);
 }
 function openMemoryDb(fallbackError) {
   if (fallbackError) {
@@ -8946,6 +9028,10 @@ function renderPatients(section) {
             <label>Indikation<input type="search" data-filter-patients="indication" placeholder="Indikation"></label>
           </div>
         </details>
+        <div class="filter-banner" id="patientVariantFilterNotice" data-visible="false" hidden>
+          <span data-variant-filter-text></span>
+          <button type="button" class="secondary" id="patientVariantFilterClear">Ryd variantfilter</button>
+        </div>
         <table id="patientsTable"><thead><tr><th>ID</th><th>MRN</th><th>ID</th><th>Familienummer</th><th>Navn</th><th>Køn</th><th>Født</th><th>Indikationer</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
           <button type="button" class="secondary" id="patientsExport">Eksportér filtrerede patienter</button>
@@ -9026,6 +9112,12 @@ function renderPatients(section) {
     birth: section.querySelector('[data-filter-patients="birth"]'),
     indication: section.querySelector('[data-filter-patients="indication"]')
   };
+  const variantFilterNotice = section.querySelector('#patientVariantFilterNotice');
+  const variantFilterText = section.querySelector('[data-variant-filter-text]');
+  const variantFilterClearButton = section.querySelector('#patientVariantFilterClear');
+  if (variantFilterClearButton) {
+    setTooltip(variantFilterClearButton, 'Fjern filtreringen på varianten.');
+  }
   const birthDateInput = form?.elements.birth_date;
   const ageNote = form?.querySelector('[data-patient-age]');
   const updateAgeNote = () => {
@@ -9043,6 +9135,28 @@ function renderPatients(section) {
   let filteredPatients = list.slice();
   let activeFilters = {};
   let selectedPatientId = null;
+  let variantFilterKey = null;
+  let variantFilterLabel = '';
+  let variantFilterPatientIds = null;
+  if (state.pendingPatientVariantFilter && state.pendingPatientVariantFilter.key) {
+    variantFilterKey = state.pendingPatientVariantFilter.key;
+    variantFilterLabel = (state.pendingPatientVariantFilter.label || '').trim();
+    const patientIds = getPatientIdsForVariantKey(variantFilterKey);
+    variantFilterPatientIds = new Set(patientIds);
+    if (searchInput) {
+      searchInput.value = '';
+    }
+    Object.values(filterInputs).forEach(input => {
+      if (input) input.value = '';
+    });
+    if (variantFilterPatientIds.size) {
+      const [firstId] = patientIds;
+      if (Number.isFinite(firstId)) {
+        selectedPatientId = Number(firstId);
+      }
+    }
+  }
+  const normalizedVariantFilterLabel = variantFilterLabel || 'den valgte variant';
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
@@ -9050,6 +9164,35 @@ function renderPatients(section) {
   applyFormTooltips(form);
   initFamilyCombos(form);
   const genderMap = {male:'Mand', female:'Kvinde', other:'Andet'};
+  const updateVariantFilterNotice = (visibleCount = filteredPatients.length) => {
+    if (!variantFilterNotice || !variantFilterText) return;
+    if (!variantFilterKey) {
+      variantFilterNotice.hidden = true;
+      variantFilterNotice.dataset.visible = 'false';
+      variantFilterText.textContent = '';
+      return;
+    }
+    const registeredCount = variantFilterPatientIds ? variantFilterPatientIds.size : 0;
+    const label = normalizedVariantFilterLabel;
+    const registeredWord = registeredCount === 1 ? 'patient' : 'patienter';
+    const visibleWord = visibleCount === 1 ? 'patient' : 'patienter';
+    const messageParts = [`Filtreret på varianten ${label}.`];
+    if (registeredCount === 0) {
+      messageParts.push('Ingen registrerede patienter har varianten.');
+    } else {
+      messageParts.push(`Registreret hos ${registeredCount} ${registeredWord}.`);
+    }
+    if (visibleCount !== registeredCount) {
+      if (visibleCount === 0) {
+        messageParts.push('Ingen patienter matcher de øvrige filtre.');
+      } else {
+        messageParts.push(`${visibleCount} ${visibleWord} matcher de aktive filtre.`);
+      }
+    }
+    variantFilterText.textContent = messageParts.join(' ');
+    variantFilterNotice.hidden = false;
+    variantFilterNotice.dataset.visible = 'true';
+  };
   const renderRows = () => {
     const term = searchInput.value.trim().toLowerCase();
     const filters = {
@@ -9066,6 +9209,10 @@ function renderPatients(section) {
     if (filters.indication) filterSummary.indikation = filters.indication;
     delete filterSummary.indication;
     if (term) filterSummary.fritekst = term;
+    if (variantFilterKey) {
+      filterSummary.variant = normalizedVariantFilterLabel;
+      filterSummary.variant_patienter = variantFilterPatientIds ? `${variantFilterPatientIds.size}` : '0';
+    }
     activeFilters = filterSummary;
     filteredPatients = list.filter(p => {
       if (!term) return true;
@@ -9085,6 +9232,14 @@ function renderPatients(section) {
       if (filters.indication && !indicationText.includes(filters.indication)) return false;
       return true;
     });
+    if (variantFilterKey) {
+      if (variantFilterPatientIds && variantFilterPatientIds.size) {
+        filteredPatients = filteredPatients.filter(p => variantFilterPatientIds.has(Number(p.id)));
+      } else {
+        filteredPatients = [];
+      }
+    }
+    updateVariantFilterNotice(filteredPatients.length);
     if (selectedPatientId != null && !filteredPatients.some(p => p.id === selectedPatientId)) {
       selectedPatientId = null;
     }
@@ -9107,6 +9262,13 @@ function renderPatients(section) {
     annotateTableCells(section);
   };
   renderRows();
+  variantFilterClearButton?.addEventListener('click', () => {
+    variantFilterKey = null;
+    variantFilterLabel = '';
+    variantFilterPatientIds = null;
+    updateVariantFilterNotice(0);
+    renderRows();
+  });
   searchInput.addEventListener('input', renderRows);
   Object.values(filterInputs).forEach(input => input?.addEventListener('input', renderRows));
   const patientExportColumns = [
@@ -9182,6 +9344,7 @@ function renderPatients(section) {
     renderRows();
   });
   clearBtn.addEventListener('click', () => form.reset());
+  state.pendingPatientVariantFilter = null;
   updateAgeNote();
 }
 function renderSamples(section) {
@@ -11596,6 +11759,7 @@ function renderVariantLibrary(section) {
           <tbody></tbody>
         </table>
         <div class="table-actions">
+          <button type="button" class="secondary" id="libraryOpenPatients" disabled data-tooltip="Åbn Patienter-fanen filtreret på den valgte variant">Vis patienter med varianten</button>
           <button type="button" class="secondary" id="libraryExportCsv">Eksportér CSV</button>
           <button type="button" class="secondary" id="libraryImportCsv">Importér CSV</button>
           <input type="file" id="variantLibraryImportInput" accept=".csv,text/csv" hidden>
@@ -11704,11 +11868,16 @@ function renderVariantLibrary(section) {
   const exportButton = section.querySelector('#libraryExportCsv');
   const importButton = section.querySelector('#libraryImportCsv');
   const importInput = section.querySelector('#variantLibraryImportInput');
+  const openPatientsButton = section.querySelector('#libraryOpenPatients');
   const hotspotChartContainer = section.querySelector('#variantHotspotChart');
   const hotspotSummary = section.querySelector('[data-hotspot-summary]');
   const hotspotCaption = section.querySelector('[data-hotspot-caption]');
   const defaultSaveLabel = saveButtonLabel?.textContent?.trim() || saveButton?.textContent?.trim() || 'Gem';
   const {updateVariantTypeFields, variantTypeSelect} = setupVariantTypeForm(form);
+  if (openPatientsButton) {
+    const tip = openPatientsButton.dataset.tooltip || 'Åbn Patienter-fanen filtreret på den valgte variant.';
+    setTooltip(openPatientsButton, tip);
+  }
   const {
     countMap: variantFrequencyMap,
     patientCount: variantFrequencyPatientCount,
@@ -11740,6 +11909,23 @@ function renderVariantLibrary(section) {
   };
   let filteredLibrary = list.slice();
   let selectedId = null;
+  const defaultOpenPatientsLabel = openPatientsButton?.textContent?.trim() || 'Vis patienter med varianten';
+  const updateOpenPatientsButton = () => {
+    if (!openPatientsButton) return;
+    const entry = selectedId != null
+      ? list.find(item => Number(item?.id) === Number(selectedId))
+      : null;
+    if (!entry) {
+      openPatientsButton.disabled = true;
+      openPatientsButton.textContent = defaultOpenPatientsLabel;
+      return;
+    }
+    const patientIds = getPatientIdsForVariant(entry);
+    const count = patientIds.length;
+    const baseText = count === 1 ? 'Vis patient med varianten' : 'Vis patienter med varianten';
+    openPatientsButton.disabled = false;
+    openPatientsButton.textContent = `${baseText} (${count})`;
+  };
   const getHighlightedEntry = () => {
     if (selectedId == null) return null;
     return filteredLibrary.find(entry => Number(entry.id) === Number(selectedId)) || null;
@@ -13143,6 +13329,7 @@ function renderVariantLibrary(section) {
     if (selectedId && !filteredLibrary.some(v => v.id === selectedId)) {
       selectedId = null;
     }
+    updateOpenPatientsButton();
     if (!filteredLibrary.length) {
       tbody.innerHTML = `<tr><td colspan="16">Ingen poster matcher filtreringen.</td></tr>`;
       annotateTableCells(section);
@@ -13191,6 +13378,16 @@ function renderVariantLibrary(section) {
     redrawHotspot();
   };
   renderRows();
+  openPatientsButton?.addEventListener('click', () => {
+    if (!openPatientsButton.disabled) {
+      const entry = selectedId != null
+        ? list.find(item => Number(item?.id) === Number(selectedId))
+        : null;
+      if (entry) {
+        openPatientsForVariant(entry);
+      }
+    }
+  });
   search?.addEventListener('input', renderRows);
   Object.entries(filterInputs).forEach(([, input]) => {
     if (!input) return;
