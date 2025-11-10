@@ -357,11 +357,15 @@ section[data-tab].active {
   min-height: 2.2rem;
 }
 .response-controls .filter-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  font-size: 0.85rem;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
   color: var(--muted-text);
+}
+.response-controls .filter-field .filterable-select {
+  margin-top: 0;
 }
 .tool-panel {
   padding: 0;
@@ -19695,10 +19699,7 @@ function renderResponses(section) {
       </div>
     </label>
     <label>Vælg skabelon
-      <div class="filterable-select">
-        <input type="search" data-select-filter placeholder="Filtrer skabeloner">
-        <select id="fhirTemplateSelect">${templateSelectOptions}</select>
-      </div>
+      <select id="fhirTemplateSelect">${templateSelectOptions}</select>
     </label>
     <div class="fhir-template-summary" data-template-summary>
       <p class="form-hint">${templates.length ? 'Vælg en skabelon for at se detaljer om profiler og levering.' : 'Opret skabeloner under Administration for at målrette FHIR-eksporten.'}</p>
@@ -20675,7 +20676,7 @@ function renderAdmin(section) {
             <label>Destination ID-system<input name="destination_identifier_system" placeholder="urn:..."></label>
             <label>Destination ID-værdi<input name="destination_identifier_value" placeholder="Fx GLIMR"></label>
           </div>
-          <div class="template-checkboxes">
+          <div class="fhir-template-checkboxes">
             <label><input type="checkbox" name="include_variant_observations" checked> Inkludér variantobservationer</label>
             <label><input type="checkbox" name="include_document_reference"> Inkludér rapportbilag</label>
             <label><input type="checkbox" name="include_composition"> Inkludér journalnotat</label>
