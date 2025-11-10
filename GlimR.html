@@ -4743,6 +4743,51 @@ function formatVariantTitle(variant) {
   return variant.gene || subtype || getVariantTypeLabel(type);
 }
 
+function truncateVariantTitleSegments(title, segments = 2) {
+  const text = String(title ?? '');
+  const normalized = text.trim();
+  if (!normalized) return normalized;
+  if (!Number.isFinite(segments) || segments <= 0) return normalized;
+  const bullet = '·';
+  let searchIndex = -1;
+  for (let i = 0; i < segments; i++) {
+    searchIndex = normalized.indexOf(bullet, searchIndex + 1);
+    if (searchIndex === -1) {
+      return normalized;
+    }
+  }
+  return normalized.slice(0, searchIndex).trim();
+}
+
+function truncateConditionDisplay(condition) {
+  const text = String(condition ?? '').trim();
+  if (!text) return '';
+  const firstLine = text
+    .split(/\r?\n+/)
+    .map(line => collapseSpaces(line))
+    .find(Boolean);
+  if (!firstLine) return '';
+  const bulletParts = firstLine
+    .split(/·+/)
+    .map(part => collapseSpaces(part))
+    .filter(Boolean);
+  if (bulletParts.length > 1) {
+    return bulletParts[0];
+  }
+  const semicolonParts = firstLine
+    .split(/\s*[;|]\s*/)
+    .map(part => collapseSpaces(part))
+    .filter(Boolean);
+  if (semicolonParts.length > 1) {
+    return semicolonParts[0];
+  }
+  const MAX_LENGTH = 120;
+  if (firstLine.length > MAX_LENGTH) {
+    return firstLine.slice(0, MAX_LENGTH - 1).trimEnd() + '…';
+  }
+  return firstLine;
+}
+
 function formatVariantDetailLines(variant) {
   if (!variant) return [];
   const type = normalizeVariantType(variant.variant_type);
@@ -13090,7 +13135,9 @@ function renderVariantLibrary(section) {
     tbody.innerHTML = filteredLibrary.map(v => {
       const selectedAttr = v.id === selectedId ? ' data-selected="true"' : '';
       const lastReview = formatDanishDate(v.last_review);
-      const title = formatVariantTitle(v);
+      const title = (formatVariantTitle(v) || '').trim();
+      const displayTitle = truncateVariantTitleSegments(title);
+      const variantTitleAttr = title ? ` title="${esc(title)}"` : '';
       const typeLabel = getVariantTypeLabel(v.variant_type);
       const genomic = formatVariantGenomicRange(v);
       const frequencyCount = getVariantFrequencyCount(v);
@@ -13111,7 +13158,12 @@ function renderVariantLibrary(section) {
           : '';
         return `${frequencyCategory} forekomst baseret på ${frequencyLabel}${topSuffix}.`;
       })();
-      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td>${esc(title)}</td><td>${esc(typeLabel)}</td><td>${esc(genomic)}</td><td>${esc(v.hgvs_c || '')}</td><td>${esc(v.hgvs_p || '')}</td><td>${formatRsIdCell(getVariantRsId(v))}</td><td>${esc(v.classification || '')}</td><td title="${esc(frequencyTitle)}">${esc(frequencyLabel)}</td><td title="${esc(frequencyCategoryTitle)}">${esc(frequencyCategory)}</td><td>${esc(v.criteria || '')}</td><td>${esc(v.iscn || '')}</td><td>${esc(v.condition || '')}</td><td>${esc(v.inheritance || '')}</td><td>${esc(v.curated_by || '')}</td><td>${esc(lastReview)}</td></tr>`;
+      const condition = v.condition || '';
+      const conditionDisplay = truncateConditionDisplay(condition);
+      const conditionTitleAttr = condition
+        ? ` title="${esc(condition).replace(/\r?\n/g, '&#10;')}"`
+        : '';
+      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td${variantTitleAttr}>${esc(displayTitle)}</td><td>${esc(typeLabel)}</td><td>${esc(genomic)}</td><td>${esc(v.hgvs_c || '')}</td><td>${esc(v.hgvs_p || '')}</td><td>${formatRsIdCell(getVariantRsId(v))}</td><td>${esc(v.classification || '')}</td><td title="${esc(frequencyTitle)}">${esc(frequencyLabel)}</td><td title="${esc(frequencyCategoryTitle)}">${esc(frequencyCategory)}</td><td>${esc(v.criteria || '')}</td><td>${esc(v.iscn || '')}</td><td${conditionTitleAttr}>${esc(conditionDisplay)}</td><td>${esc(v.inheritance || '')}</td><td>${esc(v.curated_by || '')}</td><td>${esc(lastReview)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
     redrawHotspot();
