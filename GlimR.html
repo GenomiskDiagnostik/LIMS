@@ -2685,8 +2685,9 @@ input[type="search"] {
   gap: 0.35rem;
 }
 .families-filter input {
-  min-width: 16rem;
+  min-width: 14rem;
   width: 100%;
+  max-width: 14rem;
 }
 .families-actions {
   display: flex;
@@ -2695,6 +2696,15 @@ input[type="search"] {
   align-items: center;
 }
 .families-actions button {
+  white-space: nowrap;
+}
+.families-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+.families-links button {
   white-space: nowrap;
 }
 .families-hint {
@@ -3246,6 +3256,7 @@ const state = {
   pendingOrderFilterSampleId: null,
   pendingOrderFilterSampleExact: false,
   pendingOrderFilterId: null,
+  pendingOrderFamilyNumber: '',
   pendingSampleId: null,
   pendingSampleShowAll: false,
   pendingReportFilterOrderId: null,
@@ -3256,6 +3267,7 @@ const state = {
   pendingReportSelectOrderId: null,
   pendingReportSelectReportId: null,
   pendingPatientVariantFilter: null,
+  pendingPatientFamilyNumber: '',
   currentFamilyNumber: '',
   familyFilterTerm: '',
   familyAutosaveTimer: null,
@@ -9476,14 +9488,17 @@ function renderFamilies(section) {
           <select id="familySelector"${hasMatches ? '' : ' disabled'}>
             ${selectorOptions}
           </select>
+          <div class="families-links">
+            <button type="button" class="secondary" id="familyShowPatients"${selectedFamily ? '' : ' disabled'}>Patienter</button>
+            <button type="button" class="secondary" id="familyShowOrders"${selectedFamily ? '' : ' disabled'}>Ordinationer</button>
+          </div>
         </div>
         <div class="families-actions">
           <button type="button" class="secondary" id="familyPedigreePrint"${selectedFamily ? '' : ' disabled'}>Udskriv stamtræ</button>
-          <button type="button" class="secondary" id="familyPedigreeDownload"${selectedFamily ? '' : ' disabled'}>Hent stamtræ (SVG)</button>
         </div>
       </div>
     </div>
-    <p class="families-hint">Vælg en familie for at angive forældre, søskende og tvillingestatus og generere stamtræ. Ændringer gemmes automatisk, og stamtræet kan udskrives eller gemmes som SVG.</p>
+    <p class="families-hint">Vælg en familie for at angive forældre, søskende og tvillingestatus og generere stamtræ. Ændringer gemmes automatisk, og stamtræet kan udskrives.</p>
     <p class="families-status" hidden></p>
     <p class="families-empty"${hasMatches ? ' hidden' : ''}>${emptyMessageText}</p>
     <div class="families-layout"${selectedFamily ? '' : ' hidden'}>
@@ -9569,14 +9584,10 @@ function renderFamilies(section) {
     if (!container) return null;
     return container.querySelector('svg');
   };
-  const sanitizeFileLabel = value => {
-    if (!value || typeof value !== 'string') return 'familie';
-    const normalized = value.toLowerCase().replace(/[^0-9a-zæøå_-]+/gi, '_');
-    return normalized.replace(/_{2,}/g, '_').replace(/^_+|_+$/g, '') || 'familie';
-  };
   const familyLabel = () => state.currentFamilyNumber || '';
   const printButton = section.querySelector('#familyPedigreePrint');
-  const downloadButton = section.querySelector('#familyPedigreeDownload');
+  const patientButton = section.querySelector('#familyShowPatients');
+  const ordersButton = section.querySelector('#familyShowOrders');
   if (printButton) {
     printButton.addEventListener('click', () => {
       const svg = getPedigreeSvg();
@@ -9604,28 +9615,31 @@ function renderFamilies(section) {
       setFamiliesStatus('Åbnede stamtræet i et udskriftsvenligt vindue.', {hideAfter: 5000});
     });
   }
-  if (downloadButton) {
-    downloadButton.addEventListener('click', () => {
-      const svg = getPedigreeSvg();
-      if (!svg) {
-        setFamiliesStatus('Stamtræet er ikke klar til download.', {error: true, hideAfter: 5000});
-        return;
-      }
-      const clone = svg.cloneNode(true);
-      clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-      const serializer = new XMLSerializer();
-      const markup = serializer.serializeToString(clone);
-      const blob = new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n', markup], {type: 'image/svg+xml'});
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `stamtrae_${sanitizeFileLabel(familyLabel())}.svg`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
-      setFamiliesStatus('Stamtræet er gemt som SVG-fil.', {hideAfter: 5000});
-    });
+  const goToPatients = async () => {
+    const familyNumber = (state.currentFamilyNumber || '').trim();
+    if (!familyNumber) return;
+    await flushFamilyAutosave();
+    state.pendingPatientFamilyNumber = familyNumber;
+    state.pendingPatientVariantFilter = null;
+    setStatus(`Viser patienter for familien ${familyNumber}.`);
+    activateTab('patients');
+  };
+  const goToOrders = async () => {
+    const familyNumber = (state.currentFamilyNumber || '').trim();
+    if (!familyNumber) return;
+    await flushFamilyAutosave();
+    state.pendingOrderFamilyNumber = familyNumber;
+    state.pendingOrderShowAll = true;
+    setStatus(`Viser ordinationer for familien ${familyNumber}.`);
+    activateTab('orders');
+  };
+  if (patientButton) {
+    setTooltip(patientButton, 'Åbn Patienter-fanen filtreret på familienummeret.');
+    patientButton.addEventListener('click', goToPatients);
+  }
+  if (ordersButton) {
+    setTooltip(ordersButton, 'Åbn Ordinationer-fanen filtreret på familienummeret.');
+    ordersButton.addEventListener('click', goToOrders);
   }
   let currentFamilyPatients = [];
   const flushFamilyAutosave = () => {
@@ -9911,10 +9925,8 @@ function renderFamilies(section) {
     if (!container) return;
     const familyNumber = state.currentFamilyNumber;
     const printButton = section.querySelector('#familyPedigreePrint');
-    const downloadButton = section.querySelector('#familyPedigreeDownload');
     const togglePedigreeActions = enabled => {
       if (printButton) printButton.disabled = !enabled;
-      if (downloadButton) downloadButton.disabled = !enabled;
     };
     if (!familyNumber) {
       container.innerHTML = '<p>Vælg en familie for at se stamtræet.</p>';
@@ -10614,6 +10626,28 @@ function renderPatients(section) {
       }
     }
   }
+  const pendingFamilyNumber = (state.pendingPatientFamilyNumber || '').trim();
+  if (pendingFamilyNumber) {
+    if (searchInput) {
+      searchInput.value = '';
+    }
+    Object.entries(filterInputs).forEach(([key, input]) => {
+      if (!input) return;
+      if (key === 'family') {
+        input.value = pendingFamilyNumber;
+        return;
+      }
+      if (input.tagName === 'SELECT') {
+        input.value = '';
+        return;
+      }
+      input.value = '';
+    });
+    const filterPanel = section.querySelector('#patientsFilterPanel');
+    if (filterPanel) {
+      filterPanel.open = true;
+    }
+  }
   const normalizedVariantFilterLabel = variantFilterLabel || 'den valgte variant';
   annotateHeaders(section);
   annotateSearchInputs(section);
@@ -10720,6 +10754,7 @@ function renderPatients(section) {
     annotateTableCells(section);
   };
   renderRows();
+  state.pendingPatientFamilyNumber = '';
   variantFilterClearButton?.addEventListener('click', () => {
     variantFilterKey = null;
     variantFilterLabel = '';
@@ -11866,6 +11901,19 @@ function renderOrders(section) {
     }
     selectedOrderId = pendingFilterOrderId;
   }
+  const pendingFamilyNumber = (state.pendingOrderFamilyNumber || '').trim();
+  if (pendingFamilyNumber) {
+    if (filterInputs.patient) filterInputs.patient.value = pendingFamilyNumber;
+    if (search) search.value = '';
+    const filterPanel = section.querySelector('#ordersFilterPanel');
+    if (filterPanel) {
+      filterPanel.open = true;
+    }
+    if (state.pendingOrderShowAll && activeToggle) {
+      showActiveOnly = false;
+      activeToggle.checked = false;
+    }
+  }
   const renderRows = () => {
     const term = (search?.value || '').trim().toLowerCase();
     const filters = {
@@ -12053,6 +12101,7 @@ function renderOrders(section) {
   state.pendingOrderFilterSampleId = null;
   state.pendingOrderFilterSampleExact = false;
   state.pendingOrderFilterId = null;
+  state.pendingOrderFamilyNumber = '';
   activeToggle?.addEventListener('change', () => {
     showActiveOnly = activeToggle.checked;
     renderRows();
