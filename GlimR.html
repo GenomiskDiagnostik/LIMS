@@ -4767,7 +4767,7 @@ function truncateConditionDisplay(condition) {
     .map(line => collapseSpaces(line))
     .find(Boolean);
   if (!firstLine) return '';
-  const MAX_LENGTH = 30;
+  const MAX_LENGTH = 20;
   const bulletParts = firstLine
     .split(/·+/)
     .map(part => collapseSpaces(part))
@@ -4783,6 +4783,22 @@ function truncateConditionDisplay(condition) {
     }
   }
   const normalized = collapseSpaces(candidate);
+  if (normalized.length > MAX_LENGTH) {
+    return normalized.slice(0, MAX_LENGTH - 1).trimEnd() + '…';
+  }
+  return normalized;
+}
+
+function truncateInheritanceDisplay(inheritance) {
+  const text = String(inheritance ?? '').trim();
+  if (!text) return '';
+  const firstLine = text
+    .split(/\r?\n+/)
+    .map(line => collapseSpaces(line))
+    .find(Boolean);
+  if (!firstLine) return '';
+  const MAX_LENGTH = 20;
+  const normalized = collapseSpaces(firstLine);
   if (normalized.length > MAX_LENGTH) {
     return normalized.slice(0, MAX_LENGTH - 1).trimEnd() + '…';
   }
@@ -13164,7 +13180,12 @@ function renderVariantLibrary(section) {
       const conditionTitleAttr = condition
         ? ` title="${esc(condition).replace(/\r?\n/g, '&#10;')}"`
         : '';
-      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td${variantTitleAttr}>${esc(displayTitle)}</td><td>${esc(typeLabel)}</td><td>${esc(genomic)}</td><td>${esc(v.hgvs_c || '')}</td><td>${esc(v.hgvs_p || '')}</td><td>${formatRsIdCell(getVariantRsId(v))}</td><td>${esc(v.classification || '')}</td><td title="${esc(frequencyTitle)}">${esc(frequencyLabel)}</td><td title="${esc(frequencyCategoryTitle)}">${esc(frequencyCategory)}</td><td>${esc(v.criteria || '')}</td><td>${esc(v.iscn || '')}</td><td${conditionTitleAttr}>${esc(conditionDisplay)}</td><td>${esc(v.inheritance || '')}</td><td>${esc(v.curated_by || '')}</td><td>${esc(lastReview)}</td></tr>`;
+      const inheritance = v.inheritance || '';
+      const inheritanceDisplay = truncateInheritanceDisplay(inheritance);
+      const inheritanceTitleAttr = inheritance
+        ? ` title="${esc(inheritance).replace(/\r?\n/g, '&#10;')}"`
+        : '';
+      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td${variantTitleAttr}>${esc(displayTitle)}</td><td>${esc(typeLabel)}</td><td>${esc(genomic)}</td><td>${esc(v.hgvs_c || '')}</td><td>${esc(v.hgvs_p || '')}</td><td>${formatRsIdCell(getVariantRsId(v))}</td><td>${esc(v.classification || '')}</td><td title="${esc(frequencyTitle)}">${esc(frequencyLabel)}</td><td title="${esc(frequencyCategoryTitle)}">${esc(frequencyCategory)}</td><td>${esc(v.criteria || '')}</td><td>${esc(v.iscn || '')}</td><td${conditionTitleAttr}>${esc(conditionDisplay)}</td><td${inheritanceTitleAttr}>${esc(inheritanceDisplay)}</td><td>${esc(v.curated_by || '')}</td><td>${esc(lastReview)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
     redrawHotspot();
