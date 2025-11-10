@@ -14855,7 +14855,7 @@ function renderReports(section) {
     showActiveOnly = activeToggle.checked;
     renderRows();
   });
-  const reportExportColumns = [
+  const reportExportBaseColumns = [
     {key:'id', label:'ID'},
     {key:'order_id', label:'Ordination-ID'},
     {key:'order_name', label:'Ordination', value: row => getOrderDisplayName(row.order_id)},
@@ -14867,8 +14867,9 @@ function renderReports(section) {
     {key:'status_label', label:'Status', value: row => statusMap[row.status] || row.status || ''},
     {key:'summary', label:'Konklusion'},
     {key:'findings', label:'Fund'},
-    {key:'variant_ids', label:'Variant-ID\'er'},
-    {key:'variant_details', label:'Variantdetaljer', value: row => formatJsonCell(row.variant_details)},
+    {key:'variant_count', label:'Antal varianter', value: row => typeof row.__variantCount === 'number' ? row.__variantCount : (Array.isArray(row.__variantSnapshots) ? row.__variantSnapshots.length : 0)},
+    {key:'variant_ids', label:'Variant-ID\'er', value: row => Array.isArray(row.__variantIds) && row.__variantIds.length ? row.__variantIds.join(', ') : ''},
+    {key:'variant_details', label:'Variantdetaljer', value: row => Array.isArray(row.__variantSummaries) && row.__variantSummaries.length ? row.__variantSummaries.join(' | ') : ''},
     {key:'issued_at', label:'Udstedt (ISO)'},
     {key:'issued_at_formatted', label:'Udstedt', value: row => formatDanishDate(row.issued_at, true)},
     {key:'created_by', label:'Oprettet af'},
@@ -14877,9 +14878,96 @@ function renderReports(section) {
     {key:'updated_at', label:'Opdateret (ISO)'},
     {key:'updated_at_formatted', label:'Opdateret', value: row => formatDanishDate(row.updated_at, true)}
   ];
+
+  const buildReportVariantColumns = rows => {
+    if (!Array.isArray(rows) || !rows.length) return [];
+    const variantFieldDefinitions = [
+      {key:'title', label:'Titel', getter: variant => formatVariantTitle(variant)},
+      {key:'id', label:'ID'},
+      {key:'variant_type', label:'Varianttype', getter: variant => getVariantTypeLabel(variant.variant_type) || variant.variant_type || ''},
+      {key:'gene', label:'Gen'},
+      {key:'transcript', label:'Transkript'},
+      {key:'hgvs_c', label:'HGVS.c'},
+      {key:'hgvs_p', label:'HGVS.p'},
+      {key:'classification', label:'Klassifikation'},
+      {key:'criteria', label:'ACMG'},
+      {key:'zygosity', label:'Zygositet'},
+      {key:'af', label:'Allelfrekvens'},
+      {key:'genomic_position', label:'Genomisk position'},
+      {key:'copy_number', label:'Kopital'},
+      {key:'sv_subtype', label:'Strukturel type'},
+      {key:'size_bp', label:'Størrelse (bp)'},
+      {key:'iscn', label:'ISCN'},
+      {key:'affected_genes', label:'Berørte gener'},
+      {key:'interpretation', label:'Fortolkning'},
+      {key:'description', label:'Beskrivelse'},
+      {key:'summary', label:'Opsummering', getter: variant => describeVariantNarrative(variant)}
+    ];
+    const maxVariants = rows.reduce((max, row) => {
+      const count = Array.isArray(row.__variantSnapshots) ? row.__variantSnapshots.length : 0;
+      return count > max ? count : max;
+    }, 0);
+    if (!maxVariants) return [];
+    const columns = [];
+    for (let i = 0; i < maxVariants; i++) {
+      const variantNumber = i + 1;
+      for (const field of variantFieldDefinitions) {
+        columns.push({
+          key: `variant_${variantNumber}_${field.key}`,
+          label: `Variant ${variantNumber} – ${field.label}`,
+          value: row => {
+            const variant = Array.isArray(row.__variantSnapshots) ? row.__variantSnapshots[i] : null;
+            if (!variant) return '';
+            const raw = typeof field.getter === 'function' ? field.getter(variant, row, i) : variant[field.key];
+            if (raw == null) return '';
+            if (Array.isArray(raw)) return raw.join(', ');
+            if (typeof raw === 'number') return Number.isFinite(raw) ? String(raw) : '';
+            if (typeof raw === 'boolean') return raw ? 'Ja' : 'Nej';
+            if (typeof raw === 'object') return JSON.stringify(raw);
+            return String(raw);
+          }
+        });
+      }
+    }
+    return columns;
+  };
   section.querySelector('#reportsExport').addEventListener('click', () => {
-    const rows = cloneWithCreatedBy('reports', filteredReports);
-    exportFilteredCsv('glimr-rapporter-filtreret.csv', rows, reportExportColumns, {
+    const rows = cloneWithCreatedBy('reports', filteredReports).map(report => {
+      const variantSnapshots = getReportVariantSnapshots(report, Number(report.order_id));
+      let variantIds = variantSnapshots.map(v => v.id).filter(id => id != null && id !== '');
+      if (!variantIds.length) {
+        variantIds = parseReportVariantIds(report.variant_ids).map(id => id != null ? String(id) : '').filter(Boolean);
+      } else {
+        variantIds = variantIds.map(id => id != null ? String(id) : '').filter(Boolean);
+      }
+      let variantSummaries = variantSnapshots.map(v => describeVariantNarrative(v)).filter(Boolean);
+      if (!variantSummaries.length) {
+        const rawDetails = report.variant_details;
+        if (Array.isArray(rawDetails)) {
+          variantSummaries = rawDetails.map(item => describeVariantNarrative(snapshotVariant(item))).filter(Boolean);
+        } else if (typeof rawDetails === 'string' && rawDetails.trim()) {
+          try {
+            const parsed = JSON.parse(rawDetails);
+            if (Array.isArray(parsed)) {
+              variantSummaries = parsed.map(item => describeVariantNarrative(snapshotVariant(item))).filter(Boolean);
+            }
+          } catch (err) {
+            const cleaned = rawDetails.replace(/[\[\]{}"]+/g, ' ').replace(/\s+/g, ' ').trim();
+            if (cleaned) variantSummaries = [cleaned];
+          }
+        }
+      }
+      return {
+        ...report,
+        __variantSnapshots: variantSnapshots,
+        __variantIds: variantIds,
+        __variantSummaries: variantSummaries,
+        __variantCount: variantSnapshots.length
+      };
+    });
+    const variantColumns = buildReportVariantColumns(rows);
+    const columns = reportExportBaseColumns.concat(variantColumns);
+    exportFilteredCsv('glimr-rapporter-filtreret.csv', rows, columns, {
       entity: 'rapporter',
       plural: 'rapporter'
     });
