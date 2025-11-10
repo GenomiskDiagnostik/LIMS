@@ -3259,6 +3259,7 @@ const state = {
   pendingOrderFamilyNumber: '',
   pendingSampleId: null,
   pendingSampleShowAll: false,
+  pendingSampleFamilyNumber: '',
   pendingReportFilterOrderId: null,
   pendingReportFilterOrderExact: false,
   pendingReportFilterSampleId: null,
@@ -9492,6 +9493,7 @@ function renderFamilies(section) {
           <div class="families-links">
             <button type="button" class="secondary" id="familyShowPatients"${selectedFamily ? '' : ' disabled'}>Patienter</button>
             <button type="button" class="secondary" id="familyShowOrders"${selectedFamily ? '' : ' disabled'}>Ordinationer</button>
+            <button type="button" class="secondary" id="familyShowSamples"${selectedFamily ? '' : ' disabled'}>Prøver</button>
           </div>
         </div>
         <div class="families-actions">
@@ -9589,6 +9591,7 @@ function renderFamilies(section) {
   const printButton = section.querySelector('#familyPedigreePrint');
   const patientButton = section.querySelector('#familyShowPatients');
   const ordersButton = section.querySelector('#familyShowOrders');
+  const samplesButton = section.querySelector('#familyShowSamples');
   if (printButton) {
     printButton.addEventListener('click', () => {
       const svg = getPedigreeSvg();
@@ -9634,6 +9637,15 @@ function renderFamilies(section) {
     setStatus(`Viser ordinationer for familien ${familyNumber}.`);
     activateTab('orders');
   };
+  const goToSamples = async () => {
+    const familyNumber = (state.currentFamilyNumber || '').trim();
+    if (!familyNumber) return;
+    await flushFamilyAutosave();
+    state.pendingSampleFamilyNumber = familyNumber;
+    state.pendingSampleShowAll = true;
+    setStatus(`Viser prøver for familien ${familyNumber}.`);
+    activateTab('samples');
+  };
   if (patientButton) {
     setTooltip(patientButton, 'Åbn Patienter-fanen filtreret på familienummeret.');
     patientButton.addEventListener('click', goToPatients);
@@ -9641,6 +9653,10 @@ function renderFamilies(section) {
   if (ordersButton) {
     setTooltip(ordersButton, 'Åbn Ordinationer-fanen filtreret på familienummeret.');
     ordersButton.addEventListener('click', goToOrders);
+  }
+  if (samplesButton) {
+    setTooltip(samplesButton, 'Åbn Prøver-fanen filtreret på familienummeret.');
+    samplesButton.addEventListener('click', goToSamples);
   }
   let currentFamilyPatients = [];
   const flushFamilyAutosave = () => {
@@ -11137,6 +11153,19 @@ function renderSamples(section) {
       activeToggle.checked = false;
     }
   }
+  const pendingSampleFamily = (state.pendingSampleFamilyNumber || '').trim();
+  if (pendingSampleFamily) {
+    if (filterInputs.patient) filterInputs.patient.value = pendingSampleFamily;
+    if (search) search.value = '';
+    const filterPanel = section.querySelector('#samplesFilterPanel');
+    if (filterPanel) {
+      filterPanel.open = true;
+    }
+    if (state.pendingSampleShowAll && activeToggle) {
+      showActiveOnly = false;
+      activeToggle.checked = false;
+    }
+  }
   const renderRows = () => {
     const term = search.value.toLowerCase();
     const filters = {
@@ -11225,6 +11254,7 @@ function renderSamples(section) {
   }
   state.pendingSampleId = null;
   state.pendingSampleShowAll = false;
+  state.pendingSampleFamilyNumber = '';
   activeToggle?.addEventListener('change', () => {
     showActiveOnly = activeToggle.checked;
     renderRows();
