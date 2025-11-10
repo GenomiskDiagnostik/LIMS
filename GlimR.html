@@ -15772,6 +15772,70 @@ function startNewReportPage(builder, logo, exportedAt) {
   return drawReportHeader(builder, logo, exportedAt);
 }
 
+function parsePanelGeneListForPdf(value) {
+  if (value == null) return [];
+  return String(value)
+    .split(/[\n;,]/)
+    .map(token => token.trim())
+    .filter(Boolean);
+}
+
+function determineGeneListFontSize(count) {
+  if (!count || count <= 0) return 8;
+  if (count <= 150) return 8;
+  if (count <= 300) return 7;
+  return 6;
+}
+
+function computePdfLeading(fontSize) {
+  const scaled = Math.round(fontSize * 1.35);
+  return Math.max(fontSize + 2, scaled);
+}
+
+function renderPanelGeneAppendix(builder, logo, exportedAt, panel) {
+  if (!panel) return;
+  const genes = parsePanelGeneListForPdf(panel.gene_list);
+  const geneCount = genes.length;
+  const panelName = (panel.name || 'Genpanel').toString();
+  const versionDisplay = panel.version != null && panel.version !== '' ? `(v${panel.version})` : '';
+  const panelLabel = versionDisplay ? `${panelName} ${versionDisplay}` : panelName;
+  const geneFontSize = determineGeneListFontSize(geneCount);
+  const panelNameFontSize = Math.max(8, Math.min(12, geneFontSize + 2));
+  const metaFontSize = Math.max(8, Math.min(10, geneFontSize + 1));
+  const geneLeading = computePdfLeading(geneFontSize);
+  const panelNameLeading = computePdfLeading(panelNameFontSize);
+  const metaLeading = computePdfLeading(metaFontSize);
+  const contentWidth = builder.width - builder.margin * 2;
+  const geneListContent = genes.length ? genes.join(', ') : collapseSpaces(panel.gene_list) || '';
+  const listLinesSource = geneListContent ? wrapPdfText(geneListContent, contentWidth, geneFontSize) : ['Ingen gener angivet.'];
+  const listLines = listLinesSource.length ? listLinesSource : ['Ingen gener angivet.'];
+  const countLabel = `Antal gener: ${geneCount}`;
+  const textX = builder.margin;
+  let cursor = 0;
+  let continuation = false;
+  const renderAppendixHeader = () => {
+    const headingLabel = continuation ? 'Bilag: Genpanel (fortsat)' : 'Bilag: Genpanel';
+    const header = startNewReportPage(builder, logo, exportedAt);
+    cursor = header.contentTop;
+    builder.addText(headingLabel, textX, cursor, PDF_HEADING_FONT_SIZE, PDF_HEADING_TEXT_COLOR);
+    cursor -= PDF_HEADING_LEADING;
+    builder.addText(panelLabel, textX, cursor, panelNameFontSize, PDF_TEXT_COLOR);
+    cursor -= panelNameLeading;
+    builder.addText(countLabel, textX, cursor, metaFontSize, PDF_MUTED_TEXT_COLOR);
+    cursor -= metaLeading;
+    cursor -= PDF_HEADING_GAP;
+    continuation = true;
+  };
+  renderAppendixHeader();
+  listLines.forEach(line => {
+    if (cursor - geneLeading < builder.margin) {
+      renderAppendixHeader();
+    }
+    builder.addText(line, textX, cursor, geneFontSize, PDF_TEXT_COLOR);
+    cursor -= geneLeading;
+  });
+}
+
 async function createReportPdfBlob(orderId, reportData, exportedAt = new Date()) {
   try {
     const order = findById('orders', orderId);
@@ -15929,6 +15993,7 @@ async function createReportPdfBlob(orderId, reportData, exportedAt = new Date())
     builder.addText(`Tolker: ${interpreterName || 'Ikke angivet'}`, firstLineStart, signatureLineY + 24, PDF_BODY_FONT_SIZE, PDF_TEXT_COLOR);
     builder.addLine(secondLineStart, signatureLineY, secondLineEnd, signatureLineY, 1, PDF_SIGNATURE_LINE_COLOR);
     builder.addText(`Godkender: ${approverName || 'Ikke angivet'}`, secondLineStart, signatureLineY + 24, PDF_BODY_FONT_SIZE, PDF_TEXT_COLOR);
+    renderPanelGeneAppendix(builder, logo, exportedAt, panel);
     const bytes = builder.build();
     return new Blob([bytes], {type: 'application/pdf'});
   } catch (err) {
