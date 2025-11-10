@@ -3008,7 +3008,7 @@ const tabs = [
   {id:'patients', label:'Patienter'},
   {id:'samples', label:'Prøver'},
   {id:'orders', label:'Ordinationer'},
-  {id:'panels', label:'Analyser/Panels'},
+  {id:'panels', label:'Paneler'},
   {id:'variants', label:'Varianter'},
   {id:'variant_library', label:'Variantbibliotek'},
   {id:'conclusion_library', label:'Standardtekster'},
@@ -8798,7 +8798,7 @@ function renderCreateCase(section) {
     }
   });
   if (!panels.length) {
-    setMessage('Opret først et panel under "Analyser/Panels" for at kunne oprette en sag.', 'error');
+    setMessage('Opret først et panel under "Paneler" for at kunne oprette en sag.', 'error');
     disableButtons(true);
   } else {
     setMessage('');
