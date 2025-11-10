@@ -4759,6 +4759,17 @@ function truncateVariantTitleSegments(title, segments = 2) {
   return normalized.slice(0, searchIndex).trim();
 }
 
+function truncateConditionDisplay(condition) {
+  const text = String(condition ?? '').trim();
+  if (!text) return '';
+  const lines = text
+    .split(/\r?\n+/)
+    .map(line => collapseSpaces(line))
+    .filter(Boolean);
+  if (lines.length) return lines[0];
+  return '';
+}
+
 function formatVariantDetailLines(variant) {
   if (!variant) return [];
   const type = normalizeVariantType(variant.variant_type);
@@ -13129,7 +13140,12 @@ function renderVariantLibrary(section) {
           : '';
         return `${frequencyCategory} forekomst baseret på ${frequencyLabel}${topSuffix}.`;
       })();
-      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td${variantTitleAttr}>${esc(displayTitle)}</td><td>${esc(typeLabel)}</td><td>${esc(genomic)}</td><td>${esc(v.hgvs_c || '')}</td><td>${esc(v.hgvs_p || '')}</td><td>${formatRsIdCell(getVariantRsId(v))}</td><td>${esc(v.classification || '')}</td><td title="${esc(frequencyTitle)}">${esc(frequencyLabel)}</td><td title="${esc(frequencyCategoryTitle)}">${esc(frequencyCategory)}</td><td>${esc(v.criteria || '')}</td><td>${esc(v.iscn || '')}</td><td>${esc(v.condition || '')}</td><td>${esc(v.inheritance || '')}</td><td>${esc(v.curated_by || '')}</td><td>${esc(lastReview)}</td></tr>`;
+      const condition = v.condition || '';
+      const conditionDisplay = truncateConditionDisplay(condition);
+      const conditionTitleAttr = condition
+        ? ` title="${esc(condition).replace(/\r?\n/g, '&#10;')}"`
+        : '';
+      return `<tr data-id="${v.id}"${selectedAttr}><td>${v.id}</td><td${variantTitleAttr}>${esc(displayTitle)}</td><td>${esc(typeLabel)}</td><td>${esc(genomic)}</td><td>${esc(v.hgvs_c || '')}</td><td>${esc(v.hgvs_p || '')}</td><td>${formatRsIdCell(getVariantRsId(v))}</td><td>${esc(v.classification || '')}</td><td title="${esc(frequencyTitle)}">${esc(frequencyLabel)}</td><td title="${esc(frequencyCategoryTitle)}">${esc(frequencyCategory)}</td><td>${esc(v.criteria || '')}</td><td>${esc(v.iscn || '')}</td><td${conditionTitleAttr}>${esc(conditionDisplay)}</td><td>${esc(v.inheritance || '')}</td><td>${esc(v.curated_by || '')}</td><td>${esc(lastReview)}</td></tr>`;
     }).join('');
     annotateTableCells(section);
     redrawHotspot();
