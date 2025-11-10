@@ -4762,12 +4762,30 @@ function truncateVariantTitleSegments(title, segments = 2) {
 function truncateConditionDisplay(condition) {
   const text = String(condition ?? '').trim();
   if (!text) return '';
-  const lines = text
+  const firstLine = text
     .split(/\r?\n+/)
     .map(line => collapseSpaces(line))
+    .find(Boolean);
+  if (!firstLine) return '';
+  const bulletParts = firstLine
+    .split(/·+/)
+    .map(part => collapseSpaces(part))
     .filter(Boolean);
-  if (lines.length) return lines[0];
-  return '';
+  if (bulletParts.length > 1) {
+    return bulletParts[0];
+  }
+  const semicolonParts = firstLine
+    .split(/\s*[;|]\s*/)
+    .map(part => collapseSpaces(part))
+    .filter(Boolean);
+  if (semicolonParts.length > 1) {
+    return semicolonParts[0];
+  }
+  const MAX_LENGTH = 120;
+  if (firstLine.length > MAX_LENGTH) {
+    return firstLine.slice(0, MAX_LENGTH - 1).trimEnd() + '…';
+  }
+  return firstLine;
 }
 
 function formatVariantDetailLines(variant) {
