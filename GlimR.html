@@ -787,6 +787,27 @@ section[data-tab].active {
   display: grid;
   gap: 0.5rem;
 }
+.planning-mail-control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.planning-mail-heading {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.planning-mail-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.planning-mail-select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.planning-mail-send {
+  flex: 0 0 auto;
+}
 .planning-card-controls label {
   display: flex;
   flex-direction: column;
@@ -3275,6 +3296,15 @@ const iconLibrary = {
     attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
     paths: [
       {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H6.911a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661Z'}
+    ]
+  },
+  envelope: {
+    viewBox: '0 0 24 24',
+    attrs: {fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5'},
+    paths: [
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M21.75 6.75v10.5A2.25 2.25 0 0 1 19.5 19.5h-15A2.25 2.25 0 0 1 2.25 17.25V6.75'},
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M21.75 6.75 12 12.75 2.25 6.75'},
+      {'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M21.75 6.75 12 1.5 2.25 6.75'}
     ]
   },
   'wrench-screwdriver': {
@@ -16742,6 +16772,29 @@ function renderPlanner(section) {
   const currentUser = state.currentUser;
   const currentUserId = currentUser?.id != null ? String(currentUser.id) : null;
   const canModifySampleStatus = currentCanWrite();
+  const plannerUsers = (getCached('users') || []).filter(user => {
+    if (!user) return false;
+    const email = (user.email || '').toString().trim();
+    return Boolean(email);
+  });
+  const planningRecipientUsers = plannerUsers
+    .filter(user => {
+      if (!currentUserId) return true;
+      return String(user.id) !== currentUserId;
+    })
+    .sort((a, b) => {
+      const aLabel = a?.name || a?.email || '';
+      const bLabel = b?.name || b?.email || '';
+      return aLabel.localeCompare(bLabel);
+    });
+  const hasMailRecipients = planningRecipientUsers.length > 0;
+  const planningRecipientOptionsHtml = planningRecipientUsers
+    .map(user => {
+      const label = user.name || user.email || `Bruger #${user.id}`;
+      return `<option value="${esc(String(user.id))}">${esc(label)}</option>`;
+    })
+    .join('');
+  const planningRecipientMap = new Map(planningRecipientUsers.map(user => [String(user.id), user]));
   const legacyPlanningStorageKey = currentUserId ? `glimr-plan-${currentUserId}` : null;
   let planStateSource = 'none';
 
@@ -17501,6 +17554,20 @@ function renderPlanner(section) {
         <button type="button" class="secondary planning-button" data-export="csv" data-task-id="${esc(task.id)}">Eksportér opgave til CSV</button>
       </div>
     `;
+    const mailControlsHtml = hasMailRecipients
+      ? `<div class="planning-mail-control">
+          <span class="planning-mail-heading">Del via mail</span>
+          <div class="planning-mail-row">
+            <select class="planning-mail-select" data-task-id="${esc(task.id)}">
+              <option value="">Vælg modtager</option>
+              ${planningRecipientOptionsHtml}
+            </select>
+            <button type="button" class="icon-button planning-mail-send" data-task-id="${esc(task.id)}" title="Send opgave som mail" aria-label="Send opgave som mail">
+              <span class="icon-slot" data-icon="envelope"></span>
+            </button>
+          </div>
+        </div>`
+      : '';
     return `
       <article class="planning-card" data-task-id="${esc(task.id)}" data-status="${esc(task.statusKey)}" data-due="${esc(task.dueState)}" data-healthy="${task.healthyFamilyMember ? 'true' : 'false'}">
         <div class="planning-card-header">
@@ -17532,6 +17599,7 @@ function renderPlanner(section) {
               <span class="planning-note-hint">Gem når du er færdig med at skrive.</span>
             </div>
           </div>
+          ${mailControlsHtml}
           ${statusControlHtml}
           <label class="planning-checkbox">
             <input type="checkbox" class="planning-done" data-task-id="${esc(task.id)}" ${task.planDone ? 'checked' : ''}>
@@ -17586,6 +17654,7 @@ function renderPlanner(section) {
     planningBoard.innerHTML = lanes.length
       ? lanes.join('')
       : '<p class="planning-empty">Alle opgaver i planen er markeret som færdige.</p>';
+    applyIconSlots(planningBoard);
   };
 
   const updateExportButtons = () => {
@@ -17918,6 +17987,85 @@ function renderPlanner(section) {
             card.classList.remove('planning-note-dirty');
           }
         }
+        return;
+      }
+      const mailButton = event.target.closest('button.planning-mail-send');
+      if (mailButton instanceof HTMLButtonElement) {
+        if (!currentUserId) {
+          alert('Log ind for at dele opgaver via mail.');
+          return;
+        }
+        if (!hasMailRecipients || !planningRecipientMap.size) {
+          alert('Ingen modtagere med e-mail er tilgængelige.');
+          return;
+        }
+        const taskId = mailButton.dataset.taskId;
+        if (!taskId) return;
+        const card = mailButton.closest('.planning-card');
+        const select = card?.querySelector('.planning-mail-select');
+        if (!(select instanceof HTMLSelectElement)) {
+          alert('Vælg en modtager for at sende mail.');
+          return;
+        }
+        const recipientId = select.value;
+        if (!recipientId) {
+          alert('Vælg en modtager for at sende mail.');
+          select.focus();
+          return;
+        }
+        const recipient = planningRecipientMap.get(recipientId);
+        if (!recipient || !recipient.email) {
+          alert('Den valgte bruger har ikke en registreret e-mailadresse.');
+          return;
+        }
+        const task = planningTasks.find(item => item.id === taskId);
+        if (!task) {
+          alert('Kunne ikke finde opgaven til mailafsendelse.');
+          return;
+        }
+        const stageLabel = task.stage?.label || task.stage?.shortLabel || 'Opgave';
+        const subject = `GlimR opgave: ${task.orderName} – ${stageLabel}`;
+        const details = [];
+        details.push(recipient.name ? `Hej ${recipient.name},` : 'Hej,');
+        details.push('');
+        details.push(`Du modtager detaljer om opgaven "${task.orderName}" (${stageLabel}).`);
+        details.push('');
+        details.push(`• Status: ${task.statusLabel}`);
+        const dueDisplay = task.dueDisplay || 'Ikke planlagt';
+        details.push(`• Deadline: ${dueDisplay}`);
+        if (task.dueRelative) {
+          details.push(`• Relativ deadline: ${task.dueRelative}`);
+        }
+        if (task.patientName || task.patientMrn) {
+          const patientParts = [];
+          if (task.patientName) patientParts.push(task.patientName);
+          if (task.patientMrn) patientParts.push(task.patientMrn);
+          details.push(`• Patient: ${patientParts.join(' – ')}`);
+        }
+        if (task.sampleLabel) {
+          details.push(`• Prøve: ${task.sampleLabel}`);
+        }
+        if (task.roleLabel) {
+          details.push(`• Rolle: ${task.roleLabel}`);
+        }
+        if (Array.isArray(task.info) && task.info.length) {
+          details.push('');
+          details.push('Detaljer:');
+          task.info.forEach(item => {
+            if (item) details.push(`- ${item}`);
+          });
+        }
+        const noteText = (task.note || '').trim();
+        if (noteText) {
+          details.push('');
+          details.push('Noter:');
+          details.push(noteText);
+        }
+        details.push('');
+        details.push(`Sendt fra GlimR-planlæggeren af ${currentUser?.name || 'GlimR'}.`);
+        const mailto = `mailto:${encodeURIComponent(recipient.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(details.join('\n'))}`;
+        window.location.href = mailto;
+        setStatus(`Åbnede mailkladde til ${recipient.name || recipient.email}.`);
         return;
       }
       const exportButton = event.target.closest('button[data-export]');
