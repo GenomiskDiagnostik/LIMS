@@ -8614,6 +8614,13 @@ function renderCreateCase(section) {
   const submitBtn = section.querySelector('#createCaseSubmit');
   const resetBtn = section.querySelector('#createCaseReset');
   const statusPreviewValue = section.querySelector('#orderStatusValue');
+  const patientMrnInput = form.elements.patient_mrn;
+  const patientGenderSelect = form.elements.patient_gender;
+  const patientBirthInput = form.elements.patient_birth;
+  applyCprAutofill(patientMrnInput, {
+    genderField: patientGenderSelect,
+    birthField: patientBirthInput
+  });
   const enforcePrioritySelection = setupExclusivePriorityControls(orderAcuteToggle, orderUrgentToggle);
   const setMessage = (text, tone = 'info') => {
     if (!message) return;
@@ -10738,6 +10745,12 @@ function renderPatients(section) {
     setTooltip(variantFilterClearButton, 'Fjern filtreringen på varianten.');
   }
   const birthDateInput = form?.elements.birth_date;
+  const genderSelect = form?.elements.gender;
+  const mrnInput = form?.elements.mrn;
+  applyCprAutofill(mrnInput, {
+    genderField: genderSelect,
+    birthField: birthDateInput
+  });
   const ageNote = form?.querySelector('[data-patient-age]');
   const updateAgeNote = () => {
     if (!ageNote) return;
@@ -17044,6 +17057,133 @@ function formatDanishDate(value, includeTimeHint) {
     }
   }
   return '';
+}
+
+function parseCprNumber(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const normalized = trimmed.replace(/\s+/g, '');
+  const match = normalized.match(/^(\d{2})(\d{2})(\d{2})-?(\d{4})$/);
+  if (!match) return null;
+  const [, dayStr, monthStr, yearStr, sequence] = match;
+  const day = Number(dayStr);
+  const month = Number(monthStr);
+  const yearTwo = Number(yearStr);
+  if (!Number.isFinite(day) || !Number.isFinite(month) || !Number.isFinite(yearTwo)) return null;
+  if (day < 1 || day > 31 || month < 1 || month > 12) return null;
+  const sequenceFirst = Number(sequence.charAt(0));
+  if (!Number.isFinite(sequenceFirst)) return null;
+  let yearFull;
+  if (sequenceFirst >= 0 && sequenceFirst <= 3) {
+    yearFull = 1900 + yearTwo;
+  } else if (sequenceFirst === 4 || sequenceFirst === 9) {
+    yearFull = (yearTwo <= 36 ? 2000 : 1900) + yearTwo;
+  } else if (sequenceFirst >= 5 && sequenceFirst <= 8) {
+    yearFull = (yearTwo <= 36 ? 2000 : 1800) + yearTwo;
+  } else {
+    return null;
+  }
+  const candidate = new Date(yearFull, month - 1, day);
+  if (
+    Number.isNaN(candidate.getTime()) ||
+    candidate.getFullYear() !== yearFull ||
+    candidate.getMonth() !== month - 1 ||
+    candidate.getDate() !== day
+  ) {
+    return null;
+  }
+  const genderDigit = Number(sequence.charAt(sequence.length - 1));
+  if (!Number.isFinite(genderDigit)) return null;
+  const gender = genderDigit % 2 === 0 ? 'female' : 'male';
+  const isoMonth = String(month).padStart(2, '0');
+  const isoDay = String(day).padStart(2, '0');
+  return {
+    birthDate: `${yearFull}-${isoMonth}-${isoDay}`,
+    gender
+  };
+}
+
+function applyCprAutofill(mrnInput, options = {}) {
+  if (!mrnInput) return;
+  const {genderField, birthField} = options;
+  const trackedFields = [genderField, birthField].filter(Boolean);
+  if (!trackedFields.length) return;
+  const toEventArray = events => (Array.isArray(events) ? events : events ? [events] : []);
+  const handleManualChange = field => {
+    if (!field) return;
+    const sync = () => {
+      const dataset = field.dataset;
+      if (!dataset) return;
+      const stored = dataset.cprAutofillValue ?? '';
+      if (dataset.cprAutofill === 'true' && field.value !== stored) {
+        dataset.cprAutofill = 'manual';
+      }
+      if (!field.value) {
+        delete dataset.cprAutofill;
+        delete dataset.cprAutofillValue;
+      }
+    };
+    field.addEventListener('input', sync);
+    field.addEventListener('change', sync);
+  };
+  const setAutofillValue = (field, value, triggerEvents) => {
+    if (!field || value == null) return;
+    const dataset = field.dataset;
+    if (dataset?.cprAutofill === 'manual') return;
+    const normalizedValue = typeof value === 'string' ? value : String(value);
+    const currentValue = field.value ?? '';
+    if (currentValue) {
+      if (currentValue === normalizedValue) {
+        if (dataset) {
+          dataset.cprAutofill = 'true';
+          dataset.cprAutofillValue = normalizedValue;
+        }
+        return;
+      }
+      if (dataset && dataset.cprAutofill === 'true') {
+        field.value = normalizedValue;
+        dataset.cprAutofillValue = normalizedValue;
+        toEventArray(triggerEvents).forEach(eventName => {
+          if (eventName && typeof field.dispatchEvent === 'function') {
+            field.dispatchEvent(new Event(eventName, {bubbles: true}));
+          }
+        });
+      }
+      return;
+    }
+    field.value = normalizedValue;
+    if (dataset) {
+      dataset.cprAutofill = 'true';
+      dataset.cprAutofillValue = normalizedValue;
+    }
+    toEventArray(triggerEvents).forEach(eventName => {
+      if (eventName && typeof field.dispatchEvent === 'function') {
+        field.dispatchEvent(new Event(eventName, {bubbles: true}));
+      }
+    });
+  };
+  trackedFields.forEach(handleManualChange);
+  const updateFromCpr = () => {
+    const parsed = parseCprNumber(mrnInput.value);
+    if (!parsed) return;
+    const {birthDate, gender} = parsed;
+    if (birthField && birthDate) {
+      setAutofillValue(birthField, birthDate, ['input', 'change']);
+    }
+    if (genderField && (gender === 'male' || gender === 'female')) {
+      let allowUpdate = true;
+      if (genderField.tagName && genderField.tagName.toLowerCase() === 'select') {
+        allowUpdate = Array.from(genderField.options || []).some(option => option.value === gender);
+      }
+      if (allowUpdate) {
+        setAutofillValue(genderField, gender, ['change']);
+      }
+    }
+  };
+  mrnInput.addEventListener('input', updateFromCpr);
+  mrnInput.addEventListener('change', updateFromCpr);
+  updateFromCpr();
 }
 
 const numberFormatterCache = new Map();
