@@ -3273,7 +3273,8 @@ const state = {
   currentFamilyNumber: '',
   familyFilterTerm: '',
   familyAutosaveTimer: null,
-  familySavingPromise: null
+  familySavingPromise: null,
+  validationSettings: null
 };
 const CREATED_BY_STORES = new Set(['patients','samples','orders','patient_groups','family_relations','variants','qc','qc_presets','reports','fhir_templates','conclusion_library']);
 const UPDATED_BY_STORES = new Set(['panels']);
@@ -3634,6 +3635,186 @@ function isControlOrder(order) {
   if (!Number.isFinite(sampleId)) return false;
   const sample = findById('samples', sampleId);
   return !!sample && isLikelyControlSample(sample);
+}
+
+const VALIDATION_SETTINGS_KEY = 'dataValidation';
+const VALIDATION_FIELD_KEYS = ['mrn', 'pmb', 'extraId'];
+const DEFAULT_VALIDATION_SETTINGS = {
+  mrn: {mode: 'none', preset: '', pattern: '', flags: '', message: ''},
+  pmb: {mode: 'none', preset: '', pattern: '', flags: '', message: ''},
+  extraId: {mode: 'none', preset: '', pattern: '', flags: '', message: ''}
+};
+const VALIDATION_FIELD_METADATA = {
+  mrn: {label: 'MRN'},
+  pmb: {label: 'PMB-nummer'},
+  extraId: {label: 'Ekstra ID'}
+};
+const VALIDATION_PRESETS = {
+  mrn: {
+    cpr: {
+      label: 'CPR-nummer (DDMMÅÅ-XXXX)',
+      description: 'Kræver at MRN angives som et gyldigt CPR-nummer.',
+      validate(value) {
+        if (!value) return '';
+        return parseCprNumber(value) ? '' : 'MRN skal være et gyldigt CPR-nummer (DDMMÅÅ-XXXX).';
+      }
+    }
+  },
+  pmb: {
+    digits12: {
+      label: '12 cifre (heltal)',
+      description: 'Kræver at PMB-nummeret består af præcis 12 cifre uden mellemrum.',
+      validate(value) {
+        if (!value) return '';
+        return /^\d{12}$/.test(value) ? '' : 'PMB-nummeret skal bestå af præcis 12 cifre.';
+      }
+    }
+  },
+  extraId: {
+    birthYearGender: {
+      label: 'Fødselsår + køn (fx 1985m)',
+      description: 'Kræver at ID svarer til fødselsåret og slutter på m/f afhængigt af køn.',
+      validate(value, context = {}) {
+        if (!value) return '';
+        const birthDate = (context.birthDate || '').trim();
+        const gender = (context.gender || '').trim().toLowerCase();
+        if (!birthDate || birthDate.length < 4) {
+          return 'Angiv fødselsdato for at validere ID.';
+        }
+        if (gender !== 'male' && gender !== 'female') {
+          return 'Angiv køn (mand/kvinde) for at validere ID.';
+        }
+        const year = birthDate.slice(0, 4);
+        const suffix = gender === 'male' ? 'm' : 'f';
+        const normalised = value.trim().toLowerCase();
+        return normalised === `${year}${suffix}`
+          ? ''
+          : `ID skal bestå af fødselsår (${year}) og slutte på ${suffix}.`;
+      }
+    }
+  }
+};
+
+function getDefaultValidationSettings() {
+  return JSON.parse(JSON.stringify(DEFAULT_VALIDATION_SETTINGS));
+}
+
+function normalizeValidationRule(rawRule) {
+  const base = {mode: 'none', preset: '', pattern: '', flags: '', message: ''};
+  if (!rawRule || typeof rawRule !== 'object') {
+    return {...base};
+  }
+  const rule = {...base};
+  const rawMode = typeof rawRule.mode === 'string' ? rawRule.mode.trim().toLowerCase() : '';
+  if (rawMode === 'preset') {
+    rule.mode = 'preset';
+    rule.preset = typeof rawRule.preset === 'string' ? rawRule.preset.trim() : '';
+  } else if (rawMode === 'custom') {
+    rule.mode = 'custom';
+    rule.pattern = typeof rawRule.pattern === 'string' ? rawRule.pattern : '';
+    rule.flags = typeof rawRule.flags === 'string' ? rawRule.flags : '';
+  } else {
+    rule.mode = 'none';
+  }
+  if (rawRule.message != null) {
+    rule.message = String(rawRule.message);
+  }
+  return rule;
+}
+
+function normalizeValidationSettings(raw) {
+  const defaults = getDefaultValidationSettings();
+  if (!raw || typeof raw !== 'object') {
+    return defaults;
+  }
+  for (const key of VALIDATION_FIELD_KEYS) {
+    if (raw[key]) {
+      defaults[key] = normalizeValidationRule(raw[key]);
+    }
+  }
+  return defaults;
+}
+
+function cloneValidationSettings(value = state.validationSettings) {
+  const source = value && typeof value === 'object' ? value : getDefaultValidationSettings();
+  return JSON.parse(JSON.stringify(source));
+}
+
+function getValidationSettings() {
+  if (!state.validationSettings) {
+    state.validationSettings = getDefaultValidationSettings();
+  }
+  return state.validationSettings;
+}
+
+async function loadValidationSettings() {
+  const stored = await getSetting(VALIDATION_SETTINGS_KEY);
+  const normalized = normalizeValidationSettings(stored);
+  state.validationSettings = normalized;
+  return normalized;
+}
+
+async function persistValidationSettings(settings) {
+  const normalized = normalizeValidationSettings(settings);
+  const previous = state.validationSettings;
+  state.validationSettings = normalized;
+  try {
+    await setSetting(VALIDATION_SETTINGS_KEY, normalized);
+  } catch (err) {
+    state.validationSettings = previous;
+    throw err;
+  }
+  return normalized;
+}
+
+async function applyValidationSettingsFromData(rawSettings) {
+  if (rawSettings && typeof rawSettings === 'object') {
+    return persistValidationSettings(rawSettings);
+  }
+  return persistValidationSettings(getDefaultValidationSettings());
+}
+
+function getValidationPreset(field, presetId) {
+  const fieldPresets = VALIDATION_PRESETS[field] || {};
+  return fieldPresets[presetId] || null;
+}
+
+function validateFieldValue(field, value, context = {}) {
+  if (!VALIDATION_FIELD_KEYS.includes(field)) {
+    return null;
+  }
+  const settings = getValidationSettings();
+  const rule = settings[field];
+  if (!rule) return null;
+  const normalisedValue = typeof value === 'string' ? value.trim() : value;
+  if (!normalisedValue) {
+    return null;
+  }
+  if (rule.mode === 'preset') {
+    const preset = getValidationPreset(field, rule.preset);
+    if (!preset) return null;
+    const error = preset.validate(normalisedValue, context);
+    if (error) {
+      const customMessage = (rule.message || '').trim();
+      return customMessage || error;
+    }
+    return null;
+  }
+  if (rule.mode === 'custom') {
+    if (!rule.pattern) return null;
+    try {
+      const regex = new RegExp(rule.pattern, rule.flags || '');
+      if (!regex.test(normalisedValue)) {
+        const customMessage = (rule.message || '').trim();
+        return customMessage || 'Værdien matcher ikke det krævede mønster.';
+      }
+    } catch (err) {
+      console.error('Ugyldigt regulært udtryk i datavalidering', err);
+      const customMessage = (rule.message || '').trim();
+      return customMessage || 'Valideringen kan ikke udføres pga. ugyldigt mønster.';
+    }
+  }
+  return null;
 }
 
 function normalizeCollectionDate(value) {
@@ -6531,6 +6712,7 @@ async function exportData() {
   for (const store of STORES) {
     data[store] = cloneWithCreatedBy(store, getCached(store));
   }
+  data.validation_settings = cloneValidationSettings(getValidationSettings());
   return data;
 }
 
@@ -6639,6 +6821,12 @@ function computeLocalChanges(previousData, currentData) {
       changes.hasChanges = true;
     }
   }
+  const prevValidation = previous.validation_settings;
+  const currValidation = current.validation_settings;
+  if (!recordsEqual(prevValidation, currValidation)) {
+    changes.validation = {previous: prevValidation, record: currValidation};
+    changes.hasChanges = true;
+  }
   return changes;
 }
 
@@ -6725,6 +6913,16 @@ function mergeRemoteData(remoteData, changes) {
       }
     }
     merged[store] = retained;
+  }
+  if (changes.validation) {
+    const desired = changes.validation.record;
+    const nextValue = desired && typeof desired === 'object'
+      ? deepClone(desired)
+      : getDefaultValidationSettings();
+    if (!recordsEqual(merged.validation_settings, nextValue)) {
+      merged.validation_settings = nextValue;
+      appliedChanges++;
+    }
   }
   return {merged, appliedChanges, skippedConflicts};
 }
@@ -6936,6 +7134,7 @@ async function replaceAllData(data, options = {}) {
     }
     await tx.done?.catch(() => {});
   }
+  await applyValidationSettingsFromData(data?.validation_settings);
   await loadAllStores();
   if (markSynced) {
     await captureSyncedSnapshot();
@@ -8950,6 +9149,14 @@ function renderCreateCase(section) {
       submitting = false;
       return;
     }
+    const mrnValidationError = validateFieldValue('mrn', patientMrn);
+    if (mrnValidationError) {
+      setMessage(mrnValidationError, 'error');
+      form.elements.patient_mrn.focus();
+      disableButtons(false);
+      submitting = false;
+      return;
+    }
     const patientName = form.elements.patient_name.value.trim();
     if (!patientName) {
       setMessage('Angiv patientens navn.', 'error');
@@ -8968,9 +9175,28 @@ function renderCreateCase(section) {
       birth_date: form.elements.patient_birth.value || '',
       notes: form.elements.patient_notes.value.trim()
     };
+    const extraIdValidationError = validateFieldValue('extraId', patient.extra_id, {
+      birthDate: patient.birth_date,
+      gender: patient.gender
+    });
+    if (extraIdValidationError) {
+      setMessage(extraIdValidationError, 'error');
+      form.elements.patient_extra_id.focus();
+      disableButtons(false);
+      submitting = false;
+      return;
+    }
     const samplePmb = form.elements.sample_pmb.value.trim();
     if (!samplePmb) {
       setMessage('Angiv et PMB-nummer for prøven.', 'error');
+      form.elements.sample_pmb.focus();
+      disableButtons(false);
+      submitting = false;
+      return;
+    }
+    const pmbValidationError = validateFieldValue('pmb', samplePmb);
+    if (pmbValidationError) {
+      setMessage(pmbValidationError, 'error');
       form.elements.sample_pmb.focus();
       disableButtons(false);
       submitting = false;
@@ -9004,6 +9230,14 @@ function renderCreateCase(section) {
       const controlPmb = form.elements.control_pmb.value.trim();
       if (!controlPmb) {
         setMessage('Angiv PMB-nummer for kontrolprøven.', 'error');
+        form.elements.control_pmb.focus();
+        disableButtons(false);
+        submitting = false;
+        return;
+      }
+      const controlPmbError = validateFieldValue('pmb', controlPmb);
+      if (controlPmbError) {
+        setMessage(controlPmbError, 'error');
         form.elements.control_pmb.focus();
         disableButtons(false);
         submitting = false;
@@ -10986,6 +11220,35 @@ function renderPatients(section) {
     const data = Object.fromEntries(new FormData(form).entries());
     data.healthy_family_member = Boolean(form.elements.healthy_family_member?.checked);
     data.variant_type = normalizeVariantType(data.variant_type);
+    data.mrn = (data.mrn || '').trim();
+    if (!data.mrn) {
+      alert('Angiv patientens MRN.');
+      form.elements.mrn.focus();
+      return;
+    }
+    const mrnError = validateFieldValue('mrn', data.mrn);
+    if (mrnError) {
+      alert(mrnError);
+      form.elements.mrn.focus();
+      return;
+    }
+    data.extra_id = (data.extra_id || '').trim();
+    const genderValue = (data.gender || '').trim();
+    const birthDateValue = (data.birth_date || '').trim();
+    const extraIdError = validateFieldValue('extraId', data.extra_id, {
+      birthDate: birthDateValue,
+      gender: genderValue
+    });
+    if (extraIdError) {
+      alert(extraIdError);
+      form.elements.extra_id.focus();
+      return;
+    }
+    data.family_number = (data.family_number || '').trim();
+    data.name = (data.name || '').trim();
+    data.gender = genderValue;
+    data.birth_date = birthDateValue;
+    data.notes = (data.notes || '').trim();
     if (data.id) {
       const id = Number(data.id);
       const before = {...findById('patients', id)};
@@ -11327,6 +11590,11 @@ function renderSamples(section) {
     data.pmb_number = (data.pmb_number || '').trim();
     if (!data.pmb_number) {
       alert('Angiv et PMB-nummer.');
+      return;
+    }
+    const samplePmbError = validateFieldValue('pmb', data.pmb_number);
+    if (samplePmbError) {
+      alert(samplePmbError);
       return;
     }
     const existingSamples = getCached('samples');
@@ -22450,6 +22718,64 @@ function renderAdmin(section) {
     </div>
   </div>
   <div class="panel">
+    <h2>Datavalidering</h2>
+    <p class="form-hint">Definér systemkrav til MRN, PMB og lokale ID'er.</p>
+    <form id="validationSettingsForm" class="validation-settings-form">
+      <fieldset data-validation-field="mrn">
+        <legend>MRN</legend>
+        <label>Formatkrav
+          <select name="validation_mrn_mode">
+            <option value="none">Intet krav</option>
+            <option value="preset:cpr">CPR-nummer (DDMMÅÅ-XXXX)</option>
+            <option value="custom">Brugerdefineret regulært udtryk</option>
+          </select>
+        </label>
+        <p class="form-hint" data-validation-hint="mrn"></p>
+        <div class="inline-group" data-validation-custom="mrn" hidden>
+          <label class="inline">Regulært udtryk<input name="validation_mrn_pattern" placeholder="fx ^[0-9]{10}$"></label>
+          <label class="inline">Flag<input name="validation_mrn_flags" placeholder="fx i"></label>
+        </div>
+        <label>Fejlbesked<input name="validation_mrn_message" placeholder="Valgfri tilpasset besked"></label>
+      </fieldset>
+      <fieldset data-validation-field="pmb">
+        <legend>PMB-nummer</legend>
+        <label>Formatkrav
+          <select name="validation_pmb_mode">
+            <option value="none">Intet krav</option>
+            <option value="preset:digits12">12 cifre (heltal)</option>
+            <option value="custom">Brugerdefineret regulært udtryk</option>
+          </select>
+        </label>
+        <p class="form-hint" data-validation-hint="pmb"></p>
+        <div class="inline-group" data-validation-custom="pmb" hidden>
+          <label class="inline">Regulært udtryk<input name="validation_pmb_pattern" placeholder="fx ^[0-9]{12}$"></label>
+          <label class="inline">Flag<input name="validation_pmb_flags" placeholder="fx i"></label>
+        </div>
+        <label>Fejlbesked<input name="validation_pmb_message" placeholder="Valgfri tilpasset besked"></label>
+      </fieldset>
+      <fieldset data-validation-field="extraId">
+        <legend>Ekstra ID</legend>
+        <label>Formatkrav
+          <select name="validation_extraId_mode">
+            <option value="none">Intet krav</option>
+            <option value="preset:birthYearGender">Fødselsår + m/f</option>
+            <option value="custom">Brugerdefineret regulært udtryk</option>
+          </select>
+        </label>
+        <p class="form-hint" data-validation-hint="extraId"></p>
+        <div class="inline-group" data-validation-custom="extraId" hidden>
+          <label class="inline">Regulært udtryk<input name="validation_extraId_pattern" placeholder="fx ^[0-9]{4}[mf]$"></label>
+          <label class="inline">Flag<input name="validation_extraId_flags" placeholder="fx i"></label>
+        </div>
+        <label>Fejlbesked<input name="validation_extraId_message" placeholder="Valgfri tilpasset besked"></label>
+      </fieldset>
+      <div class="btn-row">
+        <button type="submit" class="primary">Gem</button>
+        <button type="button" class="secondary" id="validationSettingsReset">Nulstil til standard</button>
+      </div>
+    </form>
+  </div>
+  <div class="panel">
     <h2>Forvalg til kvalitetskontrol</h2>
     <p class="form-hint">Administrer dropdownværdier for QC-målinger og enheder.</p>
     <div class="flex qc-preset-manager">
@@ -22486,6 +22812,115 @@ function renderAdmin(section) {
       <button class="primary" id="demoDataBtn">Indlæs demo-data</button>
     </div>
   </div>`;
+  const validationForm = section.querySelector('#validationSettingsForm');
+  const validationResetBtn = section.querySelector('#validationSettingsReset');
+  if (validationForm) {
+    const fields = VALIDATION_FIELD_KEYS.slice();
+    const updateFieldUi = field => {
+      const select = validationForm.elements[`validation_${field}_mode`];
+      const customRow = validationForm.querySelector(`[data-validation-custom="${field}"]`);
+      const hint = validationForm.querySelector(`[data-validation-hint="${field}"]`);
+      const rawValue = select?.value || 'none';
+      if (customRow) {
+        customRow.hidden = rawValue !== 'custom';
+      }
+      if (hint) {
+        let hintText = '';
+        if (rawValue.startsWith('preset:')) {
+          const preset = getValidationPreset(field, rawValue.slice(7));
+          hintText = preset?.description || '';
+        } else if (rawValue === 'custom') {
+          hintText = 'Angiv et JavaScript-regulært udtryk (uden skråstreger).';
+        } else {
+          hintText = 'Ingen validering.';
+        }
+        hint.textContent = hintText;
+        hint.hidden = !hintText;
+      }
+    };
+    const applySettingsToForm = settings => {
+      const normalized = normalizeValidationSettings(settings);
+      fields.forEach(field => {
+        const rule = normalized[field] || normalizeValidationRule();
+        const select = validationForm.elements[`validation_${field}_mode`];
+        if (select) {
+          let value = 'none';
+          if (rule.mode === 'preset' && rule.preset) {
+            value = `preset:${rule.preset}`;
+          } else if (rule.mode === 'custom') {
+            value = 'custom';
+          }
+          select.value = value;
+        }
+        const patternInput = validationForm.elements[`validation_${field}_pattern`];
+        const flagsInput = validationForm.elements[`validation_${field}_flags`];
+        const messageInput = validationForm.elements[`validation_${field}_message`];
+        if (patternInput) patternInput.value = rule.pattern || '';
+        if (flagsInput) flagsInput.value = rule.flags || '';
+        if (messageInput) messageInput.value = rule.message || '';
+        updateFieldUi(field);
+      });
+    };
+    applySettingsToForm(cloneValidationSettings(getValidationSettings()));
+    fields.forEach(field => {
+      const select = validationForm.elements[`validation_${field}_mode`];
+      select?.addEventListener('change', () => updateFieldUi(field));
+    });
+    validationForm.addEventListener('submit', async evt => {
+      evt.preventDefault();
+      if (!currentCanWrite()) {
+        alert('Handling kræver login med skrivetilladelse.');
+        return;
+      }
+      const nextSettings = {};
+      for (const field of fields) {
+        const metadata = VALIDATION_FIELD_METADATA[field] || {label: field};
+        const select = validationForm.elements[`validation_${field}_mode`];
+        const rawValue = select?.value || 'none';
+        let mode = 'none';
+        let preset = '';
+        let pattern = '';
+        let flags = '';
+        if (rawValue.startsWith('preset:')) {
+          mode = 'preset';
+          preset = rawValue.slice(7);
+        } else if (rawValue === 'custom') {
+          mode = 'custom';
+          const patternInput = validationForm.elements[`validation_${field}_pattern`];
+          const flagsInput = validationForm.elements[`validation_${field}_flags`];
+          pattern = (patternInput?.value || '').trim();
+          flags = (flagsInput?.value || '').trim();
+          if (!pattern) {
+            alert(`${metadata.label}: angiv et regulært udtryk.`);
+            patternInput?.focus();
+            return;
+          }
+          try {
+            new RegExp(pattern, flags || '');
+          } catch (err) {
+            alert(`${metadata.label}: ugyldigt regulært udtryk (${err?.message || err}).`);
+            patternInput?.focus();
+            return;
+          }
+        }
+        const messageInput = validationForm.elements[`validation_${field}_message`];
+        const message = (messageInput?.value || '').trim();
+        nextSettings[field] = {mode, preset, pattern, flags, message};
+      }
+      try {
+        const normalized = await persistValidationSettings(nextSettings);
+        applySettingsToForm(normalized);
+        setStatus('Datavalideringsregler gemt.');
+        scheduleAutosave();
+      } catch (err) {
+        console.error('Kunne ikke gemme datavalideringsregler', err);
+        alert('Kunne ikke gemme datavalideringsreglerne: ' + (err?.message || err));
+      }
+    });
+    validationResetBtn?.addEventListener('click', () => {
+      applySettingsToForm(getDefaultValidationSettings());
+    });
+  }
   applyButtonTooltips(section);
   applyControlTooltips(section);
   annotateSearchInputs(section);
@@ -23459,6 +23894,7 @@ async function init() {
     await ensureDefaultQcPresets();
     await ensureDefaultFhirTemplates();
     await ensureCreationMetadata();
+    await loadValidationSettings();
     await captureSyncedSnapshot();
     await restoreBoundHandle();
     hookUi();
