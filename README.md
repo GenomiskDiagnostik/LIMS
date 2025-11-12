@@ -11,6 +11,9 @@ GlimR is a self-contained, browser-based LIMS for genetic diagnostics. The full 
 - **Laboratory utilities** – use integrated ACMG classifiers, pedigree and consanguinity calculators, genome browser jump-offs, GC calculators, and sequencing helpers without leaving the app.
 - **Built-in validation** – automated self-tests, audit logs, and database reset/backup flows reduce onboarding friction and support regulated operations.
 
+
+<img width="1109" height="1144" alt="GlimR" src="https://github.com/user-attachments/assets/a82ca7ca-0579-4f59-9e0e-3c4ed779970f" />
+
 ## Feature tour
 
 ### Dashboard and planning
