@@ -3672,13 +3672,13 @@ const VALIDATION_PRESETS = {
   },
   extraId: {
     birthYearGender: {
-      label: 'Fødselsår + køn (fx 1985m)',
+      label: 'Fødselsår + køn (fx 85abcdem)',
       description: 'Kræver at ID svarer til fødselsåret og slutter på m/f afhængigt af køn.',
       validate(value, context = {}) {
         if (!value) return '';
         const birthDate = (context.birthDate || '').trim();
         const gender = (context.gender || '').trim().toLowerCase();
-        if (!birthDate || birthDate.length < 4) {
+        if (!birthDate || birthDate.length < 2) {
           return 'Angiv fødselsdato for at validere ID.';
         }
         if (gender !== 'male' && gender !== 'female') {
