@@ -17339,24 +17339,21 @@ function parseCprNumber(value) {
   const normalized = trimmed.replace(/\s+/g, '');
   const match = normalized.match(/^(\d{2})(\d{2})(\d{2})-?(\d{4})$/);
   if (!match) return null;
+
   const [, dayStr, monthStr, yearStr, sequence] = match;
   const day = Number(dayStr);
   const month = Number(monthStr);
   const yearTwo = Number(yearStr);
   if (!Number.isFinite(day) || !Number.isFinite(month) || !Number.isFinite(yearTwo)) return null;
   if (day < 1 || day > 31 || month < 1 || month > 12) return null;
-  const sequenceFirst = Number(sequence.charAt(0));
-  if (!Number.isFinite(sequenceFirst)) return null;
-  let yearFull;
-  if (sequenceFirst >= 0 && sequenceFirst <= 3) {
-    yearFull = 1900 + yearTwo;
-  } else if (sequenceFirst === 4 || sequenceFirst === 9) {
-    yearFull = (yearTwo <= 36 ? 2000 : 1900) + yearTwo;
-  } else if (sequenceFirst >= 5 && sequenceFirst <= 8) {
-    yearFull = (yearTwo <= 36 ? 2000 : 1800) + yearTwo;
-  } else {
-    return null;
-  }
+
+  // ⬇️ NY århundrede-estimering (glidende vindue vs. nu)
+  // Eksempel: hvis i dag er 2025, så 00–25 → 2000–2025, og 26–99 → 1926–1999.
+  const now = new Date();
+  const currentYY = now.getFullYear() % 100;
+  let yearFull = (yearTwo <= currentYY ? 2000 : 1900) + yearTwo;
+
+  // Valider datoen
   const candidate = new Date(yearFull, month - 1, day);
   if (
     Number.isNaN(candidate.getTime()) ||
@@ -17366,9 +17363,12 @@ function parseCprNumber(value) {
   ) {
     return null;
   }
+
+  // Køn ud fra sidste ciffer (uændret)
   const genderDigit = Number(sequence.charAt(sequence.length - 1));
   if (!Number.isFinite(genderDigit)) return null;
   const gender = genderDigit % 2 === 0 ? 'female' : 'male';
+
   const isoMonth = String(month).padStart(2, '0');
   const isoDay = String(day).padStart(2, '0');
   return {
