@@ -3671,25 +3671,30 @@ const VALIDATION_PRESETS = {
     }
   },
   extraId: {
-    birthYearGender: {
-      label: 'Fødselsår + køn (fx 85abcdem)',
-      description: 'Kræver at ID svarer til fødselsåret og slutter på m/f afhængigt af køn.',
-      validate(value, context = {}) {
-        if (!value) return '';
-        const birthDate = (context.birthDate || '').trim();
-        const gender = (context.gender || '').trim().toLowerCase();
-        if (!birthDate || birthDate.length < 2) {
-          return 'Angiv fødselsdato for at validere ID.';
-        }
-        if (gender !== 'male' && gender !== 'female') {
-          return 'Angiv køn (mand/kvinde) for at validere ID.';
-        }
-        const year = birthDate.slice(2, 4);
-        const suffix = gender === 'male' ? 'm' : 'f';
-        const normalised = value.trim().toLowerCase();
-        return normalised === `${year}${suffix}`
-          ? ''
-          : `ID skal bestå af fødselsår (${year}) og slutte på ${suffix}.`;
+  birthYearGender: {
+    label: 'Fødselsår + køn (fx 85abcdem)',
+    description: 'Kræver at ID starter med fødselsåret og slutter på m/f afhængigt af køn. Der må stå bogstaver imellem.',
+    validate(value, context = {}) {
+      if (!value) return '';
+      const birthDate = (context.birthDate || '').trim();
+      const gender = (context.gender || '').trim().toLowerCase();
+
+      if (!birthDate || birthDate.length < 2) {
+        return 'Angiv fødselsdato for at validere ID.';
+      }
+      if (gender !== 'male' && gender !== 'female') {
+        return 'Angiv køn (mand/kvinde) for at validere ID.';
+      }
+
+      const year = birthDate.slice(2, 4);            // to sidste cifre af året
+      const suffix = gender === 'male' ? 'm' : 'f';
+      const normalised = value.trim().toLowerCase();
+
+      // Tillad bogstaver mellem år og suffix; kræv start med år og slut med suffix
+      const re = new RegExp(`^${year}[a-z]*${suffix}$`);
+      return re.test(normalised)
+        ? ''
+        : `ID skal starte med fødselsår (${year}), må indeholde bogstaver, og skal slutte på '${suffix}'.`;
       }
     }
   }
