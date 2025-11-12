@@ -3684,7 +3684,7 @@ const VALIDATION_PRESETS = {
         if (gender !== 'male' && gender !== 'female') {
           return 'Angiv køn (mand/kvinde) for at validere ID.';
         }
-        const year = birthDate.slice(0, 4);
+        const year = birthDate.slice(2, 4);
         const suffix = gender === 'male' ? 'm' : 'f';
         const normalised = value.trim().toLowerCase();
         return normalised === `${year}${suffix}`
