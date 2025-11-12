@@ -84,7 +84,7 @@ GlimR er et selvstændigt, browserbaseret LIMS til genetisk diagnostik. Hele app
 - KPI-dashboard med overblik over volumener, svartider, backlog og personlige opgaver.
 - Kort over nyeste, ældste og tildelte ordinationer med genveje til relevante faner.
 - Personligt radaroverblik med forsinkede opgaver, kommende milepæle og abonnementer på ordinationer du følger.
-- Planlægningsmodul der organiserer ordinationer i svømmeaner for modtagelse, QC, analyse, tolkning, godkendelse, rapportering og svar. Følg progression, marker blokeringer, tilføj strukturerede noter, masseopdater deadlines, eksportér filtrerede boards til ICS/CSV og udsend opfølgningspåmindelser.
+- Planlægningsmodul der organiserer ordinationer i diagrammer for modtagelse, QC, analyse, tolkning, godkendelse, rapportering og svar. Følg progression, marker blokeringer, tilføj strukturerede noter, masseopdater deadlines, eksportér filtrerede boards til ICS/CSV og udsend opfølgningspåmindelser.
 
 ### Sagsoprettelse og registrering
 - **Sagswizard** – fold-ud sektioner til patient, prøve, kontrol, ordination, QC og varianter. Understøtter VarSeq-CSV, statusforhåndsvisning, dynamisk validering efter varianttype samt batch-oprettelse af QC-målinger og varianter.
