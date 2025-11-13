@@ -1,0 +1,1979 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<title>SanTA – Social and Network Tracking & Analysis</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<style>
+:root {
+  font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+  --bg: #f5f7fb;
+  --text: #162941;
+  --muted-text: #4a5973;
+  --panel-bg: #ffffff;
+  --panel-border: #c7d2e3;
+  --shadow: 0 6px 18px rgba(18, 76, 135, 0.12);
+  --accent: #1766af;
+  --accent-strong: #114b86;
+  --accent-soft: rgba(23, 102, 175, 0.1);
+  --danger: #c0392b;
+  --success: #1d9a6c;
+  --nav-bg: rgba(255, 255, 255, 0.88);
+  --nav-border: rgba(24, 61, 120, 0.2);
+  --badge-bg: rgba(23, 102, 175, 0.14);
+  --badge-text: #114b86;
+  --input-bg: #ffffff;
+  --input-border: #c3cde0;
+  --input-focus: rgba(23, 102, 175, 0.35);
+  --table-header-bg: #ecf2fb;
+  --link-parent: #2c5282;
+  --link-partner: #805ad5;
+  --link-weighted: #dd6b20;
+  --sex-m: #1d4ed8;
+  --sex-f: #d946ef;
+  --sex-u: #0ea5e9;
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f172a;
+  --text: #e2e8f0;
+  --muted-text: #94a3b8;
+  --panel-bg: #1e293b;
+  --panel-border: #334155;
+  --shadow: 0 8px 22px rgba(8, 37, 68, 0.5);
+  --accent: #38bdf8;
+  --accent-strong: #0ea5e9;
+  --accent-soft: rgba(56, 189, 248, 0.16);
+  --danger: #f87171;
+  --success: #34d399;
+  --nav-bg: rgba(15, 23, 42, 0.9);
+  --nav-border: rgba(148, 163, 184, 0.25);
+  --badge-bg: rgba(56, 189, 248, 0.18);
+  --badge-text: #bae6fd;
+  --input-bg: #0f172a;
+  --input-border: #334155;
+  --input-focus: rgba(14, 165, 233, 0.45);
+  --table-header-bg: #1f2937;
+  --link-parent: #60a5fa;
+  --link-partner: #c084fc;
+  --link-weighted: #fb923c;
+  --sex-m: #60a5fa;
+  --sex-f: #f472b6;
+  --sex-u: #38bdf8;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at top, rgba(24, 111, 175, 0.12), transparent 55%), var(--bg);
+  color: var(--text);
+  transition: background 0.25s ease, color 0.25s ease;
+}
+header {
+  padding: 1.8rem 2.4rem 1.5rem;
+  background: linear-gradient(135deg, rgba(18, 76, 135, 0.92), rgba(23, 102, 175, 0.94)), var(--accent);
+  color: #ffffff;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.2rem;
+  align-items: start;
+}
+header h1 {
+  margin: 0;
+  font-size: clamp(1.8rem, 2vw + 1rem, 2.5rem);
+  letter-spacing: -0.015em;
+}
+header p {
+  margin: 0;
+  max-width: 780px;
+  line-height: 1.6;
+}
+header .badge {
+  justify-self: start;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(6px);
+}
+.global-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.9rem 2.4rem;
+  border-bottom: 1px solid var(--nav-border);
+  background: var(--nav-bg);
+  position: sticky;
+  top: 0;
+  backdrop-filter: blur(12px);
+  z-index: 20;
+}
+.nav-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+.nav-group button, .status-pill {
+  border: none;
+  border-radius: 999px;
+  padding: 0.55rem 1.1rem;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.nav-group button[data-active="true"] {
+  background: var(--accent-strong);
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(17, 75, 134, 0.24);
+}
+.status-pill {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--muted-text);
+  cursor: default;
+}
+main {
+  padding: 2rem 2.4rem 3.5rem;
+}
+.view {
+  display: none;
+  gap: 1.5rem;
+}
+.view[data-active="true"] {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+.view[data-layout="single"][data-active="true"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+section {
+  background: var(--panel-bg);
+  border-radius: 1rem;
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--shadow);
+  padding: 1.25rem 1.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+section header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  color: inherit;
+}
+section header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.panel-hint {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--muted-text);
+}
+.panel-hint.warning { color: var(--danger); }
+.panel-hint.success { color: var(--success); }
+.control-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+.metric-deck {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+}
+.metric {
+  background: var(--accent-soft);
+  border-radius: 0.75rem;
+  padding: 0.9rem;
+  border: 1px solid var(--panel-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.metric strong {
+  font-size: 1.4rem;
+  color: var(--accent-strong);
+}
+.metric span {
+  color: var(--muted-text);
+  font-size: 0.85rem;
+}
+.metric small {
+  color: var(--muted-text);
+  font-size: 0.75rem;
+}
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.tag {
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: var(--badge-bg);
+  color: var(--badge-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.insight-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.insight-list li {
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.7rem;
+  background: rgba(17, 75, 134, 0.08);
+  border: 1px solid rgba(17, 75, 134, 0.08);
+}
+form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--muted-text);
+}
+input, select, textarea {
+  font: inherit;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.6rem;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: inherit;
+  transition: border 0.2s ease, box-shadow 0.2s ease;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 3px var(--input-focus);
+}
+textarea { resize: vertical; min-height: 3.6rem; }
+button {
+  font: inherit;
+  padding: 0.55rem 1rem;
+  border-radius: 0.65rem;
+  border: none;
+  cursor: pointer;
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 600;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(17, 75, 134, 0.28);
+}
+button.danger { background: var(--danger); }
+button.secondary {
+  background: rgba(17, 75, 134, 0.12);
+  color: var(--accent-strong);
+}
+button.ghost {
+  background: transparent;
+  color: var(--muted-text);
+  border: 1px solid var(--panel-border);
+}
+.table-wrapper {
+  border: 1px solid var(--panel-border);
+  border-radius: 0.75rem;
+  overflow: auto;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 280px;
+}
+thead {
+  background: var(--table-header-bg);
+}
+th, td {
+  text-align: left;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.88rem;
+  border-bottom: 1px solid var(--panel-border);
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: rgba(17, 75, 134, 0.08); }
+#pedigreeCanvas {
+  position: relative;
+  border: 1px solid var(--panel-border);
+  border-radius: 0.9rem;
+  overflow: hidden;
+  background: radial-gradient(circle at top, rgba(17, 75, 134, 0.1), transparent 60%), var(--panel-bg);
+}
+#pedigreeCanvas svg {
+  display: block;
+  width: 100%;
+  height: 520px;
+  touch-action: none;
+}
+.tooltip {
+  position: absolute;
+  pointer-events: none;
+  padding: 0.45rem 0.65rem;
+  background: rgba(15, 23, 42, 0.92);
+  color: #ffffff;
+  border-radius: 0.5rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.35);
+  transform: translate(-50%, -110%);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 50;
+}
+#statusBar {
+  position: fixed;
+  bottom: 1.2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.88);
+  color: #ffffff;
+  padding: 0.6rem 1.2rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  display: none;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.35);
+  z-index: 60;
+}
+@media (max-width: 1024px) {
+  .view[data-active="true"] {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+  #pedigreeCanvas svg { height: 420px; }
+}
+@media (max-width: 720px) {
+  header { padding: 1.6rem; }
+  .global-nav { padding: 0.8rem 1.2rem; }
+  main { padding: 1.6rem; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>SanTA</h1>
+    <p>SanTA (Social and Network Tracking &amp; Analysis) samler relationel intelligens på tværs af familier, teams og fællesskaber. Administrér personer, kobl vægtede relationer og visualisér pedigree-strukturer – alt bundet sammen af fælles data.</p>
+  </div>
+  <div class="badge">Version 1.0 · Relationelt overblik</div>
+</header>
+<nav class="global-nav">
+  <div class="nav-group" id="menuButtons">
+    <button type="button" data-view-target="overview" data-active="true">Overblik</button>
+    <button type="button" data-view-target="persons">Personer &amp; relationer</button>
+    <button type="button" data-view-target="interactions">Interaktioner</button>
+    <button type="button" data-view-target="analytics">Analyse</button>
+    <button type="button" data-view-target="pedigree">Pedigree-funktionalitet</button>
+    <button type="button" data-view-target="admin">Administration</button>
+  </div>
+  <div class="nav-group">
+    <button id="themeToggle" type="button" aria-pressed="false">🌗 Tema</button>
+    <button id="saveNowBtn" type="button">💾 Gem nu</button>
+    <button id="loadNowBtn" type="button">📂 Hent</button>
+    <button id="fitViewBtn" type="button">🗺️ Fit view</button>
+    <button id="exportPngBtn" type="button">🖼️ Export PNG</button>
+    <span class="status-pill" id="dirtyIndicator">Gemmes automatisk…</span>
+  </div>
+</nav>
+<main id="views">
+  <div class="view" data-view="overview" data-active="true">
+    <section>
+      <header><h2>Relationelt snapshot</h2></header>
+      <p class="panel-hint">Få et hurtigt blik på hvor mange personer og relationer der er registreret, hvilke netværksklynger der eksisterer og hvordan vægtede forbindelser fordeler sig.</p>
+      <div class="metric-deck">
+        <div class="metric">
+          <span>Personer</span>
+          <strong id="overviewPersons">0</strong>
+          <small id="overviewComponents">Netværksklynger: 0</small>
+        </div>
+        <div class="metric">
+          <span>Relationer</span>
+          <strong id="overviewRelations">0</strong>
+          <small id="overviewRelationSplit">Parent / Partner / Vægtede</small>
+        </div>
+        <div class="metric">
+          <span>Gns. vægt</span>
+          <strong id="overviewAvgWeight">0.0</strong>
+          <small id="overviewWeightSpread">0</small>
+        </div>
+        <div class="metric">
+          <span>Aktive brugere</span>
+          <strong id="overviewActiveUser">Ingen</strong>
+          <small id="overviewLastSaved">-</small>
+        </div>
+      </div>
+    </section>
+    <section>
+      <header><h2>Centrale aktører</h2></header>
+      <p class="panel-hint">Identificerer personer med flest forbindelser og højeste samlede vægt, så teams kan fokusere på nøglepersoner.</p>
+      <ul class="insight-list" id="overviewConnectorList"></ul>
+    </section>
+    <section>
+      <header><h2>Seneste hændelser</h2></header>
+      <p class="panel-hint">Handlinger der er udført på dataene. Loggen opdateres automatisk når relationer ændres.</p>
+      <ul class="insight-list" id="recentLogList"></ul>
+    </section>
+  </div>
+  <div class="view" data-view="persons">
+    <section id="personPanel">
+      <header>
+        <h2>Personer</h2>
+        <button class="ghost" type="button" id="personClearBtn">Ryd formular</button>
+      </header>
+      <form id="personForm" autocomplete="off">
+        <div class="control-grid">
+          <label>ID
+            <input id="personId" name="id" placeholder="auto hvis tom">
+          </label>
+          <label>Navn
+            <input id="personName" name="name" required>
+          </label>
+          <label>Køn
+            <select id="personSex" name="sex" required>
+              <option value="M">Mand</option>
+              <option value="F">Kvinde</option>
+              <option value="U">Ukendt</option>
+            </select>
+          </label>
+          <label>Fødselsår
+            <input id="personBirth" name="birth" type="number" min="1800" max="2100">
+          </label>
+          <label>Dødsår
+            <input id="personDeath" name="death" type="number" min="1800" max="2100">
+          </label>
+        </div>
+        <label>Noter
+          <textarea id="personNotes" name="notes" placeholder="Baggrund, relationer, funktion, observationer…"></textarea>
+        </label>
+        <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+          <button type="submit" id="personSubmitBtn">Tilføj / opdater</button>
+          <button type="button" class="danger" id="personDeleteBtn">Slet</button>
+        </div>
+      </form>
+      <div class="table-wrapper">
+        <table aria-label="Personer">
+          <thead>
+            <tr><th>ID</th><th>Navn</th><th>Køn</th><th>Født–Død</th></tr>
+          </thead>
+          <tbody id="personTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+    <section id="relationPanel">
+      <header><h2>Biologiske relationer</h2></header>
+      <form id="parentForm" class="control-grid">
+        <label>Forælder
+          <select id="parentParent"></select>
+        </label>
+        <label>Barn
+          <select id="parentChild"></select>
+        </label>
+        <button type="submit">Tilføj parent → barn</button>
+      </form>
+      <form id="partnerForm" class="control-grid">
+        <label>Partner A
+          <select id="partnerA"></select>
+        </label>
+        <label>Partner B
+          <select id="partnerB"></select>
+        </label>
+        <button type="submit">Tilføj partnerskab</button>
+      </form>
+      <div class="table-wrapper">
+        <table aria-label="Relationer">
+          <thead><tr><th>Type</th><th>Beskrivelse</th><th></th></tr></thead>
+          <tbody id="relationTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+    <section id="weightedPanel">
+      <header><h2>Vægtede relationer</h2></header>
+      <form id="weightedForm" class="control-grid">
+        <label>Person A
+          <select id="weightedA"></select>
+        </label>
+        <label>Person B
+          <select id="weightedB"></select>
+        </label>
+        <label>Vægt (0–100)
+          <input id="weightedWeight" type="number" min="0" max="100" value="50">
+        </label>
+        <label>Label
+          <input id="weightedLabel" placeholder="Beskrivelse eller kontekst">
+        </label>
+        <button type="submit">Tilføj / opdater vægtning</button>
+      </form>
+      <div class="table-wrapper">
+        <table aria-label="Vægtede relationer">
+          <thead><tr><th>Personer</th><th>Vægt</th><th>Label</th><th></th></tr></thead>
+          <tbody id="weightedTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+  <div class="view" data-view="interactions">
+    <section>
+      <header><h2>Relationsoverblik pr. person</h2></header>
+      <p class="panel-hint">Opsummerer hver persons relationer på tværs af parentestrukturer, partnerskaber og vægtede forbindelser.</p>
+      <div class="table-wrapper">
+        <table aria-label="Relationsoverblik">
+          <thead><tr><th>Person</th><th>Parent-links</th><th>Partner-links</th><th>Vægtede links</th><th>Samlet vægt</th></tr></thead>
+          <tbody id="interactionSummaryBody"></tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <header><h2>Vægtede højdepunkter</h2></header>
+      <p class="panel-hint">De stærkeste vægtede relationer med noter. Brug til koordinering af vigtige interaktioner.</p>
+      <ul class="insight-list" id="topWeightedList"></ul>
+    </section>
+  </div>
+  <div class="view" data-view="analytics">
+    <section id="viewPanel">
+      <header><h2>Analyse &amp; opsummering</h2></header>
+      <div id="metricsSummary" class="control-grid"></div>
+      <div class="table-wrapper">
+        <table aria-label="Relationstællinger">
+          <thead><tr><th>Relationstype</th><th>Antal</th></tr></thead>
+          <tbody id="countsTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <header><h2>Netværksklynger</h2></header>
+      <p class="panel-hint">Komponenter er afledt af alle relationstyper og hjælper med at identificere isolerede netværk.</p>
+      <div class="table-wrapper">
+        <table aria-label="Klynger">
+          <thead><tr><th>#</th><th>Størrelse</th><th>Personer</th></tr></thead>
+          <tbody id="componentTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <header><h2>Netværksindsigter</h2></header>
+      <p class="panel-hint">Viser personer der forbinder klynger, samt relationstyper der kan kræve opmærksomhed.</p>
+      <ul class="insight-list" id="analyticsInsightList"></ul>
+    </section>
+  </div>
+  <div class="view" data-view="pedigree" data-layout="single">
+    <section id="pedigreePanel">
+      <header>
+        <h2>Interaktiv pedigree-visualisering</h2>
+        <div class="tag-list">
+          <span class="tag">Force &amp; Tree</span>
+          <span class="tag">Zoom &amp; Pan</span>
+          <span class="tag">Vægtede forbindelser</span>
+        </div>
+      </header>
+      <p class="panel-hint">Træk i elementer (når tilladt), zoom med musens hjul og klik på noder for at redigere stamdata. Layout, labels og drag kan tilpasses nedenfor.</p>
+      <div class="control-grid">
+        <label>Layout
+          <select id="layoutSelect">
+            <option value="force">Force</option>
+            <option value="tree">Tree</option>
+          </select>
+        </label>
+        <label>Root ID (tree)
+          <input id="rootIdInput" type="text" placeholder="person-id for rod">
+        </label>
+        <label>Vis labels
+          <select id="labelToggle">
+            <option value="on">Ja</option>
+            <option value="off">Nej</option>
+          </select>
+        </label>
+        <label>Træk noder
+          <select id="dragToggle">
+            <option value="on">Ja</option>
+            <option value="off">Nej</option>
+          </select>
+        </label>
+        <button id="applyViewBtn" type="button">Opdater visning</button>
+      </div>
+      <div id="pedigreeCanvas">
+        <svg id="pedigreeSvg" viewBox="0 0 960 540" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <marker id="arrowParent" viewBox="0 -5 10 10" refX="18" refY="0" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M0,-5L10,0L0,5Z" fill="var(--link-parent)"></path>
+            </marker>
+          </defs>
+        </svg>
+        <div class="tooltip" id="pedigreeTooltip" role="presentation"></div>
+      </div>
+    </section>
+  </div>
+  <div class="view" data-view="admin">
+    <section id="userPanel">
+      <header>
+        <h2>Brugerstyring</h2>
+        <button class="ghost" type="button" id="userClearBtn">Ryd</button>
+      </header>
+      <p class="panel-hint">Roller styrer hvem der må redigere data. "Skriver" og "Administrator" kan gemme ændringer. "Læser" har kun læseadgang.</p>
+      <form id="userForm" autocomplete="off">
+        <div class="control-grid">
+          <label>Bruger-ID
+            <input id="userId" placeholder="auto hvis tom">
+          </label>
+          <label>Navn
+            <input id="userName" required>
+          </label>
+          <label>E-mail
+            <input id="userEmail" type="email">
+          </label>
+          <label>Rolle
+            <select id="userRole">
+              <option value="reader">Læser</option>
+              <option value="writer">Skriver</option>
+              <option value="admin">Administrator</option>
+            </select>
+          </label>
+          <label>PIN / adgangsnøgle
+            <input id="userPin" type="password" autocomplete="new-password">
+          </label>
+        </div>
+        <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+          <button type="submit">Tilføj / opdater bruger</button>
+          <button type="button" class="danger" id="userDeleteBtn">Slet bruger</button>
+        </div>
+      </form>
+      <div class="control-grid">
+        <label>Aktiv bruger
+          <select id="loginSelect"></select>
+        </label>
+        <label>PIN
+          <input id="loginPin" type="password" placeholder="Valgfrit">
+        </label>
+        <button id="loginBtn" type="button">Log ind</button>
+        <button id="logoutBtn" type="button" class="ghost">Log ud</button>
+      </div>
+      <div class="table-wrapper">
+        <table aria-label="Brugere">
+          <thead><tr><th>ID</th><th>Navn</th><th>Rolle</th><th>E-mail</th></tr></thead>
+          <tbody id="userTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+    <section id="dataPanel">
+      <header><h2>Data &amp; backup</h2></header>
+      <div class="control-grid">
+        <button id="chooseFileBtn" type="button">Vælg synk-fil</button>
+        <button id="backupBtn" type="button">Backup til .json</button>
+        <label>Gendan fra fil
+          <input id="restoreInput" type="file" accept="application/json">
+        </label>
+      </div>
+      <p class="panel-hint" id="fileHint">Ingen fil valgt til synkronisering.</p>
+      <p class="panel-hint" id="autosaveHint">Autosave aktivt.</p>
+    </section>
+    <section id="activityPanel">
+      <header><h2>Log &amp; hændelser</h2></header>
+      <div class="table-wrapper">
+        <table aria-label="Hændelser">
+          <thead><tr><th>Tid</th><th>Beskrivelse</th></tr></thead>
+          <tbody id="logTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</main>
+<div id="statusBar" role="status" aria-live="polite"></div>
+
+<script>
+const defaultState = {
+  persons: {},
+  rel: { parent: [], partner: [], weighted: [] },
+  view: { layout: 'force', rootId: null, showLabels: true, drag: true, zoom: 1 },
+  meta: { lastSaved: null, fileHandle: null, currentUserId: null },
+  _dirty: false
+};
+let state = structuredClone(defaultState);
+let users = [];
+let currentUser = null;
+let saveTimeout = null;
+let db = null;
+let simulation = null;
+let svg, svgRoot, linkLayer, weightedLayer, partnerLayer, nodeLayer, labelLayer;
+let zoomBehavior;
+const tooltip = byId('pedigreeTooltip');
+const statusBar = byId('statusBar');
+const dirtyIndicator = byId('dirtyIndicator');
+const recentLogs = [];
+const DB_NAME = 'augPedDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'kv';
+const KEY_STATE = 'data';
+const KEY_FILE_HANDLE = 'fileHandle';
+const KEY_USERS = 'users';
+const AUTOSAVE_DELAY = 800;
+
+function byId(id) { return document.getElementById(id); }
+function qs(sel, ctx = document) { return ctx.querySelector(sel); }
+function formatDateTime(date = new Date()) {
+  return date.toISOString().replace('T', ' ').split('.')[0];
+}
+function generateId(prefix) { return `${prefix}-${Math.random().toString(36).slice(2, 8)}`; }
+function escapeHTML(str = '') {
+  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  return str.replace(/[&<>"']/g, ch => map[ch] || ch);
+}
+function setDirty(reason = '') {
+  state._dirty = true;
+  dirtyIndicator.textContent = 'Ændringer ikke gemt';
+  dirtyIndicator.style.color = 'var(--danger)';
+  if (reason) addLog(`Markér som ændret: ${reason}`);
+  saveSoon();
+}
+function clearDirty() {
+  state._dirty = false;
+  dirtyIndicator.textContent = state.meta.lastSaved ? `Sidst gemt ${state.meta.lastSaved}` : 'Ændringer gemmes automatisk';
+  dirtyIndicator.style.color = 'var(--muted-text)';
+}
+function flashStatus(message, type = 'info', timeout = 2600) {
+  statusBar.textContent = message;
+  statusBar.style.display = 'inline-flex';
+  statusBar.style.background = type === 'error' ? 'rgba(192,57,43,0.95)' : type === 'success' ? 'rgba(29,154,108,0.92)' : 'rgba(15,23,42,0.88)';
+  clearTimeout(statusBar._hideTimer);
+  statusBar._hideTimer = setTimeout(() => { statusBar.style.display = 'none'; }, timeout);
+}
+function addLog(message) {
+  const entry = { time: formatDateTime(), message };
+  recentLogs.unshift(entry);
+  if (recentLogs.length > 250) recentLogs.pop();
+  renderLogTable();
+}
+function renderLogTable() {
+  const tbody = byId('logTableBody');
+  if (tbody) {
+    tbody.innerHTML = recentLogs.map(log => `<tr><td>${escapeHTML(log.time)}</td><td>${escapeHTML(log.message)}</td></tr>`).join('');
+  }
+  const list = byId('recentLogList');
+  if (list) {
+    list.innerHTML = '';
+    if (recentLogs.length === 0) {
+      const li = document.createElement('li');
+      li.textContent = 'Ingen hændelser registreret endnu.';
+      list.appendChild(li);
+    } else {
+      recentLogs.slice(0, 6).forEach(log => {
+        const li = document.createElement('li');
+        li.innerHTML = `<strong>${escapeHTML(log.time)}</strong><br>${escapeHTML(log.message)}`;
+        list.appendChild(li);
+      });
+    }
+  }
+}
+function requireWriteAccess() {
+  if (!currentUser) { alert('Log ind for at ændre data.'); return false; }
+  if (!['writer', 'admin'].includes(currentUser.role)) { alert('Handling kræver skriveadgang.'); return false; }
+  return true;
+}
+
+function openDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onerror = () => reject(request.error || new Error('IndexedDB kunne ikke åbnes.'));
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+  });
+}
+function dbTransaction(mode) {
+  if (!db) throw new Error('DB ikke initialiseret');
+  return db.transaction(STORE_NAME, mode).objectStore(STORE_NAME);
+}
+function dbGet(key) {
+  return new Promise((resolve, reject) => {
+    try {
+      const store = dbTransaction('readonly');
+      const req = store.get(key);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    } catch (err) { reject(err); }
+  });
+}
+function dbPut(key, value) {
+  return new Promise((resolve, reject) => {
+    try {
+      const store = dbTransaction('readwrite');
+      const req = store.put(value, key);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    } catch (err) { reject(err); }
+  });
+}
+async function loadUsersFromDb() {
+  try {
+    const raw = await dbGet(KEY_USERS);
+    if (raw) users = Array.isArray(raw) ? raw : [];
+  } catch (err) {
+    console.warn('Kunne ikke hente brugere', err);
+  }
+  updateUserUI();
+}
+async function saveUsersToDb() {
+  if (!db) return;
+  await dbPut(KEY_USERS, users);
+}
+function serializeState() {
+  const snapshot = structuredClone(state);
+  snapshot.meta = { ...snapshot.meta, fileHandle: null };
+  return snapshot;
+}
+async function saveAll(force = false) {
+  if (!force && !requireWriteAccess()) return;
+  if (!db) return;
+  const snapshot = serializeState();
+  try {
+    await dbPut(KEY_STATE, snapshot);
+    if (state.meta.fileHandle) {
+      await writeToFile(state.meta.fileHandle, JSON.stringify(snapshot, null, 2));
+    }
+    state.meta.lastSaved = formatDateTime();
+    state._dirty = false;
+    clearDirty();
+    await saveUsersToDb();
+    flashStatus('Data gemt', 'success');
+    updateOverviewMeta();
+  } catch (err) {
+    console.error('Gem fejlede', err);
+    flashStatus('Kunne ikke gemme data', 'error', 4000);
+  }
+}
+function saveSoon() {
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => saveAll(), AUTOSAVE_DELAY);
+}
+async function initPersistence() {
+  try {
+    await loadUsersFromDb();
+    await loadAll();
+    renderAll();
+    clearDirty();
+    flashStatus('Data indlæst', 'success');
+  } catch (err) {
+    console.error('Initialisering fejlede', err);
+    flashStatus('IndexedDB utilgængelig – sessionen gemmes ikke permanent.', 'error', 4000);
+    renderAll();
+  }
+}
+async function loadAll() {
+  if (!db) return;
+  try {
+    const handle = await dbGet(KEY_FILE_HANDLE);
+    if (handle) {
+      state.meta.fileHandle = handle;
+      const ok = await verifyFilePermission(handle, false);
+      if (ok) {
+        const text = await readFromFile(handle);
+        if (text) hydrateState(JSON.parse(text));
+        updateFileHint();
+        return;
+      }
+    }
+    const raw = await dbGet(KEY_STATE);
+    if (raw) hydrateState(raw);
+  } catch (err) {
+    console.error('Indlæsning fejlede', err);
+  }
+  updateFileHint();
+}
+function hydrateState(obj) {
+  if (!obj || typeof obj !== 'object') return;
+  const next = structuredClone(defaultState);
+  next.persons = obj.persons && typeof obj.persons === 'object' ? obj.persons : {};
+  next.rel = {
+    parent: Array.isArray(obj.rel?.parent) ? obj.rel.parent : [],
+    partner: Array.isArray(obj.rel?.partner) ? obj.rel.partner : [],
+    weighted: Array.isArray(obj.rel?.weighted) ? obj.rel.weighted : []
+  };
+  next.view = { ...defaultState.view, ...(obj.view || {}) };
+  next.meta = { ...defaultState.meta, ...(obj.meta || {}) };
+  next._dirty = false;
+  state = next;
+  if (obj.meta?.currentUserId) {
+    currentUser = users.find(u => u.id === obj.meta.currentUserId) || null;
+  }
+}
+function updateFileHint() {
+  const hint = byId('fileHint');
+  if (hint) {
+    if (state.meta.fileHandle) {
+      hint.textContent = `Synkroniseret fil: ${state.meta.fileHandle.name || 'ukendt navn'}`;
+    } else {
+      hint.textContent = 'Ingen fil valgt til synkronisering.';
+    }
+  }
+  const autosaveHint = byId('autosaveHint');
+  if (autosaveHint) {
+    autosaveHint.textContent = state._dirty ? 'Autosave afventer pga. ændringer.' : 'Autosave aktivt.';
+  }
+}
+function roleLabel(role) {
+  switch (role) {
+    case 'admin': return 'Administrator';
+    case 'writer': return 'Skriver';
+    default: return 'Læser';
+  }
+}
+
+function updateUserUI() {
+  const tbody = byId('userTableBody');
+  if (tbody) {
+    tbody.innerHTML = '';
+    users.forEach(user => {
+      const tr = document.createElement('tr');
+      tr.dataset.id = user.id;
+      tr.innerHTML = `<td>${escapeHTML(user.id)}</td><td>${escapeHTML(user.name)}</td><td>${escapeHTML(roleLabel(user.role))}</td><td>${escapeHTML(user.email || '')}</td>`;
+      tr.addEventListener('click', () => fillUserForm(user));
+      tbody.appendChild(tr);
+    });
+  }
+  const loginSelect = byId('loginSelect');
+  if (loginSelect) {
+    loginSelect.innerHTML = '<option value="">Vælg bruger</option>' + users.map(u => `<option value="${escapeHTML(u.id)}">${escapeHTML(u.name)}</option>`).join('');
+    if (currentUser) loginSelect.value = currentUser.id;
+  }
+  updateLoginState();
+  updateOverviewMeta();
+}
+function fillUserForm(user) {
+  byId('userId').value = user.id;
+  byId('userName').value = user.name;
+  byId('userEmail').value = user.email || '';
+  byId('userRole').value = user.role || 'reader';
+  byId('userPin').value = user.pin || '';
+}
+function clearUserForm() {
+  byId('userId').value = '';
+  byId('userName').value = '';
+  byId('userEmail').value = '';
+  byId('userRole').value = 'reader';
+  byId('userPin').value = '';
+}
+function updateLoginState() {
+  if (currentUser) {
+    dirtyIndicator.textContent = `${currentUser.name} (${roleLabel(currentUser.role)})` + (state._dirty ? ' – ændringer ikke gemt' : '');
+    dirtyIndicator.style.color = 'var(--accent-strong)';
+  } else {
+    clearDirty();
+  }
+  updateOverviewMeta();
+}
+function handleUserSubmit(evt) {
+  evt.preventDefault();
+  const bootstrap = users.length === 0;
+  if (!bootstrap && (!currentUser || currentUser.role !== 'admin')) {
+    alert('Kun administrator kan ændre brugere.');
+    return;
+  }
+  const id = (byId('userId').value || generateId('user')).trim();
+  const name = byId('userName').value.trim();
+  if (!name) return alert('Navn er påkrævet');
+  const email = byId('userEmail').value.trim();
+  const role = byId('userRole').value;
+  const pin = byId('userPin').value;
+  const existing = users.find(u => u.id === id);
+  if (existing) {
+    Object.assign(existing, { name, email, role, pin });
+    flashStatus('Bruger opdateret', 'success');
+    addLog(`Bruger opdateret: ${name}`);
+  } else {
+    users.push({ id, name, email, role, pin });
+    flashStatus('Bruger tilføjet', 'success');
+    addLog(`Ny bruger: ${name}`);
+    if (bootstrap) {
+      currentUser = users[0];
+      state.meta.currentUserId = currentUser.id;
+      updateLoginState();
+    }
+  }
+  clearUserForm();
+  updateUserUI();
+  saveUsersToDb();
+}
+function handleUserDelete() {
+  if (!currentUser || currentUser.role !== 'admin') {
+    alert('Kun administrator kan slette brugere.');
+    return;
+  }
+  const id = byId('userId').value.trim();
+  if (!id) return alert('Vælg en bruger');
+  if (!confirm('Slet bruger?')) return;
+  users = users.filter(u => u.id !== id);
+  if (currentUser?.id === id) {
+    currentUser = null;
+    state.meta.currentUserId = null;
+  }
+  clearUserForm();
+  updateUserUI();
+  saveUsersToDb();
+  flashStatus('Bruger slettet', 'success');
+}
+function handleLogin() {
+  const id = byId('loginSelect').value;
+  const pin = byId('loginPin').value;
+  const user = users.find(u => u.id === id);
+  if (!user) return alert('Vælg bruger');
+  if (user.pin && user.pin !== pin) {
+    alert('Forkert PIN.');
+    return;
+  }
+  currentUser = user;
+  state.meta.currentUserId = user.id;
+  updateLoginState();
+  flashStatus(`Logget ind som ${user.name}`, 'success');
+  saveUsersToDb();
+}
+function handleLogout() {
+  currentUser = null;
+  state.meta.currentUserId = null;
+  const select = byId('loginSelect');
+  if (select) select.value = '';
+  updateLoginState();
+  flashStatus('Logget ud', 'info');
+}
+
+function renderPersonTable() {
+  const tbody = byId('personTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  Object.values(state.persons).forEach(person => {
+    const tr = document.createElement('tr');
+    tr.dataset.id = person.id;
+    const lifespan = [person.birth, person.death].filter(Boolean).join('–');
+    tr.innerHTML = `<td>${escapeHTML(person.id)}</td><td>${escapeHTML(person.name)}</td><td>${escapeHTML(person.sex)}</td><td>${escapeHTML(lifespan)}</td>`;
+    tr.addEventListener('click', () => fillPersonForm(state.persons[person.id]));
+    tbody.appendChild(tr);
+  });
+}
+function fillPersonForm(person) {
+  byId('personId').value = person.id;
+  byId('personName').value = person.name;
+  byId('personSex').value = person.sex;
+  byId('personBirth').value = person.birth || '';
+  byId('personDeath').value = person.death || '';
+  byId('personNotes').value = person.notes || '';
+  activateView('persons');
+}
+function clearPersonForm() {
+  byId('personForm').reset();
+  byId('personId').value = '';
+}
+function updatePersonSelects() {
+  const persons = Object.values(state.persons);
+  const options = ['<option value="">Vælg</option>', ...persons.map(p => `<option value="${escapeHTML(p.id)}">${escapeHTML(p.name)}</option>`)];
+  ['parentParent', 'parentChild', 'partnerA', 'partnerB', 'weightedA', 'weightedB'].forEach(id => {
+    const el = byId(id);
+    if (!el) return;
+    const prev = el.value;
+    el.innerHTML = options.join('');
+    if (persons.some(p => p.id === prev)) el.value = prev;
+  });
+}
+function handlePersonSubmit(evt) {
+  evt.preventDefault();
+  if (!requireWriteAccess()) return;
+  const idRaw = byId('personId').value.trim();
+  const id = idRaw || generateId('person');
+  const name = byId('personName').value.trim();
+  if (!name) return alert('Navn er påkrævet');
+  const sex = byId('personSex').value;
+  const birthValue = byId('personBirth').value;
+  const deathValue = byId('personDeath').value;
+  const notes = byId('personNotes').value.trim();
+  const person = {
+    id,
+    name,
+    sex,
+    birth: birthValue ? Number(birthValue) : undefined,
+    death: deathValue ? Number(deathValue) : undefined,
+    notes
+  };
+  state.persons[id] = person;
+  if (!idRaw) byId('personId').value = id;
+  renderPersonsAndRelations();
+  setDirty(`Person opdateret: ${name}`);
+}
+function handlePersonDelete() {
+  if (!requireWriteAccess()) return;
+  const id = byId('personId').value.trim();
+  if (!id || !state.persons[id]) return alert('Vælg en person');
+  if (!confirm('Slet person og alle relationer?')) return;
+  delete state.persons[id];
+  state.rel.parent = state.rel.parent.filter(r => r.parentId !== id && r.childId !== id);
+  state.rel.partner = state.rel.partner.filter(r => r.aId !== id && r.bId !== id);
+  state.rel.weighted = state.rel.weighted.filter(r => r.aId !== id && r.bId !== id);
+  clearPersonForm();
+  renderPersonsAndRelations();
+  setDirty(`Person slettet: ${id}`);
+}
+function renderRelationsTables() {
+  const tbody = byId('relationTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  state.rel.parent.forEach((rel, idx) => {
+    const parent = state.persons[rel.parentId]?.name || rel.parentId;
+    const child = state.persons[rel.childId]?.name || rel.childId;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>Parent</td><td>${escapeHTML(parent)} → ${escapeHTML(child)}</td><td><button class="ghost" data-type="parent" data-index="${idx}">Slet</button></td>`;
+    tbody.appendChild(tr);
+  });
+  state.rel.partner.forEach((rel, idx) => {
+    const a = state.persons[rel.aId]?.name || rel.aId;
+    const b = state.persons[rel.bId]?.name || rel.bId;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>Partner</td><td>${escapeHTML(a)} ↔ ${escapeHTML(b)}</td><td><button class="ghost" data-type="partner" data-index="${idx}">Slet</button></td>`;
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('button').forEach(btn => btn.addEventListener('click', handleRelationDelete));
+}
+function renderWeightedTable() {
+  const tbody = byId('weightedTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  state.rel.weighted.forEach((rel, idx) => {
+    const a = state.persons[rel.aId]?.name || rel.aId;
+    const b = state.persons[rel.bId]?.name || rel.bId;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${escapeHTML(a)} ↔ ${escapeHTML(b)}</td><td>${rel.weight}</td><td>${escapeHTML(rel.label || '')}</td><td><button class="ghost" data-index="${idx}">Slet</button></td>`;
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('button').forEach(btn => btn.addEventListener('click', handleWeightedDelete));
+}
+function handleRelationDelete(evt) {
+  if (!requireWriteAccess()) return;
+  const type = evt.currentTarget.dataset.type;
+  const idx = Number(evt.currentTarget.dataset.index);
+  if (type === 'parent') state.rel.parent.splice(idx, 1);
+  if (type === 'partner') state.rel.partner.splice(idx, 1);
+  renderPersonsAndRelations();
+  setDirty('Relation fjernet');
+}
+function handleWeightedDelete(evt) {
+  if (!requireWriteAccess()) return;
+  const idx = Number(evt.currentTarget.dataset.index);
+  state.rel.weighted.splice(idx, 1);
+  renderPersonsAndRelations();
+  setDirty('Vægtet relation fjernet');
+}
+function ensureDistinctPair(a, b) {
+  return state.rel.weighted.find(rel => (
+    (rel.aId === a && rel.bId === b) || (rel.aId === b && rel.bId === a)
+  ));
+}
+function handleParentSubmit(evt) {
+  evt.preventDefault();
+  if (!requireWriteAccess()) return;
+  const parentId = byId('parentParent').value;
+  const childId = byId('parentChild').value;
+  if (!parentId || !childId) return alert('Vælg både forælder og barn');
+  if (parentId === childId) return alert('Samme person kan ikke være både forælder og barn.');
+  const exists = state.rel.parent.some(rel => rel.parentId === parentId && rel.childId === childId);
+  if (exists) return alert('Relation findes allerede.');
+  state.rel.parent.push({ parentId, childId });
+  renderPersonsAndRelations();
+  setDirty('Parent relation tilføjet');
+}
+function handlePartnerSubmit(evt) {
+  evt.preventDefault();
+  if (!requireWriteAccess()) return;
+  const aId = byId('partnerA').value;
+  const bId = byId('partnerB').value;
+  if (!aId || !bId) return alert('Vælg begge partnere');
+  if (aId === bId) return alert('Samme person kan ikke være partner med sig selv.');
+  const exists = state.rel.partner.some(rel => (rel.aId === aId && rel.bId === bId) || (rel.aId === bId && rel.bId === aId));
+  if (exists) return alert('Relation findes allerede.');
+  state.rel.partner.push({ aId, bId });
+  renderPersonsAndRelations();
+  setDirty('Partner relation tilføjet');
+}
+function handleWeightedSubmit(evt) {
+  evt.preventDefault();
+  if (!requireWriteAccess()) return;
+  const aId = byId('weightedA').value;
+  const bId = byId('weightedB').value;
+  const weightValue = Number(byId('weightedWeight').value);
+  const label = byId('weightedLabel').value.trim();
+  if (!aId || !bId) return alert('Vælg begge personer');
+  if (aId === bId) return alert('Vælg to forskellige personer.');
+  if (Number.isNaN(weightValue) || weightValue < 0 || weightValue > 100) return alert('Vægt skal være mellem 0 og 100.');
+  const existing = ensureDistinctPair(aId, bId);
+  if (existing) {
+    existing.weight = weightValue;
+    existing.label = label;
+    flashStatus('Vægt opdateret', 'success');
+  } else {
+    state.rel.weighted.push({ aId, bId, weight: weightValue, label });
+    flashStatus('Vægt tilføjet', 'success');
+  }
+  renderPersonsAndRelations();
+  setDirty('Vægtet relation opdateret');
+}
+
+function renderMetrics() {
+  const metrics = byId('metricsSummary');
+  if (!metrics) return;
+  const persons = Object.keys(state.persons).length;
+  const parents = state.rel.parent.length;
+  const partners = state.rel.partner.length;
+  const weighted = state.rel.weighted.length;
+  const avgWeight = weighted ? (state.rel.weighted.reduce((sum, r) => sum + r.weight, 0) / weighted).toFixed(1) : '0.0';
+  metrics.innerHTML = `
+    <div class="metric"><strong>${persons}</strong><span>Personer</span></div>
+    <div class="metric"><strong>${parents}</strong><span>Parent relationer</span></div>
+    <div class="metric"><strong>${partners}</strong><span>Partner relationer</span></div>
+    <div class="metric"><strong>${weighted}</strong><span>Vægtede forbindelser</span></div>
+    <div class="metric"><strong>${avgWeight}</strong><span>Gns. vægt</span></div>`;
+  const countsBody = byId('countsTableBody');
+  if (countsBody) {
+    countsBody.innerHTML = `
+      <tr><td>Parent → Child</td><td>${parents}</td></tr>
+      <tr><td>Partner ↔</td><td>${partners}</td></tr>
+      <tr><td>Vægtede</td><td>${weighted}</td></tr>`;
+  }
+}
+function computeComponents() {
+  const ids = Object.keys(state.persons);
+  const adj = new Map();
+  function ensure(id) {
+    if (!adj.has(id)) adj.set(id, new Set());
+    return adj.get(id);
+  }
+  state.rel.parent.forEach(rel => {
+    if (!state.persons[rel.parentId] || !state.persons[rel.childId]) return;
+    ensure(rel.parentId).add(rel.childId);
+    ensure(rel.childId).add(rel.parentId);
+  });
+  state.rel.partner.forEach(rel => {
+    if (!state.persons[rel.aId] || !state.persons[rel.bId]) return;
+    ensure(rel.aId).add(rel.bId);
+    ensure(rel.bId).add(rel.aId);
+  });
+  state.rel.weighted.forEach(rel => {
+    if (!state.persons[rel.aId] || !state.persons[rel.bId]) return;
+    ensure(rel.aId).add(rel.bId);
+    ensure(rel.bId).add(rel.aId);
+  });
+  const visited = new Set();
+  const components = [];
+  for (const id of ids) {
+    if (visited.has(id)) continue;
+    const queue = [id];
+    const members = [];
+    visited.add(id);
+    while (queue.length) {
+      const current = queue.shift();
+      members.push(current);
+      (adj.get(current) || []).forEach(next => {
+        if (!visited.has(next)) {
+          visited.add(next);
+          queue.push(next);
+        }
+      });
+    }
+    components.push(members);
+  }
+  return components;
+}
+function computeNetworkSummary() {
+  const persons = Object.values(state.persons);
+  const parent = state.rel.parent;
+  const partner = state.rel.partner;
+  const weighted = state.rel.weighted;
+  const degree = new Map();
+  function ensure(id) {
+    if (!degree.has(id)) degree.set(id, { id, name: state.persons[id]?.name || id, parent: 0, partner: 0, weighted: 0, weightSum: 0 });
+    return degree.get(id);
+  }
+  parent.forEach(rel => {
+    if (!state.persons[rel.parentId] || !state.persons[rel.childId]) return;
+    ensure(rel.parentId).parent++;
+    ensure(rel.childId).parent++;
+  });
+  partner.forEach(rel => {
+    if (!state.persons[rel.aId] || !state.persons[rel.bId]) return;
+    ensure(rel.aId).partner++;
+    ensure(rel.bId).partner++;
+  });
+  weighted.forEach(rel => {
+    if (!state.persons[rel.aId] || !state.persons[rel.bId]) return;
+    ensure(rel.aId).weighted++;
+    ensure(rel.bId).weighted++;
+    ensure(rel.aId).weightSum += rel.weight || 0;
+    ensure(rel.bId).weightSum += rel.weight || 0;
+  });
+  const degreeList = persons.map(p => ensure(p.id));
+  const components = computeComponents();
+  const weights = weighted.map(w => w.weight || 0);
+  const weightSpread = weights.length ? `${Math.min(...weights)} – ${Math.max(...weights)}` : 'Ingen vægte';
+  const avgWeight = weights.length ? (weights.reduce((a, b) => a + b, 0) / weights.length).toFixed(1) : '0.0';
+  return {
+    personsCount: persons.length,
+    parentCount: parent.length,
+    partnerCount: partner.length,
+    weightedCount: weighted.length,
+    avgWeight,
+    weightSpread,
+    degreeList,
+    components,
+    weights
+  };
+}
+function renderOverview() {
+  const summary = computeNetworkSummary();
+  byId('overviewPersons').textContent = summary.personsCount;
+  byId('overviewRelations').textContent = summary.parentCount + summary.partnerCount + summary.weightedCount;
+  byId('overviewRelationSplit').textContent = `${summary.parentCount} parent · ${summary.partnerCount} partner · ${summary.weightedCount} vægtede`;
+  byId('overviewAvgWeight').textContent = summary.avgWeight;
+  byId('overviewWeightSpread').textContent = summary.weightSpread;
+  byId('overviewComponents').textContent = `Netværksklynger: ${summary.components.length}`;
+  const list = byId('overviewConnectorList');
+  if (list) {
+    list.innerHTML = '';
+    const ranked = summary.degreeList
+      .map(entry => ({ ...entry, score: entry.parent + entry.partner + entry.weighted, totalWeight: entry.weightSum }))
+      .sort((a, b) => b.score === a.score ? b.totalWeight - a.totalWeight : b.score - a.score)
+      .slice(0, 6);
+    if (!ranked.length) {
+      const li = document.createElement('li');
+      li.textContent = 'Ingen personer registreret endnu.';
+      list.appendChild(li);
+    } else {
+      ranked.forEach(entry => {
+        const li = document.createElement('li');
+        li.innerHTML = `<strong>${escapeHTML(entry.name)}</strong><br>${entry.score} relationer · Samlet vægt ${entry.totalWeight}`;
+        list.appendChild(li);
+      });
+    }
+  }
+}
+function renderInteractionsView() {
+  const summary = computeNetworkSummary();
+  const tbody = byId('interactionSummaryBody');
+  if (tbody) {
+    tbody.innerHTML = '';
+    summary.degreeList.sort((a, b) => (b.weightSum || 0) - (a.weightSum || 0)).forEach(entry => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${escapeHTML(entry.name)}</td><td>${entry.parent}</td><td>${entry.partner}</td><td>${entry.weighted}</td><td>${entry.weightSum.toFixed(1)}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+  const highlights = byId('topWeightedList');
+  if (highlights) {
+    highlights.innerHTML = '';
+    const edges = [...state.rel.weighted]
+      .filter(rel => state.persons[rel.aId] && state.persons[rel.bId])
+      .sort((a, b) => (b.weight || 0) - (a.weight || 0))
+      .slice(0, 8);
+    if (!edges.length) {
+      const li = document.createElement('li');
+      li.textContent = 'Ingen vægtede relationer endnu.';
+      highlights.appendChild(li);
+    } else {
+      edges.forEach(rel => {
+        const a = state.persons[rel.aId]?.name || rel.aId;
+        const b = state.persons[rel.bId]?.name || rel.bId;
+        const li = document.createElement('li');
+        li.innerHTML = `<strong>${escapeHTML(a)} ↔ ${escapeHTML(b)}</strong><br>Vægt ${rel.weight} · ${escapeHTML(rel.label || 'Ingen label')}`;
+        highlights.appendChild(li);
+      });
+    }
+  }
+}
+function renderAnalyticsExtras() {
+  const summary = computeNetworkSummary();
+  const componentBody = byId('componentTableBody');
+  if (componentBody) {
+    componentBody.innerHTML = '';
+    summary.components.forEach((members, idx) => {
+      const tr = document.createElement('tr');
+      const names = members.map(id => state.persons[id]?.name || id).join(', ');
+      tr.innerHTML = `<td>${idx + 1}</td><td>${members.length}</td><td>${escapeHTML(names)}</td>`;
+      componentBody.appendChild(tr);
+    });
+  }
+  const insights = byId('analyticsInsightList');
+  if (insights) {
+    insights.innerHTML = '';
+    if (!summary.degreeList.length) {
+      const li = document.createElement('li');
+      li.textContent = 'Ingen data tilgængelig.';
+      insights.appendChild(li);
+    } else {
+      const multiLinks = summary.degreeList.filter(entry => entry.partner > 1 || entry.parent > 2 || entry.weighted > 2);
+      if (multiLinks.length) {
+        const li = document.createElement('li');
+        const names = multiLinks.slice(0, 5).map(entry => `${entry.name} (${entry.parent + entry.partner + entry.weighted})`);
+        li.innerHTML = `<strong>Koordinationspunkter:</strong> ${escapeHTML(names.join(', '))}`;
+        insights.appendChild(li);
+      }
+      const weakWeights = state.rel.weighted.filter(rel => (rel.weight || 0) < 30);
+      if (weakWeights.length) {
+        const li = document.createElement('li');
+        li.innerHTML = `<strong>Lav vægt:</strong> ${weakWeights.length} relationer under vægt 30 – overvej opfølgning.`;
+        insights.appendChild(li);
+      }
+      const isolated = summary.components.filter(comp => comp.length === 1);
+      if (isolated.length) {
+        const li = document.createElement('li');
+        li.innerHTML = `<strong>Isolerede personer:</strong> ${isolated.length} uden forbindelser.`;
+        insights.appendChild(li);
+      }
+    }
+  }
+}
+function updateOverviewMeta() {
+  const activeUser = byId('overviewActiveUser');
+  if (activeUser) {
+    activeUser.textContent = currentUser ? currentUser.name : 'Ingen';
+  }
+  const lastSaved = byId('overviewLastSaved');
+  if (lastSaved) {
+    lastSaved.textContent = state.meta.lastSaved ? `Sidst gemt ${state.meta.lastSaved}` : 'Ikke gemt endnu';
+  }
+}
+function renderPersonsAndRelations() {
+  renderPersonTable();
+  renderRelationsTables();
+  renderWeightedTable();
+  updatePersonSelects();
+  renderMetrics();
+  renderOverview();
+  renderInteractionsView();
+  renderAnalyticsExtras();
+  renderGraph();
+}
+
+function initGraph() {
+  svg = d3.select('#pedigreeSvg');
+  svgRoot = svg.append('g').attr('class', 'viewport');
+  linkLayer = svgRoot.append('g').attr('class', 'links parent-links');
+  partnerLayer = svgRoot.append('g').attr('class', 'links partner-links');
+  weightedLayer = svgRoot.append('g').attr('class', 'links weighted-links');
+  nodeLayer = svgRoot.append('g').attr('class', 'nodes');
+  labelLayer = svgRoot.append('g').attr('class', 'labels');
+  zoomBehavior = d3.zoom().scaleExtent([0.2, 4]).on('zoom', (event) => {
+    svgRoot.attr('transform', event.transform);
+    state.view.zoom = event.transform.k;
+  });
+  svg.call(zoomBehavior).call(zoomBehavior.transform, d3.zoomIdentity.scale(state.view.zoom));
+}
+function nodeColor(person) {
+  if (person.sex === 'M') return 'var(--sex-m)';
+  if (person.sex === 'F') return 'var(--sex-f)';
+  return 'var(--sex-u)';
+}
+function buildLinks() {
+  const parent = state.rel.parent.map(rel => ({ type: 'parent', source: rel.parentId, target: rel.childId }));
+  const partner = state.rel.partner.map(rel => ({ type: 'partner', source: rel.aId, target: rel.bId }));
+  const weighted = state.rel.weighted.map(rel => ({ type: 'weighted', source: rel.aId, target: rel.bId, weight: rel.weight, label: rel.label }));
+  return { parent, partner, weighted };
+}
+function linkKey(link) {
+  const src = typeof link.source === 'object' ? link.source.id : link.source;
+  const tgt = typeof link.target === 'object' ? link.target.id : link.target;
+  return `${link.type || 'rel'}:${src}->${tgt}`;
+}
+function nodeShape(person) {
+  switch (person.sex) {
+    case 'M': return d3.symbolSquare;
+    case 'F': return d3.symbolCircle;
+    default: return d3.symbolDiamond;
+  }
+}
+function nodeTooltip(person) {
+  const lines = [person.name, `ID: ${person.id}`, `Køn: ${person.sex}`];
+  if (person.birth || person.death) lines.push(`År: ${person.birth || '?'} – ${person.death || '?'}`);
+  if (person.notes) lines.push(`Noter: ${person.notes}`);
+  return lines.join('
+');
+}
+function showTooltip(event, person) {
+  tooltip.textContent = nodeTooltip(person);
+  tooltip.style.left = `${event.offsetX}px`;
+  tooltip.style.top = `${event.offsetY}px`;
+  tooltip.style.opacity = 1;
+}
+function hideTooltip() {
+  tooltip.style.opacity = 0;
+}
+function enableDrag() {
+  const drag = d3.drag()
+    .on('start', (event, d) => {
+      if (!state.view.drag) return;
+      if (!event.active && simulation) simulation.alphaTarget(0.3).restart();
+      d.fx = d.x;
+      d.fy = d.y;
+    })
+    .on('drag', (event, d) => {
+      if (!state.view.drag) return;
+      d.fx = event.x;
+      d.fy = event.y;
+    })
+    .on('end', (event, d) => {
+      if (!state.view.drag) return;
+      if (!event.active && simulation) simulation.alphaTarget(0);
+      d.fx = null;
+      d.fy = null;
+    });
+  return drag;
+}
+function renderGraph() {
+  if (!svgRoot) initGraph();
+  const persons = Object.values(state.persons);
+  const { parent, partner, weighted } = buildLinks();
+  if (!persons.length) {
+    linkLayer.selectAll('*').remove();
+    partnerLayer.selectAll('*').remove();
+    weightedLayer.selectAll('*').remove();
+    nodeLayer.selectAll('*').remove();
+    labelLayer.selectAll('*').remove();
+    return;
+  }
+  const nodes = persons.map(p => ({ ...p }));
+  if (state.view.layout === 'tree') {
+    renderTreeLayout(nodes, parent, partner, weighted);
+  } else {
+    renderForceLayout(nodes, parent, partner, weighted);
+  }
+}
+function renderForceLayout(nodes, parentLinks, partnerLinks, weightedLinks) {
+  if (simulation) simulation.stop();
+  const parentSel = linkLayer.selectAll('line').data(parentLinks, linkKey);
+  parentSel.join(
+    enter => enter.append('line')
+      .attr('stroke', 'var(--link-parent)')
+      .attr('stroke-width', 1.6)
+      .attr('marker-end', 'url(#arrowParent)')
+      .attr('stroke-opacity', 0.85),
+    update => update,
+    exit => exit.remove()
+  );
+  const partnerSel = partnerLayer.selectAll('line').data(partnerLinks, linkKey);
+  partnerSel.join(
+    enter => enter.append('line')
+      .attr('stroke', 'var(--link-partner)')
+      .attr('stroke-dasharray', '6 4')
+      .attr('stroke-width', 1.6)
+      .attr('stroke-opacity', 0.75),
+    update => update,
+    exit => exit.remove()
+  );
+  const weightedSel = weightedLayer.selectAll('line').data(weightedLinks, linkKey);
+  weightedSel.join(
+    enter => enter.append('line')
+      .attr('stroke', 'var(--link-weighted)')
+      .attr('stroke-width', d => 1 + (d.weight || 0) / 22)
+      .attr('stroke-opacity', d => 0.4 + (d.weight || 0) / 140),
+    update => update
+      .attr('stroke-width', d => 1 + (d.weight || 0) / 22)
+      .attr('stroke-opacity', d => 0.4 + (d.weight || 0) / 140),
+    exit => exit.remove()
+  );
+  const nodeSel = nodeLayer.selectAll('path').data(nodes, d => d.id);
+  const nodeEnter = nodeSel.enter().append('path')
+    .attr('d', d3.symbol().type(d => nodeShape(d)).size(1600))
+    .attr('fill', d => nodeColor(d))
+    .attr('fill-opacity', 0.82)
+    .attr('stroke', 'rgba(0,0,0,0.25)')
+    .attr('stroke-width', 1.2)
+    .call(enableDrag());
+  nodeEnter.append('title').text(d => nodeTooltip(d));
+  nodeSel.exit().remove();
+  nodeLayer.selectAll('path').select('title').text(d => nodeTooltip(d));
+  const labelSel = labelLayer.selectAll('text').data(state.view.showLabels ? nodes : [], d => d.id);
+  labelSel.join(
+    enter => enter.append('text')
+      .attr('text-anchor', 'middle')
+      .attr('dy', 24)
+      .attr('font-size', 12)
+      .attr('fill', 'var(--text)')
+      .text(d => d.name),
+    update => update.text(d => d.name),
+    exit => exit.remove()
+  );
+  nodeLayer.selectAll('path')
+    .on('mouseenter', (event, d) => showTooltip(event, d))
+    .on('mouseleave', hideTooltip)
+    .on('click', (event, d) => {
+      fillPersonForm(state.persons[d.id]);
+    });
+  linkLayer.selectAll('line').on('mouseenter', (event, d) => showLinkTooltip(event, d)).on('mouseleave', hideTooltip);
+  partnerLayer.selectAll('line').on('mouseenter', (event, d) => showLinkTooltip(event, d)).on('mouseleave', hideTooltip);
+  weightedLayer.selectAll('line').on('mouseenter', (event, d) => showLinkTooltip(event, d)).on('mouseleave', hideTooltip);
+  const links = [...parentLinks, ...partnerLinks, ...weightedLinks];
+  simulation = d3.forceSimulation(nodes)
+    .force('charge', d3.forceManyBody().strength(-230))
+    .force('center', d3.forceCenter(480, 270))
+    .force('link', d3.forceLink(links).id(d => d.id).distance(linkDistance).strength(linkStrength))
+    .force('collide', d3.forceCollide().radius(40));
+  simulation.on('tick', () => {
+    linkLayer.selectAll('line').attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    partnerLayer.selectAll('line').attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    weightedLayer.selectAll('line').attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    nodeLayer.selectAll('path').attr('transform', d => `translate(${d.x},${d.y})`);
+    labelLayer.selectAll('text').attr('x', d => d.x).attr('y', d => d.y);
+  });
+}
+function linkDistance(link) {
+  if (link.type === 'parent') return 140;
+  if (link.type === 'partner') return 160;
+  if (link.type === 'weighted') return 220 - (link.weight || 0) * 0.8;
+  return 180;
+}
+function linkStrength(link) {
+  if (link.type === 'parent') return 0.9;
+  if (link.type === 'partner') return 0.5;
+  if (link.type === 'weighted') return 0.2 + (link.weight || 0) / 400;
+  return 0.2;
+}
+function showLinkTooltip(event, link) {
+  const a = state.persons[link.source.id || link.source]?.name || link.source.id || link.source;
+  const b = state.persons[link.target.id || link.target]?.name || link.target.id || link.target;
+  const lines = [`${a} ↔ ${b}`];
+  if (link.type === 'parent') lines[0] = `${a} → ${b}`;
+  if (link.type === 'weighted') lines.push(`Vægt: ${link.weight}`);
+  if (link.label) lines.push(`Label: ${link.label}`);
+  tooltip.textContent = lines.join('
+');
+  tooltip.style.left = `${event.offsetX}px`;
+  tooltip.style.top = `${event.offsetY}px`;
+  tooltip.style.opacity = 1;
+}
+function renderTreeLayout(nodes, parentLinks, partnerLinks, weightedLinks) {
+  if (simulation) {
+    simulation.stop();
+    simulation = null;
+  }
+  const rootId = state.view.rootId && state.persons[state.view.rootId] ? state.view.rootId : nodes[0]?.id;
+  const childMap = new Map();
+  parentLinks.forEach(rel => {
+    if (!state.persons[rel.source] || !state.persons[rel.target]) return;
+    if (!childMap.has(rel.source)) childMap.set(rel.source, []);
+    childMap.get(rel.source).push(rel.target);
+  });
+  const seen = new Set();
+  function buildNode(id) {
+    if (seen.has(id)) return null;
+    seen.add(id);
+    const children = (childMap.get(id) || []).map(buildNode).filter(Boolean);
+    return { id, children };
+  }
+  const hierarchy = d3.hierarchy(buildNode(rootId) || { id: rootId, children: [] }, d => d.children);
+  const tree = d3.tree().nodeSize([90, 140]);
+  tree(hierarchy);
+  const positions = new Map();
+  hierarchy.descendants().forEach(d => {
+    positions.set(d.data.id, { x: d.x + 480, y: d.y + 60 });
+  });
+  nodes.forEach(node => {
+    const pos = positions.get(node.id) || { x: Math.random() * 960, y: 360 + Math.random() * 120 };
+    node.x = pos.x;
+    node.y = pos.y;
+    if (!positions.has(node.id)) positions.set(node.id, pos);
+  });
+  const nodeMap = new Map(nodes.map(n => [n.id, n]));
+  linkLayer.selectAll('line').data(parentLinks, linkKey)
+    .join(
+      enter => enter.append('line')
+        .attr('stroke', 'var(--link-parent)')
+        .attr('stroke-width', 1.6)
+        .attr('stroke-opacity', 0.85)
+        .attr('marker-end', 'url(#arrowParent)'),
+      update => update,
+      exit => exit.remove()
+    )
+    .attr('x1', d => nodeMap.get(d.source)?.x || 0)
+    .attr('y1', d => nodeMap.get(d.source)?.y || 0)
+    .attr('x2', d => nodeMap.get(d.target)?.x || 0)
+    .attr('y2', d => nodeMap.get(d.target)?.y || 0)
+    .on('mouseenter', (event, d) => showLinkTooltip(event, d))
+    .on('mouseleave', hideTooltip);
+  partnerLayer.selectAll('line').data(partnerLinks, linkKey)
+    .join(
+      enter => enter.append('line')
+        .attr('stroke', 'var(--link-partner)')
+        .attr('stroke-dasharray', '6 4')
+        .attr('stroke-width', 1.6)
+        .attr('stroke-opacity', 0.75),
+      update => update,
+      exit => exit.remove()
+    )
+    .attr('x1', d => nodeMap.get(d.source)?.x || 0)
+    .attr('y1', d => nodeMap.get(d.source)?.y || 0)
+    .attr('x2', d => nodeMap.get(d.target)?.x || 0)
+    .attr('y2', d => nodeMap.get(d.target)?.y || 0);
+  weightedLayer.selectAll('line').data(weightedLinks, linkKey)
+    .join(
+      enter => enter.append('line')
+        .attr('stroke', 'var(--link-weighted)')
+        .attr('stroke-width', d => 1 + (d.weight || 0) / 22)
+        .attr('stroke-opacity', d => 0.4 + (d.weight || 0) / 140),
+      update => update
+        .attr('stroke-width', d => 1 + (d.weight || 0) / 22)
+        .attr('stroke-opacity', d => 0.4 + (d.weight || 0) / 140),
+      exit => exit.remove()
+    )
+    .attr('x1', d => nodeMap.get(d.source)?.x || 0)
+    .attr('y1', d => nodeMap.get(d.source)?.y || 0)
+    .attr('x2', d => nodeMap.get(d.target)?.x || 0)
+    .attr('y2', d => nodeMap.get(d.target)?.y || 0);
+  const nodeSel = nodeLayer.selectAll('path').data(nodes, d => d.id);
+  nodeSel.join(
+    enter => enter.append('path')
+      .attr('d', d3.symbol().type(d => nodeShape(d)).size(1600))
+      .attr('fill', d => nodeColor(d))
+      .attr('fill-opacity', 0.82)
+      .attr('stroke', 'rgba(0,0,0,0.25)')
+      .attr('stroke-width', 1.2),
+    update => update,
+    exit => exit.remove()
+  )
+  .on('mouseenter', (event, d) => showTooltip(event, d))
+  .on('mouseleave', hideTooltip)
+  .on('click', (event, d) => fillPersonForm(state.persons[d.id]));
+  labelLayer.selectAll('text').data(state.view.showLabels ? nodes : [], d => d.id)
+    .join(
+      enter => enter.append('text')
+        .attr('text-anchor', 'middle')
+        .attr('dy', 24)
+        .attr('font-size', 12)
+        .attr('fill', 'var(--text)')
+        .text(d => d.name),
+      update => update.text(d => d.name),
+      exit => exit.remove()
+    )
+    .attr('x', d => d.x)
+    .attr('y', d => d.y);
+}
+function fitToContent() {
+  if (!svgRoot) return;
+  const bbox = svgRoot.node().getBBox();
+  const svgEl = document.getElementById('pedigreeSvg');
+  const width = svgEl.clientWidth;
+  const height = svgEl.clientHeight;
+  const scale = Math.min(width / bbox.width, height / bbox.height) * 0.9;
+  const transform = d3.zoomIdentity
+    .translate(width / 2, height / 2)
+    .scale(scale)
+    .translate(-bbox.x - bbox.width / 2, -bbox.y - bbox.height / 2);
+  svg.call(zoomBehavior.transform, transform);
+}
+
+function updateViewControls() {
+  byId('layoutSelect').value = state.view.layout;
+  byId('rootIdInput').value = state.view.rootId || '';
+  byId('labelToggle').value = state.view.showLabels ? 'on' : 'off';
+  byId('dragToggle').value = state.view.drag ? 'on' : 'off';
+}
+function applyViewSettings() {
+  state.view.layout = byId('layoutSelect').value;
+  state.view.rootId = byId('rootIdInput').value || null;
+  state.view.showLabels = byId('labelToggle').value === 'on';
+  state.view.drag = byId('dragToggle').value === 'on';
+  renderGraph();
+  setDirty('Visning opdateret');
+}
+function downloadJSON(filename, data) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+async function verifyFilePermission(handle, readWrite) {
+  const options = { mode: readWrite ? 'readwrite' : 'read' };
+  if ((await handle.queryPermission(options)) === 'granted') return true;
+  return (await handle.requestPermission(options)) === 'granted';
+}
+async function readFromFile(handle) {
+  if (!(await verifyFilePermission(handle, false))) return null;
+  const file = await handle.getFile();
+  return await file.text();
+}
+async function writeToFile(handle, contents) {
+  if (!(await verifyFilePermission(handle, true))) return;
+  const writable = await handle.createWritable();
+  await writable.write(contents);
+  await writable.close();
+}
+async function chooseFileHandle() {
+  try {
+    const [handle] = await window.showSaveFilePicker({
+      suggestedName: 'SanTA-data.json',
+      types: [{ description: 'SanTA data', accept: { 'application/json': ['.json'] } }]
+    });
+    state.meta.fileHandle = handle;
+    await dbPut(KEY_FILE_HANDLE, handle);
+    updateFileHint();
+    flashStatus('Synkronisering til fil aktiveret', 'success');
+  } catch (err) {
+    if (err?.name !== 'AbortError') {
+      console.error(err);
+      flashStatus('Kunne ikke vælge fil', 'error');
+    }
+  }
+}
+function backupState() {
+  const snapshot = serializeState();
+  snapshot.users = users;
+  downloadJSON(`santa-backup-${Date.now()}.json`, snapshot);
+}
+function restoreFromFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const obj = JSON.parse(reader.result);
+      hydrateState(obj);
+      if (Array.isArray(obj.users)) users = obj.users;
+      updateUserUI();
+      setDirty('Data gendannet fra fil');
+      flashStatus('Backup indlæst', 'success');
+    } catch (err) {
+      console.error(err);
+      flashStatus('Kunne ikke gendanne fra fil', 'error');
+    }
+  };
+  reader.readAsText(file);
+}
+function exportSVGtoPNG() {
+  const svgElement = document.getElementById('pedigreeSvg');
+  const cloned = svgElement.cloneNode(true);
+  cloned.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  const serializer = new XMLSerializer();
+  const source = serializer.serializeToString(cloned);
+  const image = new Image();
+  const svgBlob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(svgBlob);
+  image.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = svgElement.clientWidth;
+    canvas.height = svgElement.clientHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--bg');
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(blob => {
+      if (!blob) return;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'pedigree.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    });
+    URL.revokeObjectURL(url);
+  };
+  image.onerror = () => {
+    URL.revokeObjectURL(url);
+    flashStatus('Kunne ikke eksportere PNG', 'error');
+  };
+  image.src = url;
+}
+function toggleTheme() {
+  const current = document.body.dataset.theme;
+  const next = current === 'dark' ? '' : 'dark';
+  if (next) document.body.dataset.theme = next; else delete document.body.dataset.theme;
+}
+function activateView(view) {
+  document.querySelectorAll('.view').forEach(section => {
+    section.dataset.active = section.dataset.view === view ? 'true' : 'false';
+  });
+  document.querySelectorAll('[data-view-target]').forEach(btn => {
+    btn.dataset.active = btn.dataset.viewTarget === view ? 'true' : 'false';
+  });
+}
+
+function renderAll() {
+  renderPersonsAndRelations();
+  updateViewControls();
+  updateFileHint();
+  updateLoginState();
+  renderLogTable();
+  updateOverviewMeta();
+}
+function registerEvents() {
+  byId('themeToggle').addEventListener('click', () => toggleTheme());
+  byId('saveNowBtn').addEventListener('click', () => saveAll(true));
+  byId('loadNowBtn').addEventListener('click', async () => { await loadAll(); flashStatus('Data genindlæst', 'success'); renderAll(); });
+  byId('fitViewBtn').addEventListener('click', fitToContent);
+  byId('exportPngBtn').addEventListener('click', exportSVGtoPNG);
+  byId('personForm').addEventListener('submit', handlePersonSubmit);
+  byId('personDeleteBtn').addEventListener('click', handlePersonDelete);
+  byId('personClearBtn').addEventListener('click', clearPersonForm);
+  byId('parentForm').addEventListener('submit', handleParentSubmit);
+  byId('partnerForm').addEventListener('submit', handlePartnerSubmit);
+  byId('weightedForm').addEventListener('submit', handleWeightedSubmit);
+  byId('userForm').addEventListener('submit', handleUserSubmit);
+  byId('userDeleteBtn').addEventListener('click', handleUserDelete);
+  byId('userClearBtn').addEventListener('click', clearUserForm);
+  byId('loginBtn').addEventListener('click', handleLogin);
+  byId('logoutBtn').addEventListener('click', handleLogout);
+  byId('applyViewBtn').addEventListener('click', applyViewSettings);
+  byId('chooseFileBtn').addEventListener('click', chooseFileHandle);
+  byId('backupBtn').addEventListener('click', backupState);
+  byId('restoreInput').addEventListener('change', evt => {
+    const file = evt.target.files?.[0];
+    if (file) restoreFromFile(file);
+    evt.target.value = '';
+  });
+  document.getElementById('menuButtons').querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => activateView(btn.dataset.viewTarget));
+  });
+  window.addEventListener('keydown', evt => {
+    if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === 's') {
+      evt.preventDefault();
+      saveAll(true);
+    }
+  });
+}
+function init() {
+  registerEvents();
+  initGraph();
+  openDb().then(database => {
+    db = database;
+    return initPersistence();
+  }).catch(err => {
+    console.error('IndexedDB utilgængelig', err);
+    flashStatus('IndexedDB utilgængelig – sessionen gemmes ikke.', 'error');
+    renderAll();
+  });
+}
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('data:application/javascript,').catch(() => {});
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+</script>
+</body>
+</html>
