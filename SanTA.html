@@ -12,25 +12,19 @@
 :root {
   font-family: "Inter", "Segoe UI", system-ui, sans-serif;
   color-scheme: light;
-  --bg: #f5f7fb;
+  --bg: #f4f6fb;
+  --bg-alt: #e9eff8;
   --text: #162941;
-  --muted-text: #4a5973;
+  --muted: #4a5973;
   --panel-bg: #ffffff;
   --panel-border: #c7d2e3;
-  --shadow: 0 6px 18px rgba(18, 76, 135, 0.12);
+  --shadow: 0 4px 16px rgba(12, 53, 96, 0.12);
   --accent: #1766af;
   --accent-strong: #114b86;
-  --accent-soft: rgba(23, 102, 175, 0.1);
+  --accent-soft: rgba(23, 102, 175, 0.12);
   --danger: #c0392b;
   --success: #1d9a6c;
-  --nav-bg: rgba(255, 255, 255, 0.88);
-  --nav-border: rgba(24, 61, 120, 0.2);
-  --badge-bg: rgba(23, 102, 175, 0.14);
-  --badge-text: #114b86;
-  --input-bg: #ffffff;
-  --input-border: #c3cde0;
-  --input-focus: rgba(23, 102, 175, 0.35);
-  --table-header-bg: #ecf2fb;
+  --outline: rgba(23, 102, 175, 0.35);
   --link-parent: #2c5282;
   --link-partner: #805ad5;
   --link-weighted: #dd6b20;
@@ -41,24 +35,18 @@
 [data-theme="dark"] {
   color-scheme: dark;
   --bg: #0f172a;
+  --bg-alt: #16233c;
   --text: #e2e8f0;
-  --muted-text: #94a3b8;
+  --muted: #94a3b8;
   --panel-bg: #1e293b;
   --panel-border: #334155;
-  --shadow: 0 8px 22px rgba(8, 37, 68, 0.5);
+  --shadow: 0 8px 22px rgba(6, 27, 46, 0.55);
   --accent: #38bdf8;
   --accent-strong: #0ea5e9;
-  --accent-soft: rgba(56, 189, 248, 0.16);
+  --accent-soft: rgba(56, 189, 248, 0.18);
   --danger: #f87171;
   --success: #34d399;
-  --nav-bg: rgba(15, 23, 42, 0.9);
-  --nav-border: rgba(148, 163, 184, 0.25);
-  --badge-bg: rgba(56, 189, 248, 0.18);
-  --badge-text: #bae6fd;
-  --input-bg: #0f172a;
-  --input-border: #334155;
-  --input-focus: rgba(14, 165, 233, 0.45);
-  --table-header-bg: #1f2937;
+  --outline: rgba(56, 189, 248, 0.45);
   --link-parent: #60a5fa;
   --link-partner: #c084fc;
   --link-weighted: #fb923c;
@@ -70,632 +58,731 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: radial-gradient(circle at top, rgba(24, 111, 175, 0.12), transparent 55%), var(--bg);
+  background: linear-gradient(180deg, rgba(17, 76, 135, 0.08), transparent 35%), var(--bg);
   color: var(--text);
   transition: background 0.25s ease, color 0.25s ease;
 }
-header {
-  padding: 1.8rem 2.4rem 1.5rem;
-  background: linear-gradient(135deg, rgba(18, 76, 135, 0.92), rgba(23, 102, 175, 0.94)), var(--accent);
-  color: #ffffff;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1.2rem;
-  align-items: start;
-}
-header h1 {
-  margin: 0;
-  font-size: clamp(1.8rem, 2vw + 1rem, 2.5rem);
-  letter-spacing: -0.015em;
-}
-header p {
-  margin: 0;
-  max-width: 780px;
-  line-height: 1.6;
-}
-header .badge {
-  justify-self: start;
-  padding: 0.35rem 0.8rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(6px);
-}
-.global-nav {
+.app-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-  padding: 0.9rem 2.4rem;
-  border-bottom: 1px solid var(--nav-border);
-  background: var(--nav-bg);
-  position: sticky;
-  top: 0;
-  backdrop-filter: blur(12px);
-  z-index: 20;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.6rem 2.4rem;
+  background: linear-gradient(120deg, rgba(17, 76, 135, 0.9), rgba(23, 102, 175, 0.92));
+  color: #ffffff;
 }
-.nav-group {
+.app-header h1 {
+  margin: 0;
+  font-size: clamp(1.8rem, 2vw + 1rem, 2.4rem);
+  letter-spacing: -0.01em;
+}
+.app-header p {
+  margin: 0.25rem 0 0;
+  max-width: 620px;
+  line-height: 1.5;
+  font-weight: 500;
+}
+.app-shell {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  min-height: calc(100vh - 120px);
+}
+.side-nav {
+  background: var(--panel-bg);
+  border-right: 1px solid var(--panel-border);
+  padding: 1.4rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.8rem;
+  box-shadow: inset -1px 0 0 rgba(15, 37, 64, 0.05);
+}
+.side-nav .brand {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.side-nav .brand span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+#menuButtons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+#menuButtons button {
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 0.65rem 0.9rem;
+  text-align: left;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  cursor: pointer;
+}
+#menuButtons button[data-active="true"] {
+  background: var(--accent-soft);
+  border-color: rgba(17, 75, 134, 0.4);
+  color: var(--accent-strong);
+  box-shadow: inset 0 0 0 1px rgba(17, 75, 134, 0.08);
+}
+.side-tools {
+  display: grid;
+  gap: 0.6rem;
+}
+.side-tools button {
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.side-tools button:hover,
+#menuButtons button:hover {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+.side-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+main {
+  padding: 2rem 2.6rem 3.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+.quick-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
-  align-items: center;
 }
-.nav-group button, .status-pill {
-  border: none;
+.quick-actions button,
+.quick-actions span {
   border-radius: 999px;
-  padding: 0.55rem 1.1rem;
-  background: var(--accent-soft);
-  color: var(--accent-strong);
+  padding: 0.55rem 1.05rem;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  color: var(--text);
   font-weight: 600;
+}
+.quick-actions button {
   cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
-.nav-group button[data-active="true"] {
-  background: var(--accent-strong);
-  color: #ffffff;
-  box-shadow: 0 8px 20px rgba(17, 75, 134, 0.24);
-}
-.status-pill {
-  background: rgba(0, 0, 0, 0.06);
-  color: var(--muted-text);
-  cursor: default;
-}
-main {
-  padding: 2rem 2.4rem 3.5rem;
+.quick-actions button:hover {
+  border-color: var(--accent);
+  color: var(--accent-strong);
 }
 .view {
   display: none;
-  gap: 1.5rem;
+  gap: 1.6rem;
 }
 .view[data-active="true"] {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  align-items: start;
 }
 .view[data-layout="single"][data-active="true"] {
   grid-template-columns: minmax(0, 1fr);
 }
 section {
   background: var(--panel-bg);
-  border-radius: 1rem;
   border: 1px solid var(--panel-border);
+  border-radius: 18px;
+  padding: 1.6rem;
   box-shadow: var(--shadow);
-  padding: 1.25rem 1.35rem;
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
+  gap: 1rem;
 }
 section header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 0.6rem;
-  color: inherit;
+  align-items: center;
+  gap: 0.75rem;
 }
 section header h2 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.2rem;
+}
+section header button.ghost {
+  border: 1px solid var(--panel-border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 0.35rem 0.7rem;
+  cursor: pointer;
+}
+section header button.ghost:hover {
+  color: var(--accent-strong);
+  border-color: var(--accent);
 }
 .panel-hint {
   margin: 0;
-  font-size: 0.9rem;
+  color: var(--muted);
+  font-size: 0.95rem;
   line-height: 1.5;
-  color: var(--muted-text);
-}
-.panel-hint.warning { color: var(--danger); }
-.panel-hint.success { color: var(--success); }
-.control-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 0.75rem;
 }
 .metric-deck {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 1rem;
 }
 .metric {
-  background: var(--accent-soft);
-  border-radius: 0.75rem;
-  padding: 0.9rem;
-  border: 1px solid var(--panel-border);
+  background: var(--bg-alt);
+  border-radius: 14px;
+  padding: 1rem 1.2rem;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
 }
 .metric strong {
-  font-size: 1.4rem;
-  color: var(--accent-strong);
-}
-.metric span {
-  color: var(--muted-text);
-  font-size: 0.85rem;
+  font-size: 1.6rem;
 }
 .metric small {
-  color: var(--muted-text);
-  font-size: 0.75rem;
+  color: var(--muted);
 }
-.tag-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
+.control-grid {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
-.tag {
-  padding: 0.25rem 0.6rem;
-  border-radius: 999px;
-  background: var(--badge-bg);
-  color: var(--badge-text);
-  font-size: 0.75rem;
+label {
   font-weight: 600;
-}
-.insight-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+  color: var(--muted);
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
-}
-.insight-list li {
-  padding: 0.6rem 0.75rem;
-  border-radius: 0.7rem;
-  background: rgba(17, 75, 134, 0.08);
-  border: 1px solid rgba(17, 75, 134, 0.08);
-}
-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--muted-text);
+  gap: 0.4rem;
 }
 input, select, textarea {
+  border-radius: 10px;
+  border: 1px solid var(--panel-border);
+  padding: 0.55rem 0.7rem;
+  background: var(--panel-bg);
+  color: var(--text);
   font: inherit;
-  padding: 0.55rem 0.65rem;
-  border-radius: 0.6rem;
-  border: 1px solid var(--input-border);
-  background: var(--input-bg);
-  color: inherit;
-  transition: border 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 input:focus, select:focus, textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--outline);
   outline: none;
-  border-color: var(--accent-strong);
-  box-shadow: 0 0 0 3px var(--input-focus);
 }
-textarea { resize: vertical; min-height: 3.6rem; }
+textarea {
+  min-height: 120px;
+  resize: vertical;
+}
 button {
   font: inherit;
-  padding: 0.55rem 1rem;
-  border-radius: 0.65rem;
+}
+button[type="submit"],
+button:not(.ghost) {
+  border-radius: 10px;
   border: none;
-  cursor: pointer;
   background: var(--accent);
   color: #ffffff;
+  padding: 0.6rem 1.2rem;
   font-weight: 600;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
-button:hover {
+button[type="submit"]:hover,
+button:not(.ghost):hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(17, 75, 134, 0.28);
+  box-shadow: 0 8px 18px rgba(17, 76, 135, 0.25);
 }
-button.danger { background: var(--danger); }
-button.secondary {
-  background: rgba(17, 75, 134, 0.12);
-  color: var(--accent-strong);
+button.danger {
+  background: var(--danger);
 }
 button.ghost {
   background: transparent;
-  color: var(--muted-text);
   border: 1px solid var(--panel-border);
+  color: var(--muted);
 }
 .table-wrapper {
+  border-radius: 12px;
+  overflow: hidden;
   border: 1px solid var(--panel-border);
-  border-radius: 0.75rem;
-  overflow: auto;
 }
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 280px;
+  font-size: 0.95rem;
 }
 thead {
-  background: var(--table-header-bg);
+  background: var(--bg-alt);
 }
 th, td {
-  text-align: left;
-  padding: 0.55rem 0.75rem;
-  font-size: 0.88rem;
+  padding: 0.65rem 0.75rem;
   border-bottom: 1px solid var(--panel-border);
+  text-align: left;
 }
-tbody tr:last-child td { border-bottom: none; }
-tbody tr:hover { background: rgba(17, 75, 134, 0.08); }
-#pedigreeCanvas {
-  position: relative;
-  border: 1px solid var(--panel-border);
-  border-radius: 0.9rem;
-  overflow: hidden;
-  background: radial-gradient(circle at top, rgba(17, 75, 134, 0.1), transparent 60%), var(--panel-bg);
+ul.insight-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
 }
-#pedigreeCanvas svg {
-  display: block;
-  width: 100%;
-  height: 520px;
-  touch-action: none;
+ul.insight-list li {
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  background: var(--bg-alt);
+  color: var(--text);
 }
-.tooltip {
-  position: absolute;
-  pointer-events: none;
-  padding: 0.45rem 0.65rem;
-  background: rgba(15, 23, 42, 0.92);
-  color: #ffffff;
-  border-radius: 0.5rem;
-  font-size: 0.8rem;
-  line-height: 1.45;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.35);
-  transform: translate(-50%, -110%);
-  opacity: 0;
-  transition: opacity 0.15s ease;
-  z-index: 50;
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
-#statusBar {
-  position: fixed;
-  bottom: 1.2rem;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(15, 23, 42, 0.88);
-  color: #ffffff;
-  padding: 0.6rem 1.2rem;
+.tag {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  padding: 0.3rem 0.7rem;
   border-radius: 999px;
   font-size: 0.85rem;
-  display: none;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.35);
-  z-index: 60;
 }
-@media (max-width: 1024px) {
-  .view[data-active="true"] {
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+#pedigreeCanvas {
+  position: relative;
+  border-radius: 16px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  overflow: hidden;
+}
+#pedigreeCanvas svg {
+  width: 100%;
+  height: 560px;
+}
+#pedigreeTooltip {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(15, 23, 42, 0.88);
+  color: #ffffff;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  line-height: 1.3;
+  display: none;
+  max-width: 240px;
+  z-index: 10;
+}
+.status-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 32px;
+  transform: translateX(-50%);
+  padding: 0.6rem 1.1rem;
+  border-radius: 999px;
+  color: #ffffff;
+  background: rgba(15, 23, 42, 0.9);
+  display: none;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 600;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.35);
+}
+.tooltip strong {
+  font-weight: 700;
+}
+.relation-forms {
+  display: grid;
+  gap: 1.2rem;
+}
+.relation-forms form {
+  display: grid;
+  gap: 0.8rem;
+}
+.relation-forms .form-row {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+.view-toolbar {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+@media (max-width: 960px) {
+  .app-shell {
+    grid-template-columns: minmax(0, 1fr);
   }
-  #pedigreeCanvas svg { height: 420px; }
+  .side-nav {
+    flex-direction: row;
+    gap: 1rem;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--panel-border);
+  }
+  .side-nav .brand { display: none; }
+  #menuButtons { flex-direction: row; }
+  #menuButtons button { text-align: center; }
+  .side-tools, .side-status { display: none; }
 }
 @media (max-width: 720px) {
-  header { padding: 1.6rem; }
-  .global-nav { padding: 0.8rem 1.2rem; }
   main { padding: 1.6rem; }
+  .app-header { padding: 1.4rem; flex-direction: column; align-items: flex-start; }
+  .app-header p { max-width: none; }
+  .quick-actions { gap: 0.5rem; }
+  .view[data-active="true"] { grid-template-columns: minmax(0, 1fr); }
+  #pedigreeCanvas svg { height: 420px; }
 }
 </style>
 </head>
 <body>
-<header>
+<header class="app-header">
   <div>
     <h1>SanTA</h1>
     <p>SanTA (Social and Network Tracking &amp; Analysis) samler relationel intelligens på tværs af familier, teams og fællesskaber. Administrér personer, kobl vægtede relationer og visualisér pedigree-strukturer – alt bundet sammen af fælles data.</p>
   </div>
-  <div class="badge">Version 1.0 · Relationelt overblik</div>
 </header>
-<nav class="global-nav">
-  <div class="nav-group" id="menuButtons">
-    <button type="button" data-view-target="overview" data-active="true">Overblik</button>
-    <button type="button" data-view-target="persons">Personer &amp; relationer</button>
-    <button type="button" data-view-target="interactions">Interaktioner</button>
-    <button type="button" data-view-target="analytics">Analyse</button>
-    <button type="button" data-view-target="pedigree">Pedigree-funktionalitet</button>
-    <button type="button" data-view-target="admin">Administration</button>
-  </div>
-  <div class="nav-group">
-    <button id="themeToggle" type="button" aria-pressed="false">🌗 Tema</button>
-    <button id="saveNowBtn" type="button">💾 Gem nu</button>
-    <button id="loadNowBtn" type="button">📂 Hent</button>
-    <button id="fitViewBtn" type="button">🗺️ Fit view</button>
-    <button id="exportPngBtn" type="button">🖼️ Export PNG</button>
-    <span class="status-pill" id="dirtyIndicator">Gemmes automatisk…</span>
-  </div>
-</nav>
-<main id="views">
-  <div class="view" data-view="overview" data-active="true">
-    <section>
-      <header><h2>Relationelt snapshot</h2></header>
-      <p class="panel-hint">Få et hurtigt blik på hvor mange personer og relationer der er registreret, hvilke netværksklynger der eksisterer og hvordan vægtede forbindelser fordeler sig.</p>
-      <div class="metric-deck">
-        <div class="metric">
-          <span>Personer</span>
-          <strong id="overviewPersons">0</strong>
-          <small id="overviewComponents">Netværksklynger: 0</small>
+<div class="app-shell">
+  <aside class="side-nav">
+    <div class="brand">
+      <strong>Dashboard</strong>
+      <span>Vælg sektion</span>
+    </div>
+    <nav id="menuButtons" aria-label="Hovedmenu">
+      <button type="button" data-view-target="overview" data-active="true">Overblik</button>
+      <button type="button" data-view-target="persons">Personer &amp; relationer</button>
+      <button type="button" data-view-target="interactions">Interaktioner</button>
+      <button type="button" data-view-target="analytics">Analyse</button>
+      <button type="button" data-view-target="pedigree">Pedigree</button>
+      <button type="button" data-view-target="admin">Administration</button>
+    </nav>
+    <div class="side-tools">
+      <button id="themeToggle" type="button">Skift tema</button>
+      <button id="fitViewBtn" type="button">Tilpas visning</button>
+      <button id="exportPngBtn" type="button">Eksportér PNG</button>
+    </div>
+    <div class="side-status">
+      <span id="dirtyIndicator">Gemmes automatisk…</span>
+    </div>
+  </aside>
+  <main>
+    <div class="quick-actions">
+      <button id="saveNowBtn" type="button">Gem nu</button>
+      <button id="loadNowBtn" type="button">Indlæs</button>
+    </div>
+    <div class="view" data-view="overview" data-active="true">
+      <section>
+        <header><h2>Relationelt snapshot</h2></header>
+        <p class="panel-hint">Få et hurtigt blik på hvor mange personer og relationer der er registreret, hvilke netværksklynger der eksisterer og hvordan vægtede forbindelser fordeler sig.</p>
+        <div class="metric-deck">
+          <div class="metric">
+            <span>Personer</span>
+            <strong id="overviewPersons">0</strong>
+            <small id="overviewComponents">Netværksklynger: 0</small>
+          </div>
+          <div class="metric">
+            <span>Relationer</span>
+            <strong id="overviewRelations">0</strong>
+            <small id="overviewRelationSplit">Parent / Partner / Vægtede</small>
+          </div>
+          <div class="metric">
+            <span>Gns. vægt</span>
+            <strong id="overviewAvgWeight">0.0</strong>
+            <small id="overviewWeightSpread">0</small>
+          </div>
+          <div class="metric">
+            <span>Aktive brugere</span>
+            <strong id="overviewActiveUser">Ingen</strong>
+            <small id="overviewLastSaved">-</small>
+          </div>
         </div>
-        <div class="metric">
-          <span>Relationer</span>
-          <strong id="overviewRelations">0</strong>
-          <small id="overviewRelationSplit">Parent / Partner / Vægtede</small>
-        </div>
-        <div class="metric">
-          <span>Gns. vægt</span>
-          <strong id="overviewAvgWeight">0.0</strong>
-          <small id="overviewWeightSpread">0</small>
-        </div>
-        <div class="metric">
-          <span>Aktive brugere</span>
-          <strong id="overviewActiveUser">Ingen</strong>
-          <small id="overviewLastSaved">-</small>
-        </div>
-      </div>
-    </section>
-    <section>
-      <header><h2>Centrale aktører</h2></header>
-      <p class="panel-hint">Identificerer personer med flest forbindelser og højeste samlede vægt, så teams kan fokusere på nøglepersoner.</p>
-      <ul class="insight-list" id="overviewConnectorList"></ul>
-    </section>
-    <section>
-      <header><h2>Seneste hændelser</h2></header>
-      <p class="panel-hint">Handlinger der er udført på dataene. Loggen opdateres automatisk når relationer ændres.</p>
-      <ul class="insight-list" id="recentLogList"></ul>
-    </section>
-  </div>
-  <div class="view" data-view="persons">
-    <section id="personPanel">
-      <header>
-        <h2>Personer</h2>
-        <button class="ghost" type="button" id="personClearBtn">Ryd formular</button>
-      </header>
-      <form id="personForm" autocomplete="off">
-        <div class="control-grid">
-          <label>ID
-            <input id="personId" name="id" placeholder="auto hvis tom">
+      </section>
+      <section>
+        <header><h2>Centrale aktører</h2></header>
+        <p class="panel-hint">Identificerer personer med flest forbindelser og højeste samlede vægt, så teams kan fokusere på nøglepersoner.</p>
+        <ul class="insight-list" id="overviewConnectorList"></ul>
+      </section>
+      <section>
+        <header><h2>Seneste hændelser</h2></header>
+        <p class="panel-hint">Handlinger der er udført på dataene. Loggen opdateres automatisk når relationer ændres.</p>
+        <ul class="insight-list" id="recentLogList"></ul>
+      </section>
+    </div>
+    <div class="view" data-view="persons">
+      <section id="personPanel">
+        <header>
+          <h2>Personer</h2>
+          <button class="ghost" type="button" id="personClearBtn">Ryd formular</button>
+        </header>
+        <form id="personForm" autocomplete="off">
+          <div class="control-grid">
+            <label>ID
+              <input id="personId" name="id" placeholder="auto hvis tom">
+            </label>
+            <label>Navn
+              <input id="personName" name="name" required>
+            </label>
+            <label>Køn
+              <select id="personSex" name="sex" required>
+                <option value="M">Mand</option>
+                <option value="F">Kvinde</option>
+                <option value="U">Ukendt</option>
+              </select>
+            </label>
+            <label>Fødselsår
+              <input id="personBirth" name="birth" type="number" min="1800" max="2100">
+            </label>
+            <label>Dødsår
+              <input id="personDeath" name="death" type="number" min="1800" max="2100">
+            </label>
+          </div>
+          <label>Noter
+            <textarea id="personNotes" name="notes" placeholder="Baggrund, relationer, funktion, observationer…"></textarea>
           </label>
-          <label>Navn
-            <input id="personName" name="name" required>
-          </label>
-          <label>Køn
-            <select id="personSex" name="sex" required>
-              <option value="M">Mand</option>
-              <option value="F">Kvinde</option>
-              <option value="U">Ukendt</option>
+          <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+            <button type="submit" id="personSubmitBtn">Tilføj / opdater</button>
+            <button type="button" class="danger" id="personDeleteBtn">Slet</button>
+          </div>
+        </form>
+        <div class="table-wrapper">
+          <table aria-label="Personer">
+            <thead>
+              <tr><th>ID</th><th>Navn</th><th>Køn</th><th>Født–Død</th></tr>
+            </thead>
+            <tbody id="personTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+      <section>
+        <header><h2>Biologiske relationer</h2></header>
+        <p class="panel-hint">Tilføj parent→child og partnerrelationer. Systemet forhindrer dubletter.</p>
+        <div class="relation-forms">
+          <form id="parentForm">
+            <div class="form-row">
+              <label>Forælder
+                <select id="parentParent"></select>
+              </label>
+              <label>Barn
+                <select id="parentChild"></select>
+              </label>
+            </div>
+            <button type="submit">Tilføj parent→barn</button>
+          </form>
+          <form id="partnerForm">
+            <div class="form-row">
+              <label>Partner A
+                <select id="partnerA"></select>
+              </label>
+              <label>Partner B
+                <select id="partnerB"></select>
+              </label>
+            </div>
+            <button type="submit">Tilføj partnerrelation</button>
+          </form>
+        </div>
+        <div class="table-wrapper">
+          <table aria-label="Biologiske relationer">
+            <thead><tr><th>Type</th><th>Beskrivelse</th><th></th></tr></thead>
+            <tbody id="relationTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+      <section>
+        <header><h2>Vægtede relationer</h2></header>
+        <p class="panel-hint">Registrer relationer med vægtning 0–100 og valgfri etiket for at beskrive relationens karakter.</p>
+        <form id="weightedForm" class="relation-forms">
+          <div class="form-row">
+            <label>Person A
+              <select id="weightedA"></select>
+            </label>
+            <label>Person B
+              <select id="weightedB"></select>
+            </label>
+            <label>Vægt (0–100)
+              <input id="weightedWeight" type="number" min="0" max="100" value="50">
+            </label>
+            <label>Etiket
+              <input id="weightedLabel" type="text" placeholder="Relationstype eller note">
+            </label>
+          </div>
+          <button type="submit">Tilføj vægtet relation</button>
+        </form>
+        <div class="table-wrapper">
+          <table aria-label="Vægtede relationer">
+            <thead><tr><th>Relation</th><th>Vægt</th><th>Label</th><th></th></tr></thead>
+            <tbody id="weightedTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+    <div class="view" data-view="interactions">
+      <section>
+        <header><h2>Interaktionsoverblik</h2></header>
+        <p class="panel-hint">Opsummerer kombinationen af biologiske og vægtede relationer for at identificere netværksmønstre.</p>
+        <div class="table-wrapper">
+          <table aria-label="Interaktionssammendrag">
+            <thead><tr><th>Beskrivelse</th><th>Detaljer</th></tr></thead>
+            <tbody id="interactionSummaryBody"></tbody>
+          </table>
+        </div>
+      </section>
+      <section>
+        <header><h2>Vægtede højdepunkter</h2></header>
+        <p class="panel-hint">De stærkeste vægtede relationer med noter. Brug til koordinering af vigtige interaktioner.</p>
+        <ul class="insight-list" id="topWeightedList"></ul>
+      </section>
+    </div>
+    <div class="view" data-view="analytics">
+      <section id="viewPanel">
+        <header><h2>Analyse &amp; opsummering</h2></header>
+        <div id="metricsSummary" class="control-grid"></div>
+        <div class="table-wrapper">
+          <table aria-label="Relationstællinger">
+            <thead><tr><th>Relationstype</th><th>Antal</th></tr></thead>
+            <tbody id="countsTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+      <section>
+        <header><h2>Netværksklynger</h2></header>
+        <p class="panel-hint">Komponenter er afledt af alle relationstyper og hjælper med at identificere isolerede netværk.</p>
+        <div class="table-wrapper">
+          <table aria-label="Klynger">
+            <thead><tr><th>#</th><th>Størrelse</th><th>Personer</th></tr></thead>
+            <tbody id="componentTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+      <section>
+        <header><h2>Netværksindsigter</h2></header>
+        <p class="panel-hint">Viser personer der forbinder klynger, samt relationstyper der kan kræve opmærksomhed.</p>
+        <ul class="insight-list" id="analyticsInsightList"></ul>
+      </section>
+    </div>
+    <div class="view" data-view="pedigree" data-layout="single">
+      <section id="pedigreePanel">
+        <header>
+          <h2>Interaktiv pedigree-visualisering</h2>
+          <div class="tag-list">
+            <span class="tag">Force &amp; Tree</span>
+            <span class="tag">Zoom &amp; Pan</span>
+            <span class="tag">Vægtede forbindelser</span>
+          </div>
+        </header>
+        <p class="panel-hint">Træk i elementer (når tilladt), zoom med musens hjul og klik på noder for at redigere stamdata. Layout, labels og drag kan tilpasses nedenfor.</p>
+        <div class="view-toolbar">
+          <label>Layout
+            <select id="layoutSelect">
+              <option value="force">Force</option>
+              <option value="tree">Tree</option>
             </select>
           </label>
-          <label>Fødselsår
-            <input id="personBirth" name="birth" type="number" min="1800" max="2100">
+          <label>Root ID (tree)
+            <input id="rootIdInput" type="text" placeholder="person-id for rod">
           </label>
-          <label>Dødsår
-            <input id="personDeath" name="death" type="number" min="1800" max="2100">
-          </label>
-        </div>
-        <label>Noter
-          <textarea id="personNotes" name="notes" placeholder="Baggrund, relationer, funktion, observationer…"></textarea>
-        </label>
-        <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
-          <button type="submit" id="personSubmitBtn">Tilføj / opdater</button>
-          <button type="button" class="danger" id="personDeleteBtn">Slet</button>
-        </div>
-      </form>
-      <div class="table-wrapper">
-        <table aria-label="Personer">
-          <thead>
-            <tr><th>ID</th><th>Navn</th><th>Køn</th><th>Født–Død</th></tr>
-          </thead>
-          <tbody id="personTableBody"></tbody>
-        </table>
-      </div>
-    </section>
-    <section id="relationPanel">
-      <header><h2>Biologiske relationer</h2></header>
-      <form id="parentForm" class="control-grid">
-        <label>Forælder
-          <select id="parentParent"></select>
-        </label>
-        <label>Barn
-          <select id="parentChild"></select>
-        </label>
-        <button type="submit">Tilføj parent → barn</button>
-      </form>
-      <form id="partnerForm" class="control-grid">
-        <label>Partner A
-          <select id="partnerA"></select>
-        </label>
-        <label>Partner B
-          <select id="partnerB"></select>
-        </label>
-        <button type="submit">Tilføj partnerskab</button>
-      </form>
-      <div class="table-wrapper">
-        <table aria-label="Relationer">
-          <thead><tr><th>Type</th><th>Beskrivelse</th><th></th></tr></thead>
-          <tbody id="relationTableBody"></tbody>
-        </table>
-      </div>
-    </section>
-    <section id="weightedPanel">
-      <header><h2>Vægtede relationer</h2></header>
-      <form id="weightedForm" class="control-grid">
-        <label>Person A
-          <select id="weightedA"></select>
-        </label>
-        <label>Person B
-          <select id="weightedB"></select>
-        </label>
-        <label>Vægt (0–100)
-          <input id="weightedWeight" type="number" min="0" max="100" value="50">
-        </label>
-        <label>Label
-          <input id="weightedLabel" placeholder="Beskrivelse eller kontekst">
-        </label>
-        <button type="submit">Tilføj / opdater vægtning</button>
-      </form>
-      <div class="table-wrapper">
-        <table aria-label="Vægtede relationer">
-          <thead><tr><th>Personer</th><th>Vægt</th><th>Label</th><th></th></tr></thead>
-          <tbody id="weightedTableBody"></tbody>
-        </table>
-      </div>
-    </section>
-  </div>
-  <div class="view" data-view="interactions">
-    <section>
-      <header><h2>Relationsoverblik pr. person</h2></header>
-      <p class="panel-hint">Opsummerer hver persons relationer på tværs af parentestrukturer, partnerskaber og vægtede forbindelser.</p>
-      <div class="table-wrapper">
-        <table aria-label="Relationsoverblik">
-          <thead><tr><th>Person</th><th>Parent-links</th><th>Partner-links</th><th>Vægtede links</th><th>Samlet vægt</th></tr></thead>
-          <tbody id="interactionSummaryBody"></tbody>
-        </table>
-      </div>
-    </section>
-    <section>
-      <header><h2>Vægtede højdepunkter</h2></header>
-      <p class="panel-hint">De stærkeste vægtede relationer med noter. Brug til koordinering af vigtige interaktioner.</p>
-      <ul class="insight-list" id="topWeightedList"></ul>
-    </section>
-  </div>
-  <div class="view" data-view="analytics">
-    <section id="viewPanel">
-      <header><h2>Analyse &amp; opsummering</h2></header>
-      <div id="metricsSummary" class="control-grid"></div>
-      <div class="table-wrapper">
-        <table aria-label="Relationstællinger">
-          <thead><tr><th>Relationstype</th><th>Antal</th></tr></thead>
-          <tbody id="countsTableBody"></tbody>
-        </table>
-      </div>
-    </section>
-    <section>
-      <header><h2>Netværksklynger</h2></header>
-      <p class="panel-hint">Komponenter er afledt af alle relationstyper og hjælper med at identificere isolerede netværk.</p>
-      <div class="table-wrapper">
-        <table aria-label="Klynger">
-          <thead><tr><th>#</th><th>Størrelse</th><th>Personer</th></tr></thead>
-          <tbody id="componentTableBody"></tbody>
-        </table>
-      </div>
-    </section>
-    <section>
-      <header><h2>Netværksindsigter</h2></header>
-      <p class="panel-hint">Viser personer der forbinder klynger, samt relationstyper der kan kræve opmærksomhed.</p>
-      <ul class="insight-list" id="analyticsInsightList"></ul>
-    </section>
-  </div>
-  <div class="view" data-view="pedigree" data-layout="single">
-    <section id="pedigreePanel">
-      <header>
-        <h2>Interaktiv pedigree-visualisering</h2>
-        <div class="tag-list">
-          <span class="tag">Force &amp; Tree</span>
-          <span class="tag">Zoom &amp; Pan</span>
-          <span class="tag">Vægtede forbindelser</span>
-        </div>
-      </header>
-      <p class="panel-hint">Træk i elementer (når tilladt), zoom med musens hjul og klik på noder for at redigere stamdata. Layout, labels og drag kan tilpasses nedenfor.</p>
-      <div class="control-grid">
-        <label>Layout
-          <select id="layoutSelect">
-            <option value="force">Force</option>
-            <option value="tree">Tree</option>
-          </select>
-        </label>
-        <label>Root ID (tree)
-          <input id="rootIdInput" type="text" placeholder="person-id for rod">
-        </label>
-        <label>Vis labels
-          <select id="labelToggle">
-            <option value="on">Ja</option>
-            <option value="off">Nej</option>
-          </select>
-        </label>
-        <label>Træk noder
-          <select id="dragToggle">
-            <option value="on">Ja</option>
-            <option value="off">Nej</option>
-          </select>
-        </label>
-        <button id="applyViewBtn" type="button">Opdater visning</button>
-      </div>
-      <div id="pedigreeCanvas">
-        <svg id="pedigreeSvg" viewBox="0 0 960 540" preserveAspectRatio="xMidYMid meet">
-          <defs>
-            <marker id="arrowParent" viewBox="0 -5 10 10" refX="18" refY="0" markerWidth="6" markerHeight="6" orient="auto">
-              <path d="M0,-5L10,0L0,5Z" fill="var(--link-parent)"></path>
-            </marker>
-          </defs>
-        </svg>
-        <div class="tooltip" id="pedigreeTooltip" role="presentation"></div>
-      </div>
-    </section>
-  </div>
-  <div class="view" data-view="admin">
-    <section id="userPanel">
-      <header>
-        <h2>Brugerstyring</h2>
-        <button class="ghost" type="button" id="userClearBtn">Ryd</button>
-      </header>
-      <p class="panel-hint">Roller styrer hvem der må redigere data. "Skriver" og "Administrator" kan gemme ændringer. "Læser" har kun læseadgang.</p>
-      <form id="userForm" autocomplete="off">
-        <div class="control-grid">
-          <label>Bruger-ID
-            <input id="userId" placeholder="auto hvis tom">
-          </label>
-          <label>Navn
-            <input id="userName" required>
-          </label>
-          <label>E-mail
-            <input id="userEmail" type="email">
-          </label>
-          <label>Rolle
-            <select id="userRole">
-              <option value="reader">Læser</option>
-              <option value="writer">Skriver</option>
-              <option value="admin">Administrator</option>
+          <label>Vis labels
+            <select id="labelToggle">
+              <option value="on">Ja</option>
+              <option value="off">Nej</option>
             </select>
           </label>
-          <label>PIN / adgangsnøgle
-            <input id="userPin" type="password" autocomplete="new-password">
+          <label>Træk noder
+            <select id="dragToggle">
+              <option value="on">Ja</option>
+              <option value="off">Nej</option>
+            </select>
+          </label>
+          <button id="applyViewBtn" type="button">Opdater visning</button>
+        </div>
+        <div id="pedigreeCanvas">
+          <svg id="pedigreeSvg" viewBox="0 0 960 540" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <marker id="arrowParent" viewBox="0 -5 10 10" refX="18" refY="0" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M0,-5L10,0L0,5Z" fill="var(--link-parent)"></path>
+              </marker>
+            </defs>
+          </svg>
+          <div class="tooltip" id="pedigreeTooltip" role="presentation"></div>
+        </div>
+      </section>
+    </div>
+    <div class="view" data-view="admin">
+      <section id="userPanel">
+        <header>
+          <h2>Brugerstyring</h2>
+          <button class="ghost" type="button" id="userClearBtn">Ryd</button>
+        </header>
+        <p class="panel-hint">Roller styrer hvem der må redigere data. "Skriver" og "Administrator" kan gemme ændringer. "Læser" har kun læseadgang.</p>
+        <form id="userForm" autocomplete="off">
+          <div class="control-grid">
+            <label>Bruger-ID
+              <input id="userId" placeholder="auto hvis tom">
+            </label>
+            <label>Navn
+              <input id="userName" required>
+            </label>
+            <label>E-mail
+              <input id="userEmail" type="email">
+            </label>
+            <label>Rolle
+              <select id="userRole">
+                <option value="reader">Læser</option>
+                <option value="writer">Skriver</option>
+                <option value="admin">Administrator</option>
+              </select>
+            </label>
+            <label>PIN / adgangsnøgle
+              <input id="userPin" type="password" autocomplete="new-password">
+            </label>
+          </div>
+          <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+            <button type="submit">Tilføj / opdater bruger</button>
+            <button type="button" class="danger" id="userDeleteBtn">Slet bruger</button>
+          </div>
+        </form>
+        <div class="control-grid">
+          <label>Aktiv bruger
+            <select id="loginSelect"></select>
+          </label>
+          <label>PIN
+            <input id="loginPin" type="password" placeholder="Valgfrit">
+          </label>
+          <button id="loginBtn" type="button">Log ind</button>
+          <button id="logoutBtn" type="button" class="ghost">Log ud</button>
+        </div>
+        <div class="table-wrapper">
+          <table aria-label="Brugere">
+            <thead><tr><th>ID</th><th>Navn</th><th>Rolle</th><th>E-mail</th></tr></thead>
+            <tbody id="userTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+      <section id="dataPanel">
+        <header><h2>Data &amp; backup</h2></header>
+        <div class="control-grid">
+          <button id="chooseFileBtn" type="button">Vælg synk-fil</button>
+          <button id="backupBtn" type="button">Backup til .json</button>
+          <label>Gendan fra fil
+            <input id="restoreInput" type="file" accept="application/json">
           </label>
         </div>
-        <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
-          <button type="submit">Tilføj / opdater bruger</button>
-          <button type="button" class="danger" id="userDeleteBtn">Slet bruger</button>
+        <p class="panel-hint" id="fileHint">Ingen fil valgt til synkronisering.</p>
+        <p class="panel-hint" id="autosaveHint">Autosave aktivt.</p>
+      </section>
+      <section id="activityPanel">
+        <header><h2>Log &amp; hændelser</h2></header>
+        <div class="table-wrapper">
+          <table aria-label="Hændelser">
+            <thead><tr><th>Tid</th><th>Beskrivelse</th></tr></thead>
+            <tbody id="logTableBody"></tbody>
+          </table>
         </div>
-      </form>
-      <div class="control-grid">
-        <label>Aktiv bruger
-          <select id="loginSelect"></select>
-        </label>
-        <label>PIN
-          <input id="loginPin" type="password" placeholder="Valgfrit">
-        </label>
-        <button id="loginBtn" type="button">Log ind</button>
-        <button id="logoutBtn" type="button" class="ghost">Log ud</button>
-      </div>
-      <div class="table-wrapper">
-        <table aria-label="Brugere">
-          <thead><tr><th>ID</th><th>Navn</th><th>Rolle</th><th>E-mail</th></tr></thead>
-          <tbody id="userTableBody"></tbody>
-        </table>
-      </div>
-    </section>
-    <section id="dataPanel">
-      <header><h2>Data &amp; backup</h2></header>
-      <div class="control-grid">
-        <button id="chooseFileBtn" type="button">Vælg synk-fil</button>
-        <button id="backupBtn" type="button">Backup til .json</button>
-        <label>Gendan fra fil
-          <input id="restoreInput" type="file" accept="application/json">
-        </label>
-      </div>
-      <p class="panel-hint" id="fileHint">Ingen fil valgt til synkronisering.</p>
-      <p class="panel-hint" id="autosaveHint">Autosave aktivt.</p>
-    </section>
-    <section id="activityPanel">
-      <header><h2>Log &amp; hændelser</h2></header>
-      <div class="table-wrapper">
-        <table aria-label="Hændelser">
-          <thead><tr><th>Tid</th><th>Beskrivelse</th></tr></thead>
-          <tbody id="logTableBody"></tbody>
-        </table>
-      </div>
-    </section>
-  </div>
-</main>
-<div id="statusBar" role="status" aria-live="polite"></div>
-
+      </section>
+    </div>
+  </main>
+</div>
+<div class="status-bar" id="statusBar" role="status" aria-live="polite"></div>
 <script>
 const defaultState = {
   persons: {},
@@ -740,11 +827,13 @@ function setDirty(reason = '') {
   dirtyIndicator.style.color = 'var(--danger)';
   if (reason) addLog(`Markér som ændret: ${reason}`);
   saveSoon();
+  updateFileHint();
 }
 function clearDirty() {
   state._dirty = false;
   dirtyIndicator.textContent = state.meta.lastSaved ? `Sidst gemt ${state.meta.lastSaved}` : 'Ændringer gemmes automatisk';
-  dirtyIndicator.style.color = 'var(--muted-text)';
+  dirtyIndicator.style.color = 'var(--muted)';
+  updateFileHint();
 }
 function flashStatus(message, type = 'info', timeout = 2600) {
   statusBar.textContent = message;
@@ -1219,17 +1308,14 @@ function handleWeightedSubmit(evt) {
   if (!aId || !bId) return alert('Vælg begge personer');
   if (aId === bId) return alert('Vælg to forskellige personer.');
   if (Number.isNaN(weightValue) || weightValue < 0 || weightValue > 100) return alert('Vægt skal være mellem 0 og 100.');
-  const existing = ensureDistinctPair(aId, bId);
-  if (existing) {
-    existing.weight = weightValue;
-    existing.label = label;
-    flashStatus('Vægt opdateret', 'success');
-  } else {
-    state.rel.weighted.push({ aId, bId, weight: weightValue, label });
-    flashStatus('Vægt tilføjet', 'success');
+  if (ensureDistinctPair(aId, bId)) {
+    alert('Relation findes allerede.');
+    return;
   }
+  state.rel.weighted.push({ aId, bId, weight: weightValue, label });
+  flashStatus('Vægt tilføjet', 'success');
   renderPersonsAndRelations();
-  setDirty('Vægtet relation opdateret');
+  setDirty('Vægtet relation tilføjet');
 }
 
 function renderMetrics() {
@@ -1373,12 +1459,25 @@ function renderInteractionsView() {
   const summary = computeNetworkSummary();
   const tbody = byId('interactionSummaryBody');
   if (tbody) {
-    tbody.innerHTML = '';
-    summary.degreeList.sort((a, b) => (b.weightSum || 0) - (a.weightSum || 0)).forEach(entry => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${escapeHTML(entry.name)}</td><td>${entry.parent}</td><td>${entry.partner}</td><td>${entry.weighted}</td><td>${entry.weightSum.toFixed(1)}</td>`;
-      tbody.appendChild(tr);
-    });
+    const ranked = summary.degreeList
+      .map(entry => ({
+        ...entry,
+        score: entry.parent + entry.partner + entry.weighted
+      }))
+      .sort((a, b) => b.score === a.score ? (b.weightSum || 0) - (a.weightSum || 0) : b.score - a.score);
+    const largestComponent = summary.components.reduce((max, comp) => Math.max(max, comp.length), 0);
+    const rows = [
+      { label: 'Forældre-barn relationer', value: `${summary.parentCount}` },
+      { label: 'Partnerrelationer', value: `${summary.partnerCount}` },
+      { label: 'Vægtede relationer', value: `${summary.weightedCount}` },
+      { label: 'Gennemsnitlig vægt', value: summary.avgWeight },
+      { label: 'Spænd i vægte', value: summary.weightSpread },
+      { label: 'Største komponent', value: summary.components.length ? `${largestComponent} personer` : 'Ingen netværk' }
+    ];
+    if (ranked[0]) {
+      rows.push({ label: 'Top-forbinder', value: `${ranked[0].name} · ${ranked[0].score} relationer` });
+    }
+    tbody.innerHTML = rows.map(row => `<tr><td>${escapeHTML(row.label)}</td><td>${escapeHTML(row.value)}</td></tr>`).join('');
   }
   const highlights = byId('topWeightedList');
   if (highlights) {
@@ -1386,7 +1485,7 @@ function renderInteractionsView() {
     const edges = [...state.rel.weighted]
       .filter(rel => state.persons[rel.aId] && state.persons[rel.bId])
       .sort((a, b) => (b.weight || 0) - (a.weight || 0))
-      .slice(0, 8);
+      .slice(0, 6);
     if (!edges.length) {
       const li = document.createElement('li');
       li.textContent = 'Ingen vægtede relationer endnu.';
@@ -1395,8 +1494,10 @@ function renderInteractionsView() {
       edges.forEach(rel => {
         const a = state.persons[rel.aId]?.name || rel.aId;
         const b = state.persons[rel.bId]?.name || rel.bId;
+        const parts = [`Vægt ${rel.weight}`];
+        if (rel.label) parts.push(rel.label);
         const li = document.createElement('li');
-        li.innerHTML = `<strong>${escapeHTML(a)} ↔ ${escapeHTML(b)}</strong><br>Vægt ${rel.weight} · ${escapeHTML(rel.label || 'Ingen label')}`;
+        li.innerHTML = `<strong>${escapeHTML(a)} ↔ ${escapeHTML(b)}</strong><br>${escapeHTML(parts.join(' · '))}`;
         highlights.appendChild(li);
       });
     }
