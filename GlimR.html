@@ -14360,75 +14360,227 @@ function buildVariantLibraryBed(variants, {defaultGenomeBuild = ''} = {}) {
   const text = lines.join('\n');
   return {text, included, skipped};
 }
-function buildVariantLibraryVrsPayload(variants, {defaultGenomeBuild = ''} = {}) {
-  const normalizedBuild = normalizeGenomeBuildValue(defaultGenomeBuild) || '';
-  const descriptors = [];
-  (variants || []).forEach(entry => {
-    if (!entry) return;
-    const coordinate = computeVariantLibraryCoordinate(entry, {defaultGenomeBuild});
-    const label = formatVariantTitle(entry) || entry.description || entry.gene || '';
-    const descriptor = {type: 'VariationDescriptor', label};
-    if (entry.id) {
-      descriptor.id = `urn:glimr:variant-library:${entry.id}`;
-    }
-    const variantType = normalizeVariantType(entry.variant_type);
-    if (variantType) descriptor.variantType = variantType;
-    if (entry.gene) descriptor.gene = entry.gene;
-    if (entry.transcript) descriptor.transcript = entry.transcript;
-    const hgvs = {
-      c: entry.hgvs_c || '',
-      p: entry.hgvs_p || '',
-      g: entry.genomic_position || formatVariantGenomicRange(entry) || ''
-    };
-    descriptor.hgvs = Object.fromEntries(Object.entries(hgvs).filter(([, value]) => value));
-    if (!Object.keys(descriptor.hgvs).length) delete descriptor.hgvs;
-    if (entry.iscn) descriptor.iscn = entry.iscn;
-    const rsid = getVariantRsId(entry);
-    if (rsid) descriptor.rsid = rsid;
-    const classification = mapVarSeqClassification(entry.classification);
-    if (classification) descriptor.classification = classification;
-    if (entry.criteria) descriptor.criteria = entry.criteria;
-    if (entry.evidence) descriptor.evidence = entry.evidence;
-    if (entry.condition) descriptor.condition = entry.condition;
-    if (entry.inheritance) descriptor.inheritance = entry.inheritance;
-    const genomeBuild = entry.genome_build || coordinate.build || normalizedBuild;
-    if (genomeBuild) descriptor.genomeBuild = genomeBuild;
-    const coordinates = {
-      chromosome: coordinate.chromosome || '',
-      start: Number.isFinite(coordinate.start) ? coordinate.start : null,
-      end: Number.isFinite(coordinate.end) ? coordinate.end : null,
-      copyNumber: entry.copy_number || '',
-      svSubtype: normalizeStructureTypeValue(entry.sv_subtype) || '',
-      sizeBp: entry.size_bp || ''
-    };
-    const filteredCoordinates = Object.fromEntries(Object.entries(coordinates).filter(([, value]) => value !== null && value !== '' && value !== undefined && !(typeof value === 'number' && Number.isNaN(value))));
-    if (Object.keys(filteredCoordinates).length) descriptor.coordinates = filteredCoordinates;
-    if (entry.affected_genes) descriptor.affectedGenes = entry.affected_genes;
-    if (entry.curated_by) descriptor.curatedBy = entry.curated_by;
-    if (entry.last_review) descriptor.lastReview = entry.last_review;
-    if (entry.description) descriptor.description = entry.description;
-    const expressions = [];
-    if (entry.hgvs_c) expressions.push({syntax: 'hgvs.c', value: entry.hgvs_c});
-    if (entry.hgvs_p) expressions.push({syntax: 'hgvs.p', value: entry.hgvs_p});
-    const genomic = entry.genomic_position || formatVariantGenomicRange(entry);
-    if (genomic) expressions.push({syntax: 'hgvs.g', value: genomic});
-    if (entry.iscn) expressions.push({syntax: 'iscn', value: entry.iscn});
-    if (expressions.length) descriptor.expressions = expressions;
-    const variationDefinition = entry.evidence || entry.description || label || '';
-    if (variationDefinition) {
-      descriptor.variation = {type: 'Text', definition: variationDefinition};
-    }
-    descriptors.push(descriptor);
+const VRS_NON_INHERENT_KEYS = new Set(['id', 'digest', 'name', 'description', 'meta', 'metadata', 'aliases', 'extensions', 'label', 'notes', 'comments', 'source', 'sources']);
+
+function sanitizeVrsSequenceValue(value) {
+  if (value == null) return '';
+  const text = String(value).trim().toUpperCase();
+  if (!text) return '';
+  if (!/^[ACGTN-]+$/i.test(text)) {
+    return null;
+  }
+  return text.replace(/-/g, '');
+}
+
+function trimVrsAlleles(ref, alt) {
+  let prefix = 0;
+  let trimmedRef = ref;
+  let trimmedAlt = alt;
+  while (trimmedRef.length && trimmedAlt.length && trimmedRef[0] === trimmedAlt[0]) {
+    trimmedRef = trimmedRef.slice(1);
+    trimmedAlt = trimmedAlt.slice(1);
+    prefix += 1;
+  }
+  while (trimmedRef.length && trimmedAlt.length && trimmedRef[trimmedRef.length - 1] === trimmedAlt[trimmedAlt.length - 1]) {
+    trimmedRef = trimmedRef.slice(0, -1);
+    trimmedAlt = trimmedAlt.slice(0, -1);
+  }
+  return {ref: trimmedRef, alt: trimmedAlt, prefix};
+}
+
+function stripNonInherentVrs(value) {
+  if (Array.isArray(value)) {
+    return value.map(item => stripNonInherentVrs(item));
+  }
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value)
+      .filter(([key, val]) => !VRS_NON_INHERENT_KEYS.has(key) && val !== undefined && val !== null);
+    entries.sort((a, b) => a[0].localeCompare(b[0]));
+    const result = {};
+    entries.forEach(([key, val]) => {
+      const stripped = stripNonInherentVrs(val);
+      if (stripped !== undefined) {
+        result[key] = stripped;
+      }
+    });
+    return result;
+  }
+  if (typeof value === 'number') {
+    if (Number.isNaN(value)) return undefined;
+    if (!Number.isFinite(value)) return undefined;
+  }
+  return value;
+}
+
+function canonicalVrsJsonBytes(obj) {
+  const encoder = new TextEncoder();
+  const canonical = stripNonInherentVrs(obj);
+  const json = JSON.stringify(canonical);
+  return encoder.encode(json);
+}
+
+async function sha512t24u(bytes) {
+  const cryptoApi = (window.crypto || window.msCrypto);
+  if (!cryptoApi?.subtle || typeof cryptoApi.subtle.digest !== 'function') {
+    throw new Error('SHA-512 hashing er ikke understøttet i denne browser.');
+  }
+  const hashBuffer = await cryptoApi.subtle.digest('SHA-512', bytes);
+  const truncated = new Uint8Array(hashBuffer).slice(0, 24);
+  let binary = '';
+  truncated.forEach(byte => {
+    binary += String.fromCharCode(byte);
   });
+  const base64 = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  return base64;
+}
+
+async function assignVrsIdentifiers(obj, prefix) {
+  const bytes = canonicalVrsJsonBytes(obj);
+  const digest = await sha512t24u(bytes);
+  const id = `ga4gh:${prefix}.${digest}`;
+  obj.digest = digest;
+  obj.id = id;
+  return obj;
+}
+
+async function buildVariantLibraryVrsPayload(variants, {defaultGenomeBuild = ''} = {}) {
+  const normalizedBuild = normalizeGenomeBuildValue(defaultGenomeBuild) || '';
+  const sequencesById = new Map();
+  const locationsById = new Map();
+  const allelesById = new Map();
+  const variantsSummary = [];
+  let included = 0;
+  let skipped = 0;
+  for (const entry of variants || []) {
+    if (!entry) {
+      skipped++;
+      continue;
+    }
+    const coordinate = computeVariantLibraryCoordinate(entry, {defaultGenomeBuild});
+    const genomeBuild = normalizeGenomeBuildValue(entry.genome_build || coordinate.build || normalizedBuild) || '';
+    const chromosome = coordinate.chromosome || normalizeChromosomeValue(entry.chromosome || '');
+    const startValue = Number.isFinite(coordinate.start) ? coordinate.start : Number.parseInt(entry.start, 10);
+    if (!chromosome || !Number.isFinite(startValue) || startValue <= 0) {
+      skipped++;
+      continue;
+    }
+    const alleleInfo = parseVariantAlleleInfo(entry, coordinate);
+    let refSeq = sanitizeVrsSequenceValue(alleleInfo.ref || (coordinate.alleles && coordinate.alleles[0]));
+    let altSeq = sanitizeVrsSequenceValue(alleleInfo.alt || (coordinate.alleles && coordinate.alleles[1]));
+    if (refSeq === null || altSeq === null) {
+      skipped++;
+      continue;
+    }
+    if (!refSeq && !altSeq) {
+      skipped++;
+      continue;
+    }
+    if (!altSeq && normalizeVariantType(entry.variant_type) === 'snv') {
+      skipped++;
+      continue;
+    }
+    const {ref: trimmedRef, alt: trimmedAlt, prefix} = trimVrsAlleles(refSeq, altSeq);
+    const zeroBasedStart = startValue - 1 + prefix;
+    if (!Number.isFinite(zeroBasedStart) || zeroBasedStart < 0) {
+      skipped++;
+      continue;
+    }
+    const referenceSequence = trimmedRef;
+    const alternateSequence = trimmedAlt;
+    if (!referenceSequence && !alternateSequence) {
+      skipped++;
+      continue;
+    }
+    const zeroBasedEnd = zeroBasedStart + referenceSequence.length;
+    const contigLabelParts = [];
+    if (genomeBuild) contigLabelParts.push(genomeBuild.toUpperCase());
+    contigLabelParts.push(chromosome.toUpperCase());
+    const contigSequenceValue = contigLabelParts.join(':');
+    const sequence = {type: 'Sequence', sequence: contigSequenceValue || chromosome.toUpperCase() || 'UNKNOWN'};
+    await assignVrsIdentifiers(sequence, 'SQ');
+    if (!sequencesById.has(sequence.id)) {
+      sequencesById.set(sequence.id, sequence);
+    }
+    const interval = {
+      type: 'SimpleInterval',
+      start: zeroBasedStart,
+      end: zeroBasedEnd
+    };
+    const sequenceLocation = {
+      type: 'SequenceLocation',
+      sequence_id: sequence.id,
+      interval,
+      meta: {
+        genomeBuild,
+        chromosome,
+        start: zeroBasedStart + 1,
+        end: zeroBasedEnd
+      }
+    };
+    await assignVrsIdentifiers(sequenceLocation, 'SL');
+    if (!locationsById.has(sequenceLocation.id)) {
+      locationsById.set(sequenceLocation.id, sequenceLocation);
+    }
+    const allele = {
+      type: 'Allele',
+      location: sequenceLocation.id,
+      state: {
+        type: 'LiteralSequenceExpression',
+        sequence: alternateSequence
+      },
+      meta: {
+        genomeBuild,
+        chromosome,
+        reference: referenceSequence,
+        alternate: alternateSequence
+      }
+    };
+    await assignVrsIdentifiers(allele, 'VA');
+    if (!allelesById.has(allele.id)) {
+      allelesById.set(allele.id, allele);
+    }
+    const summary = {
+      source: entry.id ? `variant-library:${entry.id}` : null,
+      label: formatVariantTitle(entry) || entry.description || entry.gene || '',
+      genome_build: genomeBuild,
+      chromosome,
+      start: zeroBasedStart + 1,
+      end: zeroBasedEnd,
+      reference: referenceSequence,
+      alternate: alternateSequence,
+      sequence_id: sequence.id,
+      location_id: sequenceLocation.id,
+      allele_id: allele.id
+    };
+    const variantType = normalizeVariantType(entry.variant_type);
+    if (variantType) summary.variant_type = variantType;
+    const classification = mapVarSeqClassification(entry.classification);
+    if (classification) summary.classification = classification;
+    const rsid = getVariantRsId(entry);
+    if (rsid) summary.rsid = rsid;
+    if (entry.hgvs_c) summary.hgvs_c = entry.hgvs_c;
+    if (entry.hgvs_p) summary.hgvs_p = entry.hgvs_p;
+    const genomicNotation = entry.genomic_position || formatVariantGenomicRange(entry);
+    if (genomicNotation) summary.hgvs_g = genomicNotation;
+    variantsSummary.push(summary);
+    included++;
+  }
   const payload = {
     resourceType: 'VrsExport',
     generatedAt: new Date().toISOString(),
-    variation_descriptors: descriptors
+    sequences: Array.from(sequencesById.values()),
+    sequence_locations: Array.from(locationsById.values()),
+    alleles: Array.from(allelesById.values()),
+    variants: variantsSummary
   };
   if (normalizedBuild) {
-    payload.genomeBuild = normalizedBuild;
+    payload.defaultGenomeBuild = normalizedBuild;
   }
-  return {text: JSON.stringify(payload, null, 2), included: descriptors.length};
+  payload.summary = {
+    included,
+    skipped
+  };
+  return {payload, included, skipped};
 }
 function parseVariantLibraryVcf(text) {
   if (!text) return {records: [], genomeBuild: '', skipped: 0};
@@ -16757,7 +16909,7 @@ function renderVariantLibrary(section) {
   };
   updateImportAccept();
   importFormatSelect?.addEventListener('change', updateImportAccept);
-  exportButton?.addEventListener('click', () => {
+  exportButton?.addEventListener('click', async () => {
     const format = (exportFormatSelect?.value || 'csv').toLowerCase();
     const exportRows = filteredLibrary.map(entry => ({
       ...entry,
@@ -16804,12 +16956,26 @@ function renderVariantLibrary(section) {
         break;
       }
       case 'vrs': {
-        const result = buildVariantLibraryVrsPayload(exportRows, {defaultGenomeBuild: selectedGenomeBuild});
-        filename = downloadTextFile(result.text, 'glimr-variantbibliotek.vrs.json', {
-          entity: 'variant_library_export',
-          details: {...baseDetails, included: result.included}
-        });
-        included = result.included;
+        try {
+          const result = await buildVariantLibraryVrsPayload(exportRows, {defaultGenomeBuild: selectedGenomeBuild});
+          included = result.included;
+          skipped = result.skipped;
+          if (!included) {
+            alert('Ingen varianter kunne eksporteres til VRS-format.');
+            setStatus('Ingen varianter kunne eksporteres til VRS-format.');
+            return;
+          }
+          filename = downloadJsonFile(result.payload, 'glimr-variantbibliotek-vrs.json', {
+            entity: 'variant_library_export',
+            summary: {format: 'VRS', included: result.included, skipped: result.skipped},
+            details: {...baseDetails, format: 'VRS', included: result.included, skipped: result.skipped}
+          });
+        } catch (err) {
+          console.error(err);
+          alert(`Kunne ikke eksportere til VRS-format: ${err.message}`);
+          setStatus(`Kunne ikke eksportere til VRS-format: ${err.message}`);
+          return;
+        }
         break;
       }
       default:
