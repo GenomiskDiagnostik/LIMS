@@ -2319,7 +2319,16 @@ form textarea {
   justify-content: flex-end;
 }
 .table-actions button {
-  min-width: 220px;
+  min-width: 200px;
+}
+.table-action-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: 0.75rem;
+}
+.table-action-group select {
+  min-width: 150px;
 }
 #libraryOpenPatients {
   margin-right: auto;
@@ -4398,8 +4407,8 @@ const tooltipCatalog = {
     variantLibraryDelete: 'Slet den valgte bibliotekspost.',
     variantLibrarySaveNew: 'Gem biblioteksposten som en ny registrering.',
     variantLibrarySave: 'Gem ændringerne til den valgte bibliotekspost.',
-    libraryExportCsv: 'Eksportér de viste biblioteksposter til en CSV-fil.',
-    libraryImportCsv: 'Importer biblioteksposter fra en CSV-fil.',
+    libraryExport: 'Eksportér de viste biblioteksposter i det valgte format.',
+    libraryImport: 'Importér biblioteksposter fra en fil i det valgte format.',
     conclusionLibraryClear: 'Ryd formularen for at oprette en ny standardtekst.',
     conclusionLibraryDelete: 'Slet den valgte standardtekst.',
     conclusionLibraryInsert: 'Erstat konklusionsfeltet med den valgte standardtekst.',
@@ -4476,7 +4485,9 @@ const tooltipCatalog = {
     includeControlSample: 'Aktiver for at registrere en ekstra kontrolprøve på samme patient.',
     orderStatusPreview: 'Viser hvilken status den nye ordination får. Status følger prøvens valg.',
     caseVariantHint: 'Information om tilknyttede varianter i den nye sag.',
-    variantLibraryImportInput: 'Vælg en CSV-fil der indeholder biblioteksposter til import.',
+    libraryExportFormat: 'Vælg filformat til eksport af biblioteksposter.',
+    libraryImportFormat: 'Vælg filformat til import af biblioteksposter.',
+    variantLibraryImportInput: 'Vælg en fil til import af biblioteksposter.',
     caseImportVarSeqInput: 'Vælg en VarSeq CSV-fil med fund, som skal tilføjes til sagen.',
     variantBatchOrder: 'Vælg den ordination som de importerede varianter skal knyttes til.',
     variantBatchMessage: 'Status og advarsler for masseoprettelse af varianter.',
@@ -14006,6 +14017,874 @@ function renderVariants(section) {
     alert('Variant tilføjet til biblioteket');
   });
 }
+const VARIANT_LIBRARY_IMPORT_HEADER_MAP = {
+  id: 'id',
+  gene: 'gene',
+  gen: 'gene',
+  gene_symbol: 'gene',
+  gene_name: 'gene',
+  transcript: 'transcript',
+  transcript_id: 'transcript',
+  transkript: 'transcript',
+  hgvs_c: 'hgvs_c',
+  hgvs_c_: 'hgvs_c',
+  hgvs: 'hgvs_c',
+  c_hgvs: 'hgvs_c',
+  cdna: 'hgvs_c',
+  cdna_change: 'hgvs_c',
+  cdna_change_hgvs: 'hgvs_c',
+  hgvs_p: 'hgvs_p',
+  protein: 'hgvs_p',
+  protein_change: 'hgvs_p',
+  protein_change_hgvs: 'hgvs_p',
+  rsid: 'rsid',
+  dbsnp: 'rsid',
+  dbsnp_id: 'rsid',
+  dbsnpid: 'rsid',
+  dbsnp_rs: 'rsid',
+  rs_id: 'rsid',
+  genomic_position: 'genomic_position',
+  genomicpos: 'genomic_position',
+  genomic_pos: 'genomic_position',
+  genomisk_position: 'genomic_position',
+  position: 'genomic_position',
+  pos: 'genomic_position',
+  variant_type: 'variant_type',
+  varianttype: 'variant_type',
+  varianttypekode: 'variant_type',
+  varianttype_kode: 'variant_type',
+  type: 'variant_type',
+  klassifikation: 'classification',
+  classification: 'classification',
+  class: 'classification',
+  klasse: 'classification',
+  criteria: 'criteria',
+  kriterier: 'criteria',
+  acmg: 'criteria',
+  evidence: 'evidence',
+  evidens: 'evidence',
+  notes: 'evidence',
+  condition: 'condition',
+  tilstand: 'condition',
+  phenotype: 'condition',
+  inheritance: 'inheritance',
+  nedarvning: 'inheritance',
+  genome_build: 'genome_build',
+  genome: 'genome_build',
+  reference: 'genome_build',
+  kromosom: 'chromosome',
+  chromosome: 'chromosome',
+  chr: 'chromosome',
+  start: 'start',
+  begin: 'start',
+  position_start: 'start',
+  end: 'end',
+  stop: 'end',
+  position_end: 'end',
+  copy_number: 'copy_number',
+  copynumber: 'copy_number',
+  kopital: 'copy_number',
+  kopitaler: 'copy_number',
+  cn: 'copy_number',
+  sv_subtype: 'sv_subtype',
+  svtype: 'sv_subtype',
+  strukturtype: 'sv_subtype',
+  strukturtypekode: 'sv_subtype',
+  strukturtype_kode: 'sv_subtype',
+  variant_subtype: 'sv_subtype',
+  structuraltype: 'sv_subtype',
+  size: 'size_bp',
+  size_bp: 'size_bp',
+  stoerrelse: 'size_bp',
+  length: 'size_bp',
+  iscn: 'iscn',
+  cytogenetic: 'iscn',
+  affected_genes: 'affected_genes',
+  genes: 'affected_genes',
+  gener: 'affected_genes',
+  description: 'description',
+  beskrivelse: 'description',
+  curated_by: 'curated_by',
+  kurator: 'curated_by',
+  kurateret_af: 'curated_by',
+  last_review: 'last_review',
+  sidst_gennemgaaet: 'last_review',
+  lastreview: 'last_review'
+};
+const VARIANT_LIBRARY_COMPUTED_COLUMNS = new Set(['frekvens', 'frequency', 'forekomst', 'occurrence', 'genomisk_interval', 'genomic_interval']);
+function ensureVariantLibraryIsoDate(value) {
+  if (value == null) return '';
+  const text = String(value).trim();
+  if (!text) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const parsed = new Date(text);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().split('T')[0];
+  }
+  return text;
+}
+function parseVariantLibraryDelimited(text) {
+  const {headers, rows} = parseCsv(text);
+  if (!headers.length) throw new Error('Filen mangler kolonneoverskrifter.');
+  const ignoredComputedColumns = new Set();
+  const columnKeys = headers.map(header => {
+    const normalized = normaliseHeader(header);
+    if (VARIANT_LIBRARY_COMPUTED_COLUMNS.has(normalized)) {
+      const trimmed = (header || '').trim();
+      if (trimmed) ignoredComputedColumns.add(trimmed);
+      return null;
+    }
+    return VARIANT_LIBRARY_IMPORT_HEADER_MAP[normalized] || null;
+  });
+  if (!columnKeys.some(key => ['gene', 'hgvs_c', 'hgvs_p', 'iscn', 'chromosome', 'description'].includes(key))) {
+    throw new Error('Filen skal mindst indeholde et identificerende felt (Gen, HGVS, ISCN, kromosom eller beskrivelse).');
+  }
+  const records = [];
+  let skipped = 0;
+  rows.forEach(rowValues => {
+    if (!rowValues || rowValues.every(cell => !cell || !String(cell).trim())) {
+      skipped++;
+      return;
+    }
+    const record = {};
+    columnKeys.forEach((key, idx) => {
+      if (!key) return;
+      let raw = rowValues[idx];
+      if (raw == null) return;
+      if (typeof raw === 'number') raw = String(raw);
+      if (typeof raw !== 'string') raw = String(raw);
+      const trimmed = raw.trim();
+      if (!trimmed && trimmed !== '0') return;
+      if (key === 'rsid') {
+        record.rsid = normalizeRsId(trimmed);
+        return;
+      }
+      if (key === 'sv_subtype') {
+        record.sv_subtype = normalizeStructureTypeValue(trimmed);
+        return;
+      }
+      record[key] = trimmed;
+    });
+    if (Object.keys(record).length === 0) {
+      skipped++;
+      return;
+    }
+    records.push(record);
+  });
+  return {records, ignoredComputedColumns, skipped};
+}
+function computeVariantLibraryCoordinate(entry, {defaultGenomeBuild = ''} = {}) {
+  const coordinates = parseVariantCoordinates(entry || {});
+  const chromosome = normalizeChromosomeValue(coordinates.chromosome || entry?.chromosome || entry?.chrom || '');
+  const sanitizedStart = sanitizePositionValue(coordinates.start || entry?.start || entry?.position_start || '');
+  const sanitizedEnd = sanitizePositionValue(coordinates.end || entry?.end || entry?.position_end || '');
+  let start = sanitizedStart ? Number.parseInt(sanitizedStart, 10) : NaN;
+  let end = sanitizedEnd ? Number.parseInt(sanitizedEnd, 10) : NaN;
+  if (!Number.isFinite(start) && Number.isFinite(end)) {
+    start = end;
+  }
+  if (!Number.isFinite(end) && Number.isFinite(start)) {
+    end = start;
+  }
+  if (Number.isFinite(start) && Number.isFinite(end) && end < start) {
+    [start, end] = [end, start];
+  }
+  const build = normalizeGenomeBuildValue(entry?.genome_build || coordinates.build || defaultGenomeBuild) || '';
+  const alleles = Array.isArray(coordinates.alleles) ? coordinates.alleles.filter(Boolean) : [];
+  return {
+    chromosome,
+    start: Number.isFinite(start) && start > 0 ? start : NaN,
+    end: Number.isFinite(end) && end > 0 ? end : Number.isFinite(start) ? start : NaN,
+    alleles,
+    build
+  };
+}
+function determineVcfAlleles(entry, coordinate) {
+  const type = normalizeVariantType(entry?.variant_type);
+  const alleles = Array.isArray(coordinate?.alleles) ? coordinate.alleles : [];
+  if (type === 'snv') {
+    if (alleles.length >= 2) {
+      return {ref: alleles[0], alt: alleles[1]};
+    }
+    const hgvsMatch = (entry?.hgvs_c || entry?.hgvs_p || '').match(/([A-Z])>([A-Z])/i);
+    if (hgvsMatch) {
+      return {ref: hgvsMatch[1].toUpperCase(), alt: hgvsMatch[2].toUpperCase()};
+    }
+    return {ref: 'N', alt: '<SNV>'};
+  }
+  const subtype = normalizeStructureTypeValue(entry?.sv_subtype) || type || 'VAR';
+  return {ref: 'N', alt: `<${subtype.toUpperCase()}>`};
+}
+function escapeVcfInfoValue(value) {
+  if (value == null) return '';
+  const text = String(value).replace(/\r?\n|\r/g, ' ').trim();
+  if (!text) return '';
+  try {
+    return encodeURIComponent(text);
+  } catch (err) {
+    return text.replace(/[;\t=]/g, ' ').trim();
+  }
+}
+function decodeVcfInfoValue(value) {
+  if (value == null) return '';
+  const text = String(value);
+  try {
+    return decodeURIComponent(text);
+  } catch (err) {
+    return text;
+  }
+}
+function buildVariantLibraryVcf(variants, {defaultGenomeBuild = ''} = {}) {
+  const normalizedBuild = normalizeGenomeBuildValue(defaultGenomeBuild) || '';
+  const baseHeader = ['##fileformat=VCFv4.3', '##source=GlimR Variantbibliotek'];
+  if (normalizedBuild) {
+    baseHeader.push(`##reference=${getGenomeBuildLabel(normalizedBuild)}`);
+  }
+  const infoDefinitions = [
+    '##INFO=<ID=TYPE,Number=1,Type=String,Description="Varianttype (SNV/CNV/etc.)">',
+    '##INFO=<ID=GENE,Number=1,Type=String,Description="Gensymbol">',
+    '##INFO=<ID=TRANSCRIPT,Number=1,Type=String,Description="Transkript">',
+    '##INFO=<ID=HGVS_C,Number=1,Type=String,Description="HGVS c. notation">',
+    '##INFO=<ID=HGVS_P,Number=1,Type=String,Description="HGVS p. notation">',
+    '##INFO=<ID=HGVS_G,Number=1,Type=String,Description="Genomisk notation">',
+    '##INFO=<ID=CLASS,Number=1,Type=String,Description="ACMG-klasse">',
+    '##INFO=<ID=CRITERIA,Number=1,Type=String,Description="ACMG-kriterier">',
+    '##INFO=<ID=EVIDENCE,Number=1,Type=String,Description="Evidens">',
+    '##INFO=<ID=CONDITION,Number=1,Type=String,Description="Tilstand">',
+    '##INFO=<ID=INHERITANCE,Number=1,Type=String,Description="Nedarvningsmønster">',
+    '##INFO=<ID=END,Number=1,Type=Integer,Description="Genomisk slutposition">',
+    '##INFO=<ID=BUILD,Number=1,Type=String,Description="Genomreference">',
+    '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Strukturvarianttype">',
+    '##INFO=<ID=COPY_NUMBER,Number=1,Type=String,Description="Kopital">',
+    '##INFO=<ID=SIZE_BP,Number=1,Type=String,Description="Størrelse i bp">',
+    '##INFO=<ID=ISCN,Number=1,Type=String,Description="ISCN-betegnelse">',
+    '##INFO=<ID=AFFECTED_GENES,Number=1,Type=String,Description="Berørte gener">',
+    '##INFO=<ID=CURATED_BY,Number=1,Type=String,Description="Kurator">',
+    '##INFO=<ID=LAST_REVIEW,Number=1,Type=String,Description="Seneste gennemgangsdato">',
+    '##INFO=<ID=DESCRIPTION,Number=1,Type=String,Description="Beskrivelse">'
+  ];
+  const contigs = new Set();
+  const lines = [];
+  let skipped = 0;
+  (variants || []).forEach(entry => {
+    const coordinate = computeVariantLibraryCoordinate(entry, {defaultGenomeBuild});
+    const chrom = coordinate.chromosome;
+    const pos = Number.isFinite(coordinate.start) ? coordinate.start : NaN;
+    if (!chrom || !Number.isFinite(pos) || pos <= 0) {
+      skipped++;
+      return;
+    }
+    const idValue = entry?.rsid || (entry?.id ? `GLIMR${entry.id}` : '.');
+    const alleles = determineVcfAlleles(entry, coordinate);
+    let end = Number.isFinite(coordinate.end) ? coordinate.end : pos;
+    if (end < pos) end = pos;
+    const infoParts = [];
+    const variantType = normalizeVariantType(entry?.variant_type);
+    if (variantType) infoParts.push(`TYPE=${escapeVcfInfoValue(variantType)}`);
+    if (Number.isFinite(end)) infoParts.push(`END=${end}`);
+    if (coordinate.build) infoParts.push(`BUILD=${escapeVcfInfoValue(coordinate.build)}`);
+    if (entry?.gene) infoParts.push(`GENE=${escapeVcfInfoValue(entry.gene)}`);
+    if (entry?.transcript) infoParts.push(`TRANSCRIPT=${escapeVcfInfoValue(entry.transcript)}`);
+    if (entry?.hgvs_c) infoParts.push(`HGVS_C=${escapeVcfInfoValue(entry.hgvs_c)}`);
+    if (entry?.hgvs_p) infoParts.push(`HGVS_P=${escapeVcfInfoValue(entry.hgvs_p)}`);
+    const genomic = entry?.genomic_position || formatVariantGenomicRange(entry);
+    if (genomic) infoParts.push(`HGVS_G=${escapeVcfInfoValue(genomic)}`);
+    if (entry?.classification) infoParts.push(`CLASS=${escapeVcfInfoValue(mapVarSeqClassification(entry.classification))}`);
+    if (entry?.criteria) infoParts.push(`CRITERIA=${escapeVcfInfoValue(entry.criteria)}`);
+    if (entry?.evidence) infoParts.push(`EVIDENCE=${escapeVcfInfoValue(entry.evidence)}`);
+    if (entry?.condition) infoParts.push(`CONDITION=${escapeVcfInfoValue(entry.condition)}`);
+    if (entry?.inheritance) infoParts.push(`INHERITANCE=${escapeVcfInfoValue(entry.inheritance)}`);
+    if (entry?.sv_subtype) infoParts.push(`SVTYPE=${escapeVcfInfoValue(entry.sv_subtype)}`);
+    if (entry?.copy_number) infoParts.push(`COPY_NUMBER=${escapeVcfInfoValue(entry.copy_number)}`);
+    if (entry?.size_bp) infoParts.push(`SIZE_BP=${escapeVcfInfoValue(entry.size_bp)}`);
+    if (entry?.iscn) infoParts.push(`ISCN=${escapeVcfInfoValue(entry.iscn)}`);
+    if (entry?.affected_genes) infoParts.push(`AFFECTED_GENES=${escapeVcfInfoValue(entry.affected_genes)}`);
+    if (entry?.curated_by) infoParts.push(`CURATED_BY=${escapeVcfInfoValue(entry.curated_by)}`);
+    if (entry?.last_review) infoParts.push(`LAST_REVIEW=${escapeVcfInfoValue(entry.last_review)}`);
+    if (entry?.description) infoParts.push(`DESCRIPTION=${escapeVcfInfoValue(entry.description)}`);
+    const info = infoParts.length ? infoParts.join(';') : '.';
+    lines.push([chrom, pos, idValue || '.', alleles.ref || 'N', alleles.alt || '<VARIANT>', '.', '.', info].join('\t'));
+    contigs.add(chrom);
+  });
+  const contigLines = Array.from(contigs).sort((a, b) => a.localeCompare(b, 'da')).map(contig => `##contig=<ID=${contig}>`);
+  const header = baseHeader.concat(contigLines, infoDefinitions, ['#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO']);
+  const text = header.concat(lines).join('\n');
+  return {text, included: lines.length, skipped};
+}
+function sanitizeBedValue(value) {
+  if (value == null) return '';
+  return String(value).replace(/\r?\n|\r/g, ' ').trim();
+}
+function buildVariantLibraryBed(variants, {defaultGenomeBuild = ''} = {}) {
+  const lines = ['track name="GlimR Variantbibliotek" description="Kuraterede varianter"'];
+  let included = 0;
+  let skipped = 0;
+  (variants || []).forEach(entry => {
+    const coordinate = computeVariantLibraryCoordinate(entry, {defaultGenomeBuild});
+    const chrom = coordinate.chromosome;
+    const pos = Number.isFinite(coordinate.start) ? coordinate.start : NaN;
+    if (!chrom || !Number.isFinite(pos) || pos <= 0) {
+      skipped++;
+      return;
+    }
+    const end = Number.isFinite(coordinate.end) ? Math.max(coordinate.end, pos) : pos;
+    const zeroBasedStart = Math.max(0, pos - 1);
+    const name = sanitizeBedValue(formatVariantTitle(entry) || entry?.description || entry?.gene || `Variant ${entry?.id ?? included + 1}`) || '.';
+    const classificationNumber = Number.parseInt(mapVarSeqClassification(entry?.classification) || '', 10);
+    const score = Number.isFinite(classificationNumber) ? Math.min(1000, Math.max(0, classificationNumber * 200)) : 0;
+    const row = [
+      ensureChrPrefix(chrom) || chrom,
+      zeroBasedStart,
+      end,
+      name,
+      score,
+      '.',
+      sanitizeBedValue(normalizeVariantType(entry?.variant_type)),
+      sanitizeBedValue(entry?.gene),
+      sanitizeBedValue(entry?.transcript),
+      sanitizeBedValue(entry?.hgvs_c),
+      sanitizeBedValue(entry?.hgvs_p),
+      sanitizeBedValue(entry?.condition),
+      sanitizeBedValue(entry?.inheritance),
+      sanitizeBedValue(entry?.copy_number),
+      sanitizeBedValue(entry?.sv_subtype),
+      sanitizeBedValue(entry?.size_bp),
+      sanitizeBedValue(entry?.curated_by),
+      sanitizeBedValue(entry?.last_review),
+      sanitizeBedValue(entry?.description),
+      sanitizeBedValue(entry?.evidence)
+    ];
+    lines.push(row.join('\t'));
+    included++;
+  });
+  const text = lines.join('\n');
+  return {text, included, skipped};
+}
+function buildVariantLibraryVrsPayload(variants, {defaultGenomeBuild = ''} = {}) {
+  const normalizedBuild = normalizeGenomeBuildValue(defaultGenomeBuild) || '';
+  const descriptors = [];
+  (variants || []).forEach(entry => {
+    if (!entry) return;
+    const coordinate = computeVariantLibraryCoordinate(entry, {defaultGenomeBuild});
+    const label = formatVariantTitle(entry) || entry.description || entry.gene || '';
+    const descriptor = {type: 'VariationDescriptor', label};
+    if (entry.id) {
+      descriptor.id = `urn:glimr:variant-library:${entry.id}`;
+    }
+    const variantType = normalizeVariantType(entry.variant_type);
+    if (variantType) descriptor.variantType = variantType;
+    if (entry.gene) descriptor.gene = entry.gene;
+    if (entry.transcript) descriptor.transcript = entry.transcript;
+    const hgvs = {
+      c: entry.hgvs_c || '',
+      p: entry.hgvs_p || '',
+      g: entry.genomic_position || formatVariantGenomicRange(entry) || ''
+    };
+    descriptor.hgvs = Object.fromEntries(Object.entries(hgvs).filter(([, value]) => value));
+    if (!Object.keys(descriptor.hgvs).length) delete descriptor.hgvs;
+    if (entry.iscn) descriptor.iscn = entry.iscn;
+    const rsid = getVariantRsId(entry);
+    if (rsid) descriptor.rsid = rsid;
+    const classification = mapVarSeqClassification(entry.classification);
+    if (classification) descriptor.classification = classification;
+    if (entry.criteria) descriptor.criteria = entry.criteria;
+    if (entry.evidence) descriptor.evidence = entry.evidence;
+    if (entry.condition) descriptor.condition = entry.condition;
+    if (entry.inheritance) descriptor.inheritance = entry.inheritance;
+    const genomeBuild = entry.genome_build || coordinate.build || normalizedBuild;
+    if (genomeBuild) descriptor.genomeBuild = genomeBuild;
+    const coordinates = {
+      chromosome: coordinate.chromosome || '',
+      start: Number.isFinite(coordinate.start) ? coordinate.start : null,
+      end: Number.isFinite(coordinate.end) ? coordinate.end : null,
+      copyNumber: entry.copy_number || '',
+      svSubtype: normalizeStructureTypeValue(entry.sv_subtype) || '',
+      sizeBp: entry.size_bp || ''
+    };
+    const filteredCoordinates = Object.fromEntries(Object.entries(coordinates).filter(([, value]) => value !== null && value !== '' && value !== undefined && !(typeof value === 'number' && Number.isNaN(value))));
+    if (Object.keys(filteredCoordinates).length) descriptor.coordinates = filteredCoordinates;
+    if (entry.affected_genes) descriptor.affectedGenes = entry.affected_genes;
+    if (entry.curated_by) descriptor.curatedBy = entry.curated_by;
+    if (entry.last_review) descriptor.lastReview = entry.last_review;
+    if (entry.description) descriptor.description = entry.description;
+    const expressions = [];
+    if (entry.hgvs_c) expressions.push({syntax: 'hgvs.c', value: entry.hgvs_c});
+    if (entry.hgvs_p) expressions.push({syntax: 'hgvs.p', value: entry.hgvs_p});
+    const genomic = entry.genomic_position || formatVariantGenomicRange(entry);
+    if (genomic) expressions.push({syntax: 'hgvs.g', value: genomic});
+    if (entry.iscn) expressions.push({syntax: 'iscn', value: entry.iscn});
+    if (expressions.length) descriptor.expressions = expressions;
+    const variationDefinition = entry.evidence || entry.description || label || '';
+    if (variationDefinition) {
+      descriptor.variation = {type: 'Text', definition: variationDefinition};
+    }
+    descriptors.push(descriptor);
+  });
+  const payload = {
+    resourceType: 'VrsExport',
+    generatedAt: new Date().toISOString(),
+    variation_descriptors: descriptors
+  };
+  if (normalizedBuild) {
+    payload.genomeBuild = normalizedBuild;
+  }
+  return {text: JSON.stringify(payload, null, 2), included: descriptors.length};
+}
+function parseVariantLibraryVcf(text) {
+  if (!text) return {records: [], genomeBuild: '', skipped: 0};
+  const cleaned = text.replace(/^\ufeff/, '');
+  const lines = cleaned.split(/\r?\n/);
+  const records = [];
+  let genomeBuild = '';
+  let skipped = 0;
+  for (const rawLine of lines) {
+    if (!rawLine) continue;
+    const line = rawLine.trim();
+    if (!line) continue;
+    if (line.startsWith('##')) {
+      if (line.startsWith('##reference=')) {
+        const referenceValue = line.slice('##reference='.length);
+        genomeBuild = normalizeGenomeBuildValue(referenceValue) || referenceValue.trim();
+      }
+      continue;
+    }
+    if (line.startsWith('#')) continue;
+    const parts = line.split('\t');
+    if (parts.length < 8) {
+      skipped++;
+      continue;
+    }
+    const [chromRaw, posRaw, idRaw, , , , , infoRaw] = parts;
+    const record = {};
+    const chromNormalized = normalizeChromosomeValue(chromRaw);
+    if (chromNormalized) record.chromosome = chromNormalized;
+    const pos = Number.parseInt(posRaw, 10);
+    if (Number.isFinite(pos)) {
+      record.start = String(pos);
+      record.end = String(pos);
+      const chromLabel = chromNormalized || chromRaw.replace(/^chr/i, '') || chromRaw;
+      record.genomic_position = `${chromLabel}:${pos}`;
+    }
+    if (idRaw && idRaw !== '.') {
+      const glimrMatch = idRaw.match(/GLIMR(\d+)/i);
+      if (glimrMatch) {
+        record.id = glimrMatch[1];
+      } else if (/^\d+$/.test(idRaw)) {
+        record.id = idRaw;
+      } else if (!record.rsid) {
+        record.rsid = idRaw;
+      }
+    }
+    const infoFields = infoRaw.split(';').filter(Boolean);
+    infoFields.forEach(field => {
+      const [key, rawValue = ''] = field.split('=', 2);
+      const upperKey = key.toUpperCase();
+      const value = decodeVcfInfoValue(rawValue);
+      switch (upperKey) {
+        case 'TYPE':
+          record.variant_type = value;
+          break;
+        case 'GENE':
+          record.gene = value;
+          break;
+        case 'TRANSCRIPT':
+          record.transcript = value;
+          break;
+        case 'HGVS_C':
+          record.hgvs_c = value;
+          break;
+        case 'HGVS_P':
+          record.hgvs_p = value;
+          break;
+        case 'HGVS_G':
+          record.genomic_position = value;
+          break;
+        case 'CLASS':
+          record.classification = value;
+          break;
+        case 'CRITERIA':
+          record.criteria = value;
+          break;
+        case 'EVIDENCE':
+          record.evidence = value;
+          break;
+        case 'CONDITION':
+          record.condition = value;
+          break;
+        case 'INHERITANCE':
+          record.inheritance = value;
+          break;
+        case 'END':
+          record.end = sanitizePositionValue(value) || record.end;
+          break;
+        case 'BUILD':
+          record.genome_build = value;
+          break;
+        case 'SVTYPE':
+          record.sv_subtype = value;
+          break;
+        case 'COPY_NUMBER':
+          record.copy_number = value;
+          break;
+        case 'SIZE_BP':
+          record.size_bp = value;
+          break;
+        case 'ISCN':
+          record.iscn = value;
+          break;
+        case 'AFFECTED_GENES':
+          record.affected_genes = value;
+          break;
+        case 'CURATED_BY':
+          record.curated_by = value;
+          break;
+        case 'LAST_REVIEW':
+          record.last_review = value;
+          break;
+        case 'DESCRIPTION':
+          record.description = value;
+          break;
+        default:
+          break;
+      }
+    });
+    if (!record.variant_type && record.sv_subtype) {
+      record.variant_type = 'cnv';
+    }
+    if (!record.variant_type) {
+      record.variant_type = 'snv';
+    }
+    if (record.chromosome && record.start && record.end) {
+      const startNum = Number(record.start);
+      const endNum = Number(record.end);
+      if (Number.isFinite(startNum) && Number.isFinite(endNum) && endNum < startNum) {
+        record.start = String(endNum);
+        record.end = String(startNum);
+      }
+    }
+    records.push(record);
+  }
+  return {records, genomeBuild, skipped};
+}
+function parseVariantLibraryBed(text) {
+  if (!text) return {records: [], skipped: 0};
+  const cleaned = text.replace(/^\ufeff/, '');
+  const lines = cleaned.split(/\r?\n/);
+  const records = [];
+  let skipped = 0;
+  for (const rawLine of lines) {
+    if (!rawLine) continue;
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+    const lower = line.toLowerCase();
+    if (lower.startsWith('track') || lower.startsWith('browser')) continue;
+    const parts = line.split('\t');
+    if (parts.length < 3) {
+      skipped++;
+      continue;
+    }
+    while (parts.length < 20) {
+      parts.push('');
+    }
+    const [
+      chromRaw,
+      startRaw,
+      endRaw,
+      name,
+      score,
+      ,
+      type,
+      gene,
+      transcript,
+      hgvsC,
+      hgvsP,
+      condition,
+      inheritance,
+      copyNumber,
+      svSubtype,
+      sizeBp,
+      curatedBy,
+      lastReview,
+      description,
+      evidence
+    ] = parts;
+    const record = {};
+    const chromNormalized = normalizeChromosomeValue(chromRaw);
+    if (chromNormalized) {
+      record.chromosome = chromNormalized;
+    }
+    const start0 = Number.parseInt(startRaw, 10);
+    const end = Number.parseInt(endRaw, 10);
+    if (Number.isFinite(start0)) {
+      const start = start0 + 1;
+      record.start = String(start);
+      if (Number.isFinite(end)) {
+        record.end = String(end);
+      }
+      const chromLabel = chromNormalized || chromRaw.replace(/^chr/i, '') || chromRaw;
+      record.genomic_position = Number.isFinite(end)
+        ? `${chromLabel}:${start}-${end}`
+        : `${chromLabel}:${start}`;
+    }
+    if (type) record.variant_type = type;
+    if (gene) record.gene = gene;
+    if (transcript) record.transcript = transcript;
+    if (hgvsC) record.hgvs_c = hgvsC;
+    if (hgvsP) record.hgvs_p = hgvsP;
+    if (condition) record.condition = condition;
+    if (inheritance) record.inheritance = inheritance;
+    if (copyNumber) record.copy_number = copyNumber;
+    if (svSubtype) record.sv_subtype = svSubtype;
+    if (sizeBp) record.size_bp = sizeBp;
+    if (curatedBy) record.curated_by = curatedBy;
+    if (lastReview) record.last_review = lastReview;
+    if (description) record.description = description;
+    if (evidence) record.evidence = evidence;
+    if (score && !record.classification) {
+      const scoreNumber = Number.parseInt(score, 10);
+      if (Number.isFinite(scoreNumber) && scoreNumber >= 0) {
+        const classification = Math.max(1, Math.min(5, Math.round(scoreNumber / 200)));
+        if (classification) {
+          record.classification = String(classification);
+        }
+      }
+    }
+    if (name && name !== '.' && !record.description) {
+      record.description = name.replace(/_/g, ' ');
+    }
+    records.push(record);
+  }
+  return {records, skipped};
+}
+function parseVariantLibraryVrs(text) {
+  if (!text) return {records: [], genomeBuild: '', skipped: 0};
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (err) {
+    throw new Error('Kunne ikke tolke JSON: ' + err.message);
+  }
+  let descriptors = [];
+  if (Array.isArray(data)) {
+    descriptors = data;
+  } else if (Array.isArray(data.variation_descriptors)) {
+    descriptors = data.variation_descriptors;
+  } else if (Array.isArray(data.descriptors)) {
+    descriptors = data.descriptors;
+  } else if (data && typeof data === 'object' && data.type === 'VariationDescriptor') {
+    descriptors = [data];
+  } else {
+    throw new Error('JSON-filen indeholder ingen variationer.');
+  }
+  const genomeBuild = normalizeGenomeBuildValue(data.genomeBuild || data.reference || '') || '';
+  const records = [];
+  let skipped = 0;
+  descriptors.forEach(descriptor => {
+    if (!descriptor || typeof descriptor !== 'object') {
+      skipped++;
+      return;
+    }
+    const record = {};
+    if (descriptor.id) {
+      const match = String(descriptor.id).match(/(\d+)$/);
+      if (match) {
+        record.id = match[1];
+      }
+    }
+    if (descriptor.variantType) {
+      record.variant_type = descriptor.variantType;
+    } else if (descriptor.variationType) {
+      record.variant_type = descriptor.variationType;
+    }
+    if (descriptor.gene) record.gene = descriptor.gene;
+    if (descriptor.transcript) record.transcript = descriptor.transcript;
+    if (descriptor.iscn) record.iscn = descriptor.iscn;
+    if (descriptor.rsid) record.rsid = descriptor.rsid;
+    if (descriptor.classification) record.classification = descriptor.classification;
+    if (descriptor.criteria) record.criteria = descriptor.criteria;
+    if (descriptor.evidence) record.evidence = descriptor.evidence;
+    if (descriptor.condition) record.condition = descriptor.condition;
+    if (descriptor.inheritance) record.inheritance = descriptor.inheritance;
+    if (descriptor.description) record.description = descriptor.description;
+    if (descriptor.curatedBy) record.curated_by = descriptor.curatedBy;
+    if (descriptor.lastReview) record.last_review = descriptor.lastReview;
+    if (descriptor.affectedGenes) record.affected_genes = descriptor.affectedGenes;
+    if (descriptor.genomeBuild) record.genome_build = descriptor.genomeBuild;
+    if (descriptor.hgvs && typeof descriptor.hgvs === 'object') {
+      if (descriptor.hgvs.c && !record.hgvs_c) record.hgvs_c = descriptor.hgvs.c;
+      if (descriptor.hgvs.p && !record.hgvs_p) record.hgvs_p = descriptor.hgvs.p;
+      if (descriptor.hgvs.g && !record.genomic_position) record.genomic_position = descriptor.hgvs.g;
+    }
+    const expressions = Array.isArray(descriptor.expressions) ? descriptor.expressions : [];
+    expressions.forEach(expr => {
+      if (!expr || typeof expr !== 'object') return;
+      const syntax = String(expr.syntax || '').toLowerCase();
+      const value = expr.value || '';
+      if (!value) return;
+      if (syntax.includes('hgvs.c') && !record.hgvs_c) record.hgvs_c = value;
+      if (syntax.includes('hgvs.p') && !record.hgvs_p) record.hgvs_p = value;
+      if (syntax.includes('hgvs.g') && !record.genomic_position) record.genomic_position = value;
+      if (syntax.includes('iscn') && !record.iscn) record.iscn = value;
+    });
+    const coordinates = descriptor.coordinates;
+    if (coordinates && typeof coordinates === 'object') {
+      if (coordinates.chromosome) record.chromosome = coordinates.chromosome;
+      if (coordinates.start != null) record.start = String(coordinates.start);
+      if (coordinates.end != null) record.end = String(coordinates.end);
+      if (coordinates.copyNumber) record.copy_number = coordinates.copyNumber;
+      if (coordinates.svSubtype) record.sv_subtype = coordinates.svSubtype;
+      if (coordinates.sizeBp) record.size_bp = coordinates.sizeBp;
+    }
+    const variation = descriptor.variation;
+    if (variation && typeof variation === 'object') {
+      if (!record.variant_type && variation.type) record.variant_type = variation.type;
+      if (!record.evidence && variation.definition) record.evidence = variation.definition;
+    }
+    if (!record.genomic_position && record.chromosome && record.start) {
+      const endPart = record.end && record.end !== record.start ? `-${record.end}` : '';
+      record.genomic_position = `${record.chromosome}:${record.start}${endPart}`;
+    }
+    if (Object.keys(record).length === 0) {
+      skipped++;
+      return;
+    }
+    records.push(record);
+  });
+  return {records, genomeBuild, skipped};
+}
+async function applyVariantLibraryImport(records, {defaultGenomeBuild = ''} = {}) {
+  const summary = {created: 0, updated: 0, skipped: 0};
+  if (!Array.isArray(records) || !records.length) {
+    return summary;
+  }
+  const normalizedDefaultBuild = normalizeGenomeBuildValue(defaultGenomeBuild) || '';
+  const existingCache = new Map((getCached('variant_library') || []).map(entry => [entry.id, {...entry}]));
+  for (const raw of records) {
+    if (!raw || typeof raw !== 'object') {
+      summary.skipped++;
+      continue;
+    }
+    const entry = {};
+    Object.entries(raw).forEach(([key, value]) => {
+      if (value == null) return;
+      if (typeof value === 'number') value = String(value);
+      if (typeof value !== 'string') value = String(value);
+      const trimmed = value.trim();
+      if (!trimmed && trimmed !== '0') return;
+      switch (key) {
+        case 'id':
+          entry.id = trimmed;
+          break;
+        case 'variant_type':
+          entry.variant_type = trimmed;
+          break;
+        case 'gene':
+        case 'transcript':
+        case 'hgvs_c':
+        case 'hgvs_p':
+        case 'genomic_position':
+        case 'classification':
+        case 'criteria':
+        case 'evidence':
+        case 'condition':
+        case 'inheritance':
+        case 'chromosome':
+        case 'start':
+        case 'end':
+        case 'copy_number':
+        case 'size_bp':
+        case 'iscn':
+        case 'description':
+        case 'affected_genes':
+        case 'curated_by':
+        case 'last_review':
+          entry[key] = trimmed;
+          break;
+        case 'genome_build':
+          entry.genome_build = trimmed;
+          break;
+        case 'rsid':
+          entry.rsid = trimmed;
+          break;
+        case 'sv_subtype':
+          entry.sv_subtype = trimmed;
+          break;
+        default:
+          break;
+      }
+    });
+    entry.variant_type = normalizeVariantType(entry.variant_type || (entry.sv_subtype || entry.copy_number || entry.iscn ? 'cnv' : 'snv'));
+    entry.sv_subtype = normalizeStructureTypeValue(entry.sv_subtype);
+    entry.rsid = normalizeRsId(entry.rsid);
+    entry.classification = mapVarSeqClassification(entry.classification);
+    if (entry.start) {
+      const sanitizedStart = sanitizePositionValue(entry.start);
+      if (sanitizedStart) {
+        entry.start = sanitizedStart;
+      } else {
+        delete entry.start;
+      }
+    }
+    if (entry.end) {
+      const sanitizedEnd = sanitizePositionValue(entry.end);
+      if (sanitizedEnd) {
+        entry.end = sanitizedEnd;
+      } else {
+        delete entry.end;
+      }
+    }
+    if (entry.genome_build) {
+      const normalizedBuild = normalizeGenomeBuildValue(entry.genome_build);
+      if (normalizedBuild) {
+        entry.genome_build = normalizedBuild;
+      }
+    } else if (normalizedDefaultBuild) {
+      entry.genome_build = normalizedDefaultBuild;
+    }
+    if (entry.last_review) {
+      entry.last_review = ensureVariantLibraryIsoDate(entry.last_review);
+    }
+    if (!entry.genomic_position && entry.chromosome && entry.start) {
+      const endPart = entry.end && entry.end !== entry.start ? `-${entry.end}` : '';
+      entry.genomic_position = `${entry.chromosome}:${entry.start}${endPart}`;
+    }
+    const hasIdentifier = Boolean(
+      entry.gene
+      || entry.hgvs_c
+      || entry.hgvs_p
+      || entry.genomic_position
+      || entry.iscn
+      || (entry.chromosome && (entry.start || entry.end))
+      || entry.description
+    );
+    if (!hasIdentifier) {
+      summary.skipped++;
+      continue;
+    }
+    let id = null;
+    if (entry.id) {
+      const parsedId = Number(entry.id);
+      if (Number.isFinite(parsedId) && parsedId > 0) {
+        id = parsedId;
+      }
+    }
+    if (id && existingCache.has(id)) {
+      const before = existingCache.get(id);
+      const updated = {...before, ...entry, id};
+      await updateRecord('variant_library', updated, before);
+      existingCache.set(id, updated);
+      summary.updated++;
+    } else {
+      const record = {...entry};
+      delete record.id;
+      if (!record.curated_by) record.curated_by = currentUserName() || '';
+      if (!record.last_review) record.last_review = new Date().toISOString().split('T')[0];
+      await addRecord('variant_library', record);
+      summary.created++;
+    }
+  }
+  return summary;
+}
 function renderVariantLibrary(section) {
   const rawLibrary = getCached('variant_library') || [];
   const list = rawLibrary.map(entry => {
@@ -14097,9 +14976,29 @@ function renderVariantLibrary(section) {
         </table>
         <div class="table-actions">
           <button type="button" class="secondary" id="libraryOpenPatients" disabled data-tooltip="Åbn Patienter-fanen filtreret på den valgte variant">Vis patienter med varianten</button>
-          <button type="button" class="secondary" id="libraryExportCsv">Eksportér CSV</button>
-          <button type="button" class="secondary" id="libraryImportCsv">Importér CSV</button>
-          <input type="file" id="variantLibraryImportInput" accept=".csv,text/csv" hidden>
+          <div class="table-action-group">
+            <label for="libraryExportFormat" class="sr-only">Eksportformat</label>
+            <select id="libraryExportFormat">
+              <option value="csv">CSV</option>
+              <option value="tsv">TSV</option>
+              <option value="vcf">VCF</option>
+              <option value="bed">BED</option>
+              <option value="vrs">VRS (JSON)</option>
+            </select>
+            <button type="button" class="secondary" id="libraryExport">Eksportér</button>
+          </div>
+          <div class="table-action-group">
+            <label for="libraryImportFormat" class="sr-only">Importformat</label>
+            <select id="libraryImportFormat">
+              <option value="csv">CSV</option>
+              <option value="tsv">TSV</option>
+              <option value="vcf">VCF</option>
+              <option value="bed">BED</option>
+              <option value="vrs">VRS (JSON)</option>
+            </select>
+            <button type="button" class="secondary" id="libraryImport">Importér</button>
+          </div>
+          <input type="file" id="variantLibraryImportInput" hidden>
         </div>
       </div>
       <div>
@@ -14202,8 +15101,10 @@ function renderVariantLibrary(section) {
   const saveNewButton = section.querySelector('#variantLibrarySaveNew');
   const clearButton = section.querySelector('#variantLibraryClear');
   const deleteButton = section.querySelector('#variantLibraryDelete');
-  const exportButton = section.querySelector('#libraryExportCsv');
-  const importButton = section.querySelector('#libraryImportCsv');
+  const exportButton = section.querySelector('#libraryExport');
+  const exportFormatSelect = section.querySelector('#libraryExportFormat');
+  const importButton = section.querySelector('#libraryImport');
+  const importFormatSelect = section.querySelector('#libraryImportFormat');
   const importInput = section.querySelector('#variantLibraryImportInput');
   const openPatientsButton = section.querySelector('#libraryOpenPatients');
   const hotspotChartContainer = section.querySelector('#variantHotspotChart');
@@ -15842,206 +16743,148 @@ function renderVariantLibrary(section) {
     setStatus(`Bibliotekspost ${id} slettet.`);
     renderTab('variant_library');
   });
+  const importAcceptMap = {
+    csv: '.csv,text/csv,application/csv',
+    tsv: '.tsv,text/tab-separated-values,text/plain',
+    vcf: '.vcf,text/vcf,application/vcf,text/plain',
+    bed: '.bed,text/plain,application/octet-stream',
+    vrs: '.json,application/json,text/json'
+  };
+  const updateImportAccept = () => {
+    if (!importInput) return;
+    const format = (importFormatSelect?.value || 'csv').toLowerCase();
+    importInput.accept = importAcceptMap[format] || '';
+  };
+  updateImportAccept();
+  importFormatSelect?.addEventListener('change', updateImportAccept);
   exportButton?.addEventListener('click', () => {
+    const format = (exportFormatSelect?.value || 'csv').toLowerCase();
     const exportRows = filteredLibrary.map(entry => ({
       ...entry,
       variant_type: normalizeVariantType(entry.variant_type),
       sv_subtype: normalizeStructureTypeValue(entry.sv_subtype)
     }));
-    const filename = downloadCsvFile(exportRows, csvColumns, 'glimr-variantbibliotek.csv');
-    setStatus(`Eksporterede ${filteredLibrary.length} biblioteksposter til ${filename}.`);
+    const baseDetails = {format, source: 'variant_library', filteredCount: filteredLibrary.length};
+    let filename = '';
+    let included = exportRows.length;
+    let skipped = 0;
+    switch (format) {
+      case 'csv': {
+        filename = downloadCsvFile(exportRows, csvColumns, 'glimr-variantbibliotek.csv', ';', {
+          entity: 'variant_library_export',
+          details: {...baseDetails, included}
+        });
+        break;
+      }
+      case 'tsv': {
+        filename = downloadCsvFile(exportRows, csvColumns, 'glimr-variantbibliotek.tsv', '\t', {
+          entity: 'variant_library_export',
+          details: {...baseDetails, included}
+        });
+        break;
+      }
+      case 'vcf': {
+        const result = buildVariantLibraryVcf(exportRows, {defaultGenomeBuild: selectedGenomeBuild});
+        filename = downloadTextFile(result.text, 'glimr-variantbibliotek.vcf', {
+          entity: 'variant_library_export',
+          details: {...baseDetails, included: result.included, skipped: result.skipped}
+        });
+        included = result.included;
+        skipped = result.skipped;
+        break;
+      }
+      case 'bed': {
+        const result = buildVariantLibraryBed(exportRows, {defaultGenomeBuild: selectedGenomeBuild});
+        filename = downloadTextFile(result.text, 'glimr-variantbibliotek.bed', {
+          entity: 'variant_library_export',
+          details: {...baseDetails, included: result.included, skipped: result.skipped}
+        });
+        included = result.included;
+        skipped = result.skipped;
+        break;
+      }
+      case 'vrs': {
+        const result = buildVariantLibraryVrsPayload(exportRows, {defaultGenomeBuild: selectedGenomeBuild});
+        filename = downloadTextFile(result.text, 'glimr-variantbibliotek.vrs.json', {
+          entity: 'variant_library_export',
+          details: {...baseDetails, included: result.included}
+        });
+        included = result.included;
+        break;
+      }
+      default:
+        alert('Ukendt eksportformat.');
+        return;
+    }
+    const formatLabel = format.toUpperCase();
+    const statusParts = [`Eksporterede ${included} biblioteksposter til ${filename} (${formatLabel}).`];
+    if (skipped) {
+      statusParts.push(`${skipped} poster blev udeladt på grund af manglende koordinater.`);
+    }
+    setStatus(statusParts.join(' '));
   });
-  importButton?.addEventListener('click', () => importInput?.click());
+  importButton?.addEventListener('click', () => {
+    if (!importInput) return;
+    const format = (importFormatSelect?.value || 'csv').toLowerCase();
+    importInput.dataset.format = format;
+    updateImportAccept();
+    importInput.click();
+  });
   importInput?.addEventListener('change', async () => {
     const file = importInput.files?.[0];
     if (!file) return;
     if (!ensureWrite('variant_library')) {
       importInput.value = '';
+      delete importInput.dataset.format;
       return;
     }
+    const format = (importInput.dataset.format || importFormatSelect?.value || 'csv').toLowerCase();
     try {
       const text = await file.text();
-      const {headers, rows} = parseCsv(text);
-      if (!headers.length) throw new Error('CSV-filen mangler kolonneoverskrifter.');
-      const headerMap = {
-        id: 'id',
-        gene: 'gene',
-        gen: 'gene',
-        transcript: 'transcript',
-        transkript: 'transcript',
-        hgvs_c: 'hgvs_c',
-        hgvs_c_: 'hgvs_c',
-        hgvs: 'hgvs_c',
-        hgvs_p: 'hgvs_p',
-        rsid: 'rsid',
-        dbsnp: 'rsid',
-        dbsnp_id: 'rsid',
-        dbsnpid: 'rsid',
-        dbsnp_rs: 'rsid',
-        rs_id: 'rsid',
-        genomic_position: 'genomic_position',
-        genomisk_position: 'genomic_position',
-        genomisk_position_ra: 'genomic_position',
-        genomicpos: 'genomic_position',
-        genomic_pos: 'genomic_position',
-        position: 'genomic_position',
-        pos: 'genomic_position',
-        variant_type: 'variant_type',
-        varianttype: 'variant_type',
-        varianttypekode: 'variant_type',
-        varianttype_kode: 'variant_type',
-        type: 'variant_type',
-        klassifikation: 'classification',
-        classification: 'classification',
-        class: 'classification',
-        klasse: 'classification',
-        criteria: 'criteria',
-        kriterier: 'criteria',
-        acmg: 'criteria',
-        evidence: 'evidence',
-        evidens: 'evidence',
-        notes: 'evidence',
-        condition: 'condition',
-        tilstand: 'condition',
-        phenotype: 'condition',
-        inheritance: 'inheritance',
-        nedarvning: 'inheritance',
-        genome_build: 'genome_build',
-        genome: 'genome_build',
-        reference: 'genome_build',
-        kromosom: 'chromosome',
-        chromosome: 'chromosome',
-        chr: 'chromosome',
-        start: 'start',
-        begin: 'start',
-        begynd: 'start',
-        position_start: 'start',
-        end: 'end',
-        stop: 'end',
-        slut: 'end',
-        position_end: 'end',
-        copy_number: 'copy_number',
-        copynumber: 'copy_number',
-        kopital: 'copy_number',
-        kopitaler: 'copy_number',
-        cn: 'copy_number',
-        sv_subtype: 'sv_subtype',
-        svtype: 'sv_subtype',
-        strukturtype: 'sv_subtype',
-        strukturtypekode: 'sv_subtype',
-        strukturtype_kode: 'sv_subtype',
-        variant_subtype: 'sv_subtype',
-        structuraltype: 'sv_subtype',
-        size: 'size_bp',
-        size_bp: 'size_bp',
-        stoerrelse: 'size_bp',
-        length: 'size_bp',
-        iscn: 'iscn',
-        cytogenetic: 'iscn',
-        affected_genes: 'affected_genes',
-        genes: 'affected_genes',
-        gener: 'affected_genes',
-        description: 'description',
-        beskrivelse: 'description',
-        curated_by: 'curated_by',
-        kurator: 'curated_by',
-        kurateret_af: 'curated_by',
-        last_review: 'last_review',
-        sidst_gennemgaaet: 'last_review',
-        lastreview: 'last_review'
-      };
-      const computedColumnNames = new Set(['frekvens', 'frequency', 'forekomst', 'occurrence', 'genomisk_interval', 'genomic_interval']);
-      const ignoredComputedColumns = new Set();
-      const columnKeys = headers.map(header => {
-        const normalized = normaliseHeader(header);
-        if (computedColumnNames.has(normalized)) {
-          const trimmed = (header || '').trim();
-          if (trimmed) ignoredComputedColumns.add(trimmed);
-          return null;
-        }
-        return headerMap[normalized] || null;
-      });
-      if (!columnKeys.some(key => ['gene', 'hgvs_c', 'hgvs_p', 'iscn', 'chromosome', 'description'].includes(key))) {
-        throw new Error('CSV-filen skal mindst indeholde et identificerende felt (Gen, HGVS, ISCN, kromosom eller beskrivelse).');
+      let parseResult;
+      switch (format) {
+        case 'csv':
+        case 'tsv':
+          parseResult = parseVariantLibraryDelimited(text);
+          break;
+        case 'vcf':
+          parseResult = parseVariantLibraryVcf(text);
+          break;
+        case 'bed':
+          parseResult = parseVariantLibraryBed(text);
+          break;
+        case 'vrs':
+          parseResult = parseVariantLibraryVrs(text);
+          break;
+        default:
+          throw new Error('Ukendt importformat.');
       }
-      const summary = {created: 0, updated: 0, skipped: 0};
-      const existingCache = new Map(getCached('variant_library').map(entry => [entry.id, {...entry}]));
-      for (const rowValues of rows) {
-        if (!rowValues || rowValues.every(cell => !cell || !cell.trim())) {
-          summary.skipped++;
-          continue;
-        }
-        const entry = {};
-        columnKeys.forEach((key, idx) => {
-          if (!key) return;
-          const raw = (rowValues[idx] || '').trim();
-          if (key === 'rsid') {
-            entry.rsid = normalizeRsId(raw);
-            return;
-          }
-          if (key === 'sv_subtype') {
-            entry.sv_subtype = normalizeStructureTypeValue(raw);
-            return;
-          }
-          entry[key] = raw;
-        });
-        entry.variant_type = normalizeVariantType(entry.variant_type);
-        let id = null;
-        if (entry.id) {
-          const parsedId = Number(entry.id);
-          if (Number.isFinite(parsedId) && parsedId > 0) {
-            id = parsedId;
-            entry.id = parsedId;
-          } else {
-            delete entry.id;
-          }
-        }
-        const ensureIsoDate = value => {
-          if (!value) return '';
-          if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-          const parsed = new Date(value);
-          if (!Number.isNaN(parsed.getTime())) {
-            return parsed.toISOString().split('T')[0];
-          }
-          return value;
-        };
-        entry.last_review = ensureIsoDate(entry.last_review || '');
-        if (!entry.gene && !entry.hgvs_c && !entry.hgvs_p && !entry.genomic_position && !entry.iscn && !entry.chromosome && !entry.description) {
-          summary.skipped++;
-          continue;
-        }
-        if (id && existingCache.has(id)) {
-          const before = existingCache.get(id);
-          const updated = {...before, ...entry, id};
-          await updateRecord('variant_library', updated, before);
-          existingCache.set(id, updated);
-          summary.updated++;
-        } else {
-          const record = {...entry};
-          delete record.id;
-          if (!record.curated_by) record.curated_by = currentUserName() || '';
-          if (!record.last_review) record.last_review = new Date().toISOString().split('T')[0];
-          await addRecord('variant_library', record);
-          summary.created++;
-        }
-      }
+      const records = parseResult.records || [];
+      const defaultBuild = parseResult.genomeBuild || '';
+      const summary = await applyVariantLibraryImport(records, {defaultGenomeBuild: defaultBuild});
+      await loadStore('variant_library');
       const summaryParts = [];
       if (summary.updated) summaryParts.push(`${summary.updated} opdateret`);
       if (summary.created) summaryParts.push(`${summary.created} tilføjet`);
       if (summary.skipped) summaryParts.push(`${summary.skipped} uændret`);
       const message = summaryParts.length ? summaryParts.join(', ') : 'Ingen poster ændret';
-      const ignoredMessage = ignoredComputedColumns.size
-        ? ` Beregnede kolonner ignoreret: ${Array.from(ignoredComputedColumns).join(', ')}.`
-        : '';
-      setStatus(`Import fuldført: ${message}.${ignoredMessage}`);
-      alert(`Import fuldført: ${message}.${ignoredMessage ? `\n${ignoredMessage}` : ''}`);
+      const extraMessages = [];
+      if (parseResult.ignoredComputedColumns?.size) {
+        extraMessages.push(`Beregnede kolonner ignoreret: ${Array.from(parseResult.ignoredComputedColumns).join(', ')}.`);
+      }
+      if (parseResult.skipped) {
+        extraMessages.push(`${parseResult.skipped} linjer uden data ignoreret.`);
+      }
+      setStatus(`Import (${format.toUpperCase()}) fuldført: ${message}.${extraMessages.length ? ' ' + extraMessages.join(' ') : ''}`);
+      alert(`Import (${format.toUpperCase()}) fuldført: ${message}.${extraMessages.length ? `\n${extraMessages.join('\n')}` : ''}`);
       renderTab('variant_library');
     } catch (err) {
       console.error(err);
-      alert('Kunne ikke importere CSV: ' + err.message);
-      setStatus('Fejl under import: ' + err.message);
+      alert(`Kunne ikke importere ${format.toUpperCase()}: ${err.message}`);
+      setStatus(`Fejl under import (${format.toUpperCase()}): ${err.message}`);
     } finally {
       importInput.value = '';
+      delete importInput.dataset.format;
     }
   });
 }
