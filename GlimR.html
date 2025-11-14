@@ -1234,6 +1234,69 @@ section[data-tab].active {
   padding: 1.5rem 0.5rem;
   color: var(--muted-text);
 }
+.duplicate-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  z-index: 1100;
+}
+[data-theme="dark"] .duplicate-dialog-overlay {
+  background: rgba(8, 13, 23, 0.75);
+}
+.duplicate-dialog {
+  background: var(--panel-bg);
+  color: var(--text);
+  border-radius: 0.75rem;
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--shadow);
+  max-width: 520px;
+  width: min(520px, 100%);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.duplicate-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.duplicate-dialog header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+.duplicate-dialog-message {
+  margin: 0;
+  color: var(--priority-urgent);
+  font-weight: 600;
+}
+[data-theme="dark"] .duplicate-dialog-message {
+  color: var(--priority-acute);
+}
+.duplicate-dialog p {
+  margin: 0;
+  color: var(--muted-text);
+}
+.duplicate-dialog-details {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+.duplicate-dialog-details li + li {
+  margin-top: 0.35rem;
+}
+.duplicate-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
 .panel h2 {
   margin-top: 0;
 }
@@ -3255,6 +3318,8 @@ const state = {
   pendingOrderShowAll: false,
   pendingOrderFilterSampleId: null,
   pendingOrderFilterSampleExact: false,
+  pendingOrderFilterPatientId: null,
+  pendingOrderFilterPatientExact: false,
   pendingOrderFilterId: null,
   pendingOrderFamilyNumber: '',
   pendingSampleId: null,
@@ -5649,6 +5714,92 @@ function openVariantLibraryPicker(onSelect) {
   });
   setTimeout(() => searchInput?.focus(), 50);
 }
+
+function openDuplicateDialog({
+  title = 'Muligt duplikat',
+  message = '',
+  description = '',
+  details = [],
+  actions = [],
+  tone = 'warning'
+} = {}) {
+  const detailItems = Array.isArray(details) ? details.filter(Boolean) : [];
+  const actionItems = Array.isArray(actions) && actions.length
+    ? actions
+    : [{value: 'continue', label: 'Fortsæt', variant: 'primary'}];
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'duplicate-dialog-overlay';
+    if (tone) overlay.dataset.tone = tone;
+    const headingId = `duplicate-dialog-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const messageHtml = message ? `<p class="duplicate-dialog-message">${esc(message)}</p>` : '';
+    const descriptionHtml = description ? `<p>${esc(description)}</p>` : '';
+    const detailsHtml = detailItems.length
+      ? `<ul class="duplicate-dialog-details">${detailItems.map(item => `<li>${esc(item)}</li>`).join('')}</ul>`
+      : '';
+    const actionsHtml = actionItems.map(action => {
+      const value = String(action?.value ?? '');
+      const label = String(action?.label ?? value || 'Vælg');
+      const variant = (action?.variant || '').toLowerCase();
+      let className = 'secondary';
+      if (variant === 'primary') {
+        className = 'primary';
+      } else if (variant === 'danger') {
+        className = 'danger';
+      }
+      return `<button type="button" class="${className}" data-choice="${esc(value)}">${esc(label)}</button>`;
+    }).join('');
+    overlay.innerHTML = `
+      <div class="duplicate-dialog" role="dialog" aria-modal="true" aria-labelledby="${headingId}">
+        <header>
+          <h3 id="${headingId}">${esc(title)}</h3>
+          <button type="button" class="secondary" data-action="close">Luk</button>
+        </header>
+        <div>
+          ${messageHtml}
+          ${descriptionHtml}
+          ${detailsHtml}
+        </div>
+        <div class="duplicate-dialog-actions">
+          ${actionsHtml}
+        </div>
+      </div>`;
+    const dialog = overlay.querySelector('.duplicate-dialog');
+    if (dialog) dialog.setAttribute('tabindex', '-1');
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.body.appendChild(overlay);
+    let settled = false;
+    const cleanup = result => {
+      if (settled) return;
+      settled = true;
+      document.body.style.overflow = previousOverflow;
+      overlay.remove();
+      resolve(result);
+    };
+    overlay.addEventListener('click', event => {
+      if (event.target === overlay) cleanup(null);
+    });
+    overlay.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        cleanup(null);
+      }
+    });
+    overlay.querySelector('[data-action="close"]')?.addEventListener('click', () => cleanup(null));
+    overlay.querySelectorAll('[data-choice]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const choice = btn.getAttribute('data-choice');
+        cleanup(choice);
+      });
+    });
+    setTimeout(() => {
+      dialog?.focus({preventScroll: true});
+      const firstButton = overlay.querySelector('[data-choice]');
+      firstButton?.focus({preventScroll: true});
+    }, 50);
+  });
+}
 function initCollapsibleFieldsets(root) {
   if (!root) return;
   const toggleState = (fieldset, toggle, body, collapsed) => {
@@ -6172,6 +6323,28 @@ function openOrdersForSample(sampleId) {
   const selectedId = first ? Number(first.id) : null;
   state.pendingOrderFilterSampleId = numericId;
   state.pendingOrderFilterSampleExact = true;
+  state.pendingOrderFilterId = null;
+  state.pendingOrderId = Number.isFinite(selectedId) ? selectedId : null;
+  state.pendingOrderShowAll = true;
+  activateTab('orders');
+}
+
+function openOrdersForPatient(patientId) {
+  const numericId = Number(patientId);
+  if (!Number.isFinite(numericId)) return;
+  const orders = getCached('orders') || [];
+  const matching = orders.filter(o => Number(o.patient_id) === numericId);
+  matching.sort((a, b) => {
+    const timeA = (a.ordered_at || a.updated_at || a.created_at || '');
+    const timeB = (b.ordered_at || b.updated_at || b.created_at || '');
+    return timeB.localeCompare(timeA);
+  });
+  const first = matching[0] || null;
+  const selectedId = first ? Number(first.id) : null;
+  state.pendingOrderFilterPatientId = numericId;
+  state.pendingOrderFilterPatientExact = true;
+  state.pendingOrderFilterSampleId = null;
+  state.pendingOrderFilterSampleExact = false;
   state.pendingOrderFilterId = null;
   state.pendingOrderId = Number.isFinite(selectedId) ? selectedId : null;
   state.pendingOrderShowAll = true;
@@ -9191,6 +9364,50 @@ function renderCreateCase(section) {
       submitting = false;
       return;
     }
+    const existingPatients = getCached('patients');
+    const existingPatient = existingPatients.find(p => (p.mrn || '').toLowerCase() === patient.mrn.toLowerCase());
+    if (existingPatient) {
+      const birthDisplay = formatDanishDate(existingPatient.birth_date) || (existingPatient.birth_date || '');
+      const patientDetails = [
+        existingPatient.name ? `Navn: ${existingPatient.name}` : '',
+        existingPatient.mrn ? `MRN: ${existingPatient.mrn}` : '',
+        existingPatient.family_number ? `Familienummer: ${existingPatient.family_number}` : '',
+        birthDisplay ? `Født: ${birthDisplay}` : '',
+        Number.isFinite(Number(existingPatient.id)) ? `Patient-ID: ${existingPatient.id}` : ''
+      ].filter(Boolean);
+      const choice = await openDuplicateDialog({
+        title: 'Patient findes allerede',
+        message: `MRN ${patient.mrn} er allerede registreret.`,
+        description: 'Vælg om du vil fortsætte, åbne patienten eller oprette en ordination.',
+        details: patientDetails,
+        actions: [
+          {value: 'continue', label: 'Fortsæt med ny patient', variant: 'primary'},
+          {value: 'open', label: 'Åbn patienten', variant: 'secondary'},
+          {value: 'order', label: 'Opret ordination på patienten', variant: 'secondary'}
+        ]
+      });
+      if (choice === 'open') {
+        const patientId = Number(existingPatient.id) || existingPatient.id;
+        state.pendingPatientSelectId = patientId;
+        disableButtons(false);
+        submitting = false;
+        activateTab('patients');
+        setMessage('Åbnede patienten i patientfanen.', 'info');
+        return;
+      }
+      if (choice === 'order') {
+        disableButtons(false);
+        submitting = false;
+        openOrdersForPatient(existingPatient.id);
+        setMessage('Åbnede ordinationsfanen for den eksisterende patient.', 'info');
+        return;
+      }
+      if (choice !== 'continue') {
+        disableButtons(false);
+        submitting = false;
+        return;
+      }
+    }
     const samplePmb = form.elements.sample_pmb.value.trim();
     if (!samplePmb) {
       setMessage('Angiv et PMB-nummer for prøven.', 'error');
@@ -9418,12 +9635,51 @@ function renderCreateCase(section) {
     }
     const existingSamples = getCached('samples');
     const primaryPmbLower = sample.pmb_number.toLowerCase();
-    if (existingSamples.some(s => (s.pmb_number || '').toLowerCase() === primaryPmbLower)) {
-      setMessage('PMB-nummeret for hovedprøven er allerede i brug.', 'error');
-      form.elements.sample_pmb.focus();
-      disableButtons(false);
-      submitting = false;
-      return;
+    const primaryConflict = existingSamples.find(s => (s.pmb_number || '').toLowerCase() === primaryPmbLower);
+    if (primaryConflict) {
+      const conflictPatientName = getName('patients', Number(primaryConflict.patient_id)) || '';
+      const collectedDisplay = formatDanishDate(primaryConflict.collected_at, true) || (primaryConflict.collected_at || '');
+      const primaryDetails = [
+        primaryConflict.id != null ? `Sample-ID: ${primaryConflict.id}` : '',
+        primaryConflict.pmb_number ? `PMB-nummer: ${primaryConflict.pmb_number}` : '',
+        conflictPatientName ? `Patient: ${conflictPatientName}` : '',
+        primaryConflict.sample_type ? `Prøvetype: ${primaryConflict.sample_type}` : '',
+        primaryConflict.status ? `Status: ${primaryConflict.status}` : '',
+        collectedDisplay ? `Opsamlet: ${collectedDisplay}` : ''
+      ].filter(Boolean);
+      const choice = await openDuplicateDialog({
+        title: 'Prøven findes allerede',
+        message: `PMB-nummer ${sample.pmb_number} er allerede registreret.`,
+        description: 'Vælg om du vil fortsætte, åbne prøven eller oprette en ordination på den eksisterende prøve.',
+        details: primaryDetails,
+        actions: [
+          {value: 'continue', label: 'Fortsæt med ny prøve', variant: 'primary'},
+          {value: 'open', label: 'Åbn prøven', variant: 'secondary'},
+          {value: 'order', label: 'Opret ordination på prøven', variant: 'secondary'}
+        ]
+      });
+      if (choice === 'open') {
+        state.pendingSampleId = Number(primaryConflict.id) || primaryConflict.id;
+        state.pendingSampleShowAll = true;
+        disableButtons(false);
+        submitting = false;
+        activateTab('samples');
+        setMessage('Åbnede prøven i Prøver-fanen.', 'info');
+        return;
+      }
+      if (choice === 'order') {
+        disableButtons(false);
+        submitting = false;
+        openOrdersForSample(primaryConflict.id);
+        setMessage('Åbnede ordinationsfanen for den eksisterende prøve.', 'info');
+        return;
+      }
+      if (choice !== 'continue') {
+        disableButtons(false);
+        submitting = false;
+        form.elements.sample_pmb.focus();
+        return;
+      }
     }
     if (controlSample) {
       const controlPmbLower = controlSample.pmb_number.toLowerCase();
@@ -11254,6 +11510,39 @@ function renderPatients(section) {
     data.gender = genderValue;
     data.birth_date = birthDateValue;
     data.notes = (data.notes || '').trim();
+    const isNewPatient = !data.id;
+    if (isNewPatient) {
+      const normalizedMrn = data.mrn.toLowerCase();
+      const existingPatient = getCached('patients').find(p => (p.mrn || '').toLowerCase() === normalizedMrn);
+      if (existingPatient) {
+        const birthDisplay = formatDanishDate(existingPatient.birth_date) || (existingPatient.birth_date || '');
+        const details = [
+          existingPatient.name ? `Navn: ${existingPatient.name}` : '',
+          existingPatient.mrn ? `MRN: ${existingPatient.mrn}` : '',
+          existingPatient.family_number ? `Familienummer: ${existingPatient.family_number}` : '',
+          birthDisplay ? `Født: ${birthDisplay}` : '',
+          Number.isFinite(Number(existingPatient.id)) ? `Patient-ID: ${existingPatient.id}` : ''
+        ].filter(Boolean);
+        const choice = await openDuplicateDialog({
+          title: 'Patient findes allerede',
+          message: `MRN ${data.mrn} er allerede registreret.`,
+          description: 'Vælg om du vil fortsætte eller åbne den eksisterende patient.',
+          details,
+          actions: [
+            {value: 'continue', label: 'Fortsæt med ny patient', variant: 'primary'},
+            {value: 'open', label: 'Åbn eksisterende patient', variant: 'secondary'}
+          ]
+        });
+        if (choice === 'open') {
+          state.pendingPatientSelectId = Number(existingPatient.id) || existingPatient.id;
+          renderTab('patients');
+          return;
+        }
+        if (choice !== 'continue') {
+          return;
+        }
+      }
+    }
     if (data.id) {
       const id = Number(data.id);
       const before = {...findById('patients', id)};
@@ -11605,8 +11894,39 @@ function renderSamples(section) {
     const existingSamples = getCached('samples');
     const conflict = existingSamples.find(s => (s.pmb_number || '').toLowerCase() === data.pmb_number.toLowerCase() && s.id !== currentId);
     if (conflict) {
-      alert('PMB-nummeret er allerede i brug.');
-      return;
+      if (currentId) {
+        alert('PMB-nummeret er allerede i brug.');
+        return;
+      }
+      const conflictPatientName = getName('patients', Number(conflict.patient_id)) || '';
+      const collectedDisplay = formatDanishDate(conflict.collected_at, true) || (conflict.collected_at || '');
+      const details = [
+        conflict.id != null ? `Sample-ID: ${conflict.id}` : '',
+        conflict.pmb_number ? `PMB-nummer: ${conflict.pmb_number}` : '',
+        conflictPatientName ? `Patient: ${conflictPatientName}` : '',
+        conflict.sample_type ? `Prøvetype: ${conflict.sample_type}` : '',
+        conflict.status ? `Status: ${conflict.status}` : '',
+        collectedDisplay ? `Opsamlet: ${collectedDisplay}` : ''
+      ].filter(Boolean);
+      const choice = await openDuplicateDialog({
+        title: 'Prøven findes allerede',
+        message: `PMB-nummer ${data.pmb_number} er allerede registreret.`,
+        description: 'Vælg om du vil fortsætte eller åbne den eksisterende prøve.',
+        details,
+        actions: [
+          {value: 'continue', label: 'Fortsæt med ny prøve', variant: 'primary'},
+          {value: 'open', label: 'Åbn eksisterende prøve', variant: 'secondary'}
+        ]
+      });
+      if (choice === 'open') {
+        state.pendingSampleId = Number(conflict.id) || conflict.id;
+        state.pendingSampleShowAll = true;
+        renderTab('samples');
+        return;
+      }
+      if (choice !== 'continue') {
+        return;
+      }
     }
     if (data.sample_type) data.sample_type = data.sample_type.trim();
     if (data.status) data.status = data.status.trim();
@@ -12335,6 +12655,9 @@ function renderOrders(section) {
   let pendingFilterSampleId = state.pendingOrderFilterSampleId != null ? Number(state.pendingOrderFilterSampleId) : null;
   if (!Number.isFinite(pendingFilterSampleId)) pendingFilterSampleId = null;
   let requireExactSample = Boolean(state.pendingOrderFilterSampleExact && pendingFilterSampleId != null);
+  let pendingFilterPatientId = state.pendingOrderFilterPatientId != null ? Number(state.pendingOrderFilterPatientId) : null;
+  if (!Number.isFinite(pendingFilterPatientId)) pendingFilterPatientId = null;
+  let requireExactPatient = Boolean(state.pendingOrderFilterPatientExact && pendingFilterPatientId != null);
   let pendingFilterOrderId = state.pendingOrderFilterId != null ? Number(state.pendingOrderFilterId) : null;
   if (!Number.isFinite(pendingFilterOrderId)) pendingFilterOrderId = null;
   let showActiveOnly = activeToggle ? activeToggle.checked : false;
@@ -12357,6 +12680,34 @@ function renderOrders(section) {
         return timeB.localeCompare(timeA);
       });
       selectedOrderId = sampleOrders[0].id;
+    }
+  }
+  if (pendingFilterPatientId != null) {
+    const patient = patientMap.get(pendingFilterPatientId);
+    if (filterInputs.patient) {
+      const label = patient?.name || patient?.mrn || patient?.family_number || String(pendingFilterPatientId);
+      filterInputs.patient.value = label;
+    }
+    if (search) search.value = '';
+    if (state.pendingOrderShowAll && activeToggle) {
+      showActiveOnly = false;
+      activeToggle.checked = false;
+    }
+    const patientOrders = list.filter(o => Number(o.patient_id) === pendingFilterPatientId);
+    if (patientOrders.length && selectedOrderId == null) {
+      patientOrders.sort((a, b) => {
+        const timeA = (a.ordered_at || a.updated_at || a.created_at || '');
+        const timeB = (b.ordered_at || b.updated_at || b.created_at || '');
+        return timeB.localeCompare(timeA);
+      });
+      selectedOrderId = patientOrders[0].id;
+    }
+    if (patientSelect) {
+      const desired = String(pendingFilterPatientId);
+      if (patientSelect.value !== desired) {
+        patientSelect.value = desired;
+        updateSampleOptions();
+      }
     }
   }
   if (pendingFilterOrderId != null) {
@@ -12404,6 +12755,11 @@ function renderOrders(section) {
     const filterSummary = {...filters};
     const numericFilterSample = Number(filters.sample || '');
     const matchExactSample = requireExactSample && filters.sample !== '' && Number.isFinite(numericFilterSample) && numericFilterSample === pendingFilterSampleId;
+    if (requireExactPatient && pendingFilterPatientId != null) {
+      const patient = patientMap.get(pendingFilterPatientId);
+      const label = patient?.name || patient?.mrn || patient?.family_number || `Patient #${pendingFilterPatientId}`;
+      filterSummary.patient = label;
+    }
       if (filters.indication) filterSummary.indikation = filters.indication;
       if (filters.hpo) filterSummary['hpo-termer'] = filters.hpo;
       if (filters.sample) {
@@ -12461,6 +12817,7 @@ function renderOrders(section) {
       const hpoString = formatHpoList(o.hpo_terms).toLowerCase();
       if (filters.id && !String(o.id).includes(filters.id)) return false;
       if (filters.patient && !patientString.includes(filters.patient)) return false;
+      if (requireExactPatient && Number(o.patient_id) !== pendingFilterPatientId) return false;
       if (filters.sample) {
         if (matchExactSample) {
           if (Number(o.sample_id) !== pendingFilterSampleId) return false;
@@ -12567,6 +12924,8 @@ function renderOrders(section) {
   state.pendingOrderShowAll = false;
   state.pendingOrderFilterSampleId = null;
   state.pendingOrderFilterSampleExact = false;
+  state.pendingOrderFilterPatientId = null;
+  state.pendingOrderFilterPatientExact = false;
   state.pendingOrderFilterId = null;
   state.pendingOrderFamilyNumber = '';
   activeToggle?.addEventListener('change', () => {
@@ -12577,6 +12936,9 @@ function renderOrders(section) {
   const handleFilterChange = event => {
     if (event?.currentTarget === filterInputs.sample) {
       requireExactSample = false;
+    }
+    if (event?.currentTarget === filterInputs.patient) {
+      requireExactPatient = false;
     }
     renderRows();
   };
