@@ -7630,18 +7630,26 @@ async function restoreFromCsvFile(file) {
     const rows = parseCsvRecordsForStore(entry.store, entry.text);
     storeMap.set(entry.store, rows);
   }
+  const storesToReplace = new Set(storeMap.keys());
+  const isFullImport = STORES.every(store => storesToReplace.has(store));
   const data = {};
   const summary = [];
   for (const store of STORES) {
-    const rows = storeMap.get(store) || [];
-    data[store] = rows;
-    if (storeMap.has(store)) {
+    if (storesToReplace.has(store)) {
+      const rows = storeMap.get(store) || [];
+      data[store] = rows;
       summary.push(`${store} (${rows.length})`);
+    } else if (isFullImport) {
+      data[store] = [];
+    } else {
+      const cached = getCached(store);
+      data[store] = deepClone(Array.isArray(cached) ? cached : []);
     }
   }
   await importData(data);
   if (summary.length) {
-    setStatus(`CSV-data importeret for ${summary.join(', ')}.`);
+    const statusSuffix = isFullImport ? '' : ' Øvrige datatyper er bevaret.';
+    setStatus(`CSV-data importeret for ${summary.join(', ')}.${statusSuffix}`);
   } else {
     setStatus('CSV-data importeret.');
   }
