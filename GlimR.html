@@ -13177,7 +13177,6 @@ function renderOrders(section) {
   });
   section.querySelector('#orderClear').addEventListener('click', () => form.reset());
 }
-
 function resolveAiBaseUrl(provider) {
   const base = (provider?.base_url || '').trim();
   if (base) return base.replace(/\/+$/, '');
@@ -24749,6 +24748,7 @@ function renderAdmin(section) {
     renderTab('admin');
     refreshDependentTabs();
   });
+  
   const aiProviderTableBody = section.querySelector('[data-ai-provider-table] tbody');
   const aiProviderSearch = section.querySelector('#aiProviderSearch');
   const aiProviderForm = section.querySelector('#aiProviderForm');
