@@ -335,6 +335,34 @@ section[data-tab].active {
   flex-direction: column;
   gap: 0.35rem;
 }
+.ai-provider-manager {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+.ai-provider-list {
+  flex: 1 1 260px;
+  min-width: 240px;
+}
+.ai-provider-form {
+  flex: 2 1 360px;
+  min-width: 320px;
+}
+.ai-provider-form textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+.ai-provider-inline-hint {
+  font-size: 0.9rem;
+  color: var(--muted-text);
+}
+.ai-provider-grid {
+  display: grid;
+  gap: 0.75rem 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-top: 0.75rem;
+}
 .template-advanced {
   margin-top: 1rem;
 }
@@ -3042,8 +3070,8 @@ pre {
 (() => {
 'use strict';
 const DB_NAME = 'glims';
-const DB_VER = 13;
-const STORES = ['patients','samples','orders','patient_groups','family_relations','panels','variants','qc','qc_presets','reports','users','audit','variant_library','responses','fhir_templates','conclusion_library','planner'];
+const DB_VER = 14;
+const STORES = ['patients','samples','orders','patient_groups','family_relations','panels','variants','qc','qc_presets','reports','users','audit','variant_library','responses','fhir_templates','conclusion_library','planner','ai_providers'];
 const SETTINGS_STORE = 'settings';
 const MEMORY_DB_STORE_DEFINITIONS = {
   patients: {keyPath: 'id', autoIncrement: true},
@@ -3062,6 +3090,7 @@ const MEMORY_DB_STORE_DEFINITIONS = {
   fhir_templates: {keyPath: 'id', autoIncrement: true},
   conclusion_library: {keyPath: 'id', autoIncrement: true},
   planner: {keyPath: 'id', autoIncrement: false},
+  ai_providers: {keyPath: 'id', autoIncrement: true},
   [SETTINGS_STORE]: {keyPath: 'key', autoIncrement: false}
 };
 let memoryDbSnapshot = null;
@@ -3285,6 +3314,15 @@ function createMemoryDb(initialSnapshot = {}) {
 const BOUND_HANDLE_SETTING_KEY = 'boundFileHandle';
 const BOUND_HANDLE_NAME_KEY = 'glimr-bound-handle-name';
 const AUTOSAVE_STORAGE_KEY = 'glimr-autosave';
+const AI_PROVIDER_SETTING_KEY = 'aiProviderPreference';
+const DEFAULT_VARIANT_JSON_TEMPLATE = '{"gene":"","transcript":"","hgvs_c":"","hgvs_p":"","genomic_position":"","rsid":"","zygosity":"","classification":"","criteria":"","interpretation":"","annotations":""}';
+const DEFAULT_VARIANT_PRETEXT = 'Du er en klinisk genetisk assistent. Brug kun validerbare fakta fra brugerens input og relevante referenceformater. Besvar altid med JSON der matcher skabelonen og uden frit tekstafsnit. Udfyld kun felter du med sikkerhed kan bestemme.';
+const AI_PROVIDER_TYPES = [
+  {value:'openai', label:'OpenAI / kompatibel', defaultBase:'https://api.openai.com/v1', requiresKey:true},
+  {value:'ollama', label:'Ollama (lokal)', defaultBase:'http://localhost:11434/v1', requiresKey:false},
+  {value:'lmstudio', label:'LM Studio (lokal)', defaultBase:'http://localhost:1234/v1', requiresKey:false},
+  {value:'custom', label:'Anden (OpenAI-kompatibel)', defaultBase:'', requiresKey:false}
+];
 const storage = (() => {
   try {
     const testKey = '__glimr_storage_test__';
@@ -3320,6 +3358,7 @@ const state = {
   currentTab: 'dashboard',
   currentUser: null,
   theme: storage.getItem('glimr-theme') || 'light',
+  aiProviderPreference: null,
   testResults: [],
   lastStatus: '',
   usingMemoryDb: false,
@@ -3350,7 +3389,7 @@ const state = {
   familySavingPromise: null,
   validationSettings: null
 };
-const CREATED_BY_STORES = new Set(['patients','samples','orders','patient_groups','family_relations','variants','qc','qc_presets','reports','fhir_templates','conclusion_library']);
+const CREATED_BY_STORES = new Set(['patients','samples','orders','patient_groups','family_relations','variants','qc','qc_presets','reports','fhir_templates','conclusion_library','ai_providers']);
 const UPDATED_BY_STORES = new Set(['panels']);
 const ROLE_OPTIONS = [
   {value: 'Observatør', description: 'Kun læseadgang til data', canWrite: false},
@@ -4088,6 +4127,7 @@ const schemaFields = {
   variant_library: ['id','variant_type','gene','transcript','hgvs_c','hgvs_p','rsid','classification','criteria','genomic_position','evidence','condition','inheritance','genome_build','chromosome','start','end','copy_number','sv_subtype','size_bp','iscn','description','affected_genes','curated_by','last_review','created_at','updated_at'],
   responses: ['id','ts','sender','patient','diagnostic_report_id','variant_count','variants','raw','created_at','updated_at'],
   fhir_templates: ['id','name','target_system','description','bundle_profile','message_profile','message_event_system','message_event_code','message_event_display','destination_name','destination_endpoint','destination_identifier_system','destination_identifier_value','diagnostic_report_profile','observation_profile','include_document_reference','include_composition','include_variant_observations','composition_title','composition_type_system','composition_type_code','composition_type_display','composition_profile','document_type_system','document_type_code','document_type_display','document_title','document_profile','created_by','created_at','updated_at'],
+  ai_providers: ['id','name','provider_type','base_url','api_key','model','variant_pretext','variant_template','created_by','created_at','updated_at'],
   conclusion_library: ['id','title','body','created_by','created_at','updated_at'],
   planner: ['id','user_id','tasks','view','created_at','updated_at']
 };
@@ -6525,6 +6565,7 @@ function openIndexedDb() {
       if (!plannerStore.indexNames.contains('user_id')) {
         try { plannerStore.createIndex('user_id','user_id',{unique:true}); } catch (e) {}
       }
+      ai_providers: ['id','name','provider_type','base_url','api_key','model','variant_pretext','variant_template','created_by','created_at','updated_at'],
       ensureStore(SETTINGS_STORE, {keyPath:'key'});
     };
     req.onblocked = () => {
@@ -6620,6 +6661,36 @@ async function deleteSetting(key) {
   }
 }
 
+async function loadAiProviderPreference() {
+  try {
+    const stored = await getSetting(AI_PROVIDER_SETTING_KEY);
+    state.aiProviderPreference = stored ?? null;
+  } catch (err) {
+    console.warn('Kunne ikke læse AI-udbyderpræference', err);
+    state.aiProviderPreference = null;
+  }
+}
+
+async function persistAiProviderPreference(id) {
+  try {
+    await setSetting(AI_PROVIDER_SETTING_KEY, id ?? null);
+  } catch (err) {
+    console.warn('Kunne ikke gemme AI-præference', err);
+  }
+}
+
+function getAiProvidersSorted() {
+  return (getCached('ai_providers') || []).slice().sort((a, b) => (a?.name || '').localeCompare(b?.name || '', 'da'));
+}
+
+function getPreferredAiProviderId(list, preferredId) {
+  const asNumber = Number(preferredId);
+  if (Number.isFinite(asNumber) && list.some(p => Number(p.id) === asNumber)) {
+    return asNumber;
+  }
+  return list[0]?.id ?? null;
+}
+  
 async function persistBoundHandle(handle) {
   state.boundHandle = handle;
   if (handle && handle.name) {
@@ -13106,6 +13177,181 @@ function renderOrders(section) {
   });
   section.querySelector('#orderClear').addEventListener('click', () => form.reset());
 }
+
+function resolveAiBaseUrl(provider) {
+  const base = (provider?.base_url || '').trim();
+  if (base) return base.replace(/\/+$/, '');
+  const fallback = AI_PROVIDER_TYPES.find(opt => opt.value === provider?.provider_type)?.defaultBase
+    || 'https://api.openai.com/v1';
+  return fallback.replace(/\/+$/, '');
+}
+
+function providerSupportsJsonFormat(provider) {
+  const type = (provider?.provider_type || '').toLowerCase();
+  return type !== 'ollama';
+}
+
+function buildVariantPrompt(provider, formData) {
+  const template = (provider?.variant_template || DEFAULT_VARIANT_JSON_TEMPLATE || '').trim() || DEFAULT_VARIANT_JSON_TEMPLATE;
+  const pretext = (provider?.variant_pretext || DEFAULT_VARIANT_PRETEXT || '').trim() || DEFAULT_VARIANT_PRETEXT;
+  const context = {
+    gene: (formData.gene || '').trim(),
+    transcript: (formData.transcript || '').trim(),
+    hgvs_c: (formData.hgvs_c || '').trim(),
+    hgvs_p: (formData.hgvs_p || '').trim(),
+    genomic_position: (formData.genomic_position || '').trim(),
+    rsid: (formData.rsid || '').trim(),
+    zygosity: (formData.zygosity || '').trim(),
+    classification: (formData.classification || '').trim(),
+    criteria: (formData.criteria || '').trim(),
+    description: (formData.description || '').trim(),
+    genome_build: (formData.genome_build || '').trim(),
+    chromosome: (formData.chromosome || '').trim(),
+    start: (formData.start || '').trim(),
+    end: (formData.end || '').trim(),
+    iscn: (formData.iscn || '').trim()
+  };
+  const instructions = [
+    'Returner kun JSON uden markdown eller forklaringer.',
+    'Udfyld kun felter du med sikkerhed kan bestemme; ellers brug tom streng.',
+    'Bevar HGVS og genomiske formater uændret. Brug faktuelle forslag frem for spekulation.'
+  ].join(' ');
+  const message = `Udfyld JSON-skabelonen for varianten ud fra oplysningerne. ${instructions}\nSkabelon:\n${template}\nInput:\n${JSON.stringify(context, null, 2)}`;
+  return {pretext, template, message};
+}
+
+function extractJsonFromText(text) {
+  if (!text) return null;
+  const trimmed = text.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch (err) {
+    const match = trimmed.match(/\{[\s\S]*\}/);
+    if (match) {
+      try { return JSON.parse(match[0]); } catch (e) {}
+    }
+  }
+  return null;
+}
+
+function applyVariantAiSuggestion(form, suggestion) {
+  if (!form || !suggestion || typeof suggestion !== 'object') return;
+  const mapping = {
+    variant_type: 'variant_type',
+    gene: 'gene',
+    transcript: 'transcript',
+    hgvs_c: 'hgvs_c',
+    hgvs_p: 'hgvs_p',
+    genomic_position: 'genomic_position',
+    rsid: 'rsid',
+    zygosity: 'zygosity',
+    classification: 'classification',
+    criteria: 'criteria',
+    af: 'af',
+    annotations: 'annotations',
+    interpretation: 'interpretation',
+    genome_build: 'genome_build',
+    chromosome: 'chromosome',
+    start: 'start',
+    end: 'end',
+    copy_number: 'copy_number',
+    sv_subtype: 'sv_subtype',
+    size_bp: 'size_bp',
+    iscn: 'iscn',
+    description: 'description',
+    affected_genes: 'affected_genes'
+  };
+  for (const [formField, suggestionKey] of Object.entries(mapping)) {
+    if (!(suggestionKey in suggestion)) continue;
+    const value = suggestion[suggestionKey];
+    const control = form.elements[formField];
+    if (!control) continue;
+    if (value == null) continue;
+    const currentValue = (control.value ?? '').toString();
+    const textValue = String(value);
+    if (textValue.trim() === '' && currentValue.trim() !== '') {
+      continue;
+    }
+    if (formField === 'variant_type') {
+      control.value = normalizeVariantType(String(value));
+    } else if (control.type === 'number') {
+      const numeric = Number(value);
+      control.value = value === '' ? '' : (Number.isFinite(numeric) ? numeric : '');
+    } else if (control.tagName === 'SELECT') {
+      control.value = String(value);
+    } else {
+      control.value = String(value);
+    }
+  }
+}
+
+async function handleVariantAiFill(providerId, form) {
+  if (!form) throw new Error('Variantformular ikke klar.');
+  const providers = getAiProvidersSorted();
+  const provider = providers.find(p => Number(p.id) === Number(providerId)) || providers[0];
+  if (!provider) {
+    throw new Error('Konfigurer først en AI-udbyder under Administration.');
+  }
+  const model = (provider.model || '').trim();
+  if (!model) {
+    throw new Error('Angiv en model for den valgte udbyder.');
+  }
+  const formData = Object.fromEntries(new FormData(form).entries());
+  const hasSeedData = ['gene','hgvs_c','genomic_position','description','iscn'].some(key => (formData[key] || '').trim());
+  if (!hasSeedData) {
+    throw new Error('Angiv mindst gen, HGVS eller position før AI-udfyldning.');
+  }
+  const {pretext, message} = buildVariantPrompt(provider, formData);
+  const baseUrl = resolveAiBaseUrl(provider);
+  const payload = {
+    model,
+    temperature: 0.2,
+    messages: [
+      {role:'system', content: pretext},
+      {role:'user', content: message}
+    ]
+  };
+  if (providerSupportsJsonFormat(provider)) {
+    payload.response_format = {type:'json_object'};
+  }
+  const headers = {'Content-Type':'application/json'};
+  if (provider.api_key) {
+    headers.Authorization = `Bearer ${provider.api_key}`;
+  }
+  const url = `${baseUrl}/chat/completions`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  let suggestion;
+  try {
+    const resp = await fetch(url, {
+      method:'POST',
+      headers,
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => resp.statusText);
+      throw new Error(`API-fejl (${resp.status}): ${text}`);
+    }
+    const data = await resp.json();
+    const content = data?.choices?.[0]?.message?.content?.trim();
+    suggestion = extractJsonFromText(content);
+    if (!suggestion) {
+      throw new Error('Kunne ikke tolke AI-svar som JSON.');
+    }
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      throw new Error('Forespørgslen til AI blev afbrudt (timeout).');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+  applyVariantAiSuggestion(form, suggestion);
+  form.querySelector('select[name="variant_type"]')?.dispatchEvent(new Event('change', {bubbles:true}));
+  setStatus(`Variantdata udfyldt via ${provider.name || 'AI'}.`);
+}
+
 function renderVariants(section) {
   let list = getCached('variants') || [];
   list = list.map(entry => {
@@ -13124,6 +13370,12 @@ function renderVariants(section) {
   const orderMap = new Map(orders.map(order => [Number(order.id), order]));
   const defaultGenomeBuild = determineDefaultGenomeBuild(list, orders, variantLibrary);
   const orderNameCache = new Map();
+  const aiProviders = getAiProvidersSorted();
+  const preferredAiProviderId = getPreferredAiProviderId(aiProviders, state.aiProviderPreference);
+  const aiProviderOptions = aiProviders.length
+    ? aiProviders.map(p => `<option value="${p.id}"${Number(p.id) === Number(preferredAiProviderId) ? ' selected' : ''}>${esc(p.name || `Udbyder #${p.id}`)}</option>`).join('')
+    : '<option value="" selected>Ingen udbydere konfigureret</option>';
+  const aiButtonLabel = aiProviders.find(p => Number(p.id) === Number(preferredAiProviderId))?.name || 'AI';
   const getOrderDisplayName = orderId => {
     const numericId = Number(orderId);
     if (!Number.isFinite(numericId) || numericId === 0) return '';
@@ -13241,6 +13493,13 @@ function renderVariants(section) {
           <label>Annoteringer<textarea name="annotations" placeholder="Importerede annoteringer fra VarSeq og andre værktøjer."></textarea></label>
           <label>Tolkning<textarea name="interpretation"></textarea></label>
           <div class="btn-row">
+            <label class="inline">AI-udbyder
+              <select id="variantAiProvider" ${aiProviders.length ? '' : 'disabled'}>${aiProviderOptions}</select>
+            </label>
+            <button class="secondary" type="button" id="variantAiFill" ${aiProviders.length ? '' : 'disabled'}>Brug ${esc(aiButtonLabel)}</button>
+          </div>
+          <p class="form-hint">Knappen udfylder varianten automatisk ud fra HGVS/position og udbyderens pretext. Resultatet tilpasses JSON-skabelonen.</p>
+          <div class="btn-row">
             <button class="primary action-button action-save with-icon" type="submit" id="variantSave" data-action="save">
               <span class="icon-slot" aria-hidden="true">
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -13337,6 +13596,37 @@ function renderVariants(section) {
   const batchFileInput = section.querySelector('#variantBatchFile');
   const batchSaveBtn = section.querySelector('#variantBatchSave');
   const batchClearBtn = section.querySelector('#variantBatchClear');
+  const aiProviderSelect = section.querySelector('#variantAiProvider');
+  const aiFillButton = section.querySelector('#variantAiFill');
+  const updateAiButtonLabel = () => {
+    if (!aiFillButton) return;
+    const selectedId = Number(aiProviderSelect?.value);
+    const provider = aiProviders.find(p => Number(p.id) === selectedId);
+    aiFillButton.textContent = provider?.name ? `Brug ${provider.name}` : 'Brug AI';
+  };
+  updateAiButtonLabel();
+  aiProviderSelect?.addEventListener('change', async () => {
+    const selectedId = Number(aiProviderSelect.value);
+    state.aiProviderPreference = Number.isFinite(selectedId) ? selectedId : null;
+    try {
+      await persistAiProviderPreference(state.aiProviderPreference);
+    } catch (err) {
+      console.warn('Kunne ikke gemme AI-præference', err);
+    }
+    updateAiButtonLabel();
+  });
+  aiFillButton?.addEventListener('click', async () => {
+    if (!aiFillButton || aiFillButton.disabled) return;
+    aiFillButton.disabled = true;
+    try {
+      await handleVariantAiFill(Number(aiProviderSelect?.value), form);
+    } catch (err) {
+      console.error(err);
+      alert('AI-udfyldning fejlede: ' + (err?.message || err));
+    } finally {
+      aiFillButton.disabled = false;
+    }
+  });
   const batchMessage = section.querySelector('#variantBatchMessage');
   const batchOrderSelect = section.querySelector('#variantBatchOrder');
   const setBatchMessage = (text, tone = 'info') => {
@@ -24103,6 +24393,47 @@ function renderAdmin(section) {
     </div>
   </div>
   <div class="panel">
+    <h2>AI-integration</h2>
+    <p class="form-hint">Registrér OpenAI-kompatible udbydere (fx OpenAI, Ollama eller LM Studio), API-nøgler, modeller og pretexts pr. datatype.</p>
+    <div class="ai-provider-manager">
+      <div class="ai-provider-list">
+        <label for="aiProviderSearch">Søg</label>
+        <input id="aiProviderSearch" type="search" placeholder="Udbyder eller model...">
+        <table data-ai-provider-table>
+          <thead><tr><th>ID</th><th>Navn</th><th>Udbyder</th><th>Model</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="ai-provider-form">
+        <h3>Udbyder</h3>
+        <form id="aiProviderForm">
+          <input type="hidden" name="id">
+          <div class="ai-provider-grid">
+            <label>Navn<input name="name" required placeholder="Fx OpenAI produktion"></label>
+            <label>Udbyder
+              <select name="provider_type">${AI_PROVIDER_TYPES.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('')}</select>
+            </label>
+            <label>Model<input name="model" placeholder="fx gpt-4o-mini eller llama3"></label>
+            <label>API-base URL<input name="base_url" placeholder="https://api.openai.com/v1"></label>
+            <label>API-key<input type="password" name="api_key" placeholder="Kun nødvendig hvis udbyderen kræver det"></label>
+          </div>
+          <p class="ai-provider-inline-hint">Gemmes lokalt i IndexedDB og eksporteres med backups. Tomt API-key-felt overskriver ikke en eksisterende værdi.</p>
+          <label>Prompt pretext (variant)
+            <textarea name="variant_pretext" placeholder="Systemprompt der beskriver tone, format og fokus på fakta">${esc(DEFAULT_VARIANT_PRETEXT)}</textarea>
+          </label>
+          <label>JSON-skabelon til varianter
+            <textarea name="variant_template" placeholder='${esc(DEFAULT_VARIANT_JSON_TEMPLATE)}'>${esc(DEFAULT_VARIANT_JSON_TEMPLATE)}</textarea>
+          </label>
+          <div class="btn-row">
+            <button class="primary" type="submit" id="aiProviderSave">Gem</button>
+            <button class="secondary" type="button" id="aiProviderClear">Ny</button>
+            <button class="danger" type="button" id="aiProviderDelete">Slet</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
     <h2>Datavalidering</h2>
     <p class="form-hint">Definér systemkrav til MRN, PMB og lokale ID'er.</p>
     <form id="validationSettingsForm" class="validation-settings-form">
@@ -24417,6 +24748,138 @@ function renderAdmin(section) {
     await loadStore('patient_groups');
     renderTab('admin');
     refreshDependentTabs();
+  });
+  const aiProviderTableBody = section.querySelector('[data-ai-provider-table] tbody');
+  const aiProviderSearch = section.querySelector('#aiProviderSearch');
+  const aiProviderForm = section.querySelector('#aiProviderForm');
+  const aiProviderClearBtn = section.querySelector('#aiProviderClear');
+  const aiProviderDeleteBtn = section.querySelector('#aiProviderDelete');
+  const aiProviders = (getCached('ai_providers') || []).slice().sort((a, b) => (a?.name || '').localeCompare(b?.name || '', 'da'));
+  let filteredProviders = aiProviders.slice();
+  let selectedProviderId = null;
+  const getProviderTypeLabel = value => AI_PROVIDER_TYPES.find(opt => opt.value === value)?.label || value || '';
+  const resetApiKeyPlaceholder = (provider) => {
+    const field = aiProviderForm?.elements.api_key;
+    if (!field) return;
+    field.placeholder = provider?.api_key ? 'Udfyld for at ændre (nuværende nøgle skjult)' : 'Kun nødvendig hvis udbyderen kræver det';
+  };
+  const renderProviderRows = () => {
+    if (!aiProviderTableBody) return;
+    const term = (aiProviderSearch?.value || '').trim().toLowerCase();
+    filteredProviders = aiProviders.filter(provider => {
+      if (!term) return true;
+      const haystack = `${provider.name || ''} ${provider.model || ''} ${provider.provider_type || ''}`.toLowerCase();
+      return haystack.includes(term);
+    });
+    if (!filteredProviders.length) {
+      aiProviderTableBody.innerHTML = '<tr><td colspan="4">Ingen udbydere.</td></tr>';
+      annotateTableCells(section);
+      return;
+    }
+    if (selectedProviderId != null && !filteredProviders.some(p => Number(p.id) === Number(selectedProviderId))) {
+      selectedProviderId = null;
+    }
+    aiProviderTableBody.innerHTML = filteredProviders.map(provider => {
+      const selectedAttr = Number(provider.id) === Number(selectedProviderId) ? ' data-selected="true"' : '';
+      return `<tr data-id="${provider.id}"${selectedAttr}><td>${provider.id}</td><td>${esc(provider.name || '')}</td><td>${esc(getProviderTypeLabel(provider.provider_type))}</td><td>${esc(provider.model || '')}</td></tr>`;
+    }).join('');
+    annotateTableCells(section);
+  };
+  const loadProviderIntoForm = provider => {
+    if (!aiProviderForm) return;
+    if (provider) {
+      fillForm(aiProviderForm, provider);
+      resetApiKeyPlaceholder(provider);
+      if (provider.variant_pretext) {
+        aiProviderForm.elements.variant_pretext.value = provider.variant_pretext;
+      }
+      if (provider.variant_template) {
+        aiProviderForm.elements.variant_template.value = provider.variant_template;
+      }
+    } else {
+      aiProviderForm.reset();
+      clearFormIdentifier(aiProviderForm);
+      aiProviderForm.elements.variant_pretext.value = DEFAULT_VARIANT_PRETEXT;
+      aiProviderForm.elements.variant_template.value = DEFAULT_VARIANT_JSON_TEMPLATE;
+      resetApiKeyPlaceholder(null);
+    }
+  };
+  renderProviderRows();
+  if (filteredProviders[0]?.id != null) {
+    selectedProviderId = filteredProviders[0].id;
+    loadProviderIntoForm(filteredProviders[0]);
+  } else {
+    loadProviderIntoForm(null);
+  }
+  aiProviderSearch?.addEventListener('input', renderProviderRows);
+  aiProviderTableBody?.addEventListener('click', evt => {
+    const row = evt.target.closest('tr[data-id]');
+    if (!row) return;
+    const id = Number(row.dataset.id);
+    if (!Number.isFinite(id)) return;
+    selectedProviderId = id;
+    const provider = aiProviders.find(item => Number(item.id) === id);
+    loadProviderIntoForm(provider || null);
+    renderProviderRows();
+  });
+  aiProviderClearBtn?.addEventListener('click', () => {
+    selectedProviderId = null;
+    loadProviderIntoForm(null);
+    renderProviderRows();
+  });
+  aiProviderForm?.addEventListener('submit', async evt => {
+    evt.preventDefault();
+    if (!ensureWrite('ai_providers')) return;
+    const data = Object.fromEntries(new FormData(aiProviderForm).entries());
+    data.name = (data.name || '').trim();
+    data.provider_type = (data.provider_type || '').trim() || AI_PROVIDER_TYPES[0]?.value || 'openai';
+    data.model = (data.model || '').trim();
+    data.base_url = (data.base_url || '').trim();
+    data.variant_pretext = data.variant_pretext ? data.variant_pretext.trim() : DEFAULT_VARIANT_PRETEXT;
+    data.variant_template = data.variant_template ? data.variant_template.trim() : DEFAULT_VARIANT_JSON_TEMPLATE;
+    const existing = data.id ? aiProviders.find(p => Number(p.id) === Number(data.id)) : null;
+    if (!data.name) {
+      alert('Navn er påkrævet.');
+      aiProviderForm.elements.name?.focus();
+      return;
+    }
+    if (!data.base_url) {
+      const defaults = AI_PROVIDER_TYPES.find(opt => opt.value === data.provider_type)?.defaultBase || '';
+      data.base_url = defaults;
+    }
+    if (!data.api_key && existing?.api_key) {
+      data.api_key = existing.api_key;
+    }
+    if (existing) {
+      const before = {...existing};
+      const updated = {...existing, ...data, id: existing.id};
+      await updateRecord('ai_providers', updated, before);
+    } else {
+      delete data.id;
+      await addRecord('ai_providers', data);
+    }
+    await loadStore('ai_providers');
+    renderTab('admin');
+    const variantSection = document.querySelector('section[data-tab="variants"]');
+    if (variantSection && variantSection.classList.contains('active')) {
+      renderTab('variants');
+    }
+  });
+  aiProviderDeleteBtn?.addEventListener('click', async () => {
+    const id = Number(aiProviderForm?.elements.id?.value);
+    if (!id) {
+      alert('Vælg en udbyder der skal slettes.');
+      return;
+    }
+    if (!ensureWrite('ai_providers')) return;
+    if (!confirm('Slet udbyderen?')) return;
+    await deleteRecord('ai_providers', id);
+    await loadStore('ai_providers');
+    renderTab('admin');
+    const variantSection = document.querySelector('section[data-tab="variants"]');
+    if (variantSection && variantSection.classList.contains('active')) {
+      renderTab('variants');
+    }
   });
 
   const templateTableBody = section.querySelector('[data-fhir-template-table] tbody');
@@ -25136,6 +25599,19 @@ CREATE TABLE IF NOT EXISTS \`fhir_templates\` (
   \`created_at\` DATETIME,
   \`updated_at\` DATETIME
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS \`ai_providers\` (
+  \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+  \`name\` VARCHAR(255),
+  \`provider_type\` VARCHAR(64),
+  \`base_url\` VARCHAR(512),
+  \`api_key\` TEXT,
+  \`model\` VARCHAR(255),
+  \`variant_pretext\` TEXT,
+  \`variant_template\` TEXT,
+  \`created_by\` VARCHAR(255),
+  \`created_at\` DATETIME,
+  \`updated_at\` DATETIME
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE IF NOT EXISTS \`audit_log\` (
   \`id\` INT AUTO_INCREMENT PRIMARY KEY,
   \`ts\` DATETIME,
@@ -25165,6 +25641,7 @@ CREATE TABLE IF NOT EXISTS \`audit_log\` (
     conclusion_library: 'conclusion_library',
     responses: 'responses',
     fhir_templates: 'fhir_templates',
+    ai_providers: 'ai_providers',
     audit: 'audit_log'
   };
   for (const [store, table] of Object.entries(mapTable)) {
@@ -25280,6 +25757,7 @@ async function init() {
     await ensureDefaultFhirTemplates();
     await ensureCreationMetadata();
     await loadValidationSettings();
+    await loadAiProviderPreference();
     await captureSyncedSnapshot();
     await restoreBoundHandle();
     hookUi();
