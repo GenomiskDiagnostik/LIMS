@@ -3070,7 +3070,7 @@ pre {
 (() => {
 'use strict';
 const DB_NAME = 'glims';
-const DB_VER = 14;
+const DB_VER = 15;
 const STORES = ['patients','samples','orders','patient_groups','family_relations','panels','variants','qc','qc_presets','reports','users','audit','variant_library','responses','fhir_templates','conclusion_library','planner','ai_providers'];
 const SETTINGS_STORE = 'settings';
 const MEMORY_DB_STORE_DEFINITIONS = {
@@ -3316,7 +3316,7 @@ const BOUND_HANDLE_NAME_KEY = 'glimr-bound-handle-name';
 const AUTOSAVE_STORAGE_KEY = 'glimr-autosave';
 const AI_PROVIDER_SETTING_KEY = 'aiProviderPreference';
 const DEFAULT_VARIANT_JSON_TEMPLATE = '{"gene":"","transcript":"","hgvs_c":"","hgvs_p":"","genomic_position":"","rsid":"","zygosity":"","classification":"","criteria":"","interpretation":"","annotations":""}';
-const DEFAULT_VARIANT_PRETEXT = 'Du er en klinisk genetisk assistent. Brug kun validerbare fakta fra brugerens input og relevante referenceformater. Besvar altid med JSON der matcher skabelonen og uden frit tekstafsnit. Udfyld kun felter du med sikkerhed kan bestemme.';
+const DEFAULT_VARIANT_PRETEXT = 'Du er en klinisk genetisk assistent. Beregn ACMG/AMP-klassifikation efter seneste retningslinjer inkl. SVI-opdateringer og brug kun dokumenterbare fakta. Returner kun JSON der matcher skabelonen og ingen fri tekst. Udfyld kun felter du med sikkerhed kan bestemme. "classification" skal være et tal 1-5 (1 benign, 5 patogen). "criteria" skal være en komma-adskilt liste over anvendte ACMG-koder med styrke (fx "PVS1_strong, PS3_moderate, PM2_supporting").';
 const AI_PROVIDER_TYPES = [
   {value:'openai', label:'OpenAI / kompatibel', defaultBase:'https://api.openai.com/v1', requiresKey:true},
   {value:'ollama', label:'Ollama (lokal)', defaultBase:'http://localhost:11434/v1', requiresKey:false},
@@ -3423,6 +3423,62 @@ const classificationMap = {
   '4': {code:'LA6668-3', display:'Formodet patogen'},
   '5': {code:'LA6708-8', display:'Patogen'}
 };
+const classificationSynonyms = [
+  {pattern: /likely\s*benign|formodet\s*benign/i, value: '2'},
+  {pattern: /benign/i, value: '1'},
+  {pattern: /vus|uncertain|usikker/i, value: '3'},
+  {pattern: /likely\s*pathogen(ic)?|formodet\s*patogen/i, value: '4'},
+  {pattern: /pathogen(ic)?|patogen/i, value: '5'}
+];
+
+function normaliseClassificationValue(value) {
+  if (value == null) return '';
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) {
+    if (numeric >= 1 && numeric <= 5) return String(Math.round(numeric));
+  }
+  const text = String(value).trim();
+  if (!text) return '';
+  const digitMatch = text.match(/\b([1-5])\b/);
+  if (digitMatch) return digitMatch[1];
+  const byDisplay = Object.entries(classificationMap).find(([, meta]) => meta.display.toLowerCase() === text.toLowerCase());
+  if (byDisplay) return byDisplay[0];
+  const synonym = classificationSynonyms.find(entry => entry.pattern.test(text));
+  return synonym ? synonym.value : '';
+}
+
+function normalizeCriteriaEntry(entry) {
+  if (!entry) return '';
+  if (Array.isArray(entry)) {
+    return entry.map(normalizeCriteriaEntry).filter(Boolean).join(', ');
+  }
+  if (typeof entry === 'string' || typeof entry === 'number') {
+    return String(entry).trim();
+  }
+  if (typeof entry === 'object') {
+    const code = (entry.code || entry.id || entry.name || '').toString().trim();
+    const strength = (entry.strength || entry.level || '').toString().trim();
+    if (code && strength) return `${code}_${strength.replace(/\s+/g, '_').toLowerCase()}`;
+    return code;
+  }
+  return '';
+}
+
+function formatCriteriaValue(value) {
+  if (value == null) return '';
+  if (Array.isArray(value)) {
+    return value.map(normalizeCriteriaEntry).filter(Boolean).join(', ');
+  }
+  if (typeof value === 'object') {
+    const entries = [];
+    for (const [code, strength] of Object.entries(value)) {
+      const normalised = normalizeCriteriaEntry({code, strength});
+      if (normalised) entries.push(normalised);
+    }
+    return entries.join(', ');
+  }
+  return normalizeCriteriaEntry(value);
+}
 const tabs = [
   {id:'dashboard', label:'Overblik'},
   {id:'planner', label:'Plan'},
@@ -6565,7 +6621,12 @@ function openIndexedDb() {
       if (!plannerStore.indexNames.contains('user_id')) {
         try { plannerStore.createIndex('user_id','user_id',{unique:true}); } catch (e) {}
       }
-      ai_providers: ['id','name','provider_type','base_url','api_key','model','variant_pretext','variant_template','created_by','created_at','updated_at'],
+      const aiProviderStore = withTimestamps(ensureStore('ai_providers',{keyPath:'id',autoIncrement:true}));
+      ['name','provider_type'].forEach(idx => {
+        if (!aiProviderStore.indexNames.contains(idx)) {
+          try { aiProviderStore.createIndex(idx, idx); } catch (e) {}
+        }
+      });
       ensureStore(SETTINGS_STORE, {keyPath:'key'});
     };
     req.onblocked = () => {
@@ -13212,6 +13273,8 @@ function buildVariantPrompt(provider, formData) {
   };
   const instructions = [
     'Returner kun JSON uden markdown eller forklaringer.',
+    'Beregn ACMG/AMP-klassifikation (1 benign – 5 patogen) efter seneste guidelines inkl. SVI-justeringer.',
+    'Udfyld kriterier med ACMG-koder og styrke som komma-adskilt tekst (fx PVS1_strong, PS3_moderate, PM2_supporting).',
     'Udfyld kun felter du med sikkerhed kan bestemme; ellers brug tom streng.',
     'Bevar HGVS og genomiske formater uændret. Brug faktuelle forslag frem for spekulation.'
   ].join(' ');
@@ -13273,6 +13336,14 @@ function applyVariantAiSuggestion(form, suggestion) {
     }
     if (formField === 'variant_type') {
       control.value = normalizeVariantType(String(value));
+    } else if (formField === 'classification') {
+      const normalised = normaliseClassificationValue(value);
+      if (normalised) control.value = normalised;
+    } else if (formField === 'criteria') {
+      const formatted = formatCriteriaValue(value);
+      if (formatted || currentValue.trim() === '') {
+        control.value = formatted;
+      }
     } else if (control.type === 'number') {
       const numeric = Number(value);
       control.value = value === '' ? '' : (Number.isFinite(numeric) ? numeric : '');
@@ -13497,7 +13568,7 @@ function renderVariants(section) {
             </label>
             <button class="secondary" type="button" id="variantAiFill" ${aiProviders.length ? '' : 'disabled'}>Brug ${esc(aiButtonLabel)}</button>
           </div>
-          <p class="form-hint">Knappen udfylder varianten automatisk ud fra HGVS/position og udbyderens pretext. Resultatet tilpasses JSON-skabelonen.</p>
+          <p class="form-hint">Knappen udfylder varianten automatisk ud fra HGVS/position og udbyderens pretext. Resultatet tilpasses JSON-skabelonen og inkluderer ACMG/AMP-klassifikation og kriteriestyrker.</p>
           <div class="btn-row">
             <button class="primary action-button action-save with-icon" type="submit" id="variantSave" data-action="save">
               <span class="icon-slot" aria-hidden="true">
