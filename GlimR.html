@@ -6863,14 +6863,47 @@ async function findVariantLibraryMatchByIdentifiers({gene, transcript, hgvsC, ge
   if (VARIANT_LIBRARY_LOOKUP_CACHE.has(cacheKey)) {
     return VARIANT_LIBRARY_LOOKUP_CACHE.get(cacheKey);
   }
-  if (!normalizedCriteria.hgvsC && !normalizedCriteria.genomicPosition && !normalizedCriteria.rsid) {
+  const hasLookupKey = normalizedCriteria.hgvsC || normalizedCriteria.genomicPosition || normalizedCriteria.rsid;
+  if (!hasLookupKey) {
     VARIANT_LIBRARY_LOOKUP_CACHE.set(cacheKey, null);
     return null;
   }
+  
+  const matchesCriteria = (entry = {}) => {
+    const entryGene = normalize(entry.gene || entry.region);
+    const entryTranscript = normalize(entry.transcript);
+    const entryHgvsC = normalize(entry.hgvs_c);
+    const entryGenomicPos = normalize(entry.genomic_position || entry.position || entry.genomicPosition || entry.genomicpos);
+    const entryRsid = normalizeRsId(getVariantRsId(entry));
+    if (normalizedCriteria.hgvsC) {
+      if (normalizedCriteria.gene && entryGene === normalizedCriteria.gene && entryHgvsC === normalizedCriteria.hgvsC) {
+        return true;
+      }
+      if (normalizedCriteria.transcript && entryTranscript === normalizedCriteria.transcript && entryHgvsC === normalizedCriteria.hgvsC) {
+        return true;
+      }
+    }
+    if (normalizedCriteria.genomicPosition && entryGenomicPos === normalizedCriteria.genomicPosition) {
+      return true;
+    }
+    if (normalizedCriteria.rsid && entryRsid === normalizedCriteria.rsid) {
+      return true;
+    }
+    return false;
+  };
+
+  const cachedEntries = getCached('variant_library');
+  const cachedMatch = cachedEntries.find(matchesCriteria);
+  if (cachedMatch) {
+    VARIANT_LIBRARY_LOOKUP_CACHE.set(cacheKey, cachedMatch);
+    return cachedMatch;
+  }
+  
   if (!state.db) {
-    VARIANT_LIBRARY_LOOKUP_CACHE.set(cacheKey, null);
+        // Lad være med at cache et negativt resultat før databasen er klar, så vi kan slå op senere.
     return null;
   }
+  
   return new Promise(resolve => {
     let settled = false;
     const finish = result => {
@@ -6893,28 +6926,8 @@ async function findVariantLibraryMatchByIdentifiers({gene, transcript, hgvsC, ge
           finish(null);
           return;
         }
-        const entry = cursor.value || {};
-        const entryGene = normalize(entry.gene || entry.region);
-        const entryTranscript = normalize(entry.transcript);
-        const entryHgvsC = normalize(entry.hgvs_c);
-        const entryGenomicPos = normalize(entry.genomic_position || entry.position || entry.genomicPosition || entry.genomicpos);
-        const entryRsid = normalizeRsId(getVariantRsId(entry));
-        let match = false;
-        if (normalizedCriteria.hgvsC) {
-          if (normalizedCriteria.gene && entryGene === normalizedCriteria.gene && entryHgvsC === normalizedCriteria.hgvsC) {
-            match = true;
-          } else if (normalizedCriteria.transcript && entryTranscript === normalizedCriteria.transcript && entryHgvsC === normalizedCriteria.hgvsC) {
-            match = true;
-          }
-        }
-        if (!match && normalizedCriteria.genomicPosition && entryGenomicPos === normalizedCriteria.genomicPosition) {
-          match = true;
-        }
-        if (!match && normalizedCriteria.rsid && entryRsid === normalizedCriteria.rsid) {
-          match = true;
-        }
-        if (match) {
-          finish(entry);
+        if (matchesCriteria(cursor.value)) {
+          finish(cursor.value);
           return;
         }
         cursor.continue();
