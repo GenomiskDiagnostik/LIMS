@@ -9391,8 +9391,11 @@ function renderCreateCase(section) {
   };
   const addVariantRow = (values = {}) => {
     if (!variantList) return;
-    const defaultClass = values.classification != null ? String(values.classification) : '3';
-    const classificationOptions = ['1','2','3','4','5'].map(v => `<option value="${v}"${defaultClass === String(v) ? ' selected' : ''}>${v}</option>`).join('');
+    const defaultClass = values.classification != null ? String(values.classification) : '';
+    const classificationOptions = ['','1','2','3','4','5'].map(v => {
+      const label = v || 'Vælg';
+      return `<option value="${v}"${defaultClass === String(v) ? ' selected' : ''}>${label}</option>`;
+    }).join('');
     const row = document.createElement('div');
     row.className = 'case-row variant-row';
     row.innerHTML = `
@@ -9934,7 +9937,7 @@ function renderCreateCase(section) {
         const genomicPosition = getFieldValue('genomic_position');
         const rsid = getFieldValue('rsid');
         const zygosity = getFieldValue('zygosity');
-        const classification = row.querySelector('[data-field="classification"]')?.value || '3';
+        const classification = row.querySelector('[data-field="classification"]')?.value || '';
         const criteria = getFieldValue('criteria');
         const afRaw = getFieldValue('af');
         const interpretation = getFieldValue('interpretation');
@@ -9977,7 +9980,7 @@ function renderCreateCase(section) {
           genomic_position: genomicPosition,
           rsid: normalizeRsId(rsid),
           zygosity,
-          classification: String(classification || '3'),
+          classification: classification ? String(classification) : '',
           criteria,
           interpretation,
           genome_build: genomeBuild,
@@ -13842,7 +13845,7 @@ function renderVariants(section) {
             <label>Berørte gener<textarea name="affected_genes" class="small"></textarea></label>
             <label>Beskrivelse<textarea name="description" class="small"></textarea></label>
           </div>
-          <label>ACMG-klasse<select name="classification" required><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></label>
+          <label>ACMG-klasse<select name="classification" required><option value="" selected>Vælg</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></label>
           <label>Kriterier<input name="criteria" placeholder="PM1,PP3..."></label>
           <label>VAF<input name="af" type="number" step="0.0001" placeholder="0,500"></label>
           <label>Annoteringer<textarea name="annotations" placeholder="Importerede annoteringer fra VarSeq og andre værktøjer."></textarea></label>
@@ -14073,8 +14076,11 @@ function renderVariants(section) {
   };
   const addBatchVariantRow = (values = {}) => {
     if (!batchList) return;
-    const defaultClass = values.classification != null ? String(values.classification) : '3';
-    const classificationOptions = ['1','2','3','4','5'].map(v => `<option value="${v}"${defaultClass === String(v) ? ' selected' : ''}>${v}</option>`).join('');
+    const defaultClass = values.classification != null ? String(values.classification) : '';
+    const classificationOptions = ['','1','2','3','4','5'].map(v => {
+      const label = v || 'Vælg';
+      return `<option value="${v}"${defaultClass === String(v) ? ' selected' : ''}>${label}</option>`;
+    }).join('');
     const row = document.createElement('div');
     row.className = 'case-row variant-row';
     row.innerHTML = `
@@ -14271,7 +14277,7 @@ function renderVariants(section) {
       const iscn = getBatchValue(row, 'iscn');
       const description = getBatchValue(row, 'description');
       const affectedGenes = getBatchValue(row, 'affected_genes');
-      const classification = row.querySelector('[data-field="classification"]')?.value || '3';
+      const classification = row.querySelector('[data-field="classification"]')?.value || '';
       const isEmpty = !gene && !transcript && !hgvsC && !hgvsP && !genomicPosition && !rsid && !zygosity && !criteria && !afRaw && !interpretation && !annotations && !genomeBuild && !chromosome && !start && !end && !copyNumber && !svSubtype && !sizeBp && !iscn && !description && !affectedGenes;
       if (isEmpty) return;
       if (variantType === 'snv') {
@@ -14296,7 +14302,7 @@ function renderVariants(section) {
         genomic_position: genomicPosition,
         rsid: normalizeRsId(rsid),
         zygosity,
-        classification: String(classification || '3'),
+        classification: classification ? String(classification) : '',
         criteria,
         interpretation,
         genome_build: genomeBuild,
