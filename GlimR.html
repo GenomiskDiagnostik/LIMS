@@ -9436,10 +9436,12 @@ function renderCreateCase(section) {
     if (libraryBtn) setTooltip(libraryBtn, 'Vælg en variant fra biblioteket.');
     variantList.appendChild(row);
     applyButtonTooltips(row);
-    const genomicField = row.querySelector('[data-field="genomic_position"]');
-    if (genomicField) setTooltip(genomicField, tooltipCatalog.forms.variantForm.genomic_position);
-    const rsidField = row.querySelector('[data-field="rsid"]');
-    if (rsidField) setTooltip(rsidField, tooltipCatalog.forms.variantForm.rsid);
+    if (genomicPositionField) {
+      setTooltip(genomicPositionField, tooltipCatalog.forms.variantForm.genomic_position);
+    }
+    if (rsidField) {
+      setTooltip(rsidField, tooltipCatalog.forms.variantForm.rsid);
+    }
     const subtypeSelect = row.querySelector('[data-field="sv_subtype"]');
     if (subtypeSelect) setTooltip(subtypeSelect, tooltipCatalog.forms.variantForm.sv_subtype);
   };
