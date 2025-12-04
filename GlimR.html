@@ -6850,13 +6850,36 @@ function findById(store, id) {
   return getCached(store).find(item => item.id === id);
 }
 
+function normalizeGeneOrRegion(value) {
+  return collapseSpaces(value || '').toLowerCase();
+}
+
+function normalizeTranscriptValue(value) {
+  return collapseSpaces(value || '').toLowerCase();
+}
+
+function normalizeHgvsCValue(value) {
+  const raw = collapseSpaces(value || '').toLowerCase();
+  if (!raw) return '';
+  const withoutPrefix = raw.includes(':') ? raw.split(':').pop() : raw;
+  const compact = withoutPrefix.replace(/\s+/g, '');
+  if (compact.startsWith('c.')) return compact;
+  if (compact.startsWith('p.')) return compact; // defensive: allow protein HGVS to pass through unchanged
+  return compact;
+}
+
+function normalizeGenomicPosition(value) {
+  const raw = collapseSpaces(value || '').toLowerCase();
+  if (!raw) return '';
+  return raw.replace(/^chr/i, 'chr').replace(/\s+/g, '');
+}
+
 async function findVariantLibraryMatchByIdentifiers({gene, transcript, hgvsC, genomicPosition, rsid}) {
-  const normalize = value => collapseSpaces(value || '').toLowerCase();
   const normalizedCriteria = {
-    gene: normalize(gene),
-    transcript: normalize(transcript),
-    hgvsC: normalize(hgvsC),
-    genomicPosition: normalize(genomicPosition),
+    gene: normalizeGeneOrRegion(gene),
+    transcript: normalizeTranscriptValue(transcript),
+    hgvsC: normalizeHgvsCValue(hgvsC),
+    genomicPosition: normalizeGenomicPosition(genomicPosition),
     rsid: normalizeRsId(rsid)
   };
   const cacheKey = JSON.stringify(normalizedCriteria);
@@ -6870,10 +6893,10 @@ async function findVariantLibraryMatchByIdentifiers({gene, transcript, hgvsC, ge
   }
   
   const matchesCriteria = (entry = {}) => {
-    const entryGene = normalize(entry.gene || entry.region);
-    const entryTranscript = normalize(entry.transcript);
-    const entryHgvsC = normalize(entry.hgvs_c);
-    const entryGenomicPos = normalize(entry.genomic_position || entry.position || entry.genomicPosition || entry.genomicpos);
+    const entryGene = normalizeGeneOrRegion(entry.gene || entry.region);
+    const entryTranscript = normalizeTranscriptValue(entry.transcript);
+    const entryHgvsC = normalizeHgvsCValue(entry.hgvs_c);
+    const entryGenomicPos = normalizeGenomicPosition(entry.genomic_position || entry.position || entry.genomicPosition || entry.genomicpos);
     const entryRsid = normalizeRsId(getVariantRsId(entry));
     if (normalizedCriteria.hgvsC) {
       if (normalizedCriteria.gene && entryGene === normalizedCriteria.gene && entryHgvsC === normalizedCriteria.hgvsC) {
