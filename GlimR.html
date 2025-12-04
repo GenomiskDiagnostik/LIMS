@@ -9350,6 +9350,89 @@ function renderCreateCase(section) {
         updateVariantTypeFields();
       });
     });
+    const geneField = row.querySelector('[data-field="gene"]');
+    const transcriptField = row.querySelector('[data-field="transcript"]');
+    const hgvsCField = row.querySelector('[data-field="hgvs_c"]');
+    const genomicPositionField = row.querySelector('[data-field="genomic_position"]');
+    const rsidField = row.querySelector('[data-field="rsid"]');
+    const maybeAutofillFromLibrary = () => {
+      const library = getCached('variant_library') || [];
+      if (!library.length) return;
+      const normalize = value => collapseSpaces(value || '').toLowerCase();
+      const gene = normalize(geneField?.value);
+      const transcript = normalize(transcriptField?.value);
+      const hgvsC = normalize(hgvsCField?.value);
+      const genomicPosition = normalize(genomicPositionField?.value);
+      const rsid = normalizeRsId(rsidField?.value);
+      let match = null;
+      const findMatch = predicate => library.find(entry => {
+        try {
+          return predicate(entry);
+        } catch (err) {
+          return false;
+        }
+      });
+      if (hgvsC) {
+        if (gene) {
+          match = findMatch(entry => normalize(entry.gene || entry.region) === gene && normalize(entry.hgvs_c) === hgvsC);
+        }
+        if (!match && transcript) {
+          match = findMatch(entry => normalize(entry.transcript) === transcript && normalize(entry.hgvs_c) === hgvsC);
+        }
+      }
+      if (!match && genomicPosition) {
+        match = findMatch(entry => normalize(entry.genomic_position || entry.position || entry.genomicPosition || entry.genomicpos) === genomicPosition);
+      }
+      if (!match && rsid) {
+        match = findMatch(entry => normalizeRsId(getVariantRsId(entry)) === rsid);
+      }
+      if (!match) return;
+      const setIfEmpty = (selector, value) => {
+        if (value === undefined || value === null) return;
+        const el = row.querySelector(selector);
+        if (!el) return;
+        if ((el.value || '').trim()) return;
+        setValue(selector, value);
+      };
+      setValue('[data-field="variant_type"]', normalizeVariantType(match.variant_type));
+      setIfEmpty('[data-field="gene"]', match.gene || match.region);
+      setIfEmpty('[data-field="transcript"]', match.transcript);
+      setIfEmpty('[data-field="hgvs_c"]', match.hgvs_c);
+      setIfEmpty('[data-field="hgvs_p"]', match.hgvs_p);
+      setIfEmpty('[data-field="genomic_position"]', match.genomic_position || match.position || match.genomicPosition || match.genomicpos);
+      setIfEmpty('[data-field="rsid"]', getVariantRsId(match));
+      setIfEmpty('[data-field="zygosity"]', match.zygosity);
+      setIfEmpty('[data-field="criteria"]', match.criteria);
+      setIfEmpty('[data-field="genome_build"]', match.genome_build || match.genome || match.reference_genome);
+      setIfEmpty('[data-field="chromosome"]', match.chromosome || match.chrom);
+      setIfEmpty('[data-field="start"]', match.start || match.position_start || match.begin);
+      setIfEmpty('[data-field="end"]', match.end || match.position_end || match.finish);
+      setIfEmpty('[data-field="copy_number"]', match.copy_number || match.copynumber || match.copies);
+      setIfEmpty('[data-field="sv_subtype"]', match.sv_subtype || match.structural_type || match.variant_subtype);
+      setIfEmpty('[data-field="size_bp"]', match.size_bp);
+      setIfEmpty('[data-field="iscn"]', match.iscn || match.cytogenetic);
+      setIfEmpty('[data-field="affected_genes"]', match.affected_genes || match.genes);
+      setIfEmpty('[data-field="description"]', match.description);
+      const classField = row.querySelector('[data-field="classification"]');
+      if (classField && match.classification != null && match.classification !== '') {
+        classField.value = String(match.classification);
+      }
+      const interpretationField = row.querySelector('[data-field="interpretation"]');
+      if (interpretationField && !interpretationField.value.trim()) {
+        interpretationField.value = match.evidence || match.interpretation || '';
+      }
+      const annotationsField = row.querySelector('[data-field="annotations"]');
+      if (annotationsField && !annotationsField.value.trim()) {
+        annotationsField.value = match.annotations || match.annotation_summary || '';
+      }
+      updateVariantTypeFields();
+      setMessage('Felter udfyldt automatisk fra Variantbiblioteket.', 'success');
+    };
+    [geneField, transcriptField, hgvsCField, genomicPositionField, rsidField].forEach(field => {
+      ['change', 'blur'].forEach(eventName => {
+        field?.addEventListener(eventName, maybeAutofillFromLibrary);
+      });
+    });
     if (libraryBtn) setTooltip(libraryBtn, 'Vælg en variant fra biblioteket.');
     variantList.appendChild(row);
     applyButtonTooltips(row);
