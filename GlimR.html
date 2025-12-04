@@ -9355,8 +9355,20 @@ function renderCreateCase(section) {
     const hgvsCField = row.querySelector('[data-field="hgvs_c"]');
     const genomicPositionField = row.querySelector('[data-field="genomic_position"]');
     const rsidField = row.querySelector('[data-field="rsid"]');
-    const maybeAutofillFromLibrary = () => {
-      const library = getCached('variant_library') || [];
+    let libraryLoading = false;
+    const maybeAutofillFromLibrary = async () => {
+      let library = getCached('variant_library') || [];
+      if (!library.length && state.db && !libraryLoading) {
+        libraryLoading = true;
+        try {
+          await loadStore('variant_library');
+        } catch (err) {
+          console.warn('Kunne ikke hente variantbiblioteket til autofyld', err);
+        } finally {
+          libraryLoading = false;
+        }
+        library = getCached('variant_library') || [];
+      }
       if (!library.length) return;
       const normalize = value => collapseSpaces(value || '').toLowerCase();
       const gene = normalize(geneField?.value);
@@ -9429,7 +9441,7 @@ function renderCreateCase(section) {
       setMessage('Felter udfyldt automatisk fra Variantbiblioteket.', 'success');
     };
     [geneField, transcriptField, hgvsCField, genomicPositionField, rsidField].forEach(field => {
-      ['change', 'blur'].forEach(eventName => {
+      ['change', 'blur', 'input'].forEach(eventName => {
         field?.addEventListener(eventName, maybeAutofillFromLibrary);
       });
     });
