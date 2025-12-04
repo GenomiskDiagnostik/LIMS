@@ -363,6 +363,9 @@ section[data-tab].active {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   margin-top: 0.75rem;
 }
+.ai-provider-grid.ai-provider-params {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
 .template-advanced {
   margin-top: 1rem;
 }
@@ -4183,7 +4186,7 @@ const schemaFields = {
   variant_library: ['id','variant_type','gene','transcript','hgvs_c','hgvs_p','rsid','classification','criteria','genomic_position','evidence','condition','inheritance','genome_build','chromosome','start','end','copy_number','sv_subtype','size_bp','iscn','description','affected_genes','curated_by','last_review','created_at','updated_at'],
   responses: ['id','ts','sender','patient','diagnostic_report_id','variant_count','variants','raw','created_at','updated_at'],
   fhir_templates: ['id','name','target_system','description','bundle_profile','message_profile','message_event_system','message_event_code','message_event_display','destination_name','destination_endpoint','destination_identifier_system','destination_identifier_value','diagnostic_report_profile','observation_profile','include_document_reference','include_composition','include_variant_observations','composition_title','composition_type_system','composition_type_code','composition_type_display','composition_profile','document_type_system','document_type_code','document_type_display','document_title','document_profile','created_by','created_at','updated_at'],
-  ai_providers: ['id','name','provider_type','base_url','api_key','model','variant_pretext','variant_template','created_by','created_at','updated_at'],
+   ai_providers: ['id','name','provider_type','base_url','api_key','model','variant_pretext','variant_template','reasoning_effort','text_verbosity','max_output_tokens','temperature','top_p','logprobs','created_by','created_at','updated_at'],
   conclusion_library: ['id','title','body','created_by','created_at','updated_at'],
   planner: ['id','user_id','tasks','view','created_at','updated_at']
 };
@@ -13251,6 +13254,31 @@ function providerSupportsJsonFormat(provider) {
   return type !== 'ollama';
 }
 
+const REASONING_EFFORT_VALUES = ['none','low','medium','high'];
+const TEXT_VERBOSITY_VALUES = ['low','medium','high'];
+
+function normaliseReasoningEffort(value) {
+  const effort = (value || '').toLowerCase();
+  return REASONING_EFFORT_VALUES.includes(effort) ? effort : 'none';
+}
+
+function normaliseTextVerbosity(value) {
+  const verbosity = (value || '').toLowerCase();
+  return TEXT_VERBOSITY_VALUES.includes(verbosity) ? verbosity : '';
+}
+
+function parseNumberInRange(value, {min = -Infinity, max = Infinity, round = false} = {}) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return null;
+  if (num < min || num > max) return null;
+  return round ? Math.round(num) : Number(num.toFixed(4));
+}
+
+function isGpt51Model(model) {
+  const normalised = (model || '').toLowerCase();
+  return normalised.startsWith('gpt-5.1');
+}
+
 function buildVariantPrompt(provider, formData) {
   const template = (provider?.variant_template || DEFAULT_VARIANT_JSON_TEMPLATE || '').trim() || DEFAULT_VARIANT_JSON_TEMPLATE;
   const pretext = (provider?.variant_pretext || DEFAULT_VARIANT_PRETEXT || '').trim() || DEFAULT_VARIANT_PRETEXT;
@@ -13280,6 +13308,39 @@ function buildVariantPrompt(provider, formData) {
   ].join(' ');
   const message = `Udfyld JSON-skabelonen for varianten ud fra oplysningerne. ${instructions}\nSkabelon:\n${template}\nInput:\n${JSON.stringify(context, null, 2)}`;
   return {pretext, template, message};
+}
+
+function buildVariantAiPayload(provider, prompt) {
+  const model = (provider?.model || '').trim();
+  const reasoningEffort = normaliseReasoningEffort(provider?.reasoning_effort);
+  const payload = {
+    model,
+    messages: [
+      {role:'system', content: prompt.pretext},
+      {role:'user', content: prompt.message}
+    ]
+  };
+  if (reasoningEffort) {
+    payload.reasoning = {effort: reasoningEffort};
+  }
+  const verbosity = normaliseTextVerbosity(provider?.text_verbosity);
+  if (verbosity) {
+    payload.text = {...(payload.text || {}), verbosity};
+  }
+  const maxTokens = parseNumberInRange(provider?.max_output_tokens, {min:1, round:true});
+  if (maxTokens != null) {
+    payload.max_output_tokens = maxTokens;
+  }
+  const allowSampling = isGpt51Model(model) && reasoningEffort === 'none';
+  if (allowSampling) {
+    const temperature = parseNumberInRange(provider?.temperature ?? 0.2, {min:0, max:2});
+    const topP = parseNumberInRange(provider?.top_p, {min:0, max:1});
+    const logprobs = parseNumberInRange(provider?.logprobs, {min:0, max:5, round:true});
+    if (temperature != null) payload.temperature = temperature;
+    if (topP != null) payload.top_p = topP;
+    if (logprobs != null) payload.logprobs = logprobs;
+  }
+  return payload;
 }
 
 function extractJsonFromText(text) {
@@ -13371,16 +13432,9 @@ async function handleVariantAiFill(providerId, form) {
   if (!hasSeedData) {
     throw new Error('Angiv mindst gen, HGVS eller position før AI-udfyldning.');
   }
-  const {pretext, message} = buildVariantPrompt(provider, formData);
+  const prompt = buildVariantPrompt(provider, formData);
   const baseUrl = resolveAiBaseUrl(provider);
-  const payload = {
-    model,
-    temperature: 0.2,
-    messages: [
-      {role:'system', content: pretext},
-      {role:'user', content: message}
-    ]
-  };
+  const payload = buildVariantAiPayload(provider, prompt);
   if (providerSupportsJsonFormat(provider)) {
     payload.response_format = {type:'json_object'};
   }
@@ -24488,6 +24542,30 @@ function renderAdmin(section) {
             <label>API-key<input type="password" name="api_key" placeholder="Kun nødvendig hvis udbyderen kræver det"></label>
           </div>
           <p class="ai-provider-inline-hint">Gemmes lokalt i IndexedDB og eksporteres med backups. Tomt API-key-felt overskriver ikke en eksisterende værdi.</p>
+          <div class="ai-provider-grid ai-provider-params">
+            <label>Reasoning effort
+              <select name="reasoning_effort">
+                <option value="none" selected>none</option>
+                <option value="low">low</option>
+                <option value="medium">medium</option>
+                <option value="high">high</option>
+              </select>
+            </label>
+            <label>Output-verbosity
+              <select name="text_verbosity">
+                <option value="" selected>Standard</option>
+                <option value="low">low</option>
+                <option value="medium">medium</option>
+                <option value="high">high</option>
+              </select>
+            </label>
+            <label>Maks. output tokens<input type="number" name="max_output_tokens" min="1" step="1" placeholder="Fx 4000"></label>
+            <label>Temperature<input type="number" name="temperature" min="0" max="2" step="0.05" placeholder="Fx 0.2"></label>
+            <label>Top-p<input type="number" name="top_p" min="0" max="1" step="0.01" placeholder="Fx 1.0"></label>
+            <label>Logprobs<input type="number" name="logprobs" min="0" max="5" step="1" placeholder="0-5"></label>
+          </div>
+          <p class="ai-provider-inline-hint">Temperature, top_p og logprobs må kun sendes til GPT-5.1 når reasoning effort er sat til "none"; andre GPT-5* kombinationer afviser forespørgslen.</p>
+          <p class="ai-provider-inline-hint">Brug reasoning/verbosity/max_output_tokens for at styre længere eller mere detaljerede svar, især når reasoning effort er højere end none eller modellen ikke er GPT-5.1.</p>
           <label>Prompt pretext (variant)
             <textarea name="variant_pretext" placeholder="Systemprompt der beskriver tone, format og fokus på fakta">${esc(DEFAULT_VARIANT_PRETEXT)}</textarea>
           </label>
@@ -24867,11 +24945,35 @@ function renderAdmin(section) {
       if (provider.variant_template) {
         aiProviderForm.elements.variant_template.value = provider.variant_template;
       }
+      if (aiProviderForm.elements.reasoning_effort) {
+        aiProviderForm.elements.reasoning_effort.value = provider.reasoning_effort || 'none';
+      }
+      if (aiProviderForm.elements.text_verbosity) {
+        aiProviderForm.elements.text_verbosity.value = provider.text_verbosity || '';
+      }
+      ['temperature','top_p','logprobs','max_output_tokens'].forEach(field => {
+        const control = aiProviderForm.elements[field];
+        if (control) {
+          control.value = provider[field] ?? '';
+        }
+      });
     } else {
       aiProviderForm.reset();
       clearFormIdentifier(aiProviderForm);
       aiProviderForm.elements.variant_pretext.value = DEFAULT_VARIANT_PRETEXT;
       aiProviderForm.elements.variant_template.value = DEFAULT_VARIANT_JSON_TEMPLATE;
+      if (aiProviderForm.elements.reasoning_effort) {
+        aiProviderForm.elements.reasoning_effort.value = 'none';
+      }
+      if (aiProviderForm.elements.text_verbosity) {
+        aiProviderForm.elements.text_verbosity.value = '';
+      }
+      ['temperature','top_p','logprobs','max_output_tokens'].forEach(field => {
+        const control = aiProviderForm.elements[field];
+        if (control) {
+          control.value = '';
+        }
+      });
       resetApiKeyPlaceholder(null);
     }
   };
@@ -24908,6 +25010,13 @@ function renderAdmin(section) {
     data.base_url = (data.base_url || '').trim();
     data.variant_pretext = data.variant_pretext ? data.variant_pretext.trim() : DEFAULT_VARIANT_PRETEXT;
     data.variant_template = data.variant_template ? data.variant_template.trim() : DEFAULT_VARIANT_JSON_TEMPLATE;
+    data.reasoning_effort = normaliseReasoningEffort(data.reasoning_effort);
+    const verbosity = normaliseTextVerbosity(data.text_verbosity);
+    data.text_verbosity = verbosity || null;
+    data.max_output_tokens = parseNumberInRange(data.max_output_tokens, {min:1, round:true});
+    data.temperature = parseNumberInRange(data.temperature, {min:0, max:2});
+    data.top_p = parseNumberInRange(data.top_p, {min:0, max:1});
+    data.logprobs = parseNumberInRange(data.logprobs, {min:0, max:5, round:true});
     const existing = data.id ? aiProviders.find(p => Number(p.id) === Number(data.id)) : null;
     if (!data.name) {
       alert('Navn er påkrævet.');
@@ -25679,6 +25788,12 @@ CREATE TABLE IF NOT EXISTS \`ai_providers\` (
   \`model\` VARCHAR(255),
   \`variant_pretext\` TEXT,
   \`variant_template\` TEXT,
+  \`reasoning_effort\` VARCHAR(32),
+  \`text_verbosity\` VARCHAR(32),
+  \`max_output_tokens\` INT,
+  \`temperature\` DECIMAL(4,2),
+  \`top_p\` DECIMAL(4,3),
+  \`logprobs\` INT,
   \`created_by\` VARCHAR(255),
   \`created_at\` DATETIME,
   \`updated_at\` DATETIME
