@@ -13320,7 +13320,7 @@ function buildVariantAiPayload(provider, prompt) {
       {role:'user', content: prompt.message}
     ]
   };
-  if (reasoningEffort) {
+  if (reasoningEffort && reasoningEffort !== 'none') {
     payload.reasoning = {effort: reasoningEffort};
   }
   const verbosity = normaliseTextVerbosity(provider?.text_verbosity);
