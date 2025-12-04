@@ -3352,6 +3352,7 @@ const storage = (() => {
 const state = {
   db: null,
   cache: new Map(),
+  variantLibraryLookup: null,
   creationLookup: new Map(),
   boundHandle: null,
   autosave: storage.getItem(AUTOSAVE_STORAGE_KEY) === '1',
@@ -6827,6 +6828,7 @@ async function loadStore(name) {
   const rows = await requestToPromise(req);
   if (name === 'variant_library') {
     VARIANT_LIBRARY_LOOKUP_CACHE.clear();
+    rebuildVariantLibraryLookupIndex(rows);
   }
   state.cache.set(name, rows);
   if (name === 'orders') {
@@ -6874,6 +6876,44 @@ function normalizeGenomicPosition(value) {
   return raw.replace(/^chr/i, 'chr').replace(/\s+/g, '');
 }
 
+function rebuildVariantLibraryLookupIndex(entries = []) {
+  const lookup = {
+    geneHgvs: new Map(),
+    transcriptHgvs: new Map(),
+    genomicPos: new Map(),
+    rsid: new Map()
+  };
+
+  const addIfMissing = (map, key, entry) => {
+    if (!key || map.has(key)) return;
+    map.set(key, entry);
+  };
+
+  for (const entry of entries) {
+    if (!entry || typeof entry !== 'object') continue;
+    const geneKey = normalizeGeneOrRegion(entry.gene || entry.region);
+    const transcriptKey = normalizeTranscriptValue(entry.transcript);
+    const hgvsKey = normalizeHgvsCValue(entry.hgvs_c);
+    const genomicKey = normalizeGenomicPosition(entry.genomic_position || entry.position || entry.genomicPosition || entry.genomicpos);
+    const rsKey = normalizeRsId(getVariantRsId(entry));
+
+    if (geneKey && hgvsKey) {
+      addIfMissing(lookup.geneHgvs, `${geneKey}|${hgvsKey}`, entry);
+    }
+    if (transcriptKey && hgvsKey) {
+      addIfMissing(lookup.transcriptHgvs, `${transcriptKey}|${hgvsKey}`, entry);
+    }
+    if (genomicKey) {
+      addIfMissing(lookup.genomicPos, genomicKey, entry);
+    }
+    if (rsKey) {
+      addIfMissing(lookup.rsid, rsKey, entry);
+    }
+  }
+
+  state.variantLibraryLookup = lookup;
+}
+
 async function findVariantLibraryMatchByIdentifiers({gene, transcript, hgvsC, genomicPosition, rsid}) {
   const normalizedCriteria = {
     gene: normalizeGeneOrRegion(gene),
@@ -6892,6 +6932,20 @@ async function findVariantLibraryMatchByIdentifiers({gene, transcript, hgvsC, ge
     return null;
   }
   
+  const lookup = state.variantLibraryLookup;
+  if (lookup) {
+    const geneKey = normalizedCriteria.gene && normalizedCriteria.hgvsC ? `${normalizedCriteria.gene}|${normalizedCriteria.hgvsC}` : '';
+    const transcriptKey = normalizedCriteria.transcript && normalizedCriteria.hgvsC ? `${normalizedCriteria.transcript}|${normalizedCriteria.hgvsC}` : '';
+    const directHit = geneKey && lookup.geneHgvs.get(geneKey)
+      || transcriptKey && lookup.transcriptHgvs.get(transcriptKey)
+      || normalizedCriteria.genomicPosition && lookup.genomicPos.get(normalizedCriteria.genomicPosition)
+      || normalizedCriteria.rsid && lookup.rsid.get(normalizedCriteria.rsid);
+    if (directHit) {
+      VARIANT_LIBRARY_LOOKUP_CACHE.set(cacheKey, directHit);
+      return directHit;
+    }
+  }
+
   const matchesCriteria = (entry = {}) => {
     const entryGene = normalizeGeneOrRegion(entry.gene || entry.region);
     const entryTranscript = normalizeTranscriptValue(entry.transcript);
