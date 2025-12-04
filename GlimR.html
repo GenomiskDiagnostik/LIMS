@@ -13945,6 +13945,87 @@ function renderVariants(section) {
   const saveNewButton = form.querySelector('#variantSaveNew');
   const defaultSaveLabel = saveButtonLabel?.textContent?.trim() || saveButton?.textContent?.trim() || 'Gem';
   const {updateVariantTypeFields, variantTypeSelect} = setupVariantTypeForm(form);
+  // Auto-udfyld variantformular fra Variantbiblioteket ved indtastning
+  if (form && typeof findVariantLibraryMatchByIdentifiers === 'function') {
+    const geneField = form.elements.gene;
+    const transcriptField = form.elements.transcript;
+    const hgvsCField = form.elements.hgvs_c;
+    const genomicPositionField = form.elements.genomic_position;
+    const rsidField = form.elements.rsid;
+
+    const maybeAutofillVariantFormFromLibrary = () => {
+      const match = findVariantLibraryMatchByIdentifiers({
+        gene: geneField?.value || '',
+        transcript: transcriptField?.value || '',
+        hgvs_c: hgvsCField?.value || '',
+        genomic_position: genomicPositionField?.value || '',
+        rsid: rsidField?.value || ''
+      });
+      if (!match) return;
+
+      const setValue = (name, value) => {
+        if (!value) return;
+        const field = form.elements[name];
+        if (!field) return;
+        field.value = value;
+      };
+      const setIfEmpty = (name, value) => {
+        if (!value) return;
+        const field = form.elements[name];
+        if (!field) return;
+        if ((field.value || '').trim()) return;
+        field.value = value;
+      };
+
+      // Samme mapping som i Opret sag / batch-rækkerne 
+      setValue('variant_type', normalizeVariantType(match.variant_type));
+      setIfEmpty('gene', match.gene || match.region);
+      setIfEmpty('transcript', match.transcript);
+      setIfEmpty('hgvs_c', match.hgvs_c);
+      setIfEmpty('hgvs_p', match.hgvs_p);
+      setIfEmpty('genomic_position',
+        match.genomic_position || match.position || match.genomicPosition || match.genomicpos
+      );
+      setIfEmpty('rsid', getVariantRsId(match));
+      setIfEmpty('zygosity', match.zygosity);
+      setIfEmpty('criteria', match.criteria);
+      setIfEmpty('genome_build', match.genome_build || match.genome || match.reference_genome);
+      setIfEmpty('chromosome', match.chromosome || match.chrom);
+      setIfEmpty('start', match.start || match.position_start || match.begin);
+      setIfEmpty('end', match.end || match.position_end || match.finish);
+      setIfEmpty('copy_number', match.copy_number || match.copynumber || match.copies);
+      setIfEmpty('sv_subtype', match.sv_subtype || match.structural_type || match.variant_subtype);
+      setIfEmpty('size_bp', match.size_bp);
+      setIfEmpty('iscn', match.iscn || match.cytogenetic);
+      setIfEmpty('affected_genes', match.affected_genes || match.genes);
+      setIfEmpty('description', match.description);
+
+      const classField = form.elements.classification;
+      if (classField && match.classification != null && match.classification !== '') {
+        classField.value = String(match.classification);
+      }
+
+      const interpretationField = form.elements.interpretation;
+      if (interpretationField && !interpretationField.value.trim()) {
+        interpretationField.value = match.evidence || match.interpretation || '';
+      }
+
+      const annotationsField = form.elements.annotations;
+      if (annotationsField && !annotationsField.value.trim()) {
+        annotationsField.value = match.annotations || match.annotation_summary || '';
+      }
+
+      updateVariantTypeFields();
+      setMessage('Felter udfyldt automatisk fra Variantbiblioteket.', 'success');
+    };
+
+    [geneField, transcriptField, hgvsCField, genomicPositionField, rsidField].forEach(field => {
+      if (!field) return;
+      ['change', 'blur', 'input'].forEach(eventName => {
+        field.addEventListener(eventName, maybeAutofillVariantFormFromLibrary);
+      });
+    });
+  }
   const batchList = section.querySelector('#variantBatchList');
   const batchAddBtn = section.querySelector('#variantBatchAdd');
   const batchImportBtn = section.querySelector('#variantBatchImport');
