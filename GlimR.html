@@ -25730,6 +25730,180 @@ function renderAdmin(section) {
     }
   });
 }
+function recordSelfTestResult(results, name, pass, detail = '') {
+  results.push([name, Boolean(pass), detail || '']);
+}
+function describeSelfTestError(err) {
+  if (!err) return 'Ukendt fejl';
+  return err?.message ? String(err.message) : String(err);
+}
+async function expectAsyncError(task) {
+  try {
+    await task();
+    return null;
+  } catch (err) {
+    return err;
+  }
+}
+function createSelfTestValidationSettings() {
+  const settings = cloneValidationSettings(getValidationSettings());
+  settings.mrn = {mode: 'preset', preset: 'cpr', pattern: '', flags: '', message: ''};
+  settings.pmb = {mode: 'preset', preset: 'digits12', pattern: '', flags: '', message: ''};
+  return settings;
+}
+function waitForSelfTestTick() {
+  return new Promise(resolve => setTimeout(resolve, 0));
+}
+function createSelfTestSection(tabName) {
+  const host = document.createElement('div');
+  host.setAttribute('aria-hidden', 'true');
+  host.style.cssText = 'position:fixed;left:-10000px;top:0;width:1200px;height:1px;overflow:hidden;opacity:0;pointer-events:none;';
+  const section = document.createElement('section');
+  section.dataset.tab = tabName;
+  host.appendChild(section);
+  document.body.appendChild(host);
+  return {
+    section,
+    cleanup() {
+      host.remove();
+    }
+  };
+}
+async function captureSelfTestAlerts(callback) {
+  const originalAlert = window.alert;
+  const messages = [];
+  window.alert = message => {
+    messages.push(String(message ?? ''));
+  };
+  try {
+    await callback(messages);
+    return messages;
+  } finally {
+    window.alert = originalAlert;
+  }
+}
+async function readBlobSignature(blob, length = 5) {
+  if (!(blob instanceof Blob)) return '';
+  const buffer = await blob.arrayBuffer();
+  const bytes = new Uint8Array(buffer).slice(0, length);
+  return Array.from(bytes).map(byte => String.fromCharCode(byte)).join('');
+}
+function nextUnusedSelfTestPmb(existingValues, startValue = 202603230001) {
+  const existing = existingValues instanceof Set ? existingValues : new Set();
+  let candidateNumber = Number(startValue);
+  if (!Number.isFinite(candidateNumber) || candidateNumber < 0) {
+    candidateNumber = 202603230001;
+  }
+  for (let attempt = 0; attempt < 10000; attempt++) {
+    const candidate = String(candidateNumber).padStart(12, '0').slice(-12);
+    if (!existing.has(candidate.toLowerCase())) {
+      existing.add(candidate.toLowerCase());
+      return candidate;
+    }
+    candidateNumber += 1;
+  }
+  throw new Error('Kunne ikke finde et ledigt PMB-nummer til selvtest.');
+}
+async function seedSelfTestDataset(fixedNow) {
+  const iso = fixedNow.toISOString();
+  const existingPmbs = new Set((getCached('samples') || []).map(sample => String(sample?.pmb_number || '').trim().toLowerCase()).filter(Boolean));
+  const primarySamplePmb = nextUnusedSelfTestPmb(existingPmbs, 202603230001);
+  const secondarySamplePmb = nextUnusedSelfTestPmb(existingPmbs, 202603230002);
+  const patientAlphaId = await addRecord('patients', {
+    mrn: '010170-1235',
+    name: 'Testpatient',
+    gender: 'male',
+    birth_date: '1970-01-01',
+    notes: 'Selvtest',
+    family_number: 'FAM-SELFTEST',
+    extra_id: '',
+    healthy_family_member: false
+  });
+  const patientBetaId = await addRecord('patients', {
+    mrn: '020280-1234',
+    name: 'ZZZ Selftest Filter Beta',
+    gender: 'female',
+    birth_date: '1980-02-02',
+    notes: '',
+    family_number: 'FAM-EXPORT',
+    extra_id: '',
+    healthy_family_member: false
+  });
+  const patientGammaId = await addRecord('patients', {
+    mrn: '030390-1235',
+    name: 'ZZZ Selftest Filter Gamma',
+    gender: 'male',
+    birth_date: '1990-03-03',
+    notes: '',
+    family_number: 'FAM-EXPORT',
+    extra_id: '',
+    healthy_family_member: false
+  });
+  const sampleAlphaId = await addRecord('samples', {
+    patient_id: patientAlphaId,
+    pmb_number: primarySamplePmb,
+    sample_type: 'Blod',
+    status: 'Modtaget',
+    collected_at: iso,
+    notes: 'Primær selvtestprøve'
+  });
+  const sampleBetaId = await addRecord('samples', {
+    patient_id: patientBetaId,
+    pmb_number: secondarySamplePmb,
+    sample_type: 'Blod',
+    status: 'Modtaget',
+    collected_at: iso,
+    notes: 'Sekundær selvtestprøve'
+  });
+  const orderId = await addRecord('orders', {
+    patient_id: patientAlphaId,
+    sample_id: sampleAlphaId,
+    panel_id: null,
+    clinician: 'Testperson',
+    status: 'Analyse',
+    acute: false,
+    urgent: false,
+    ordered_at: iso,
+    family_type: 'singleton'
+  });
+  const variantId = await addRecord('variants', {
+    order_id: orderId,
+    gene: 'BRCA1',
+    transcript: '',
+    hgvs_c: 'c.5266dupC',
+    hgvs_p: 'p.(Gln1756Profs*74)',
+    classification: '5',
+    criteria: 'PVS1',
+    af: '',
+    interpretation: 'Selvtest-variant'
+  });
+  const variant = findById('variants', variantId);
+  const variantDetails = variant ? [snapshotVariant(variant)] : [];
+  const reportId = await addRecord('reports', {
+    order_id: orderId,
+    status: 'draft',
+    issued_at: iso,
+    summary: 'Selvtestrapport',
+    variant_ids: JSON.stringify(variantDetails.map(item => item.id).filter(id => id != null)),
+    variant_details: variantDetails
+  });
+  return {
+    fixedNow,
+    iso,
+    patientAlphaId,
+    patientBetaId,
+    patientGammaId,
+    sampleAlphaId,
+    sampleBetaId,
+    orderId,
+    variantId,
+    reportId,
+    primaryPatientMrn: '010170-1235',
+    primarySamplePmb,
+    secondarySamplePmb,
+    patientExportFilterName: 'ZZZ Selftest Filter Beta'
+  };
+}
 async function runTests() {
   if (!ensureWrite('patients')) return;
   let section = document.querySelector('section[data-tab="admin"]');
@@ -25740,12 +25914,75 @@ async function runTests() {
   setStatus('Kører selvtest...');
   const snapshot = await exportData();
   const results = [];
+  const fixedNow = new Date('2026-03-23T10:15:00Z');
   try {
-    const patientId = await addRecord('patients', {mrn:'TEST1', name:'Testpatient', gender:'other', birth_date:'1980-01-01', notes:''});
-    const patient = findById('patients', patientId);
-    results.push(['Oprettelse/udlæsning patient', patient?.name === 'Testpatient', `Navn: ${patient?.name}`]);
-    const sampleId = await addRecord('samples', {patient_id:patientId, pmb_number:`PMB-SELFTST-${Date.now()}`, sample_type:'Blod', status:'Modtaget', collected_at:new Date().toISOString(), notes:''});
-    const orderId = await addRecord('orders', {patient_id:patientId, sample_id:sampleId, panel_id:null, clinician:'Testperson', status:'Analyse', acute:false, urgent:false, ordered_at:new Date().toISOString(), family_type:'singleton'});
+    await persistValidationSettings(createSelfTestValidationSettings());
+    const seed = await seedSelfTestDataset(fixedNow);
+    const patient = findById('patients', seed.patientAlphaId);
+    recordSelfTestResult(results, 'Oprettelse/udlæsning patient', patient?.name === 'Testpatient', `Navn: ${patient?.name}`);
+    const sampleId = seed.sampleAlphaId;
+    const orderId = seed.orderId;
+    const primarySample = findById('samples', sampleId);
+    recordSelfTestResult(results, 'PMB-validering accepterer 12 cifre', !validateFieldValue('pmb', seed.primarySamplePmb) && primarySample?.pmb_number === seed.primarySamplePmb, `PMB: ${seed.primarySamplePmb}`);
+    const shortPmbError = validateFieldValue('pmb', '12345678901');
+    recordSelfTestResult(results, 'PMB-validering afviser forkert længde', !!shortPmbError, shortPmbError || 'Ingen fejl returneret');
+    const alphaPmbError = validateFieldValue('pmb', '12345ABC9012');
+    recordSelfTestResult(results, 'PMB-validering afviser ikke-numeriske tegn', !!alphaPmbError, alphaPmbError || 'Ingen fejl returneret');
+    const duplicateCreateError = await expectAsyncError(() => addRecord('samples', {
+      patient_id: seed.patientGammaId,
+      pmb_number: seed.primarySamplePmb,
+      sample_type: 'Blod',
+      status: 'Modtaget',
+      collected_at: seed.iso,
+      notes: 'Duplikatprøve'
+    }));
+    if (!duplicateCreateError) {
+      const duplicateSamples = getCached('samples').filter(sample => sample.id !== sampleId && sample.pmb_number === seed.primarySamplePmb);
+      for (const duplicateSample of duplicateSamples) {
+        await deleteRecord('samples', duplicateSample.id);
+      }
+    }
+    recordSelfTestResult(results, 'Duplicate PMB blokeres ved oprettelse', !!duplicateCreateError, duplicateCreateError ? describeSelfTestError(duplicateCreateError) : 'Ingen fejl blev rejst');
+    const sampleEditMount = createSelfTestSection('samples');
+    try {
+      renderSamples(sampleEditMount.section);
+      const sampleForm = sampleEditMount.section.querySelector('#sampleForm');
+      const sampleToEdit = findById('samples', seed.sampleBetaId);
+      const duplicateEditAlerts = await captureSelfTestAlerts(async () => {
+        sampleForm.elements.id.value = String(seed.sampleBetaId);
+        sampleForm.elements.patient_id.value = String(sampleToEdit.patient_id);
+        sampleForm.elements.pmb_number.value = seed.primarySamplePmb;
+        sampleForm.elements.sample_type.value = sampleToEdit.sample_type || 'Blod';
+        sampleForm.elements.status.value = sampleToEdit.status || 'Modtaget';
+        sampleForm.elements.collected_at.value = sampleToEdit.collected_at ? toLocalDateTimeValue(sampleToEdit.collected_at) : '';
+        sampleForm.elements.notes.value = sampleToEdit.notes || '';
+        sampleForm.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
+        await waitForSelfTestTick();
+      });
+      const afterEdit = findById('samples', seed.sampleBetaId);
+      const duplicateEditBlocked = duplicateEditAlerts.some(message => message.includes('PMB-nummeret er allerede i brug.')) && afterEdit?.pmb_number === seed.secondarySamplePmb;
+      recordSelfTestResult(results, 'Duplicate PMB blokeres ved redigering', duplicateEditBlocked, duplicateEditAlerts[0] || `PMB efter submit: ${afterEdit?.pmb_number || ''}`);
+    } finally {
+      sampleEditMount.cleanup();
+    }
+    const validMrnError = validateFieldValue('mrn', seed.primaryPatientMrn);
+    recordSelfTestResult(results, 'CPR-validering accepterer gyldigt format', !validMrnError, seed.primaryPatientMrn);
+    const invalidCprError = validateFieldValue('mrn', '310299-1234');
+    recordSelfTestResult(results, 'CPR-validering afviser ugyldig dato', !!invalidCprError, invalidCprError || 'Ingen fejl returneret');
+    const parsedCpr = parseCprNumber(seed.primaryPatientMrn);
+    const parsedCprOk = parsedCpr?.birthDate === '1970-01-01' && parsedCpr?.gender === 'male';
+    recordSelfTestResult(results, 'CPR-parser afleder fødselsdato og køn', parsedCprOk, parsedCprOk ? `${parsedCpr.birthDate} / ${parsedCpr.gender}` : JSON.stringify(parsedCpr || {}));
+    const cprInput = document.createElement('input');
+    const birthInput = document.createElement('input');
+    const genderSelect = document.createElement('select');
+    genderSelect.innerHTML = '<option value=""></option><option value="male">Mand</option><option value="female">Kvinde</option>';
+    applyCprAutofill(cprInput, {birthField: birthInput, genderField: genderSelect});
+    cprInput.value = seed.primaryPatientMrn;
+    cprInput.dispatchEvent(new Event('input', {bubbles: true}));
+    cprInput.dispatchEvent(new Event('change', {bubbles: true}));
+    await waitForSelfTestTick();
+    const autofillOk = birthInput.value === '1970-01-01' && genderSelect.value === 'male';
+    recordSelfTestResult(results, 'CPR-autofill udfylder felter', autofillOk, `${birthInput.value || 'ingen dato'} / ${genderSelect.value || 'intet køn'}`);
     await addRecord('variants', {
       order_id: orderId,
       gene: 'BRCA1',
@@ -25772,11 +26009,96 @@ async function runTests() {
     const centralDirOffset = view.getUint32(zip.length - 6, true);
     results.push(['ZIP-bytes genereret', centralDirOffset > 0, `Centraldir-offset: ${centralDirOffset}`]);
     const sql = await generateSqlDump();
-    results.push(['SQL-dump indeholder variants.criteria', sql.includes('`criteria`'), 'Længde ' + sql.length]);
-    results.push(['Filbinding API', 'showOpenFilePicker' in window || 'showSaveFilePicker' in window, 'Filadgang ' + (('showOpenFilePicker' in window) ? 'tilgængelig' : 'ukendt')]);
+    const backupData = deepClone(await exportData());
+    const backupCounts = summarizeStoreCounts(backupData);
+    await addRecord('patients', {
+      mrn: '040490-1234',
+      name: 'Roundtrip Delta',
+      gender: 'female',
+      birth_date: '1990-04-04',
+      notes: 'Mutation før restore',
+      family_number: 'FAM-ROUNDTRIP',
+      extra_id: '',
+      healthy_family_member: false
+    });
+    await persistValidationSettings(getDefaultValidationSettings());
+    await replaceAllData(backupData, {markSynced: true});
+    const restoredData = await exportData();
+    const restoredCounts = summarizeStoreCounts(restoredData);
+    const backupStores = ['patients', 'samples', 'orders', 'variants', 'reports'];
+    const countsMatch = backupStores.every(store => restoredCounts[store] === backupCounts[store]);
+    const keyDataPreserved = restoredData.patients.some(item => item.mrn === seed.primaryPatientMrn)
+      && restoredData.samples.some(item => item.pmb_number === seed.primarySamplePmb)
+      && restoredData.orders.some(item => Number(item.id) === Number(seed.orderId))
+      && restoredData.reports.some(item => Number(item.id) === Number(seed.reportId));
+    const settingsPreserved = recordsEqual(restoredData.validation_settings, backupData.validation_settings);
+    recordSelfTestResult(results, 'Backup/restore roundtrip bevarer data', countsMatch && keyDataPreserved, `Stores: ${backupStores.map(store => `${store}:${restoredCounts[store]}`).join(', ')}`);
+    recordSelfTestResult(results, 'Backup/restore roundtrip bevarer settings', settingsPreserved, settingsPreserved ? 'validation_settings bevaret via exportData/replaceAllData' : 'validation_settings tabt ved restore');
+    const reportAfterRestore = findById('reports', seed.reportId);
+    const pdfData = {
+      ...(reportAfterRestore || {}),
+      variant_details: getCached('variants').filter(v => Number(v.order_id) === Number(seed.orderId)).map(snapshotVariant)
+    };
+    const hadLogoCache = Object.prototype.hasOwnProperty.call(loadReportLogoImage, 'cache');
+    const previousLogoCache = loadReportLogoImage.cache;
+    loadReportLogoImage.cache = null;
+    let pdfBlob = null;
+    let pdfSignature = '';
+    try {
+      pdfBlob = await createReportPdfBlob(seed.orderId, pdfData, fixedNow);
+      pdfSignature = await readBlobSignature(pdfBlob);
+    } finally {
+      if (hadLogoCache) {
+        loadReportLogoImage.cache = previousLogoCache;
+      } else {
+        delete loadReportLogoImage.cache;
+      }
+    }
+    const pdfFilename = buildReportPdfFilename(seed.orderId, pdfData, fixedNow);
+    recordSelfTestResult(results, 'PDF blob genereres uden logo', !!pdfBlob && pdfBlob.size > 0, `Blob bytes: ${pdfBlob?.size || 0}`);
+    recordSelfTestResult(results, 'PDF blob har gyldig type/signatur', pdfBlob?.type === 'application/pdf' && pdfSignature === '%PDF-', `${pdfBlob?.type || 'ingen type'} / ${pdfSignature || 'ingen signatur'}`);
+    recordSelfTestResult(results, 'PDF filnavn er deterministisk', pdfFilename.endsWith('.pdf') && pdfFilename.includes('20260323'), pdfFilename);
+    const patientExportMount = createSelfTestSection('patients');
+    const originalDownloadCsvFile = downloadCsvFile;
+    try {
+      renderPatients(patientExportMount.section);
+      const nameFilter = patientExportMount.section.querySelector('[data-filter-patients="name"]');
+      const exportButton = patientExportMount.section.querySelector('#patientsExport');
+      const tableBody = patientExportMount.section.querySelector('tbody');
+      let capturedExport = null;
+      downloadCsvFile = (rows, columns, baseName, delimiter = ';') => {
+        capturedExport = {
+          rows: deepClone(rows),
+          columns,
+          baseName,
+          delimiter
+        };
+        return 'selftest-patienter.csv';
+      };
+      nameFilter.value = seed.patientExportFilterName;
+      nameFilter.dispatchEvent(new Event('input', {bubbles: true}));
+      await waitForSelfTestTick();
+      const visibleRows = tableBody.querySelectorAll('tr').length;
+      exportButton.click();
+      await waitForSelfTestTick();
+      const csvExport = capturedExport ? buildCsvExport(capturedExport.rows, capturedExport.columns, capturedExport.delimiter) : null;
+      const lineCount = csvExport?.csv ? csvExport.csv.split('\r\n').length : 0;
+      const exportMatchesFilter = !!capturedExport
+        && capturedExport.baseName === 'glimr-patienter-filtreret.csv'
+        && visibleRows === 1
+        && capturedExport.rows.length === visibleRows
+        && csvExport?.rowCount === visibleRows
+        && lineCount === visibleRows + 1;
+      recordSelfTestResult(results, 'Filtreret patienteksport matcher visning', exportMatchesFilter, `Viste: ${visibleRows}, eksporterede: ${capturedExport?.rows?.length ?? 0}`);
+    } finally {
+      downloadCsvFile = originalDownloadCsvFile;
+      patientExportMount.cleanup();
+    }
+    recordSelfTestResult(results, 'SQL-dump indeholder variants.criteria', sql.includes('`criteria`'), 'Længde ' + sql.length);
+    recordSelfTestResult(results, 'Filbinding API', 'showOpenFilePicker' in window || 'showSaveFilePicker' in window, 'Filadgang ' + (('showOpenFilePicker' in window) ? 'tilgængelig' : 'ukendt'));
   } catch (err) {
     console.error(err);
-    results.push(['Testfejl', false, err.message]);
+    recordSelfTestResult(results, 'Testfejl', false, describeSelfTestError(err));
   } finally {
     state.testResults = results;
     await replaceAllData(snapshot, {markSynced: true});

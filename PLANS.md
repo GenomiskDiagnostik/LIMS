@@ -36,6 +36,11 @@ Lock governance and the regression baseline around the verified GlimR codebase b
 - Phase 0 baseline stays authoritative until intentionally superseded
 - No Class B or Class C implementation starts without explicit test requirements
 
+### Progress
+- Governance package is locked on `fa6c55f`.
+- The first technical regression-harness round now covers PMB validation, CPR validation, JSON roundtrip via `exportData()`/`replaceAllData()`, PDF blob generation, and patient filtered-export row counts.
+- Bound-file/autosave flows, CSV/ZIP restore assertions, broader filtered-export coverage, and visual PDF verification remain open.
+
 ### Exit criteria
 - Governance documents are merged and internally consistent
 - Regression targets for PMB, CPR, backup/restore, PDF, filtered export, and bound-file flows are defined
@@ -99,7 +104,7 @@ Lock governance and the regression baseline around the verified GlimR codebase b
 - P3: high-risk integrations, migrations, and new modules
 
 ## Next milestone
-Merge the governance lock package and begin Phase 1 regression-harness work, starting with explicit tests for PMB, CPR, backup/restore, PDF generation, and filtered export counts.
+Close the remaining Phase 1 regression gaps after the first harness round, starting with bound-file/autosave, CSV/ZIP restore assertions, and broader filtered-export/runtime PDF verification.
 
 ## Next recommended commit
-`docs(governance): lock 2026-03-23 baseline and formalize change gates`
+`test(regression): extend self-test coverage for validation, backup and pdf flows`
