@@ -20,12 +20,12 @@ The older file remains the intake history. This file is the governed tracker tie
 - `C`: high-risk schema, storage, naming, migration, or integration work
 
 ## Summary
-- Verified: 11
+- Verified: 13
 - Partial: 10
 - Missing: 12
 - Class A: 10
 - Class B: 8
-- Class C: 15
+- Class C: 17
 
 | ID | Feature / oenske | Status | Risk class | Paavirkede moduler | Paavirker dataformat | Kraever ADR | Kraever migration | Foreslaaet slice | Acceptkriterier | Testkrav | Noter |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -62,6 +62,9 @@ The older file remains the intake history. This file is the governed tracker tie
 | B-031 | PMB maa ikke vises under Ordination paa Varianter | missing | A | Variants, Orders UI | No | No | No | Phase 2 / Slice A8 | PMB is hidden in the targeted context without removing needed identifiers elsewhere. | Manual UI regression around variant and order context. | UI-only request if implemented narrowly. |
 | B-032 | Per-bruger Organisation/Stednavn som praesentationslabel | verified | B | Users, Header, Dashboard, Planner, Families, Reports | Yes | No | No | Phase 2 / Presentation slice | Brugeren kan angive et valgfrit praesentationsnavn, og sikre bruger-/klinikerrettede outputs viser dette uden at aendre tekniske navne. | Self-test for default/custom header og titel plus manuel smoke for KPI-print, planner-mail, pedigree-print og PDF-subtitle. | Implementeret som et valgfrit `organization_label` paa brugerrecorden. Ingen DB/index-loeft, ingen CSV-formatudvidelse og ingen naming-migration. |
 | B-033 | Varianter: ikon-only AI-handling | verified | A | Variants, AI action UI | No | No | No | Phase 2 / Presentation slice | AI-handlingen renderer som ikonknap med tooltip/aria-label, mens valgt provider fortsat er synlig i selecten. | Self-test for ikonknap-rendering og tilgaengelighedslabel plus manuel variant-smoke. | Præsentationsaendring kun i UI. Ingen aendring i provider-valg, prompt-logik eller write-paths. |
+| B-034 | Per-bruger PNG-logo overstyring i UI og PDF | verified | C | Users, Header, Reports, PDF flow, Backup/restore, Audit | Yes | Yes | No | ADR-004 / Branding slice | Brugeren kan gemme et valgfrit PNG-logo paa sin egen brugerrecord, og UI-header samt rapport-PDF bruger dette logo foran lokal `logo.png` og indlejret SVG-fallback. | Self-test for header/PDF-prioritet, backup/restore-bevarelse og audit-sanitization plus manuel upload-smoke. | Implementeret via valgfrit `organization_logo_data_url` paa `users`. Ingen `DB_VER`, store-, index- eller `schemaFields.users`-aendring; CSV/SQL forbliver uendrede, og audit udelader logoindhold. |
+
+| B-035 | Globale branding-defaults under Administration | verified | C | Admin, Settings, Header, Reports, PDF flow, Backup/restore | Yes | Yes | No | ADR-005 / Branding defaults | Administration kan gemme et globalt praesentationsnavn og et globalt PNG-logo, som bruges naar den aktuelle bruger ikke har sin egen branding. | Self-test for global form, global header/PDF-prioritet og backup/restore plus manuel admin-smoke. | Implementeret via `presentationBranding` i settings store og `presentation_branding_settings` i JSON/bound-file. Ingen `DB_VER`, store-, index- eller `schemaFields`-aendring; per-bruger branding overstyrer global branding. |
 
 ## Interpretation rule
 If a backlog item touches multiple risk domains, keep the highest assigned risk class unless a newer governance decision explicitly reclassifies it.

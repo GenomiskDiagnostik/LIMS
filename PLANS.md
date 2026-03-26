@@ -1,7 +1,7 @@
 # PLANS.md
 
 ## Current objective
-Carry the current validation and form slice through merge and release review without reopening migration, storage, or naming questions.
+Carry the per-user logo override slice through merge and release review without reopening schema, DB version, export-format, or naming questions.
 
 ## Ground rules
 - Baseline before behavior changes.
@@ -106,6 +106,13 @@ Carry the current validation and form slice through merge and release review wit
 - Larger i18n or theme architecture changes
 - New analysis modules
 
+### Progress
+- ADR-004 now governs a bounded Class C slice for per-user PNG-logo override on `users.organization_logo_data_url`.
+- ADR-005 now governs global branding defaults under Administration via `presentationBranding` in the settings store and `presentation_branding_settings` in the JSON/bound-file contract.
+- The logo overrides reuse the existing `users` payload plus settings payload without `DB_VER`, store, index, or `schemaFields.users` changes.
+- Header and report PDF now resolve branding in this order: per-user PNG logo, global PNG logo, local `logo.png`, embedded SVG fallback.
+- Audit omits `organization_logo_data_url`, and logo-only user updates do not create empty audit entries.
+
 ### Exit criteria
 - ADR approved
 - Migration plan approved where required
@@ -119,7 +126,7 @@ Carry the current validation and form slice through merge and release review wit
 - P3: high-risk integrations, migrations, and new modules
 
 ## Next milestone
-Complete manual validation and orders-form smoke plus merge/release evidence for the PMB/display-label/order-selector slice, then return to the remaining Phase 1 gaps around bound-file/autosave, CSV/ZIP restore assertions, and broader runtime verification.
+Complete manual branding smoke for global defaults in Administration plus per-user overrides in Users, verify override order in UI and PDF, and then return to the remaining Phase 1 gaps around bound-file/autosave, CSV/ZIP restore assertions, and broader runtime verification.
 
 ## Next recommended commit
-`fix(validation): harden integer fields and refine configurable id labels`
+`feat(branding): add global branding defaults under admin`

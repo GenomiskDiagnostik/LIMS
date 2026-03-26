@@ -161,6 +161,50 @@ header {
   height: 64px;
   object-fit: contain;
 }
+.user-logo-preview {
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  border: 1px solid var(--panel-border);
+  background: rgba(24, 111, 175, 0.04);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin-top: 0.25rem;
+}
+.user-logo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.user-logo-preview.empty {
+  color: var(--muted-text);
+  font-size: 0.8rem;
+  padding: 0.4rem;
+  text-align: center;
+}
+.user-logo-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.35rem;
+}
+.user-logo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+}
+.user-logo-status {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted-text);
+}
+.user-logo-file-input {
+  display: none;
+}
 .brand.logo-missing::after {
   content: 'logo.png mangler - indlejret SVG bruges som fallback.';
   display: block;
@@ -3451,7 +3495,10 @@ const state = {
   familyFilterTerm: '',
   familyAutosaveTimer: null,
   familySavingPromise: null,
-  validationSettings: null
+  validationSettings: null,
+  presentationBrandingSettings: null,
+  headerLogoRequestId: 0,
+  headerLogoCandidates: []
 };
 const CREATED_BY_STORES = new Set(['patients','samples','orders','patient_groups','family_relations','variants','qc','qc_presets','reports','fhir_templates','conclusion_library','ai_providers']);
 const VARIANT_LIBRARY_LOOKUP_CACHE = new Map();
@@ -3880,7 +3927,13 @@ function isControlOrder(order) {
 }
 
 const VALIDATION_SETTINGS_KEY = 'dataValidation';
+const PRESENTATION_BRANDING_SETTINGS_KEY = 'presentationBranding';
 const VALIDATION_FIELD_KEYS = ['mrn', 'pmb', 'extraId'];
+const USER_LOGO_MAX_BYTES = 1024 * 1024;
+const DEFAULT_PRESENTATION_BRANDING_SETTINGS = {
+  organizationLabel: '',
+  logoDataUrl: ''
+};
 const DEFAULT_VALIDATION_SETTINGS = {
   mrn: {mode: 'none', preset: '', pattern: '', flags: '', message: '', displayName: ''},
   pmb: {mode: 'none', preset: '', pattern: '', flags: '', message: '', displayName: ''},
@@ -3944,6 +3997,31 @@ const VALIDATION_PRESETS = {
 
 function getDefaultValidationSettings() {
   return JSON.parse(JSON.stringify(DEFAULT_VALIDATION_SETTINGS));
+}
+
+function getDefaultPresentationBrandingSettings() {
+  return {...DEFAULT_PRESENTATION_BRANDING_SETTINGS};
+}
+
+function normalizePngDataUrl(value) {
+  const stringValue = String(value || '').trim();
+  return /^data:image\/png;base64,[A-Za-z0-9+/=]+$/i.test(stringValue) ? stringValue : '';
+}
+
+function normalizePresentationBrandingSettings(raw) {
+  const defaults = getDefaultPresentationBrandingSettings();
+  if (!raw || typeof raw !== 'object') {
+    return defaults;
+  }
+  return {
+    organizationLabel: collapseSpaces(raw.organizationLabel || ''),
+    logoDataUrl: normalizePngDataUrl(raw.logoDataUrl)
+  };
+}
+
+function clonePresentationBrandingSettings(value = state.presentationBrandingSettings) {
+  const source = value && typeof value === 'object' ? value : getDefaultPresentationBrandingSettings();
+  return JSON.parse(JSON.stringify(source));
 }
 
 function normalizeValidationRule(rawRule) {
@@ -4022,6 +4100,13 @@ function getValidationSettings() {
   return state.validationSettings;
 }
 
+function getPresentationBrandingSettings() {
+  if (!state.presentationBrandingSettings) {
+    state.presentationBrandingSettings = getDefaultPresentationBrandingSettings();
+  }
+  return state.presentationBrandingSettings;
+}
+
 async function loadValidationSettings() {
   const stored = await getSetting(VALIDATION_SETTINGS_KEY);
   const normalized = normalizeValidationSettings(stored);
@@ -4047,6 +4132,33 @@ async function applyValidationSettingsFromData(rawSettings) {
     return persistValidationSettings(rawSettings);
   }
   return persistValidationSettings(getDefaultValidationSettings());
+}
+
+async function loadPresentationBrandingSettings() {
+  const stored = await getSetting(PRESENTATION_BRANDING_SETTINGS_KEY);
+  const normalized = normalizePresentationBrandingSettings(stored);
+  state.presentationBrandingSettings = normalized;
+  return normalized;
+}
+
+async function persistPresentationBrandingSettings(settings) {
+  const normalized = normalizePresentationBrandingSettings(settings);
+  const previous = state.presentationBrandingSettings;
+  state.presentationBrandingSettings = normalized;
+  try {
+    await setSetting(PRESENTATION_BRANDING_SETTINGS_KEY, normalized);
+  } catch (err) {
+    state.presentationBrandingSettings = previous;
+    throw err;
+  }
+  return normalized;
+}
+
+async function applyPresentationBrandingSettingsFromData(rawSettings) {
+  if (rawSettings && typeof rawSettings === 'object') {
+    return persistPresentationBrandingSettings(rawSettings);
+  }
+  return persistPresentationBrandingSettings(getDefaultPresentationBrandingSettings());
 }
 
 function getValidationPreset(field, presetId) {
@@ -6203,9 +6315,136 @@ function refreshLoginOptions() {
     placeholder.selected = true;
   }
 }
+function getGlobalPresentationName(settings = getPresentationBrandingSettings()) {
+  return collapseSpaces(settings?.organizationLabel || '');
+}
 function getPresentationSystemName(user = state.currentUser) {
   const customLabel = collapseSpaces(user?.organization_label || '');
-  return customLabel || DEFAULT_PRESENTATION_SYSTEM_NAME;
+  return customLabel || getGlobalPresentationName() || DEFAULT_PRESENTATION_SYSTEM_NAME;
+}
+function getUserLogoDataUrl(user = state.currentUser) {
+  return normalizePngDataUrl(user?.organization_logo_data_url);
+}
+function getGlobalLogoDataUrl(settings = getPresentationBrandingSettings()) {
+  return normalizePngDataUrl(settings?.logoDataUrl);
+}
+function getHeaderLogoElements() {
+  const logoImg = document.getElementById('glimrLogo');
+  const logoFallback = document.getElementById('glimrLogoFallback');
+  const brand = logoImg ? logoImg.closest('.brand') : logoFallback?.closest('.brand');
+  const brandMark = brand ? brand.querySelector('.brand-mark') : null;
+  return {logoImg, logoFallback, brand, brandMark};
+}
+function getHeaderLogoCredits(source = 'logo.png') {
+  if (source === 'user-logo') {
+    return 'Brugerdefineret PNG-logo. Lokalt logo.png bruges som sekundær fallback; indlejret logo.svg bruges som sidste fallback i UI og PDF.';
+  }
+  if (source === 'svg-fallback') {
+    return 'Indlejret logo.svg bruges som fallback, fordi hverken brugerlogo eller lokalt logo.png kunne bruges.';
+  }
+  return 'GlimR-logo. logo.png bruges som primær brandingasset; indlejret logo.svg bruges som fallback i UI og PDF.';
+}
+function applyManagedHeaderLogoState(hasLoadedLogo) {
+  const {logoImg, logoFallback, brand, brandMark} = getHeaderLogoElements();
+  if (brand) {
+    brand.classList.toggle('logo-missing', !hasLoadedLogo);
+  }
+  if (logoImg) {
+    logoImg.hidden = !hasLoadedLogo;
+    logoImg.setAttribute('aria-hidden', hasLoadedLogo ? 'false' : 'true');
+  }
+  if (logoFallback) {
+    logoFallback.hidden = hasLoadedLogo;
+    logoFallback.setAttribute('aria-hidden', hasLoadedLogo ? 'true' : 'false');
+    if (!hasLoadedLogo) {
+      setTooltip(logoFallback, getHeaderLogoCredits('svg-fallback'));
+    }
+  }
+  if (brandMark) {
+    brandMark.hidden = true;
+    brandMark.setAttribute('aria-hidden', 'true');
+  }
+}
+function handleHeaderLogoLoad(event) {
+  const logoImg = event?.currentTarget;
+  if (!logoImg) return;
+  const requestId = logoImg.dataset.logoRequestId || '';
+  if (requestId && requestId !== String(state.headerLogoRequestId || '')) {
+    return;
+  }
+  setTooltip(logoImg, getHeaderLogoCredits(logoImg.dataset.logoSource || 'logo.png'));
+  applyManagedHeaderLogoState(true);
+}
+function handleHeaderLogoError(event) {
+  const logoImg = event?.currentTarget;
+  if (!logoImg) {
+    applyManagedHeaderLogoState(false);
+    return;
+  }
+  const requestId = logoImg.dataset.logoRequestId || '';
+  if (requestId && requestId !== String(state.headerLogoRequestId || '')) {
+    return;
+  }
+  if (logoImg.dataset.logoSource === 'user-logo') {
+    const fallbackRequestId = String((state.headerLogoRequestId || 0) + 1);
+    state.headerLogoRequestId = Number(fallbackRequestId);
+    logoImg.dataset.logoRequestId = fallbackRequestId;
+    logoImg.dataset.logoSource = 'logo.png';
+    logoImg.removeAttribute('src');
+    setTooltip(logoImg, getHeaderLogoCredits('logo.png'));
+    logoImg.src = buildAdjacentLogoUrl('logo.png', Date.now());
+    if (logoImg.complete && logoImg.naturalWidth === 0) {
+      applyManagedHeaderLogoState(false);
+    } else if (logoImg.complete) {
+      applyManagedHeaderLogoState(true);
+    }
+    return;
+  }
+  applyManagedHeaderLogoState(false);
+}
+function applyHeaderLogoBranding(user = state.currentUser) {
+  const {logoImg, logoFallback, brandMark} = getHeaderLogoElements();
+  if (!logoImg && !logoFallback) return;
+  normalizeEmbeddedLogoFallbackSvg(document);
+  if (brandMark) {
+    brandMark.hidden = true;
+    brandMark.setAttribute('aria-hidden', 'true');
+  }
+  if (!logoImg) {
+    applyManagedHeaderLogoState(false);
+    return;
+  }
+  const requestId = String((state.headerLogoRequestId || 0) + 1);
+  state.headerLogoRequestId = Number(requestId);
+  const userLogoDataUrl = getUserLogoDataUrl(user);
+  const source = userLogoDataUrl ? 'user-logo' : 'logo.png';
+  const src = userLogoDataUrl || buildAdjacentLogoUrl('logo.png', Date.now());
+  logoImg.dataset.logoRequestId = requestId;
+  logoImg.dataset.logoSource = source;
+  logoImg.removeAttribute('src');
+  setTooltip(logoImg, getHeaderLogoCredits(source));
+  logoImg.src = src;
+  if (logoImg.complete) {
+    if (logoImg.naturalWidth === 0) {
+      if (source === 'user-logo') {
+        logoImg.dataset.logoRequestId = String((state.headerLogoRequestId || 0) + 1);
+        state.headerLogoRequestId = Number(logoImg.dataset.logoRequestId);
+        logoImg.dataset.logoSource = 'logo.png';
+        logoImg.removeAttribute('src');
+        setTooltip(logoImg, getHeaderLogoCredits('logo.png'));
+        logoImg.src = buildAdjacentLogoUrl('logo.png', Date.now());
+        if (logoImg.complete && logoImg.naturalWidth === 0) {
+          applyManagedHeaderLogoState(false);
+        } else if (logoImg.complete) {
+          applyManagedHeaderLogoState(true);
+        }
+      } else {
+        applyManagedHeaderLogoState(false);
+      }
+    } else {
+      applyManagedHeaderLogoState(true);
+    }
+  }
 }
 function applyPresentationBranding(user = state.currentUser) {
   const presentationName = getPresentationSystemName(user);
@@ -6214,7 +6453,93 @@ function applyPresentationBranding(user = state.currentUser) {
     titleEl.textContent = presentationName;
   }
   document.title = presentationName;
+  applyHeaderLogoBranding(user);
   return presentationName;
+}
+function getHeaderLogoCredits(source = 'logo.png') {
+  if (source === 'user-logo') {
+    return 'Brugerdefineret PNG-logo. Global branding bruges som sekundaer fallback; lokalt logo.png bruges derefter; indlejret logo.svg bruges som sidste fallback i UI og PDF.';
+  }
+  if (source === 'global-logo') {
+    return 'Globalt PNG-logo fra Administration. Lokalt logo.png bruges som sekundaer fallback; indlejret logo.svg bruges som sidste fallback i UI og PDF.';
+  }
+  if (source === 'svg-fallback') {
+    return 'Indlejret logo.svg bruges som fallback, fordi hverken brugerlogo, globalt logo eller lokalt logo.png kunne bruges.';
+  }
+  return 'GlimR-logo. logo.png bruges som primaer brandingasset; indlejret logo.svg bruges som fallback i UI og PDF.';
+}
+function getHeaderLogoCandidates(user = state.currentUser) {
+  const candidates = [];
+  const userLogoDataUrl = getUserLogoDataUrl(user);
+  const globalLogoDataUrl = getGlobalLogoDataUrl();
+  if (userLogoDataUrl) {
+    candidates.push({source: 'user-logo', src: userLogoDataUrl});
+  }
+  if (globalLogoDataUrl) {
+    candidates.push({source: 'global-logo', src: globalLogoDataUrl});
+  }
+  candidates.push({source: 'logo.png', src: buildAdjacentLogoUrl('logo.png', Date.now())});
+  return candidates;
+}
+function loadNextHeaderLogoCandidate(logoImg, candidateIndex) {
+  if (!logoImg) {
+    applyManagedHeaderLogoState(false);
+    return;
+  }
+  const candidates = Array.isArray(state.headerLogoCandidates) ? state.headerLogoCandidates : [];
+  const candidate = candidates[candidateIndex];
+  if (!candidate?.src) {
+    applyManagedHeaderLogoState(false);
+    return;
+  }
+  const requestId = String((state.headerLogoRequestId || 0) + 1);
+  state.headerLogoRequestId = Number(requestId);
+  logoImg.dataset.logoRequestId = requestId;
+  logoImg.dataset.logoCandidateIndex = String(candidateIndex);
+  logoImg.dataset.logoSource = candidate.source || 'logo.png';
+  logoImg.removeAttribute('src');
+  setTooltip(logoImg, getHeaderLogoCredits(candidate.source || 'logo.png'));
+  logoImg.src = candidate.src;
+  if (logoImg.complete) {
+    if (logoImg.naturalWidth === 0) {
+      handleHeaderLogoError({currentTarget: logoImg});
+    } else {
+      applyManagedHeaderLogoState(true);
+    }
+  }
+}
+function handleHeaderLogoError(event) {
+  const logoImg = event?.currentTarget;
+  if (!logoImg) {
+    applyManagedHeaderLogoState(false);
+    return;
+  }
+  const requestId = logoImg.dataset.logoRequestId || '';
+  if (requestId && requestId !== String(state.headerLogoRequestId || '')) {
+    return;
+  }
+  const currentIndex = Number(logoImg.dataset.logoCandidateIndex || 0);
+  const nextIndex = Number.isFinite(currentIndex) ? currentIndex + 1 : 1;
+  if (Array.isArray(state.headerLogoCandidates) && nextIndex < state.headerLogoCandidates.length) {
+    loadNextHeaderLogoCandidate(logoImg, nextIndex);
+    return;
+  }
+  applyManagedHeaderLogoState(false);
+}
+function applyHeaderLogoBranding(user = state.currentUser) {
+  const {logoImg, logoFallback, brandMark} = getHeaderLogoElements();
+  if (!logoImg && !logoFallback) return;
+  normalizeEmbeddedLogoFallbackSvg(document);
+  if (brandMark) {
+    brandMark.hidden = true;
+    brandMark.setAttribute('aria-hidden', 'true');
+  }
+  if (!logoImg) {
+    applyManagedHeaderLogoState(false);
+    return;
+  }
+  state.headerLogoCandidates = getHeaderLogoCandidates(user);
+  loadNextHeaderLogoCandidate(logoImg, 0);
 }
 function updateAuthUi() {
   applyPresentationBranding(state.currentUser);
@@ -7331,15 +7656,34 @@ async function deleteRecord(store, id) {
   await logAudit('DELETE', store, id, existing, null);
   scheduleAutosave();
 }
+function sanitizeAuditEntityPayload(entity, record, options = {}) {
+  if (!record || typeof record !== 'object') return record;
+  const {forComparison = false} = options;
+  if (entity !== 'users') return record;
+  const clone = {...record};
+  delete clone.organization_logo_data_url;
+  if (forComparison) {
+    delete clone.updated_at;
+    delete clone.updated_by;
+  }
+  return clone;
+}
 async function logAudit(action, entity, entityId, before, after) {
+  const sanitizedBefore = before ? sanitizeAuditEntityPayload(entity, before) : null;
+  const sanitizedAfter = after ? sanitizeAuditEntityPayload(entity, after) : null;
+  const comparisonBefore = before ? sanitizeAuditEntityPayload(entity, before, {forComparison: true}) : null;
+  const comparisonAfter = after ? sanitizeAuditEntityPayload(entity, after, {forComparison: true}) : null;
+  if (action === 'UPDATE' && recordsEqual(comparisonBefore, comparisonAfter)) {
+    return;
+  }
   const entry = {
     ts: new Date().toISOString(),
     user: currentUserName(),
     action,
     entity,
     entity_id: entityId ?? null,
-    before: before ? JSON.stringify(before) : null,
-    after: after ? JSON.stringify(after) : null
+    before: sanitizedBefore ? JSON.stringify(sanitizedBefore) : null,
+    after: sanitizedAfter ? JSON.stringify(sanitizedAfter) : null
   };
   const tx = state.db.transaction('audit','readwrite');
   tx.objectStore('audit').add({...entry, created_at:new Date().toISOString(), updated_at:new Date().toISOString()});
@@ -7370,6 +7714,7 @@ async function exportData() {
     data[store] = cloneWithCreatedBy(store, getCached(store));
   }
   data.validation_settings = cloneValidationSettings(getValidationSettings());
+  data.presentation_branding_settings = clonePresentationBrandingSettings(getPresentationBrandingSettings());
   return data;
 }
 
@@ -7484,6 +7829,12 @@ function computeLocalChanges(previousData, currentData) {
     changes.validation = {previous: prevValidation, record: currValidation};
     changes.hasChanges = true;
   }
+  const prevPresentationBranding = previous.presentation_branding_settings;
+  const currPresentationBranding = current.presentation_branding_settings;
+  if (!recordsEqual(prevPresentationBranding, currPresentationBranding)) {
+    changes.presentationBranding = {previous: prevPresentationBranding, record: currPresentationBranding};
+    changes.hasChanges = true;
+  }
   return changes;
 }
 
@@ -7578,6 +7929,16 @@ function mergeRemoteData(remoteData, changes) {
       : getDefaultValidationSettings();
     if (!recordsEqual(merged.validation_settings, nextValue)) {
       merged.validation_settings = nextValue;
+      appliedChanges++;
+    }
+  }
+  if (changes.presentationBranding) {
+    const desired = changes.presentationBranding.record;
+    const nextValue = desired && typeof desired === 'object'
+      ? deepClone(desired)
+      : getDefaultPresentationBrandingSettings();
+    if (!recordsEqual(merged.presentation_branding_settings, nextValue)) {
+      merged.presentation_branding_settings = nextValue;
       appliedChanges++;
     }
   }
@@ -7792,6 +8153,7 @@ async function replaceAllData(data, options = {}) {
     await tx.done?.catch(() => {});
   }
   await applyValidationSettingsFromData(data?.validation_settings);
+  await applyPresentationBrandingSettingsFromData(data?.presentation_branding_settings);
   await loadAllStores();
   if (markSynced) {
     await captureSyncedSnapshot();
@@ -20146,6 +20508,14 @@ function buildAdjacentLogoUrl(filename, stamp = Date.now()) {
   }
   return `${safeName}?ts=${stamp}`;
 }
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('Kunne ikke læse filen.'));
+    reader.readAsDataURL(file);
+  });
+}
 function loadImageElement(src) {
   return new Promise((resolve, reject) => {
     const element = new Image();
@@ -20153,6 +20523,31 @@ function loadImageElement(src) {
     element.onerror = reject;
     element.src = src;
   });
+}
+async function loadValidatedUserLogoDataUrl(file) {
+  if (!file) {
+    throw new Error('Ingen fil valgt.');
+  }
+  const filename = String(file.name || '').toLowerCase();
+  const mimeType = String(file.type || '').toLowerCase();
+  if (mimeType && mimeType !== 'image/png') {
+    throw new Error('Logo skal være en PNG-fil.');
+  }
+  if (!mimeType && !filename.endsWith('.png')) {
+    throw new Error('Logo skal være en PNG-fil.');
+  }
+  if (Number(file.size || 0) > USER_LOGO_MAX_BYTES) {
+    throw new Error('Logo må højst fylde 1 MiB.');
+  }
+  const dataUrl = await readFileAsDataUrl(file);
+  if (!/^data:image\/png;base64,/i.test(dataUrl)) {
+    throw new Error('Logo skal være en gyldig PNG-fil.');
+  }
+  const img = await loadImageElement(dataUrl);
+  if (!img?.naturalWidth || !img?.naturalHeight) {
+    throw new Error('Logoet kan ikke indlæses.');
+  }
+  return dataUrl;
 }
 function buildPdfLogoAssetFromImage(img, backgroundColor = '') {
   if (!img?.naturalWidth || !img?.naturalHeight) return null;
@@ -20178,6 +20573,17 @@ function buildPdfLogoAssetFromImage(img, backgroundColor = '') {
     filter: '/DCTDecode',
     colorSpace: '/DeviceRGB'
   };
+}
+async function buildPdfLogoAssetFromSource(src, source, backgroundColor = '') {
+  const img = await loadImageElement(src);
+  if (!img?.naturalWidth || !img?.naturalHeight) {
+    throw new Error(`Tomt logoasset: ${source}`);
+  }
+  const asset = buildPdfLogoAssetFromImage(img, backgroundColor);
+  if (!asset) {
+    throw new Error(`Kunne ikke rasterisere ${source} til PDF`);
+  }
+  return {...asset, source};
 }
 function normalizeEmbeddedLogoFallbackSvg(source = document) {
   const svg = source?.querySelector ? source.querySelector('#glimrLogoFallback svg') : null;
@@ -20212,54 +20618,64 @@ function getEmbeddedLogoFallbackSvgMarkup() {
   }
   return new XMLSerializer().serializeToString(clone);
 }
+function getEmbeddedLogoFallbackDataUrl() {
+  const markup = getEmbeddedLogoFallbackSvgMarkup();
+  return markup ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}` : '';
+}
 async function buildEmbeddedSvgLogoPdfAsset() {
   const markup = getEmbeddedLogoFallbackSvgMarkup();
   if (!markup) return null;
   const svgBlob = new Blob([markup], {type: 'image/svg+xml'});
   const objectUrl = URL.createObjectURL(svgBlob);
   try {
-    const img = await loadImageElement(objectUrl);
-    const asset = buildPdfLogoAssetFromImage(img, PDF_HEADER_BAND_COLOR);
-    if (!asset) return null;
-    asset.source = 'svg-fallback';
-    return asset;
+    return await buildPdfLogoAssetFromSource(objectUrl, 'svg-fallback', PDF_HEADER_BAND_COLOR);
   } finally {
     URL.revokeObjectURL(objectUrl);
   }
 }
+async function loadUserLogoPdfAsset(user = state.currentUser) {
+  const userLogoDataUrl = getUserLogoDataUrl(user);
+  if (!userLogoDataUrl) return null;
+  return buildPdfLogoAssetFromSource(userLogoDataUrl, 'user-logo');
+}
+async function loadGlobalLogoPdfAsset() {
+  const globalLogoDataUrl = getGlobalLogoDataUrl();
+  if (!globalLogoDataUrl) return null;
+  return buildPdfLogoAssetFromSource(globalLogoDataUrl, 'global-logo');
+}
 async function loadLocalPngLogoPdfAsset() {
-  const img = await loadImageElement(buildAdjacentLogoUrl('logo.png', Date.now()));
-  if (!img?.naturalWidth || !img?.naturalHeight) {
-    throw new Error('Tomt logoasset: logo.png');
-  }
-  const asset = buildPdfLogoAssetFromImage(img);
-  if (!asset) {
-    throw new Error('Kunne ikke rasterisere logo.png til PDF');
-  }
-  return {...asset, source: 'logo.png'};
+  return buildPdfLogoAssetFromSource(buildAdjacentLogoUrl('logo.png', Date.now()), 'logo.png');
 }
 
-async function loadReportLogoImage() {
-  const cachedLogo = loadReportLogoImage.cache;
-  if (cachedLogo?.source === 'logo.png') {
-    return cachedLogo;
-  }
+async function loadReportLogoImage(user = state.currentUser) {
   try {
     try {
-      loadReportLogoImage.cache = await loadLocalPngLogoPdfAsset();
-    } catch (localLogoError) {
-      if (cachedLogo?.source === 'svg-fallback') {
-        return cachedLogo;
+      const userLogo = await loadUserLogoPdfAsset(user);
+      if (userLogo) {
+        return userLogo;
       }
+    } catch (userLogoError) {
+      console.warn('Kunne ikke indlæse brugerlogo til PDF', userLogoError);
+    }
+    try {
+      const globalLogo = await loadGlobalLogoPdfAsset();
+      if (globalLogo) {
+        return globalLogo;
+      }
+    } catch (globalLogoError) {
+      console.warn('Kunne ikke indlæse globalt logo til PDF', globalLogoError);
+    }
+    try {
+      return await loadLocalPngLogoPdfAsset();
+    } catch (localLogoError) {
       const embeddedSvgAsset = await buildEmbeddedSvgLogoPdfAsset();
       if (!embeddedSvgAsset) throw localLogoError;
-      loadReportLogoImage.cache = embeddedSvgAsset;
+      return embeddedSvgAsset;
     }
   } catch (err) {
     console.warn('Kunne ikke indlæse logo til PDF', err);
-    loadReportLogoImage.cache = null;
+    return null;
   }
-  return loadReportLogoImage.cache;
 }
 
 function drawReportHeader(builder, logo, exportedAt, presentationName = DEFAULT_PRESENTATION_SYSTEM_NAME) {
@@ -24667,6 +25083,18 @@ function renderUsers(section) {
           <label>Navn<input name="name" required></label>
           <label>E-mail<input type="email" name="email" required></label>
           <label>Organisation/Stednavn<input name="organization_label" placeholder="Valgfrit præsentationsnavn"></label>
+          <div class="user-logo-tools">
+            <span>Brugerlogo</span>
+            <div class="user-logo-preview" data-user-logo-preview>
+              <img data-user-logo-preview-image alt="Preview af brugerlogo">
+            </div>
+            <input class="user-logo-file-input" type="file" id="userLogoFile" accept="image/png">
+            <div class="user-logo-actions">
+              <button class="secondary" type="button" id="userLogoChoose">Vælg logo</button>
+              <button class="secondary" type="button" id="userLogoRemove">Fjern logo</button>
+            </div>
+            <p class="user-logo-status" data-user-logo-status>Standardlogo anvendes.</p>
+          </div>
           <label>Rolle<select name="role" required>${ROLE_OPTIONS.map(opt => `<option value="${opt.value}">${opt.value} – ${opt.description}</option>`).join('')}</select></label>
           <label>Adgangskode (PIN)<input type="password" name="pin" placeholder="Valgfri kode"></label>
           <div class="btn-row">
@@ -24710,12 +25138,84 @@ function renderUsers(section) {
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#userSearch');
   const form = section.querySelector('#userForm');
+  const logoFileInput = section.querySelector('#userLogoFile');
+  const logoChooseButton = section.querySelector('#userLogoChoose');
+  const logoRemoveButton = section.querySelector('#userLogoRemove');
+  const logoPreview = section.querySelector('[data-user-logo-preview]');
+  const logoPreviewImage = section.querySelector('[data-user-logo-preview-image]');
+  const logoStatus = section.querySelector('[data-user-logo-status]');
   annotateHeaders(section);
   annotateSearchInputs(section);
   applyButtonTooltips(section);
   applyControlTooltips(section);
   applyFormTooltips(form);
   let selectedUserId = null;
+  let pendingLogoDataUrl = '';
+  let pendingLogoDirty = false;
+  const getSelectedUser = () => list.find(user => user.id === selectedUserId) || null;
+  const getStoredUserLogoRaw = user => String(user?.organization_logo_data_url || '').trim();
+  const getPreviewUserLogo = user => getUserLogoDataUrl(user) || '';
+  const applyLogoPreviewSource = (src, fallbackSrc = '') => {
+    if (!logoPreviewImage) return;
+    logoPreviewImage.dataset.fallbackSrc = fallbackSrc || '';
+    logoPreviewImage.dataset.usingFallback = 'false';
+    logoPreviewImage.hidden = false;
+    logoPreview?.classList.remove('empty');
+    logoPreviewImage.removeAttribute('src');
+    if (src) {
+      logoPreviewImage.src = src;
+    } else if (fallbackSrc) {
+      logoPreviewImage.dataset.usingFallback = 'true';
+      logoPreviewImage.src = fallbackSrc;
+    }
+  };
+  const renderLogoPreview = () => {
+    const selectedUser = getSelectedUser();
+    const rawCustomLogo = pendingLogoDirty ? String(pendingLogoDataUrl || '').trim() : getStoredUserLogoRaw(selectedUser);
+    const validCustomLogo = rawCustomLogo ? getUserLogoDataUrl({organization_logo_data_url: rawCustomLogo}) : '';
+    const defaultSvgDataUrl = getEmbeddedLogoFallbackDataUrl();
+    if (validCustomLogo) {
+      applyLogoPreviewSource(validCustomLogo);
+      if (logoStatus) {
+        logoStatus.textContent = 'Brugeren anvender eget PNG-logo.';
+      }
+      if (logoRemoveButton) {
+        logoRemoveButton.disabled = false;
+      }
+      return;
+    }
+    applyLogoPreviewSource(buildAdjacentLogoUrl('logo.png', Date.now()), defaultSvgDataUrl);
+    if (logoStatus) {
+      logoStatus.textContent = rawCustomLogo
+        ? 'Eksisterende brugerlogo er ugyldigt; standardlogo anvendes indtil du vælger et nyt eller fjerner det.'
+        : 'Standardlogo anvendes (lokal logo.png eller indlejret SVG).';
+    }
+    if (logoRemoveButton) {
+      logoRemoveButton.disabled = !rawCustomLogo;
+    }
+  };
+  const resetLogoFormState = user => {
+    pendingLogoDirty = false;
+    pendingLogoDataUrl = getStoredUserLogoRaw(user);
+    if (logoFileInput) {
+      logoFileInput.value = '';
+    }
+    renderLogoPreview();
+  };
+  logoPreviewImage?.addEventListener('error', () => {
+    const fallbackSrc = logoPreviewImage.dataset.fallbackSrc || '';
+    if (fallbackSrc && logoPreviewImage.dataset.usingFallback !== 'true') {
+      logoPreviewImage.dataset.usingFallback = 'true';
+      logoPreviewImage.src = fallbackSrc;
+      return;
+    }
+    logoPreview?.classList.add('empty');
+    logoPreviewImage.hidden = true;
+  });
+  logoPreviewImage?.addEventListener('load', () => {
+    logoPreview?.classList.remove('empty');
+    logoPreviewImage.hidden = false;
+  });
   const renderRows = () => {
     const term = search.value.toLowerCase();
     const filteredUsers = list.filter(u => !term || [u.name,u.email,u.role].some(v => (v||'').toLowerCase().includes(term)));
@@ -24740,6 +25240,7 @@ function renderUsers(section) {
     if (!user) return;
     selectedUserId = user.id;
     fillForm(form, user);
+    resetLogoFormState(user);
     renderRows();
   });
   form.addEventListener('submit', async e => {
@@ -24750,11 +25251,13 @@ function renderUsers(section) {
     if (data.id) {
       const id = Number(data.id);
       const before = {...findById('users', id)};
+      data.organization_logo_data_url = pendingLogoDirty ? pendingLogoDataUrl : getStoredUserLogoRaw(before);
       if (!data.pin) data.pin = before?.pin || '';
       const updated = {...before, ...data, id};
       await updateRecord('users', updated, before);
     } else {
       if (!data.pin) data.pin = '';
+      data.organization_logo_data_url = pendingLogoDirty ? pendingLogoDataUrl : '';
       delete data.id;
       await addRecord('users', data);
     }
@@ -24780,8 +25283,36 @@ function renderUsers(section) {
   form.addEventListener('reset', () => {
     clearFormIdentifier(form);
     selectedUserId = null;
+    resetLogoFormState(null);
     renderRows();
   });
+  logoChooseButton?.addEventListener('click', () => {
+    logoFileInput?.click();
+  });
+  logoRemoveButton?.addEventListener('click', () => {
+    pendingLogoDirty = true;
+    pendingLogoDataUrl = '';
+    if (logoFileInput) {
+      logoFileInput.value = '';
+    }
+    renderLogoPreview();
+  });
+  logoFileInput?.addEventListener('change', async () => {
+    const file = logoFileInput.files?.[0];
+    if (!file) return;
+    try {
+      pendingLogoDataUrl = await loadValidatedUserLogoDataUrl(file);
+      pendingLogoDirty = true;
+      renderLogoPreview();
+    } catch (err) {
+      alert(err?.message || 'Logoet kunne ikke indlæses.');
+      if (logoFileInput) {
+        logoFileInput.value = '';
+      }
+      renderLogoPreview();
+    }
+  });
+  resetLogoFormState(null);
   section.querySelector('#userClear').addEventListener('click', () => form.reset());
 }
 function renderAudit(section) {
@@ -25407,6 +25938,32 @@ function renderAdmin(section) {
     </div>
   </div>`;
   initAdminCollapsiblePanels(section);
+  const actionPanel = section.querySelector('.single-action-panel');
+  if (actionPanel) {
+    actionPanel.insertAdjacentHTML('afterbegin', `
+      <h2>Handlinger</h2>
+      <p class="form-hint">Global branding bruges, når den aktuelle bruger ikke har eget præsentationsnavn eller logo.</p>
+      <form id="presentationBrandingForm" class="presentation-branding-form">
+        <label>Globalt Organisation/Stednavn<input name="organizationLabel" placeholder="Valgfrit globalt præsentationsnavn"></label>
+        <div class="user-logo-tools">
+          <span>Globalt logo</span>
+          <div class="user-logo-preview" data-global-logo-preview>
+            <img data-global-logo-preview-image alt="Preview af globalt logo">
+          </div>
+          <input class="user-logo-file-input" type="file" id="globalBrandingLogoFile" accept="image/png">
+          <div class="user-logo-actions">
+            <button class="secondary" type="button" id="globalBrandingLogoChoose">Vælg globalt logo</button>
+            <button class="secondary" type="button" id="globalBrandingLogoRemove">Fjern globalt logo</button>
+          </div>
+          <p class="user-logo-status" data-global-logo-status>Standardbranding anvendes, medmindre den aktuelle bruger har sin egen branding.</p>
+        </div>
+        <div class="btn-row">
+          <button class="primary" type="submit" id="globalBrandingSave">Gem global branding</button>
+          <button class="secondary" type="button" id="globalBrandingReset">Nulstil branding</button>
+        </div>
+      </form>
+    `);
+  }
   const validationForm = section.querySelector('#validationSettingsForm');
   const validationResetBtn = section.querySelector('#validationSettingsReset');
   if (validationForm) {
@@ -25529,6 +26086,135 @@ function renderAdmin(section) {
     validationResetBtn?.addEventListener('click', () => {
       applySettingsToForm(getDefaultValidationSettings());
     });
+  }
+  const presentationBrandingForm = section.querySelector('#presentationBrandingForm');
+  const globalLogoFileInput = section.querySelector('#globalBrandingLogoFile');
+  const globalLogoChooseButton = section.querySelector('#globalBrandingLogoChoose');
+  const globalLogoRemoveButton = section.querySelector('#globalBrandingLogoRemove');
+  const globalLogoPreview = section.querySelector('[data-global-logo-preview]');
+  const globalLogoPreviewImage = section.querySelector('[data-global-logo-preview-image]');
+  const globalLogoStatus = section.querySelector('[data-global-logo-status]');
+  const globalBrandingResetButton = section.querySelector('#globalBrandingReset');
+  if (presentationBrandingForm) {
+    let pendingGlobalLogoDataUrl = '';
+    let pendingGlobalLogoDirty = false;
+    const getStoredGlobalLogoRaw = () => String(getPresentationBrandingSettings()?.logoDataUrl || '').trim();
+    const applyGlobalLogoPreviewSource = (src, fallbackSrc = '') => {
+      if (!globalLogoPreviewImage) return;
+      globalLogoPreviewImage.dataset.fallbackSrc = fallbackSrc || '';
+      globalLogoPreviewImage.dataset.usingFallback = 'false';
+      globalLogoPreviewImage.hidden = false;
+      globalLogoPreview?.classList.remove('empty');
+      globalLogoPreviewImage.removeAttribute('src');
+      if (src) {
+        globalLogoPreviewImage.src = src;
+      } else if (fallbackSrc) {
+        globalLogoPreviewImage.dataset.usingFallback = 'true';
+        globalLogoPreviewImage.src = fallbackSrc;
+      }
+    };
+    const renderGlobalLogoPreview = () => {
+      const rawGlobalLogo = pendingGlobalLogoDirty ? String(pendingGlobalLogoDataUrl || '').trim() : getStoredGlobalLogoRaw();
+      const validGlobalLogo = normalizePngDataUrl(rawGlobalLogo);
+      const defaultSvgDataUrl = getEmbeddedLogoFallbackDataUrl();
+      if (validGlobalLogo) {
+        applyGlobalLogoPreviewSource(validGlobalLogo);
+        if (globalLogoStatus) {
+          globalLogoStatus.textContent = 'Globalt PNG-logo anvendes, når den aktuelle bruger ikke har eget logo.';
+        }
+        if (globalLogoRemoveButton) {
+          globalLogoRemoveButton.disabled = false;
+        }
+        return;
+      }
+      applyGlobalLogoPreviewSource(buildAdjacentLogoUrl('logo.png', Date.now()), defaultSvgDataUrl);
+      if (globalLogoStatus) {
+        globalLogoStatus.textContent = rawGlobalLogo
+          ? 'Eksisterende globalt logo er ugyldigt; standardbranding anvendes, indtil du vælger et nyt eller fjerner det.'
+          : 'Standardbranding anvendes (lokal logo.png eller indlejret SVG), medmindre den aktuelle bruger har sin egen branding.';
+      }
+      if (globalLogoRemoveButton) {
+        globalLogoRemoveButton.disabled = !rawGlobalLogo;
+      }
+    };
+    const applyPresentationBrandingSettingsToForm = settings => {
+      const normalized = normalizePresentationBrandingSettings(settings);
+      const labelInput = presentationBrandingForm.elements.organizationLabel;
+      if (labelInput) {
+        labelInput.value = normalized.organizationLabel || '';
+      }
+      pendingGlobalLogoDirty = false;
+      pendingGlobalLogoDataUrl = normalized.logoDataUrl || '';
+      if (globalLogoFileInput) {
+        globalLogoFileInput.value = '';
+      }
+      renderGlobalLogoPreview();
+    };
+    globalLogoPreviewImage?.addEventListener('error', () => {
+      const fallbackSrc = globalLogoPreviewImage.dataset.fallbackSrc || '';
+      if (fallbackSrc && globalLogoPreviewImage.dataset.usingFallback !== 'true') {
+        globalLogoPreviewImage.dataset.usingFallback = 'true';
+        globalLogoPreviewImage.src = fallbackSrc;
+        return;
+      }
+      globalLogoPreview?.classList.add('empty');
+      globalLogoPreviewImage.hidden = true;
+    });
+    globalLogoPreviewImage?.addEventListener('load', () => {
+      globalLogoPreview?.classList.remove('empty');
+      globalLogoPreviewImage.hidden = false;
+    });
+    globalLogoChooseButton?.addEventListener('click', () => {
+      globalLogoFileInput?.click();
+    });
+    globalLogoRemoveButton?.addEventListener('click', () => {
+      pendingGlobalLogoDirty = true;
+      pendingGlobalLogoDataUrl = '';
+      if (globalLogoFileInput) {
+        globalLogoFileInput.value = '';
+      }
+      renderGlobalLogoPreview();
+    });
+    globalLogoFileInput?.addEventListener('change', async () => {
+      const file = globalLogoFileInput.files?.[0];
+      if (!file) return;
+      try {
+        pendingGlobalLogoDataUrl = await loadValidatedUserLogoDataUrl(file);
+        pendingGlobalLogoDirty = true;
+        renderGlobalLogoPreview();
+      } catch (err) {
+        alert(err?.message || 'Det globale logo kunne ikke indlæses.');
+        if (globalLogoFileInput) {
+          globalLogoFileInput.value = '';
+        }
+        renderGlobalLogoPreview();
+      }
+    });
+    presentationBrandingForm.addEventListener('submit', async evt => {
+      evt.preventDefault();
+      if (!currentCanWrite()) {
+        alert('Handling kræver login med skrivetilladelse.');
+        return;
+      }
+      const nextSettings = {
+        organizationLabel: collapseSpaces(presentationBrandingForm.elements.organizationLabel?.value || ''),
+        logoDataUrl: pendingGlobalLogoDirty ? pendingGlobalLogoDataUrl : getStoredGlobalLogoRaw()
+      };
+      try {
+        const normalized = await persistPresentationBrandingSettings(nextSettings);
+        setStatus('Global branding gemt.');
+        scheduleAutosave();
+        applyPresentationBranding(state.currentUser);
+        applyPresentationBrandingSettingsToForm(normalized);
+      } catch (err) {
+        console.error('Kunne ikke gemme global branding', err);
+        alert('Kunne ikke gemme global branding: ' + (err?.message || err));
+      }
+    });
+    globalBrandingResetButton?.addEventListener('click', () => {
+      applyPresentationBrandingSettingsToForm(getDefaultPresentationBrandingSettings());
+    });
+    applyPresentationBrandingSettingsToForm(clonePresentationBrandingSettings(getPresentationBrandingSettings()));
   }
   applyButtonTooltips(section);
   applyControlTooltips(section);
@@ -26179,6 +26865,13 @@ function createSelfTestValidationSettings() {
   settings.extraId = {...normalizeValidationRule(settings.extraId), displayName: ''};
   return settings;
 }
+function createSelfTestPresentationBrandingSettings() {
+  return {
+    organizationLabel: 'Selvtest Global Branding',
+    logoDataUrl: SELF_TEST_PNG_LOGO_DATA_URL
+  };
+}
+const SELF_TEST_PNG_LOGO_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR42mP8z8Dwn4GBgYGJAQoAHxcCAr7xL6sAAAAASUVORK5CYII=';
 function waitForSelfTestTick() {
   return new Promise(resolve => setTimeout(resolve, 0));
 }
@@ -26366,6 +27059,7 @@ async function runTests() {
   const snapshot = await exportData();
   const results = [];
   const fixedNow = new Date('2026-03-23T10:15:00Z');
+  const selfTestGlobalBrandingSettings = createSelfTestPresentationBrandingSettings();
   try {
     await persistValidationSettings(createSelfTestValidationSettings());
     const seed = await seedSelfTestDataset(fixedNow);
@@ -26484,6 +27178,28 @@ async function runTests() {
     const centralDirOffset = view.getUint32(zip.length - 6, true);
     results.push(['ZIP-bytes genereret', centralDirOffset > 0, `Centraldir-offset: ${centralDirOffset}`]);
     const sql = await generateSqlDump();
+    const selfTestLogoUserId = await addRecord('users', {
+      name: 'Selvtest Logo Bruger',
+      email: `selftest-logo-${fixedNow.getTime()}@example.invalid`,
+      role: 'Skriver',
+      pin: '',
+      organization_label: '',
+      organization_logo_data_url: ''
+    });
+    const selfTestLogoUserBeforeLogoUpdate = {...findById('users', selfTestLogoUserId)};
+    const auditCountBeforeLogoOnlyUpdate = getCached('audit').length;
+    await updateRecord('users', {...selfTestLogoUserBeforeLogoUpdate, organization_logo_data_url: SELF_TEST_PNG_LOGO_DATA_URL}, selfTestLogoUserBeforeLogoUpdate);
+    const auditCountAfterLogoOnlyUpdate = getCached('audit').length;
+    const selfTestLogoUserWithLogo = findById('users', selfTestLogoUserId);
+    const selfTestLogoUserBeforeNameUpdate = {...selfTestLogoUserWithLogo};
+    await updateRecord('users', {...selfTestLogoUserBeforeNameUpdate, name: 'Selvtest Logo Bruger Opdateret'}, selfTestLogoUserBeforeNameUpdate);
+    const sanitizedLogoAuditEntry = getCached('audit').slice().reverse().find(entry => entry.entity === 'users' && Number(entry.entity_id) === Number(selfTestLogoUserId) && entry.action === 'UPDATE');
+    const auditLogoSanitized = auditCountAfterLogoOnlyUpdate === auditCountBeforeLogoOnlyUpdate
+      && !!sanitizedLogoAuditEntry
+      && !String(sanitizedLogoAuditEntry.before || '').includes('organization_logo_data_url')
+      && !String(sanitizedLogoAuditEntry.after || '').includes('organization_logo_data_url');
+    recordSelfTestResult(results, 'Audit logger ikke brugerlogo-data', auditLogoSanitized, auditLogoSanitized ? 'Logo-only update blev ikke logget, og øvrige user-audits er saniterede.' : 'Audit indeholder stadig logo-data eller logo-only update blev logget.');
+    await persistPresentationBrandingSettings(selfTestGlobalBrandingSettings);
     const backupData = deepClone(await exportData());
     const backupCounts = summarizeStoreCounts(backupData);
     await addRecord('patients', {
@@ -26507,41 +27223,34 @@ async function runTests() {
       && restoredData.orders.some(item => Number(item.id) === Number(seed.orderId))
       && restoredData.reports.some(item => Number(item.id) === Number(seed.reportId));
     const settingsPreserved = recordsEqual(restoredData.validation_settings, backupData.validation_settings);
+    const globalBrandingPreserved = recordsEqual(restoredData.presentation_branding_settings, backupData.presentation_branding_settings);
+    const userLogoPreserved = restoredData.users.some(user => Number(user.id) === Number(selfTestLogoUserId) && user.organization_logo_data_url === SELF_TEST_PNG_LOGO_DATA_URL);
     recordSelfTestResult(results, 'Backup/restore roundtrip bevarer data', countsMatch && keyDataPreserved, `Stores: ${backupStores.map(store => `${store}:${restoredCounts[store]}`).join(', ')}`);
     recordSelfTestResult(results, 'Backup/restore roundtrip bevarer settings', settingsPreserved, settingsPreserved ? 'validation_settings bevaret via exportData/replaceAllData' : 'validation_settings tabt ved restore');
+    recordSelfTestResult(results, 'Backup/restore roundtrip bevarer global branding', globalBrandingPreserved, globalBrandingPreserved ? 'presentation_branding_settings bevaret' : 'Global branding mangler efter restore');
+    recordSelfTestResult(results, 'Backup/restore roundtrip bevarer brugerlogo i users-data', userLogoPreserved, userLogoPreserved ? 'organization_logo_data_url bevaret' : 'Brugerlogo mangler efter restore');
+    await persistPresentationBrandingSettings(getDefaultPresentationBrandingSettings());
     const reportAfterRestore = findById('reports', seed.reportId);
     const pdfData = {
       ...(reportAfterRestore || {}),
       variant_details: getCached('variants').filter(v => Number(v.order_id) === Number(seed.orderId)).map(snapshotVariant)
     };
-    const hadLogoCache = Object.prototype.hasOwnProperty.call(loadReportLogoImage, 'cache');
-    const previousLogoCache = loadReportLogoImage.cache;
-    loadReportLogoImage.cache = null;
     let pdfBlob = null;
     let pdfSignature = '';
     let pdfLogoSource = 'ingen';
     try {
       pdfBlob = await createReportPdfBlob(seed.orderId, pdfData, fixedNow);
-      pdfLogoSource = loadReportLogoImage.cache?.source || 'ingen';
+      pdfLogoSource = (await loadReportLogoImage())?.source || 'ingen';
       pdfSignature = await readBlobSignature(pdfBlob);
-    } finally {
-      if (hadLogoCache) {
-        loadReportLogoImage.cache = previousLogoCache;
-      } else {
-        delete loadReportLogoImage.cache;
-      }
-    }
+    } finally {}
     const pdfFilename = buildReportPdfFilename(seed.orderId, pdfData, fixedNow);
     recordSelfTestResult(results, 'PDF blob genereres med logo eller fallback', !!pdfBlob && pdfBlob.size > 0, `Blob bytes: ${pdfBlob?.size || 0}; kilde: ${pdfLogoSource}`);
     recordSelfTestResult(results, 'PDF blob har gyldig type/signatur', pdfBlob?.type === 'application/pdf' && pdfSignature === '%PDF-', `${pdfBlob?.type || 'ingen type'} / ${pdfSignature || 'ingen signatur'}`);
     recordSelfTestResult(results, 'PDF filnavn er deterministisk', pdfFilename.endsWith('.pdf') && pdfFilename.includes('20260323'), pdfFilename);
-    const hadLogoCacheBeforePngCheck = Object.prototype.hasOwnProperty.call(loadReportLogoImage, 'cache');
-    const previousLogoCacheBeforePngCheck = loadReportLogoImage.cache;
     const originalLoadImageElementForPngCheck = loadImageElement;
     const originalBuildPdfLogoAssetFromImage = buildPdfLogoAssetFromImage;
     let pngLogoAsset = null;
     try {
-      loadReportLogoImage.cache = undefined;
       loadImageElement = src => {
         if (typeof src === 'string' && /^logo\.png(?:\?|$)/i.test(src)) {
           return Promise.resolve({naturalWidth: 120, naturalHeight: 60});
@@ -26557,39 +27266,26 @@ async function runTests() {
         filter: '/DCTDecode',
         colorSpace: '/DeviceRGB'
       } : null;
-      pngLogoAsset = await loadReportLogoImage();
+      pngLogoAsset = await loadReportLogoImage({organization_logo_data_url: ''});
     } finally {
       loadImageElement = originalLoadImageElementForPngCheck;
       buildPdfLogoAssetFromImage = originalBuildPdfLogoAssetFromImage;
-      if (hadLogoCacheBeforePngCheck) {
-        loadReportLogoImage.cache = previousLogoCacheBeforePngCheck;
-      } else {
-        delete loadReportLogoImage.cache;
-      }
     }
-    recordSelfTestResult(results, 'PDF-logo bruger lokal logo.png naar den findes', !!pngLogoAsset && pngLogoAsset.source === 'logo.png', pngLogoAsset?.source || 'ingen lokal png');
-    const hadLogoCacheBeforeFallback = Object.prototype.hasOwnProperty.call(loadReportLogoImage, 'cache');
-    const previousLogoCacheBeforeFallback = loadReportLogoImage.cache;
+    recordSelfTestResult(results, 'PDF falder tilbage til lokal logo.png naar brugerlogo mangler', !!pngLogoAsset && pngLogoAsset.source === 'logo.png', pngLogoAsset?.source || 'ingen lokal png');
     const originalLoadImageElement = loadImageElement;
     let fallbackLogoAsset = null;
     try {
-      loadReportLogoImage.cache = undefined;
       loadImageElement = src => {
         if (typeof src === 'string' && /^logo\.png(?:\?|$)/i.test(src)) {
           return Promise.reject(new Error('Selvtest: tvungen logo.png-fejl'));
         }
         return originalLoadImageElement(src);
       };
-      fallbackLogoAsset = await loadReportLogoImage();
+      fallbackLogoAsset = await loadReportLogoImage({organization_logo_data_url: ''});
     } finally {
       loadImageElement = originalLoadImageElement;
-      if (hadLogoCacheBeforeFallback) {
-        loadReportLogoImage.cache = previousLogoCacheBeforeFallback;
-      } else {
-        delete loadReportLogoImage.cache;
-      }
     }
-    recordSelfTestResult(results, 'PDF-logo fallback bruger indlejret SVG naar lokale filer fejler', !!fallbackLogoAsset && fallbackLogoAsset.source === 'svg-fallback', fallbackLogoAsset?.source || 'ingen fallback');
+    recordSelfTestResult(results, 'PDF falder tilbage til indlejret SVG naar hverken brugerlogo eller logo.png virker', !!fallbackLogoAsset && fallbackLogoAsset.source === 'svg-fallback', fallbackLogoAsset?.source || 'ingen fallback');
     const headerLogo = document.getElementById('glimrLogo');
     const headerLogoFallback = document.getElementById('glimrLogoFallback');
     const headerBrand = headerLogo ? headerLogo.closest('.brand') : headerLogoFallback?.closest('.brand');
@@ -26604,8 +27300,14 @@ async function runTests() {
       const originalBrandMarkHidden = headerBrandMark?.hidden;
       const originalBrandMarkAriaHidden = headerBrandMark?.getAttribute('aria-hidden');
       const originalLogoMissing = headerBrand?.classList.contains('logo-missing') || false;
+      const originalLogoSource = headerLogo.dataset.logoSource || '';
+      const originalLogoRequestId = headerLogo.dataset.logoRequestId || '';
+      const originalStateLogoRequestId = state.headerLogoRequestId;
       try {
-        headerLogo.dispatchEvent(new Event('error'));
+        state.headerLogoRequestId = 999001;
+        headerLogo.dataset.logoSource = 'logo.png';
+        headerLogo.dataset.logoRequestId = '999001';
+        handleHeaderLogoError({currentTarget: headerLogo});
         await waitForSelfTestTick();
         logoFallbackStateOk = headerLogo.hidden && !headerLogoFallback.hidden && (!headerBrandMark || headerBrandMark.hidden);
         logoFallbackDetail = `png hidden=${headerLogo.hidden}; svg hidden=${headerLogoFallback.hidden}; brand-mark hidden=${headerBrandMark?.hidden ?? 'n/a'}`;
@@ -26633,6 +27335,17 @@ async function runTests() {
             headerBrandMark.setAttribute('aria-hidden', originalBrandMarkAriaHidden);
           }
         }
+        if (originalLogoSource) {
+          headerLogo.dataset.logoSource = originalLogoSource;
+        } else {
+          delete headerLogo.dataset.logoSource;
+        }
+        if (originalLogoRequestId) {
+          headerLogo.dataset.logoRequestId = originalLogoRequestId;
+        } else {
+          delete headerLogo.dataset.logoRequestId;
+        }
+        state.headerLogoRequestId = originalStateLogoRequestId;
       }
     }
     recordSelfTestResult(results, 'UI-logo fallback aktiveres ved manglende logo', logoFallbackStateOk, logoFallbackDetail);
@@ -26641,13 +27354,31 @@ async function runTests() {
     const originalSystemTitle = systemTitleEl?.textContent || '';
     const originalDocumentTitle = document.title;
     try {
-      const defaultPresentationUser = originalCurrentUser ? {...originalCurrentUser, organization_label: '   '} : {name: 'Selvtest', organization_label: ''};
+      const defaultPresentationUser = originalCurrentUser
+        ? {...originalCurrentUser, organization_label: '   ', organization_logo_data_url: ''}
+        : {name: 'Selvtest', organization_label: '', organization_logo_data_url: ''};
+      await persistPresentationBrandingSettings(getDefaultPresentationBrandingSettings());
       state.currentUser = defaultPresentationUser;
       const defaultPresentationName = applyPresentationBranding(state.currentUser);
       const defaultPresentationOk = defaultPresentationName === DEFAULT_PRESENTATION_SYSTEM_NAME
         && (systemTitleEl?.textContent || '') === DEFAULT_PRESENTATION_SYSTEM_NAME
         && document.title === DEFAULT_PRESENTATION_SYSTEM_NAME;
       recordSelfTestResult(results, 'Præsentationsnavn bruger standardtitel som fallback', defaultPresentationOk, systemTitleEl?.textContent || 'Ingen systemtitel');
+      await persistPresentationBrandingSettings(selfTestGlobalBrandingSettings);
+      state.currentUser = {...defaultPresentationUser};
+      const globalPresentationName = applyPresentationBranding(state.currentUser);
+      await waitForSelfTestTick();
+      const globalPresentationOk = globalPresentationName === selfTestGlobalBrandingSettings.organizationLabel
+        && (systemTitleEl?.textContent || '') === selfTestGlobalBrandingSettings.organizationLabel
+        && document.title === selfTestGlobalBrandingSettings.organizationLabel;
+      recordSelfTestResult(results, 'Globalt praesentationsnavn bruges uden brugeroverride', globalPresentationOk, `${systemTitleEl?.textContent || 'ingen'} / ${document.title}`);
+      const globalHeaderLogoOk = headerLogo?.dataset.logoSource === 'global-logo'
+        && (headerLogo?.src || '').startsWith('data:image/png;base64,')
+        && !headerLogo?.hidden
+        && !!headerLogoFallback?.hidden;
+      recordSelfTestResult(results, 'Globalt logo overstyrer headerens standardlogo naar brugerlogo mangler', globalHeaderLogoOk, `${headerLogo?.dataset.logoSource || 'ingen kilde'} / ${headerLogo?.src || 'ingen src'}`);
+      const globalLogoPdfAsset = await loadReportLogoImage(state.currentUser);
+      recordSelfTestResult(results, 'PDF bruger globalt logo naar brugerlogo mangler', !!globalLogoPdfAsset && globalLogoPdfAsset.source === 'global-logo', globalLogoPdfAsset?.source || 'ingen global logo-kilde');
       const customPresentationName = 'Rigshospitalet Klinisk Genetik';
       state.currentUser = {...defaultPresentationUser, organization_label: ` ${customPresentationName} `};
       const appliedCustomPresentation = applyPresentationBranding(state.currentUser);
@@ -26665,13 +27396,52 @@ async function runTests() {
         }
       }
     }
+    const adminMount = createSelfTestSection('admin');
+    try {
+      renderAdmin(adminMount.section);
+      const presentationBrandingForm = adminMount.section.querySelector('#presentationBrandingForm');
+      const globalBrandingLabelInput = presentationBrandingForm?.elements?.organizationLabel;
+      const globalBrandingChoose = adminMount.section.querySelector('#globalBrandingLogoChoose');
+      const globalBrandingRemove = adminMount.section.querySelector('#globalBrandingLogoRemove');
+      const globalBrandingFile = adminMount.section.querySelector('#globalBrandingLogoFile');
+      const globalBrandingOk = !!presentationBrandingForm
+        && !!globalBrandingLabelInput
+        && !!globalBrandingChoose
+        && !!globalBrandingRemove
+        && !!globalBrandingFile;
+      recordSelfTestResult(results, 'Administration viser global branding-form', globalBrandingOk, globalBrandingLabelInput?.getAttribute('placeholder') || 'Global branding-form mangler');
+    } finally {
+      adminMount.cleanup();
+    }
     const usersMount = createSelfTestSection('users');
     try {
       renderUsers(usersMount.section);
       const organizationInput = usersMount.section.querySelector('input[name="organization_label"]');
+      const logoChooseControl = usersMount.section.querySelector('#userLogoChoose');
+      const logoRemoveControl = usersMount.section.querySelector('#userLogoRemove');
+      const logoFileControl = usersMount.section.querySelector('#userLogoFile');
       recordSelfTestResult(results, 'Brugerformular viser Organisation/Stednavn', !!organizationInput, organizationInput?.getAttribute('placeholder') || 'Felt mangler');
+      recordSelfTestResult(results, 'Brugerformular viser logo-upload', !!logoChooseControl && !!logoRemoveControl && !!logoFileControl, logoChooseControl?.textContent || 'Mangler logo-upload');
     } finally {
       usersMount.cleanup();
+    }
+    const originalCurrentUserForLogoOverride = state.currentUser;
+    try {
+      await persistPresentationBrandingSettings(selfTestGlobalBrandingSettings);
+      const userLogoState = {...(findById('users', selfTestLogoUserId) || {}), organization_logo_data_url: SELF_TEST_PNG_LOGO_DATA_URL, organization_label: ''};
+      state.currentUser = userLogoState;
+      applyPresentationBranding(state.currentUser);
+      await waitForSelfTestTick();
+      const userHeaderLogoOk = headerLogo?.dataset.logoSource === 'user-logo'
+        && (headerLogo?.src || '').startsWith('data:image/png;base64,')
+        && !headerLogo?.hidden
+        && !!headerLogoFallback?.hidden;
+      recordSelfTestResult(results, 'Brugerlogo overstyrer headerens standardlogo', userHeaderLogoOk, `${headerLogo?.dataset.logoSource || 'ingen kilde'} / ${headerLogo?.src || 'ingen src'}`);
+      const userLogoPdfAsset = await loadReportLogoImage(state.currentUser);
+      recordSelfTestResult(results, 'PDF bruger brugerlogo naar det findes', !!userLogoPdfAsset && userLogoPdfAsset.source === 'user-logo', userLogoPdfAsset?.source || 'ingen brugerlogo-kilde');
+    } finally {
+      state.currentUser = originalCurrentUserForLogoOverride;
+      applyPresentationBranding(originalCurrentUserForLogoOverride);
     }
     const variantMount = createSelfTestSection('variants');
     try {
@@ -27230,49 +28000,18 @@ function hookUi() {
   const logoFallback = document.getElementById('glimrLogoFallback');
   if (logoImg || logoFallback) {
     normalizeEmbeddedLogoFallbackSvg(document);
-    const brand = logoImg ? logoImg.closest('.brand') : logoFallback?.closest('.brand');
-    const brandMark = brand ? brand.querySelector('.brand-mark') : null;
-    const logoCredits = 'GlimR-logo. logo.png bruges som primær brandingasset; indlejret logo.svg bruges som fallback i UI og PDF.';
-    if (logoImg) setTooltip(logoImg, logoCredits);
-    if (logoFallback) setTooltip(logoFallback, logoCredits);
-    if (brandMark) {
-      brandMark.hidden = true;
-      brandMark.setAttribute('aria-hidden', 'true');
+    if (logoImg) {
+      logoImg.addEventListener('error', event => {
+        handleHeaderLogoError(event);
+      });
+      logoImg.addEventListener('load', event => {
+        handleHeaderLogoLoad(event);
+      });
     }
-    const applyHeaderLogoState = hasLoadedLogo => {
-      if (brand) {
-        brand.classList.toggle('logo-missing', !hasLoadedLogo);
-      }
-      if (logoImg) {
-        logoImg.hidden = !hasLoadedLogo;
-        logoImg.setAttribute('aria-hidden', hasLoadedLogo ? 'false' : 'true');
-      }
-      if (logoFallback) {
-        logoFallback.hidden = hasLoadedLogo;
-        logoFallback.setAttribute('aria-hidden', hasLoadedLogo ? 'true' : 'false');
-      }
-      if (brandMark) {
-        brandMark.hidden = true;
-        brandMark.setAttribute('aria-hidden', 'true');
-      }
-    };
-    const markMissing = () => {
-      applyHeaderLogoState(false);
-    };
-    const markLoaded = () => {
-      applyHeaderLogoState(true);
-    };
-    logoImg?.addEventListener('error', markMissing);
-    logoImg?.addEventListener('load', markLoaded);
-    if (logoImg?.complete) {
-      if (logoImg.naturalWidth === 0) {
-        markMissing();
-      } else {
-        markLoaded();
-      }
-    } else {
-      markLoaded();
+    if (logoFallback) {
+      setTooltip(logoFallback, getHeaderLogoCredits('svg-fallback'));
     }
+    applyHeaderLogoBranding(state.currentUser);
   }
   applyTheme();
   refreshLoginOptions();
@@ -27291,6 +28030,7 @@ async function init() {
     await ensureDefaultFhirTemplates();
     await ensureCreationMetadata();
     await loadValidationSettings();
+    await loadPresentationBrandingSettings();
     await loadAiProviderPreference();
     await captureSyncedSnapshot();
     await restoreBoundHandle();
