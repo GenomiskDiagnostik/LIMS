@@ -1,7 +1,7 @@
 # PLANS.md
 
 ## Current objective
-Carry the current low-risk presentation and micro-UI slice through merge and release review without reopening baseline or storage questions.
+Carry the current validation and form slice through merge and release review without reopening migration, storage, or naming questions.
 
 ## Ground rules
 - Baseline before behavior changes.
@@ -57,6 +57,8 @@ Carry the current low-risk presentation and micro-UI slice through merge and rel
 - The embedded SVG fallback now hardens its filter extents to avoid cropped rendering in UI and PDF fallback serialization.
 - Users can now store an optional per-user `organization_label` that drives presentation-only branding in the header, browser title, KPI print view, planner mail text, pedigree print, and the report PDF subtitle while technical names remain unchanged.
 - The variant AI action now renders as an icon-only button with tooltip and `aria-label`, while the selected provider remains visible in the adjacent select and the underlying AI flow is unchanged.
+- Admin datavalidering now stores configurable display labels for `pmb`, `mrn`, and `extraId`, with `Prøvenummer`, `MRN`, and `Ekstra ID` as presentation defaults.
+- Orders now restrict new sample selection to non-control samples, show sample type in the dropdown, and keep historical control-linked orders editable as legacy references without mutating stored data.
 
 ### Candidate slices
 - Orders shortcuts to patient and family
@@ -80,6 +82,11 @@ Carry the current low-risk presentation and micro-UI slice through merge and rel
 - CSV-assisted PMB lookup
 - Variant-library review interval behavior
 - Any configurable uniqueness policy that does not escalate into migration
+
+### Progress
+- PMB validation is now hardened against decimal-like input while remaining string-based and preserving leading zeroes.
+- `copy_number` and `size_bp` were intentionally not tightened in runtime behavior in this slice, because the current baseline still treats them as free-text/domain-text fields.
+- Uniqueness policy remains analysis-only: PMB uniqueness is already hard-enforced in both UI save logic and the IndexedDB unique index on `samples.pmb_number`.
 
 ### Exit criteria
 - Targeted validation and PDF tests are green
@@ -112,7 +119,7 @@ Carry the current low-risk presentation and micro-UI slice through merge and rel
 - P3: high-risk integrations, migrations, and new modules
 
 ## Next milestone
-Complete manual UI and PDF smoke plus merge/release evidence for the presentation micro-slice, then return to the remaining Phase 1 gaps around bound-file/autosave, CSV/ZIP restore assertions, and broader runtime verification.
+Complete manual validation and orders-form smoke plus merge/release evidence for the PMB/display-label/order-selector slice, then return to the remaining Phase 1 gaps around bound-file/autosave, CSV/ZIP restore assertions, and broader runtime verification.
 
 ## Next recommended commit
-`feat(ui): add per-user organization label and icon-only ai action`
+`fix(validation): harden integer fields and refine configurable id labels`

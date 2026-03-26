@@ -1941,6 +1941,35 @@ button.icon-button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
+#variantAiFill {
+  flex: 0 0 auto;
+  width: 2.35rem;
+  height: 2.35rem;
+  padding: 0;
+  border: 1px solid rgba(24, 111, 175, 0.28);
+  border-radius: 0.7rem;
+  background: rgba(24, 111, 175, 0.08);
+  color: var(--accent-strong);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+#variantAiFill .icon-slot {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+#variantAiFill:hover,
+#variantAiFill:focus-visible {
+  border-color: rgba(24, 111, 175, 0.42);
+}
+[data-theme="dark"] #variantAiFill {
+  border-color: rgba(56, 189, 248, 0.34);
+  background: rgba(56, 189, 248, 0.12);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.2);
+}
+[data-theme="dark"] #variantAiFill:hover,
+[data-theme="dark"] #variantAiFill:focus-visible {
+  border-color: rgba(56, 189, 248, 0.48);
+}
 .table-shortcut-actions button.icon-button {
   flex: 0 0 auto;
   padding: 0.25rem;
@@ -2069,6 +2098,9 @@ form textarea {
   display: flex;
   gap: 0.6rem;
   flex-wrap: wrap;
+}
+.variant-ai-row {
+  align-items: flex-end;
 }
 .panel.single-action-panel .btn-row {
   justify-content: flex-start;
@@ -3850,33 +3882,33 @@ function isControlOrder(order) {
 const VALIDATION_SETTINGS_KEY = 'dataValidation';
 const VALIDATION_FIELD_KEYS = ['mrn', 'pmb', 'extraId'];
 const DEFAULT_VALIDATION_SETTINGS = {
-  mrn: {mode: 'none', preset: '', pattern: '', flags: '', message: ''},
-  pmb: {mode: 'none', preset: '', pattern: '', flags: '', message: ''},
-  extraId: {mode: 'none', preset: '', pattern: '', flags: '', message: ''}
+  mrn: {mode: 'none', preset: '', pattern: '', flags: '', message: '', displayName: ''},
+  pmb: {mode: 'none', preset: '', pattern: '', flags: '', message: '', displayName: ''},
+  extraId: {mode: 'none', preset: '', pattern: '', flags: '', message: '', displayName: ''}
 };
 const VALIDATION_FIELD_METADATA = {
-  mrn: {label: 'MRN'},
-  pmb: {label: 'PMB-nummer'},
-  extraId: {label: 'Ekstra ID'}
+  mrn: {defaultLabel: 'MRN'},
+  pmb: {defaultLabel: 'Prøvenummer'},
+  extraId: {defaultLabel: 'Ekstra ID'}
 };
 const VALIDATION_PRESETS = {
   mrn: {
     cpr: {
       label: 'CPR-nummer (DDMMÅÅ-XXXX)',
-      description: 'Kræver at MRN angives som et gyldigt CPR-nummer.',
+      description: 'Kræver et gyldigt CPR-nummer i formatet DDMMÅÅ-XXXX.',
       validate(value) {
         if (!value) return '';
-        return parseCprNumber(value) ? '' : 'MRN skal være et gyldigt CPR-nummer (DDMMÅÅ-XXXX).';
+        return parseCprNumber(value) ? '' : `${getValidationFieldDisplayName('mrn')} skal være et gyldigt CPR-nummer (DDMMÅÅ-XXXX).`;
       }
     }
   },
   pmb: {
     digits12: {
       label: '12 cifre (heltal)',
-      description: 'Kræver at PMB-nummeret består af præcis 12 cifre uden mellemrum.',
+      description: 'Kræver præcis 12 cifre uden mellemrum.',
       validate(value) {
         if (!value) return '';
-        return /^\d{12}$/.test(value) ? '' : 'PMB-nummeret skal bestå af præcis 12 cifre.';
+        return /^\d{12}$/.test(value) ? '' : `${getValidationFieldDisplayName('pmb')} skal bestå af præcis 12 cifre.`;
       }
     }
   },
@@ -3915,7 +3947,7 @@ function getDefaultValidationSettings() {
 }
 
 function normalizeValidationRule(rawRule) {
-  const base = {mode: 'none', preset: '', pattern: '', flags: '', message: ''};
+  const base = {mode: 'none', preset: '', pattern: '', flags: '', message: '', displayName: ''};
   if (!rawRule || typeof rawRule !== 'object') {
     return {...base};
   }
@@ -3933,6 +3965,9 @@ function normalizeValidationRule(rawRule) {
   }
   if (rawRule.message != null) {
     rule.message = String(rawRule.message);
+  }
+  if (rawRule.displayName != null) {
+    rule.displayName = String(rawRule.displayName);
   }
   return rule;
 }
@@ -3953,6 +3988,31 @@ function normalizeValidationSettings(raw) {
 function cloneValidationSettings(value = state.validationSettings) {
   const source = value && typeof value === 'object' ? value : getDefaultValidationSettings();
   return JSON.parse(JSON.stringify(source));
+}
+
+function getDefaultValidationFieldLabel(field) {
+  return VALIDATION_FIELD_METADATA[field]?.defaultLabel || field;
+}
+
+function getValidationFieldDisplayName(field, settings = getValidationSettings()) {
+  const displayName = settings?.[field]?.displayName;
+  const trimmed = typeof displayName === 'string' ? displayName.trim() : '';
+  return trimmed || getDefaultValidationFieldLabel(field);
+}
+
+function getPmbFormatError(value, label = getValidationFieldDisplayName('pmb')) {
+  const normalisedValue = typeof value === 'string' ? value.trim() : String(value ?? '').trim();
+  if (!normalisedValue) return '';
+  if (/\s/.test(normalisedValue)) {
+    return `${label} må ikke indeholde mellemrum.`;
+  }
+  if (/^(?:\d+[.,]\d*|\d*[.,]\d+)$/.test(normalisedValue)) {
+    return `${label} må ikke angives som kommatal.`;
+  }
+  if (/^\d+(?:[eE][+-]?\d+)$/.test(normalisedValue)) {
+    return `${label} må ikke angives i eksponentformat.`;
+  }
+  return '';
 }
 
 function getValidationSettings() {
@@ -4005,12 +4065,18 @@ function validateFieldValue(field, value, context = {}) {
   if (!normalisedValue) {
     return null;
   }
+  const customMessage = (rule.message || '').trim();
+  if (field === 'pmb') {
+    const pmbFormatError = getPmbFormatError(normalisedValue, getValidationFieldDisplayName(field, settings));
+    if (pmbFormatError) {
+      return customMessage || pmbFormatError;
+    }
+  }
   if (rule.mode === 'preset') {
     const preset = getValidationPreset(field, rule.preset);
     if (!preset) return null;
     const error = preset.validate(normalisedValue, context);
     if (error) {
-      const customMessage = (rule.message || '').trim();
       return customMessage || error;
     }
     return null;
@@ -4020,12 +4086,10 @@ function validateFieldValue(field, value, context = {}) {
     try {
       const regex = new RegExp(rule.pattern, rule.flags || '');
       if (!regex.test(normalisedValue)) {
-        const customMessage = (rule.message || '').trim();
         return customMessage || 'Værdien matcher ikke det krævede mønster.';
       }
     } catch (err) {
       console.error('Ugyldigt regulært udtryk i datavalidering', err);
-      const customMessage = (rule.message || '').trim();
       return customMessage || 'Valideringen kan ikke udføres pga. ugyldigt mønster.';
     }
   }
@@ -9237,6 +9301,9 @@ function renderCreateCase(section) {
   const panels = getCached('panels').slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   const users = getCached('users').slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   const patientGroups = getCached('patient_groups').slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', 'da'));
+  const mrnLabel = getValidationFieldDisplayName('mrn');
+  const extraIdLabel = getValidationFieldDisplayName('extraId');
+  const pmbLabel = getValidationFieldDisplayName('pmb');
   const families = Array.from(new Set(getCached('patients').map(p => (p.family_number || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'da'));
   const familySelectOptions = ['<option value="">Vælg familienummer</option>']
     .concat(families.map(num => `<option value="${esc(num)}">${esc(num)}</option>`))
@@ -9265,8 +9332,8 @@ function renderCreateCase(section) {
         </legend>
         <div class="fieldset-body" hidden>
           <div class="inline-group">
-            <label class="inline">MRN<input name="patient_mrn" required placeholder="Fx 010170-1234"></label>
-            <label class="inline">ID<input name="patient_extra_id" placeholder="Fx intern ID"></label>
+            <label class="inline">${esc(mrnLabel)}<input name="patient_mrn" required placeholder="Fx 010170-1234"></label>
+            <label class="inline">${esc(extraIdLabel)}<input name="patient_extra_id" placeholder="Fx intern ID"></label>
             <label class="inline">Navn<input name="patient_name" required placeholder="Patientnavn"></label>
             <label class="inline" for="createCasePatientFamily">Familienummer
               <div class="family-combo">
@@ -9295,7 +9362,7 @@ function renderCreateCase(section) {
         </legend>
         <div class="fieldset-body" hidden>
           <div class="inline-group">
-            <label class="inline">PMB-nummer<input name="sample_pmb" required placeholder="PMB-12345"></label>
+            <label class="inline">${esc(pmbLabel)}<input name="sample_pmb" required placeholder="PMB-12345"></label>
             <label class="inline">Prøvetype<select name="sample_type" required><option value="" selected>Vælg type</option>${typeOptions}</select></label>
           </div>
           <div class="inline-group">
@@ -9306,7 +9373,7 @@ function renderCreateCase(section) {
           <label class="toggle"><input type="checkbox" id="includeControlSample"> Tilføj kontrolprøve</label>
           <div id="controlSampleFields" hidden>
             <div class="inline-group">
-              <label class="inline">PMB-nummer<input name="control_pmb" placeholder="PMB-KONTROL"></label>
+              <label class="inline">${esc(pmbLabel)}<input name="control_pmb" placeholder="PMB-KONTROL"></label>
               <label class="inline">Prøvetype<select name="control_type">${controlTypeOptions}</select></label>
             </div>
             <div class="inline-group">
@@ -9838,7 +9905,7 @@ function renderCreateCase(section) {
     setMessage('');
     const patientMrn = form.elements.patient_mrn.value.trim();
     if (!patientMrn) {
-      setMessage('Angiv patientens MRN.', 'error');
+      setMessage(`Angiv patientens ${mrnLabel}.`, 'error');
       form.elements.patient_mrn.focus();
       disableButtons(false);
       submitting = false;
@@ -9887,14 +9954,14 @@ function renderCreateCase(section) {
       const birthDisplay = formatDanishDate(existingPatient.birth_date) || (existingPatient.birth_date || '');
       const patientDetails = [
         existingPatient.name ? `Navn: ${existingPatient.name}` : '',
-        existingPatient.mrn ? `MRN: ${existingPatient.mrn}` : '',
+        existingPatient.mrn ? `${mrnLabel}: ${existingPatient.mrn}` : '',
         existingPatient.family_number ? `Familienummer: ${existingPatient.family_number}` : '',
         birthDisplay ? `Født: ${birthDisplay}` : '',
         Number.isFinite(Number(existingPatient.id)) ? `Patient-ID: ${existingPatient.id}` : ''
       ].filter(Boolean);
       const choice = await openDuplicateDialog({
         title: 'Patient findes allerede',
-        message: `MRN ${patient.mrn} er allerede registreret.`,
+        message: `${mrnLabel} ${patient.mrn} er allerede registreret.`,
         description: 'Vælg om du vil fortsætte, åbne patienten eller oprette en ordination.',
         details: patientDetails,
         actions: [
@@ -9927,7 +9994,7 @@ function renderCreateCase(section) {
     }
     const samplePmb = form.elements.sample_pmb.value.trim();
     if (!samplePmb) {
-      setMessage('Angiv et PMB-nummer for prøven.', 'error');
+      setMessage(`Angiv ${pmbLabel} for prøven.`, 'error');
       form.elements.sample_pmb.focus();
       disableButtons(false);
       submitting = false;
@@ -9968,7 +10035,7 @@ function renderCreateCase(section) {
     if (controlToggle?.checked) {
       const controlPmb = form.elements.control_pmb.value.trim();
       if (!controlPmb) {
-        setMessage('Angiv PMB-nummer for kontrolprøven.', 'error');
+        setMessage(`Angiv ${pmbLabel} for kontrolprøven.`, 'error');
         form.elements.control_pmb.focus();
         disableButtons(false);
         submitting = false;
@@ -10158,7 +10225,7 @@ function renderCreateCase(section) {
       const collectedDisplay = formatDanishDate(primaryConflict.collected_at, true) || (primaryConflict.collected_at || '');
       const primaryDetails = [
         primaryConflict.id != null ? `Sample-ID: ${primaryConflict.id}` : '',
-        primaryConflict.pmb_number ? `PMB-nummer: ${primaryConflict.pmb_number}` : '',
+        primaryConflict.pmb_number ? `${pmbLabel}: ${primaryConflict.pmb_number}` : '',
         conflictPatientName ? `Patient: ${conflictPatientName}` : '',
         primaryConflict.sample_type ? `Prøvetype: ${primaryConflict.sample_type}` : '',
         primaryConflict.status ? `Status: ${primaryConflict.status}` : '',
@@ -10166,7 +10233,7 @@ function renderCreateCase(section) {
       ].filter(Boolean);
       const choice = await openDuplicateDialog({
         title: 'Prøven findes allerede',
-        message: `PMB-nummer ${sample.pmb_number} er allerede registreret.`,
+        message: `${pmbLabel} ${sample.pmb_number} er allerede registreret.`,
         description: 'Vælg om du vil fortsætte, åbne prøven eller oprette en ordination på den eksisterende prøve.',
         details: primaryDetails,
         actions: [
@@ -10201,14 +10268,14 @@ function renderCreateCase(section) {
     if (controlSample) {
       const controlPmbLower = controlSample.pmb_number.toLowerCase();
       if (controlPmbLower === primaryPmbLower) {
-        setMessage('Kontrolprøven skal have et andet PMB-nummer end hovedprøven.', 'error');
+        setMessage(`Kontrolprøven skal have et andet ${pmbLabel} end hovedprøven.`, 'error');
         form.elements.control_pmb.focus();
         disableButtons(false);
         submitting = false;
         return;
       }
       if (existingSamples.some(s => (s.pmb_number || '').toLowerCase() === controlPmbLower)) {
-        setMessage('Kontrolprøvens PMB-nummer er allerede i brug.', 'error');
+        setMessage(`Kontrolprøvens ${pmbLabel} er allerede i brug.`, 'error');
         form.elements.control_pmb.focus();
         disableButtons(false);
         submitting = false;
@@ -10230,7 +10297,7 @@ function renderCreateCase(section) {
         await addRecord('variants', {...variant, order_id: orderId});
       }
       form.reset();
-      setMessage(`Sag ${orderId} oprettet for ${patient.name} med PMB ${sample.pmb_number}.`, 'success');
+      setMessage(`Sag ${orderId} oprettet for ${patient.name} med ${pmbLabel} ${sample.pmb_number}.`, 'success');
       setStatus(`Sag ${orderId} oprettet for ${patient.name}.`);
       const dashboardSection = document.querySelector('section[data-tab="dashboard"]');
       if (dashboardSection) renderDashboard(dashboardSection);
@@ -11625,6 +11692,8 @@ function renderFamilies(section) {
 function renderPatients(section) {
   const list = getCached('patients');
   const orders = getCached('orders');
+  const mrnLabel = getValidationFieldDisplayName('mrn');
+  const extraIdLabel = getValidationFieldDisplayName('extraId');
   const patientIndicationSets = new Map();
   for (const order of orders) {
     if (!order) continue;
@@ -11658,8 +11727,8 @@ function renderPatients(section) {
           <summary>Avanceret filter</summary>
           <div class="filter-grid">
             <label>ID<input type="search" data-filter-patients="id" placeholder="Fx 152"></label>
-            <label>MRN<input type="search" data-filter-patients="mrn" placeholder="MRN eller CPR"></label>
-            <label>ID<input type="search" data-filter-patients="extra" placeholder="Fx lokalt ID"></label>
+            <label>${esc(mrnLabel)}<input type="search" data-filter-patients="mrn" placeholder="${esc(mrnLabel)} eller CPR"></label>
+            <label>${esc(extraIdLabel)}<input type="search" data-filter-patients="extra" placeholder="Fx lokalt ID"></label>
             <label>Familienummer<input type="search" data-filter-patients="family" placeholder="${esc(familyPlaceholder)}"></label>
             <label>Navn<input type="search" data-filter-patients="name" placeholder="Patientnavn"></label>
             <label>Køn<select data-filter-patients="gender"><option value="">Alle</option><option value="male">Mand</option><option value="female">Kvinde</option><option value="other">Andet</option></select></label>
@@ -11671,7 +11740,7 @@ function renderPatients(section) {
           <span data-variant-filter-text></span>
           <button type="button" class="secondary" id="patientVariantFilterClear">Ryd variantfilter</button>
         </div>
-        <table id="patientsTable"><thead><tr><th>ID</th><th>MRN</th><th>ID</th><th>Familienummer</th><th>Navn</th><th>Køn</th><th>Født</th><th>Indikationer</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
+        <table id="patientsTable"><thead><tr><th>ID</th><th>${esc(mrnLabel)}</th><th>${esc(extraIdLabel)}</th><th>Familienummer</th><th>Navn</th><th>Køn</th><th>Født</th><th>Indikationer</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
           <button type="button" class="secondary" id="patientsExport">Eksportér filtrerede patienter</button>
         </div>
@@ -11680,8 +11749,8 @@ function renderPatients(section) {
         <h2>Patient</h2>
         <form id="patientForm">
           <input type="hidden" name="id">
-          <label>MRN<input name="mrn" required></label>
-          <label>ID<input name="extra_id" placeholder="Fx lokalt ID"></label>
+          <label>${esc(mrnLabel)}<input name="mrn" required></label>
+          <label>${esc(extraIdLabel)}<input name="extra_id" placeholder="Fx lokalt ID"></label>
           <label for="patientFamilyNumber">Familienummer
             <div class="family-combo">
               <select data-family-select>
@@ -12003,7 +12072,7 @@ function renderPatients(section) {
     data.variant_type = normalizeVariantType(data.variant_type);
     data.mrn = (data.mrn || '').trim();
     if (!data.mrn) {
-      alert('Angiv patientens MRN.');
+      alert(`Angiv patientens ${mrnLabel}.`);
       form.elements.mrn.focus();
       return;
     }
@@ -12038,14 +12107,14 @@ function renderPatients(section) {
         const birthDisplay = formatDanishDate(existingPatient.birth_date) || (existingPatient.birth_date || '');
         const details = [
           existingPatient.name ? `Navn: ${existingPatient.name}` : '',
-          existingPatient.mrn ? `MRN: ${existingPatient.mrn}` : '',
+          existingPatient.mrn ? `${mrnLabel}: ${existingPatient.mrn}` : '',
           existingPatient.family_number ? `Familienummer: ${existingPatient.family_number}` : '',
           birthDisplay ? `Født: ${birthDisplay}` : '',
           Number.isFinite(Number(existingPatient.id)) ? `Patient-ID: ${existingPatient.id}` : ''
         ].filter(Boolean);
         const choice = await openDuplicateDialog({
           title: 'Patient findes allerede',
-          message: `MRN ${data.mrn} er allerede registreret.`,
+          message: `${mrnLabel} ${data.mrn} er allerede registreret.`,
           description: 'Vælg om du vil fortsætte eller åbne den eksisterende patient.',
           details,
           actions: [
@@ -12102,6 +12171,7 @@ function renderSamples(section) {
   const patients = getCached('patients');
   const orders = getCached('orders') || [];
   const reports = getCached('reports') || [];
+  const pmbLabel = getValidationFieldDisplayName('pmb');
   const patientMap = new Map(patients.map(p => [p.id, p]));
   const ordersBySample = new Map();
   orders.forEach(order => {
@@ -12123,13 +12193,13 @@ function renderSamples(section) {
     <div class="flex">
       <div>
         <label for="sampleSearch">Søg</label>
-        <input id="sampleSearch" type="search" placeholder="ID/PMB/status...">
+        <input id="sampleSearch" type="search" placeholder="ID/${esc(pmbLabel)}/status...">
         <label class="list-toggle"><input type="checkbox" id="samplesActiveOnly" checked> Vis kun aktive</label>
         <details class="advanced-filter" id="samplesFilterPanel">
           <summary>Avanceret filter</summary>
           <div class="filter-grid">
             <label>ID<input type="search" data-filter-samples="id" placeholder="Sample-ID"></label>
-            <label>PMB-nummer<input type="search" data-filter-samples="pmb" placeholder="PMB"></label>
+            <label>${esc(pmbLabel)}<input type="search" data-filter-samples="pmb" placeholder="${esc(pmbLabel)}"></label>
             <label>Patient<input type="search" data-filter-samples="patient" placeholder="Patientnavn/MRN/ID/familie"></label>
             <label>Prøvetype<input type="search" data-filter-samples="type" placeholder="Type"></label>
             <label>Status<input type="search" data-filter-samples="status" placeholder="Status"></label>
@@ -12137,7 +12207,7 @@ function renderSamples(section) {
             <label>Opsamlet til<input type="date" data-filter-samples="collected_to"></label>
           </div>
         </details>
-        <table><thead><tr><th class="table-shortcuts"><span class="sr-only">Genveje</span></th><th>ID</th><th>PMB-nummer</th><th>Patient</th><th>Prøvetype</th><th>Status</th><th>Opsamlet</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
+        <table><thead><tr><th class="table-shortcuts"><span class="sr-only">Genveje</span></th><th>ID</th><th>${esc(pmbLabel)}</th><th>Patient</th><th>Prøvetype</th><th>Status</th><th>Opsamlet</th><th>Oprettet af</th></tr></thead><tbody></tbody></table>
         <div class="table-actions">
           <button type="button" class="secondary" id="samplesExport">Eksportér filtrerede prøver</button>
         </div>
@@ -12158,7 +12228,7 @@ function renderSamples(section) {
               </select>
             </div>
           </label>
-          <label>PMB-nummer<input name="pmb_number" required></label>
+          <label>${esc(pmbLabel)}<input name="pmb_number" required></label>
           <label>Prøvetype
             <select name="sample_type" required data-allow-legacy-option>
               <option value="">Vælg prøvetype</option>
@@ -12405,7 +12475,7 @@ function renderSamples(section) {
     data.patient_id = Number(data.patient_id);
     data.pmb_number = (data.pmb_number || '').trim();
     if (!data.pmb_number) {
-      alert('Angiv et PMB-nummer.');
+      alert(`Angiv ${pmbLabel}.`);
       return;
     }
     const samplePmbError = validateFieldValue('pmb', data.pmb_number);
@@ -12417,14 +12487,14 @@ function renderSamples(section) {
     const conflict = existingSamples.find(s => (s.pmb_number || '').toLowerCase() === data.pmb_number.toLowerCase() && s.id !== currentId);
     if (conflict) {
       if (currentId) {
-        alert('PMB-nummeret er allerede i brug.');
+        alert(`${pmbLabel} er allerede i brug.`);
         return;
       }
       const conflictPatientName = getName('patients', Number(conflict.patient_id)) || '';
       const collectedDisplay = formatDanishDate(conflict.collected_at, true) || (conflict.collected_at || '');
       const details = [
         conflict.id != null ? `Sample-ID: ${conflict.id}` : '',
-        conflict.pmb_number ? `PMB-nummer: ${conflict.pmb_number}` : '',
+        conflict.pmb_number ? `${pmbLabel}: ${conflict.pmb_number}` : '',
         conflictPatientName ? `Patient: ${conflictPatientName}` : '',
         conflict.sample_type ? `Prøvetype: ${conflict.sample_type}` : '',
         conflict.status ? `Status: ${conflict.status}` : '',
@@ -12432,7 +12502,7 @@ function renderSamples(section) {
       ].filter(Boolean);
       const choice = await openDuplicateDialog({
         title: 'Prøven findes allerede',
-        message: `PMB-nummer ${data.pmb_number} er allerede registreret.`,
+        message: `${pmbLabel} ${data.pmb_number} er allerede registreret.`,
         description: 'Vælg om du vil fortsætte eller åbne den eksisterende prøve.',
         details,
         actions: [
@@ -12814,14 +12884,23 @@ function renderOrders(section) {
   const list = getCached('orders');
   const patients = getCached('patients');
   const samples = getCached('samples');
+  const pmbLabel = getValidationFieldDisplayName('pmb');
   const panels = getCached('panels');
   const reports = getCached('reports') || [];
   const users = getCached('users').slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   const patientGroups = getCached('patient_groups').slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', 'da'));
   const patientMap = new Map(patients.map(p => [p.id, p]));
   const sampleMap = new Map(samples.map(s => [s.id, s]));
+  const selectableSamples = samples.filter(sample => !isLikelyControlSample(sample));
+  const selectableSampleIds = new Set(selectableSamples.map(sample => Number(sample.id)));
   const panelMap = new Map(panels.map(p => [p.id, p]));
   const userMap = new Map(users.map(u => [u.id, u]));
+  const buildOrderSampleOptionLabel = sample => {
+    if (!sample) return '';
+    const patientName = patientMap.get(Number(sample.patient_id))?.name || getName('patients', sample.patient_id) || 'Ukendt patient';
+    const sampleType = sample.sample_type || 'Ukendt prøvetype';
+    return `${sample.id} (${esc(sample.pmb_number || '–')}) – ${esc(patientName)} – ${esc(sampleType)}`;
+  };
   const reportsByOrder = new Map();
   reports.forEach(report => {
     const orderId = Number(report.order_id);
@@ -12836,14 +12915,14 @@ function renderOrders(section) {
     <div class="flex">
       <div>
         <label for="orderSearch">Søg</label>
-        <input id="orderSearch" type="search" placeholder="Status/ID/PMB...">
+        <input id="orderSearch" type="search" placeholder="Status/ID/${esc(pmbLabel)}...">
         <label class="list-toggle"><input type="checkbox" id="ordersActiveOnly" checked> Vis kun aktive</label>
         <details class="advanced-filter" id="ordersFilterPanel">
           <summary>Avanceret filter</summary>
           <div class="filter-grid">
             <label>ID<input type="search" data-filter-orders="id" placeholder="Ordination-ID"></label>
             <label>Patient<input type="search" data-filter-orders="patient" placeholder="Patientnavn/MRN/ID/familie"></label>
-            <label>Prøve<input type="search" data-filter-orders="sample" placeholder="Prøve-ID eller PMB"></label>
+            <label>Prøve<input type="search" data-filter-orders="sample" placeholder="Prøve-ID eller ${esc(pmbLabel)}"></label>
             <label>Panel<input type="search" data-filter-orders="panel" placeholder="Panelnavn"></label>
             <label>Indikation<input type="search" data-filter-orders="indication" placeholder="Indikation"></label>
             <label>HPO-termer<input type="search" data-filter-orders="hpo" placeholder="HP:0001250"></label>
@@ -12929,9 +13008,9 @@ function renderOrders(section) {
           <label>Prøve
             <div class="filterable-select">
               <input type="search" data-select-filter placeholder="Filtrer prøver">
-              <select name="sample_id" required>
+              <select name="sample_id" required data-allow-legacy-option>
                 <option value="" selected>Vælg prøve</option>
-                ${samples.map(s => `<option value="${s.id}">${s.id} (${esc(s.pmb_number||'–')}) – ${esc(getName('patients', s.patient_id))}</option>`).join('')}
+                ${selectableSamples.map(sample => `<option value="${sample.id}">${buildOrderSampleOptionLabel(sample)}</option>`).join('')}
               </select>
             </div>
           </label>
@@ -13067,6 +13146,23 @@ function renderOrders(section) {
   const statusSelect = form?.elements?.status;
   const sampleSelect = form?.elements?.sample_id;
   const patientSelect = form?.elements?.patient_id;
+  const ensureLegacySampleOption = sampleId => {
+    if (!sampleSelect || !sampleId) return null;
+    const numericId = Number(sampleId);
+    const sample = sampleMap.get(numericId);
+    const legacyLabel = sample
+      ? `${sample.id} (${sample.pmb_number || '–'}) – ${patientMap.get(Number(sample.patient_id))?.name || getName('patients', sample.patient_id) || 'Ukendt patient'} – ${sample.sample_type || 'Ukendt prøvetype'} [legacy kontrolreference]`
+      : `Prøve #${numericId} [legacy reference]`;
+    let option = Array.from(sampleSelect.options).find(opt => Number(opt.value) === numericId);
+    if (!option) {
+      option = document.createElement('option');
+      option.value = String(numericId);
+      sampleSelect.appendChild(option);
+    }
+    option.textContent = legacyLabel;
+    option.dataset.legacy = 'true';
+    return option;
+  };
   const ensureStatusOption = value => {
     if (!statusSelect || !value) return;
     if (!Array.from(statusSelect.options).some(opt => opt.value === value)) {
@@ -13099,18 +13195,26 @@ function renderOrders(section) {
     const selectedPatientId = Number(patientSelect?.value || 0);
     const enforcePatient = Number.isFinite(selectedPatientId) && selectedPatientId > 0;
     const currentSampleId = Number(sampleSelect.value || 0);
+    const currentSample = sampleMap.get(currentSampleId);
+    const hasLegacyControlSelection = !!currentSample && isLikelyControlSample(currentSample) && !selectableSampleIds.has(currentSampleId);
+    if (hasLegacyControlSelection) {
+      ensureLegacySampleOption(currentSampleId);
+    }
     Array.from(sampleSelect.options).forEach(opt => {
       if (!opt.value) {
         opt.disabled = false;
         opt.hidden = false;
         return;
       }
+      const optionId = Number(opt.value);
+      const isCurrentLegacy = hasLegacyControlSelection && optionId === currentSampleId;
       const optionPatientId = getSamplePatientId(opt.value);
-      const matches = !enforcePatient || optionPatientId === selectedPatientId;
+      const matchesPatient = !enforcePatient || optionPatientId === selectedPatientId;
+      const matches = isCurrentLegacy || (selectableSampleIds.has(optionId) && matchesPatient);
       opt.disabled = !matches;
       opt.hidden = !matches;
     });
-    if (enforcePatient && currentSampleId) {
+    if (enforcePatient && currentSampleId && !hasLegacyControlSelection) {
       const currentPatientId = getSamplePatientId(currentSampleId);
       if (currentPatientId !== selectedPatientId) {
         sampleSelect.value = '';
@@ -13570,6 +13674,21 @@ function renderOrders(section) {
     data.urgent = isUrgent;
     data.patient_id = Number(data.patient_id);
     data.sample_id = Number(data.sample_id);
+    const selectedSample = sampleMap.get(data.sample_id);
+    const existingOrder = data.id ? findById('orders', Number(data.id)) : null;
+    const isLegacyControlSelection = !!existingOrder
+      && Number(existingOrder.sample_id) === Number(data.sample_id)
+      && isLikelyControlSample(selectedSample);
+    if (!selectedSample) {
+      alert('Vælg en prøve.');
+      form.elements.sample_id?.focus();
+      return;
+    }
+    if (isLikelyControlSample(selectedSample) && !isLegacyControlSelection) {
+      alert('Kun prøver kan vælges på ordinationer.');
+      form.elements.sample_id?.focus();
+      return;
+    }
     data.family_type = normalizeFamilyType(data.family_type);
     data.panel_id = data.panel_id ? Number(data.panel_id) : null;
     data.analysis_responsible_id = data.analysis_responsible_id ? Number(data.analysis_responsible_id) : null;
@@ -14004,7 +14123,7 @@ function renderVariants(section) {
           <label>VAF<input name="af" type="number" step="0.0001" placeholder="0,500"></label>
           <label>Annoteringer<textarea name="annotations" placeholder="Importerede annoteringer fra VarSeq og andre værktøjer."></textarea></label>
           <label>Tolkning<textarea name="interpretation"></textarea></label>
-          <div class="btn-row">
+          <div class="btn-row variant-ai-row">
             <label class="inline">AI-udbyder
               <select id="variantAiProvider" ${aiProviders.length ? '' : 'disabled'}>${aiProviderOptions}</select>
             </label>
@@ -14013,7 +14132,6 @@ function renderVariants(section) {
               <span class="sr-only">Brug ${esc(aiButtonLabel)} til automatisk variantudfyldning</span>
             </button>
           </div>
-          <p class="form-hint">Knappen udfylder varianten automatisk ud fra HGVS/position og udbyderens pretext. Resultatet tilpasses JSON-skabelonen og inkluderer ACMG/AMP-klassifikation og kriteriestyrker.</p>
           <div class="btn-row">
             <button class="primary action-button action-save with-icon" type="submit" id="variantSave" data-action="save">
               <span class="icon-slot" aria-hidden="true">
@@ -14097,6 +14215,7 @@ function renderVariants(section) {
       </div>
     </fieldset>
   </div>`;
+  applyIconSlots(section);
   const tbody = section.querySelector('tbody');
   const search = section.querySelector('#variantSearch');
   const form = section.querySelector('#variantForm');
@@ -14194,6 +14313,7 @@ function renderVariants(section) {
   const batchClearBtn = section.querySelector('#variantBatchClear');
   const aiProviderSelect = section.querySelector('#variantAiProvider');
   const aiFillButton = section.querySelector('#variantAiFill');
+  const aiFillHintText = 'Knappen udfylder varianten automatisk ud fra HGVS/position og udbyderens pretext. Resultatet tilpasses JSON-skabelonen og inkluderer ACMG/AMP-klassifikation og kriteriestyrker.';
   const updateAiButtonLabel = () => {
     if (!aiFillButton) return;
     const selectedId = Number(aiProviderSelect?.value);
@@ -14201,12 +14321,13 @@ function renderVariants(section) {
     const tooltipLabel = provider?.name
       ? `Brug ${provider.name} til automatisk variantudfyldning`
       : 'Brug AI til automatisk variantudfyldning';
+    const tooltipText = `${tooltipLabel}. ${aiFillHintText}`;
     const srOnlyLabel = aiFillButton.querySelector('.sr-only');
     if (srOnlyLabel) {
-      srOnlyLabel.textContent = tooltipLabel;
+      srOnlyLabel.textContent = tooltipText;
     }
     aiFillButton.dataset.providerName = provider?.name || '';
-    setTooltip(aiFillButton, tooltipLabel);
+    setTooltip(aiFillButton, tooltipText);
   };
   updateAiButtonLabel();
   aiProviderSelect?.addEventListener('change', async () => {
@@ -20016,6 +20137,15 @@ function base64ToUint8Array(base64) {
   }
   return bytes;
 }
+function buildAdjacentLogoUrl(filename, stamp = Date.now()) {
+  const safeName = String(filename || '').trim();
+  if (!safeName) return '';
+  const protocol = window.location?.protocol || '';
+  if (protocol === 'file:') {
+    return safeName;
+  }
+  return `${safeName}?ts=${stamp}`;
+}
 function loadImageElement(src) {
   return new Promise((resolve, reject) => {
     const element = new Image();
@@ -20097,19 +20227,32 @@ async function buildEmbeddedSvgLogoPdfAsset() {
     URL.revokeObjectURL(objectUrl);
   }
 }
+async function loadLocalPngLogoPdfAsset() {
+  const img = await loadImageElement(buildAdjacentLogoUrl('logo.png', Date.now()));
+  if (!img?.naturalWidth || !img?.naturalHeight) {
+    throw new Error('Tomt logoasset: logo.png');
+  }
+  const asset = buildPdfLogoAssetFromImage(img);
+  if (!asset) {
+    throw new Error('Kunne ikke rasterisere logo.png til PDF');
+  }
+  return {...asset, source: 'logo.png'};
+}
 
 async function loadReportLogoImage() {
-  if (loadReportLogoImage.cache !== undefined) {
-    return loadReportLogoImage.cache;
+  const cachedLogo = loadReportLogoImage.cache;
+  if (cachedLogo?.source === 'logo.png') {
+    return cachedLogo;
   }
   try {
     try {
-      const img = await loadImageElement(`logo.png?ts=${Date.now()}`);
-      const asset = buildPdfLogoAssetFromImage(img);
-      loadReportLogoImage.cache = asset ? {...asset, source: 'png'} : null;
-    } catch (pngError) {
+      loadReportLogoImage.cache = await loadLocalPngLogoPdfAsset();
+    } catch (localLogoError) {
+      if (cachedLogo?.source === 'svg-fallback') {
+        return cachedLogo;
+      }
       const embeddedSvgAsset = await buildEmbeddedSvgLogoPdfAsset();
-      if (!embeddedSvgAsset) throw pngError;
+      if (!embeddedSvgAsset) throw localLogoError;
       loadReportLogoImage.cache = embeddedSvgAsset;
     }
   } catch (err) {
@@ -20143,7 +20286,8 @@ function drawReportHeader(builder, logo, exportedAt, presentationName = DEFAULT_
     const aspect = logo.width && logo.height ? logo.width / logo.height : 1;
     imageHeight = Math.min(targetHeight, Math.max(0, maxHeaderImageHeight));
     imageWidth = imageHeight * aspect;
-    const imageY = headerBottom + PDF_HEADER_BAND_HEIGHT - imageHeight - 12;
+    const preferredImageBottom = Math.max(headerBottom + 14, titleBaseline - 4);
+    const imageY = Math.min(preferredImageBottom, headerBottom + PDF_HEADER_BAND_HEIGHT - imageHeight - 12);
     builder.drawImage(logo.objectName, margin, imageY, imageWidth, imageHeight);
   }
   const titleX = imageWidth ? margin + imageWidth + 28 : margin + PDF_SECTION_CARD_PADDING_X;
@@ -24979,6 +25123,9 @@ function renderDbTab(section) {
   });
 }
 function renderAdmin(section) {
+  const mrnLabel = getValidationFieldDisplayName('mrn');
+  const pmbLabel = getValidationFieldDisplayName('pmb');
+  const extraIdLabel = getValidationFieldDisplayName('extraId');
   section.innerHTML = `
   <div class="panel">
     <div class="flex">
@@ -25163,10 +25310,11 @@ function renderAdmin(section) {
   </div>
   <div class="panel">
     <h2>Datavalidering</h2>
-    <p class="form-hint">Definér systemkrav til MRN, PMB og lokale ID'er.</p>
+    <p class="form-hint">Definér visningsnavne og formatkrav for identifikatorfelterne.</p>
     <form id="validationSettingsForm" class="validation-settings-form">
       <fieldset data-validation-field="mrn">
-        <legend>MRN</legend>
+        <legend>${esc(mrnLabel)}</legend>
+        <label>Visningsnavn<input name="validation_mrn_displayName" placeholder="${esc(getDefaultValidationFieldLabel('mrn'))}"></label>
         <label>Formatkrav
           <select name="validation_mrn_mode">
             <option value="none">Intet krav</option>
@@ -25182,7 +25330,8 @@ function renderAdmin(section) {
         <label>Fejlbesked<input name="validation_mrn_message" placeholder="Valgfri tilpasset besked"></label>
       </fieldset>
       <fieldset data-validation-field="pmb">
-        <legend>PMB-nummer</legend>
+        <legend>${esc(pmbLabel)}</legend>
+        <label>Visningsnavn<input name="validation_pmb_displayName" placeholder="${esc(getDefaultValidationFieldLabel('pmb'))}"></label>
         <label>Formatkrav
           <select name="validation_pmb_mode">
             <option value="none">Intet krav</option>
@@ -25198,7 +25347,8 @@ function renderAdmin(section) {
         <label>Fejlbesked<input name="validation_pmb_message" placeholder="Valgfri tilpasset besked"></label>
       </fieldset>
       <fieldset data-validation-field="extraId">
-        <legend>Ekstra ID</legend>
+        <legend>${esc(extraIdLabel)}</legend>
+        <label>Visningsnavn<input name="validation_extraId_displayName" placeholder="${esc(getDefaultValidationFieldLabel('extraId'))}"></label>
         <label>Formatkrav
           <select name="validation_extraId_mode">
             <option value="none">Intet krav</option>
@@ -25263,9 +25413,16 @@ function renderAdmin(section) {
     const fields = VALIDATION_FIELD_KEYS.slice();
     const updateFieldUi = field => {
       const select = validationForm.elements[`validation_${field}_mode`];
+      const displayNameInput = validationForm.elements[`validation_${field}_displayName`];
+      const fieldset = validationForm.querySelector(`[data-validation-field="${field}"]`);
+      const legend = fieldset?.querySelector('legend');
       const customRow = validationForm.querySelector(`[data-validation-custom="${field}"]`);
       const hint = validationForm.querySelector(`[data-validation-hint="${field}"]`);
+      const fieldLabel = (displayNameInput?.value || '').trim() || getDefaultValidationFieldLabel(field);
       const rawValue = select?.value || 'none';
+      if (legend) {
+        legend.textContent = fieldLabel;
+      }
       if (customRow) {
         customRow.hidden = rawValue !== 'custom';
       }
@@ -25300,16 +25457,20 @@ function renderAdmin(section) {
         const patternInput = validationForm.elements[`validation_${field}_pattern`];
         const flagsInput = validationForm.elements[`validation_${field}_flags`];
         const messageInput = validationForm.elements[`validation_${field}_message`];
+        const displayNameInput = validationForm.elements[`validation_${field}_displayName`];
         if (patternInput) patternInput.value = rule.pattern || '';
         if (flagsInput) flagsInput.value = rule.flags || '';
         if (messageInput) messageInput.value = rule.message || '';
+        if (displayNameInput) displayNameInput.value = rule.displayName || '';
         updateFieldUi(field);
       });
     };
     applySettingsToForm(cloneValidationSettings(getValidationSettings()));
     fields.forEach(field => {
       const select = validationForm.elements[`validation_${field}_mode`];
+      const displayNameInput = validationForm.elements[`validation_${field}_displayName`];
       select?.addEventListener('change', () => updateFieldUi(field));
+      displayNameInput?.addEventListener('input', () => updateFieldUi(field));
     });
     validationForm.addEventListener('submit', async evt => {
       evt.preventDefault();
@@ -25319,8 +25480,11 @@ function renderAdmin(section) {
       }
       const nextSettings = {};
       for (const field of fields) {
-        const metadata = VALIDATION_FIELD_METADATA[field] || {label: field};
+        const defaultLabel = getDefaultValidationFieldLabel(field);
         const select = validationForm.elements[`validation_${field}_mode`];
+        const displayNameInput = validationForm.elements[`validation_${field}_displayName`];
+        const displayName = (displayNameInput?.value || '').trim();
+        const fieldLabel = displayName || defaultLabel;
         const rawValue = select?.value || 'none';
         let mode = 'none';
         let preset = '';
@@ -25336,27 +25500,27 @@ function renderAdmin(section) {
           pattern = (patternInput?.value || '').trim();
           flags = (flagsInput?.value || '').trim();
           if (!pattern) {
-            alert(`${metadata.label}: angiv et regulært udtryk.`);
+            alert(`${fieldLabel}: angiv et regulært udtryk.`);
             patternInput?.focus();
             return;
           }
           try {
             new RegExp(pattern, flags || '');
           } catch (err) {
-            alert(`${metadata.label}: ugyldigt regulært udtryk (${err?.message || err}).`);
+            alert(`${fieldLabel}: ugyldigt regulært udtryk (${err?.message || err}).`);
             patternInput?.focus();
             return;
           }
         }
         const messageInput = validationForm.elements[`validation_${field}_message`];
         const message = (messageInput?.value || '').trim();
-        nextSettings[field] = {mode, preset, pattern, flags, message};
+        nextSettings[field] = {mode, preset, pattern, flags, message, displayName};
       }
       try {
         const normalized = await persistValidationSettings(nextSettings);
-        applySettingsToForm(normalized);
         setStatus('Datavalideringsregler gemt.');
         scheduleAutosave();
+        renderTab('admin');
       } catch (err) {
         console.error('Kunne ikke gemme datavalideringsregler', err);
         alert('Kunne ikke gemme datavalideringsreglerne: ' + (err?.message || err));
@@ -26010,8 +26174,9 @@ async function expectAsyncError(task) {
 }
 function createSelfTestValidationSettings() {
   const settings = cloneValidationSettings(getValidationSettings());
-  settings.mrn = {mode: 'preset', preset: 'cpr', pattern: '', flags: '', message: ''};
-  settings.pmb = {mode: 'preset', preset: 'digits12', pattern: '', flags: '', message: ''};
+  settings.mrn = {mode: 'preset', preset: 'cpr', pattern: '', flags: '', message: '', displayName: ''};
+  settings.pmb = {mode: 'preset', preset: 'digits12', pattern: '', flags: '', message: '', displayName: ''};
+  settings.extraId = {...normalizeValidationRule(settings.extraId), displayName: ''};
   return settings;
 }
 function waitForSelfTestTick() {
@@ -26072,6 +26237,7 @@ async function seedSelfTestDataset(fixedNow) {
   const existingPmbs = new Set((getCached('samples') || []).map(sample => String(sample?.pmb_number || '').trim().toLowerCase()).filter(Boolean));
   const primarySamplePmb = nextUnusedSelfTestPmb(existingPmbs, 202603230001);
   const secondarySamplePmb = nextUnusedSelfTestPmb(existingPmbs, 202603230002);
+  const legacyControlPmb = nextUnusedSelfTestPmb(existingPmbs, 202603230003);
   const patientAlphaId = await addRecord('patients', {
     mrn: '010170-1235',
     name: 'Testpatient',
@@ -26118,11 +26284,30 @@ async function seedSelfTestDataset(fixedNow) {
     collected_at: iso,
     notes: 'Sekundær selvtestprøve'
   });
+  const legacyControlSampleId = await addRecord('samples', {
+    patient_id: patientGammaId,
+    pmb_number: legacyControlPmb,
+    sample_type: 'Kontrol',
+    status: 'Modtaget',
+    collected_at: iso,
+    notes: 'Legacy kontrolprøve til selvtest'
+  });
   const orderId = await addRecord('orders', {
     patient_id: patientAlphaId,
     sample_id: sampleAlphaId,
     panel_id: null,
     clinician: 'Testperson',
+    status: 'Analyse',
+    acute: false,
+    urgent: false,
+    ordered_at: iso,
+    family_type: 'singleton'
+  });
+  const legacyControlOrderId = await addRecord('orders', {
+    patient_id: patientGammaId,
+    sample_id: legacyControlSampleId,
+    panel_id: null,
+    clinician: 'Legacy test',
     status: 'Analyse',
     acute: false,
     urgent: false,
@@ -26158,12 +26343,15 @@ async function seedSelfTestDataset(fixedNow) {
     patientGammaId,
     sampleAlphaId,
     sampleBetaId,
+    legacyControlSampleId,
     orderId,
+    legacyControlOrderId,
     variantId,
     reportId,
     primaryPatientMrn: '010170-1235',
     primarySamplePmb,
     secondarySamplePmb,
+    legacyControlPmb,
     patientExportFilterName: 'ZZZ Selftest Filter Beta'
   };
 }
@@ -26189,6 +26377,8 @@ async function runTests() {
     recordSelfTestResult(results, 'PMB-validering accepterer 12 cifre', !validateFieldValue('pmb', seed.primarySamplePmb) && primarySample?.pmb_number === seed.primarySamplePmb, `PMB: ${seed.primarySamplePmb}`);
     const shortPmbError = validateFieldValue('pmb', '12345678901');
     recordSelfTestResult(results, 'PMB-validering afviser forkert længde', !!shortPmbError, shortPmbError || 'Ingen fejl returneret');
+    const decimalPmbError = validateFieldValue('pmb', '123456.789012');
+    recordSelfTestResult(results, 'PMB-validering afviser decimal-lignende input', !!decimalPmbError, decimalPmbError || 'Ingen fejl returneret');
     const alphaPmbError = validateFieldValue('pmb', '12345ABC9012');
     recordSelfTestResult(results, 'PMB-validering afviser ikke-numeriske tegn', !!alphaPmbError, alphaPmbError || 'Ingen fejl returneret');
     const duplicateCreateError = await expectAsyncError(() => addRecord('samples', {
@@ -26223,10 +26413,32 @@ async function runTests() {
         await waitForSelfTestTick();
       });
       const afterEdit = findById('samples', seed.sampleBetaId);
-      const duplicateEditBlocked = duplicateEditAlerts.some(message => message.includes('PMB-nummeret er allerede i brug.')) && afterEdit?.pmb_number === seed.secondarySamplePmb;
+      const duplicateEditBlocked = duplicateEditAlerts.some(message => message.includes(`${getValidationFieldDisplayName('pmb')} er allerede i brug.`)) && afterEdit?.pmb_number === seed.secondarySamplePmb;
       recordSelfTestResult(results, 'Duplicate PMB blokeres ved redigering', duplicateEditBlocked, duplicateEditAlerts[0] || `PMB efter submit: ${afterEdit?.pmb_number || ''}`);
     } finally {
       sampleEditMount.cleanup();
+    }
+    const defaultPmbLabelOk = getValidationFieldDisplayName('pmb') === 'Prøvenummer';
+    recordSelfTestResult(results, 'Standardlabel for PMB er Prøvenummer', defaultPmbLabelOk, getValidationFieldDisplayName('pmb'));
+    const originalValidationSettings = cloneValidationSettings(getValidationSettings());
+    try {
+      const customValidationSettings = cloneValidationSettings(originalValidationSettings);
+      customValidationSettings.pmb.displayName = 'PMB-nummer';
+      customValidationSettings.extraId.displayName = 'NGC ID';
+      await persistValidationSettings(customValidationSettings);
+      const labelMount = createSelfTestSection('case_create');
+      try {
+        renderCreateCase(labelMount.section);
+        const caseForm = labelMount.section.querySelector('#createCaseForm');
+        const samplePmbLabel = caseForm?.elements?.sample_pmb?.closest('label')?.textContent || '';
+        const extraIdFieldLabel = caseForm?.elements?.patient_extra_id?.closest('label')?.textContent || '';
+        const overrideOk = samplePmbLabel.includes('PMB-nummer') && extraIdFieldLabel.includes('NGC ID');
+        recordSelfTestResult(results, 'Admin-overrides for visningsnavne slår igennem', overrideOk, `${samplePmbLabel} / ${extraIdFieldLabel}`);
+      } finally {
+        labelMount.cleanup();
+      }
+    } finally {
+      await persistValidationSettings(originalValidationSettings);
     }
     const validMrnError = validateFieldValue('mrn', seed.primaryPatientMrn);
     recordSelfTestResult(results, 'CPR-validering accepterer gyldigt format', !validMrnError, seed.primaryPatientMrn);
@@ -26323,6 +26535,39 @@ async function runTests() {
     recordSelfTestResult(results, 'PDF blob genereres med logo eller fallback', !!pdfBlob && pdfBlob.size > 0, `Blob bytes: ${pdfBlob?.size || 0}; kilde: ${pdfLogoSource}`);
     recordSelfTestResult(results, 'PDF blob har gyldig type/signatur', pdfBlob?.type === 'application/pdf' && pdfSignature === '%PDF-', `${pdfBlob?.type || 'ingen type'} / ${pdfSignature || 'ingen signatur'}`);
     recordSelfTestResult(results, 'PDF filnavn er deterministisk', pdfFilename.endsWith('.pdf') && pdfFilename.includes('20260323'), pdfFilename);
+    const hadLogoCacheBeforePngCheck = Object.prototype.hasOwnProperty.call(loadReportLogoImage, 'cache');
+    const previousLogoCacheBeforePngCheck = loadReportLogoImage.cache;
+    const originalLoadImageElementForPngCheck = loadImageElement;
+    const originalBuildPdfLogoAssetFromImage = buildPdfLogoAssetFromImage;
+    let pngLogoAsset = null;
+    try {
+      loadReportLogoImage.cache = undefined;
+      loadImageElement = src => {
+        if (typeof src === 'string' && /^logo\.png(?:\?|$)/i.test(src)) {
+          return Promise.resolve({naturalWidth: 120, naturalHeight: 60});
+        }
+        return Promise.reject(new Error('Selvtest: kun logo.png maa lykkes'));
+      };
+      buildPdfLogoAssetFromImage = img => img?.naturalWidth ? {
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+        data: new Uint8Array([255]),
+        dataString: String.fromCharCode(255),
+        bitsPerComponent: 8,
+        filter: '/DCTDecode',
+        colorSpace: '/DeviceRGB'
+      } : null;
+      pngLogoAsset = await loadReportLogoImage();
+    } finally {
+      loadImageElement = originalLoadImageElementForPngCheck;
+      buildPdfLogoAssetFromImage = originalBuildPdfLogoAssetFromImage;
+      if (hadLogoCacheBeforePngCheck) {
+        loadReportLogoImage.cache = previousLogoCacheBeforePngCheck;
+      } else {
+        delete loadReportLogoImage.cache;
+      }
+    }
+    recordSelfTestResult(results, 'PDF-logo bruger lokal logo.png naar den findes', !!pngLogoAsset && pngLogoAsset.source === 'logo.png', pngLogoAsset?.source || 'ingen lokal png');
     const hadLogoCacheBeforeFallback = Object.prototype.hasOwnProperty.call(loadReportLogoImage, 'cache');
     const previousLogoCacheBeforeFallback = loadReportLogoImage.cache;
     const originalLoadImageElement = loadImageElement;
@@ -26330,7 +26575,7 @@ async function runTests() {
     try {
       loadReportLogoImage.cache = undefined;
       loadImageElement = src => {
-        if (typeof src === 'string' && src.startsWith('logo.png')) {
+        if (typeof src === 'string' && /^logo\.png(?:\?|$)/i.test(src)) {
           return Promise.reject(new Error('Selvtest: tvungen logo.png-fejl'));
         }
         return originalLoadImageElement(src);
@@ -26344,7 +26589,7 @@ async function runTests() {
         delete loadReportLogoImage.cache;
       }
     }
-    recordSelfTestResult(results, 'PDF-logo fallback bruger indlejret SVG', !!fallbackLogoAsset && fallbackLogoAsset.source === 'svg-fallback', fallbackLogoAsset?.source || 'ingen fallback');
+    recordSelfTestResult(results, 'PDF-logo fallback bruger indlejret SVG naar lokale filer fejler', !!fallbackLogoAsset && fallbackLogoAsset.source === 'svg-fallback', fallbackLogoAsset?.source || 'ingen fallback');
     const headerLogo = document.getElementById('glimrLogo');
     const headerLogoFallback = document.getElementById('glimrLogoFallback');
     const headerBrand = headerLogo ? headerLogo.closest('.brand') : headerLogoFallback?.closest('.brand');
@@ -26434,11 +26679,13 @@ async function runTests() {
       const aiProviderSelect = variantMount.section.querySelector('#variantAiProvider');
       const aiButton = variantMount.section.querySelector('#variantAiFill');
       const iconSlot = aiButton?.querySelector('.icon-slot[data-icon="sparkles"]');
+      const renderedIcon = aiButton?.querySelector('.icon-slot svg, .icon-slot .icon');
       const hiddenLabel = aiButton?.querySelector('.sr-only');
       const accessibleAiLabel = aiButton?.getAttribute('aria-label') || aiButton?.title || '';
       const iconButtonOk = !!aiButton
         && aiButton.classList.contains('icon-button')
         && !!iconSlot
+        && !!renderedIcon
         && !!hiddenLabel
         && accessibleAiLabel.trim().length > 0
         && !!aiProviderSelect;
@@ -26486,9 +26733,28 @@ async function runTests() {
     const orderExportMount = createSelfTestSection('orders');
     try {
       renderOrders(orderExportMount.section);
+      const orderForm = orderExportMount.section.querySelector('#orderForm');
+      const orderSampleSelect = orderForm?.elements?.sample_id;
       const orderIdFilter = orderExportMount.section.querySelector('[data-filter-orders="id"]');
       const orderExportButton = orderExportMount.section.querySelector('#ordersExport');
       const orderTableBody = orderExportMount.section.querySelector('tbody');
+      const selectableOrderSampleIds = Array.from(orderSampleSelect?.options || [])
+        .map(option => option.value)
+        .filter(Boolean)
+        .map(value => Number(value));
+      const onlySamplesSelectable = selectableOrderSampleIds.length > 0
+        && !selectableOrderSampleIds.includes(seed.legacyControlSampleId)
+        && selectableOrderSampleIds.every(id => !isLikelyControlSample(findById('samples', id)));
+      recordSelfTestResult(results, 'Ordinationsformularens valgliste indeholder kun prøver', onlySamplesSelectable, selectableOrderSampleIds.join(', ') || 'Ingen valgmuligheder');
+      const sampleTypeInLabel = Array.from(orderSampleSelect?.options || []).some(option => option.value === String(seed.sampleAlphaId) && option.textContent.includes('Blod'));
+      recordSelfTestResult(results, 'Ordinationsdropdown viser prøvetype', sampleTypeInLabel, orderSampleSelect?.querySelector(`option[value="${seed.sampleAlphaId}"]`)?.textContent || 'Mangler prøvetype');
+      const legacyOrderRow = orderTableBody.querySelector(`tr[data-id="${seed.legacyControlOrderId}"]`);
+      legacyOrderRow?.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+      await waitForSelfTestTick();
+      const legacySelectedOption = orderSampleSelect?.selectedOptions?.[0];
+      const legacySelectionOk = orderSampleSelect?.value === String(seed.legacyControlSampleId)
+        && (legacySelectedOption?.textContent || '').includes('legacy kontrolreference');
+      recordSelfTestResult(results, 'Legacy kontrolreference i ordination kan åbnes uden crash', legacySelectionOk, legacySelectedOption?.textContent || 'Ingen legacy reference');
       let capturedOrderExport = null;
       downloadCsvFile = (rows, columns, baseName, delimiter = ';') => {
         capturedOrderExport = {
