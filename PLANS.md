@@ -1,7 +1,7 @@
 # PLANS.md
 
 ## Current objective
-Lock governance and the regression baseline around the verified GlimR codebase before new feature work continues.
+Carry the current low-risk presentation and micro-UI slice through merge and release review without reopening baseline or storage questions.
 
 ## Ground rules
 - Baseline before behavior changes.
@@ -38,7 +38,7 @@ Lock governance and the regression baseline around the verified GlimR codebase b
 
 ### Progress
 - Governance package is locked on `fa6c55f`.
-- The first technical regression-harness round now covers PMB validation, CPR validation, JSON roundtrip via `exportData()`/`replaceAllData()`, PDF blob generation, and patient filtered-export row counts.
+- The first technical regression-harness round now covers PMB validation, CPR validation, JSON roundtrip via `exportData()`/`replaceAllData()`, PDF blob generation, patient and order filtered-export row counts, UI logo-fallback state, and PDF SVG fallback behind `logo.png`.
 - Bound-file/autosave flows, CSV/ZIP restore assertions, broader filtered-export coverage, and visual PDF verification remain open.
 
 ### Exit criteria
@@ -47,7 +47,16 @@ Lock governance and the regression baseline around the verified GlimR codebase b
 - The next low-risk slices are ready to implement without re-opening baseline questions
 
 ## Phase 2 - Low-risk additive changes
-**Status:** Queued
+**Status:** Active
+
+### Progress
+- Filtered export buttons now show the current filtered count across patients, samples, panels, orders, variants, reports, audit, and variant-library export entry points without changing export payloads.
+- Orders now expose additive patient and family shortcuts alongside the existing sample and report shortcuts.
+- Administration panels are now collapsible and default-minimized using the existing `tool-panel` pattern.
+- Logo hover credits, an inline SVG fallback for missing `logo.png` in both UI and PDF export, and a safe subset of clickable KPI cards are in place without adding new filters or changing underlying data semantics.
+- The embedded SVG fallback now hardens its filter extents to avoid cropped rendering in UI and PDF fallback serialization.
+- Users can now store an optional per-user `organization_label` that drives presentation-only branding in the header, browser title, KPI print view, planner mail text, pedigree print, and the report PDF subtitle while technical names remain unchanged.
+- The variant AI action now renders as an icon-only button with tooltip and `aria-label`, while the selected provider remains visible in the adjacent select and the underlying AI flow is unchanged.
 
 ### Candidate slices
 - Orders shortcuts to patient and family
@@ -68,7 +77,6 @@ Lock governance and the regression baseline around the verified GlimR codebase b
 ### Candidate slices
 - Integer enforcement hardening for selected fields
 - PDF spacing and report formatting hardening
-- SVG logo fallback
 - CSV-assisted PMB lookup
 - Variant-library review interval behavior
 - Any configurable uniqueness policy that does not escalate into migration
@@ -104,7 +112,7 @@ Lock governance and the regression baseline around the verified GlimR codebase b
 - P3: high-risk integrations, migrations, and new modules
 
 ## Next milestone
-Close the remaining Phase 1 regression gaps after the first harness round, starting with bound-file/autosave, CSV/ZIP restore assertions, and broader filtered-export/runtime PDF verification.
+Complete manual UI and PDF smoke plus merge/release evidence for the presentation micro-slice, then return to the remaining Phase 1 gaps around bound-file/autosave, CSV/ZIP restore assertions, and broader runtime verification.
 
 ## Next recommended commit
-`test(regression): extend self-test coverage for validation, backup and pdf flows`
+`feat(ui): add per-user organization label and icon-only ai action`
